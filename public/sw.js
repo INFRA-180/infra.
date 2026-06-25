@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260625-audio250";
+const VERSION = "infra-shell-20260625-sphragis251";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
@@ -10,6 +10,7 @@ const SHELL_ASSETS = [
   "./index.html",
   "./sphragis/",
   "./sphragis/index.html",
+  "./assets/css/sphragis.css?v=sphragis20260625",
   "./assets/css/styles.css?v=audiofix249-20260625",
   "./assets/js/covers.js?v=audiofix249-20260625",
   "./assets/js/favorites.js?v=audiofix249-20260625",
@@ -31,6 +32,7 @@ const SHELL_ASSETS = [
   "./assets/js/pwa-install.js?v=audiofix249-20260625",
   "./assets/js/scripts.js?v=audiofix249-20260625",
   "./assets/js/scripts.admin.js?v=audiofix249-20260625",
+  "./assets/js/sphragis.js?v=sphragis20260625",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
   "./data/catalog.json",

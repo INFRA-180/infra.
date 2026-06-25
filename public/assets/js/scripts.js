@@ -4836,66 +4836,6 @@ function openAppDownloadGatekeeper(appName, url) {
     appsMenu.open = false;
   }
 
-  async function openSphragisWithAnswer(answer) {
-    const raw = String(answer || "").trim();
-    if (!raw || !WORKER_URL) return "";
-    const response = await fetch(`${WORKER_URL.replace(/\/+$/, "")}/sphragis/unlock`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ answer: raw }),
-      credentials: "omit",
-      cache: "no-store"
-    });
-    if (!response.ok) return "";
-    const payload = await response.json().catch(function () { return null; });
-    if (!payload || payload.ok !== true || typeof payload.html !== "string") return "";
-    return payload.html;
-  }
-
-  function initSphragisUnlock() {
-    const root = document.querySelector("[data-sphragis]");
-    if (!root) return;
-    const form = root.querySelector("[data-sphragis-form]");
-    const input = root.querySelector("[data-sphragis-answer]");
-    const reward = root.querySelector("[data-sphragis-reward]");
-    const feedback = root.querySelector("[data-sphragis-feedback]");
-    const seal = root.querySelector(".seal");
-    if (!form || !input || !reward) return;
-
-    form.addEventListener("submit", function (event) {
-      event.preventDefault();
-      const rawAnswer = input.value;
-      if (feedback) feedback.textContent = "πνοὴ ζητεῖται...";
-      openSphragisWithAnswer(rawAnswer).then(function (html) {
-        if (!html) {
-          root.classList.remove("is-open");
-          reward.hidden = true;
-          reward.replaceChildren();
-          if (feedback) feedback.textContent = "οὐ λύεται.";
-          return;
-        }
-        reward.innerHTML = html;
-        reward.hidden = false;
-        requestAnimationFrame(function () {
-          root.classList.add("is-open");
-        });
-        if (feedback) feedback.textContent = "";
-        if (seal && typeof seal.animate === "function" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          seal.animate(
-            [
-              { transform: "translateY(0) scale(1)", filter: "blur(0)" },
-              { transform: "translateY(-3px) scale(1.025)", filter: "blur(0.2px)" },
-              { transform: "translateY(0) scale(1)", filter: "blur(0)" }
-            ],
-            { duration: 720, easing: "ease-out" }
-          );
-        }
-      }).catch(function () {
-        if (feedback) feedback.textContent = "οὐ λύεται.";
-      });
-    });
-  }
-
   async function initPage() {
     const adminMode = isAdminModeEnabled();
     document.body.classList.toggle("ios-device", isIosDevice());
@@ -4974,7 +4914,6 @@ function openAppDownloadGatekeeper(appName, url) {
     scheduleAlbumCoverCacheWarmup(isHomeScreen ? "home_idle" : "page_idle");
     snapshotCurrentSpaPage(spaState.currentUrl || window.location.href);
     initPwaInstallPrompt(adminMode);
-    initSphragisUnlock();
   }
 
   document.addEventListener("DOMContentLoaded", function () {

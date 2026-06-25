@@ -1226,6 +1226,7 @@
       if (overlayVolumeToggle) overlayVolumeToggle.addEventListener("click", toggleNowPlayingVolumeVisible);
       if (overlayProgress) {
         let overlaySeeking = false;
+        let overlaySeekPointerId = null;
         let overlaySeekRatio = 0;
 
         function getOverlayProgressRatio(clientX) {
@@ -1251,6 +1252,7 @@
           event.preventDefault();
           event.stopPropagation();
           overlaySeeking = true;
+          overlaySeekPointerId = event.pointerId;
           audioState.nowPlayingSeeking = true;
           previewOverlaySeek(ratio);
           if (typeof overlayProgress.setPointerCapture === "function") {
@@ -1261,19 +1263,22 @@
             }
           }
         });
-        overlayProgress.addEventListener("pointermove", function (event) {
+        function moveOverlaySeeking(event) {
           if (!overlaySeeking) return;
+          if (overlaySeekPointerId !== null && event.pointerId !== overlaySeekPointerId) return;
           const ratio = getOverlayProgressRatio(event.clientX);
           if (ratio === null) return;
           event.preventDefault();
           event.stopPropagation();
           previewOverlaySeek(ratio);
-        });
+        }
         function stopOverlaySeeking(event) {
           if (!overlaySeeking) return;
+          if (event && overlaySeekPointerId !== null && event.pointerId !== overlaySeekPointerId) return;
           event.preventDefault();
           event.stopPropagation();
           overlaySeeking = false;
+          overlaySeekPointerId = null;
           audioState.nowPlayingSeeking = false;
           if (event && typeof overlayProgress.releasePointerCapture === "function") {
             try {
@@ -1287,16 +1292,22 @@
         }
         function cancelOverlaySeeking(event) {
           if (!overlaySeeking) return;
+          if (event && overlaySeekPointerId !== null && event.pointerId !== overlaySeekPointerId) return;
           if (event) {
             event.preventDefault();
             event.stopPropagation();
           }
           overlaySeeking = false;
+          overlaySeekPointerId = null;
           audioState.nowPlayingSeeking = false;
           updateProgressUi();
         }
+        overlayProgress.addEventListener("pointermove", moveOverlaySeeking);
         overlayProgress.addEventListener("pointerup", stopOverlaySeeking);
         overlayProgress.addEventListener("pointercancel", cancelOverlaySeeking);
+        window.addEventListener("pointermove", moveOverlaySeeking, { passive: false });
+        window.addEventListener("pointerup", stopOverlaySeeking, { passive: false });
+        window.addEventListener("pointercancel", cancelOverlaySeeking, { passive: false });
       }
       if (overlayVolume) {
         overlayVolume.addEventListener("input", function () {
@@ -1325,8 +1336,13 @@
         }
 
         let miniSeeking = false;
+        let miniSeekPointerId = null;
         miniProgress.addEventListener("pointerdown", function (event) {
+          if (miniProgress.disabled) return;
+          event.preventDefault();
+          event.stopPropagation();
           miniSeeking = true;
+          miniSeekPointerId = event.pointerId;
           if (typeof miniProgress.setPointerCapture === "function") {
             try {
               miniProgress.setPointerCapture(event.pointerId);
@@ -1336,13 +1352,22 @@
           }
           seekFromMiniProgress(event.clientX);
         });
-        miniProgress.addEventListener("pointermove", function (event) {
+        function moveMiniSeeking(event) {
           if (!miniSeeking) return;
+          if (miniSeekPointerId !== null && event.pointerId !== miniSeekPointerId) return;
+          event.preventDefault();
+          event.stopPropagation();
           seekFromMiniProgress(event.clientX);
-        });
+        }
         function stopMiniSeeking(event) {
           if (!miniSeeking) return;
+          if (event && miniSeekPointerId !== null && event.pointerId !== miniSeekPointerId) return;
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
           miniSeeking = false;
+          miniSeekPointerId = null;
           if (event && typeof miniProgress.releasePointerCapture === "function") {
             try {
               miniProgress.releasePointerCapture(event.pointerId);
@@ -1351,9 +1376,15 @@
             }
           }
         }
+        miniProgress.addEventListener("pointermove", moveMiniSeeking);
         miniProgress.addEventListener("pointerup", stopMiniSeeking);
         miniProgress.addEventListener("pointercancel", stopMiniSeeking);
+        window.addEventListener("pointermove", moveMiniSeeking, { passive: false });
+        window.addEventListener("pointerup", stopMiniSeeking, { passive: false });
+        window.addEventListener("pointercancel", stopMiniSeeking, { passive: false });
         miniProgress.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
           seekFromMiniProgress(event.clientX);
         });
       }

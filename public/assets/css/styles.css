@@ -833,7 +833,9 @@ body.home-screen {
   cursor: pointer;
   overflow: visible;
   box-shadow: none;
-  touch-action: pan-x;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .global-transport-mini-progress::before {
@@ -3214,7 +3216,9 @@ body.now-playing-open {
   cursor: pointer;
   overflow: visible;
   box-shadow: none;
-  touch-action: pan-x;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .now-playing-progress::before {

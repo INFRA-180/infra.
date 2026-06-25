@@ -1,0 +1,2509 @@
+{
+  "version": "catalog-20260621T193632Z-musicmeta",
+  "generatedAt": "2026-06-21",
+  "trackCount": 278,
+  "tracks": [
+    {
+      "album": "V-23π56",
+      "albumPage": "music/v-23pi56-infra.html",
+      "index": 1,
+      "title": "LAVERNA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/v-23pi56/01-laverna.m4a",
+      "seconds": 240.002,
+      "duration": "4:00"
+    },
+    {
+      "album": "V-23π56",
+      "albumPage": "music/v-23pi56-infra.html",
+      "index": 2,
+      "title": "DURGA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/v-23pi56/02-durga.m4a",
+      "seconds": 216.782,
+      "duration": "3:37"
+    },
+    {
+      "album": "V-23π56",
+      "albumPage": "music/v-23pi56-infra.html",
+      "index": 3,
+      "title": "AIRE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/v-23pi56/03-aire.m4a",
+      "seconds": 250.265,
+      "duration": "4:10"
+    },
+    {
+      "album": "V-23π56",
+      "albumPage": "music/v-23pi56-infra.html",
+      "index": 4,
+      "title": "VENUS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/v-23pi56/04-venus.m4a",
+      "seconds": 139.483,
+      "duration": "2:19"
+    },
+    {
+      "album": "V-23π56",
+      "albumPage": "music/v-23pi56-infra.html",
+      "index": 5,
+      "title": "ETNA",
+      "src": "assets/music/streams/v20260621T185645Z-68a2576edc/v-23pi56/05-etna.m4a",
+      "seconds": 140.156,
+      "duration": "2:20"
+    },
+    {
+      "album": "V-23π56",
+      "albumPage": "music/v-23pi56-infra.html",
+      "index": 6,
+      "title": "LIMONE",
+      "src": "assets/music/streams/v20260617-aac320-itunes-v2/v-23pi56/06-limone.m4a",
+      "seconds": 144.961,
+      "duration": "2:25"
+    },
+    {
+      "album": "V-23π56",
+      "albumPage": "music/v-23pi56-infra.html",
+      "index": 7,
+      "title": "STROMBOLI",
+      "src": "assets/music/streams/v20260621T184756Z-c23fa36a5f/v-23pi56/08-stromboli.m4a",
+      "seconds": 177.796,
+      "duration": "2:58"
+    },
+    {
+      "album": "V-23π56",
+      "albumPage": "music/v-23pi56-infra.html",
+      "index": 8,
+      "title": "PANAREA",
+      "src": "assets/music/streams/v20260621T184111Z-b7670e3daa/v-23pi56/07-panarea.m4a",
+      "seconds": 231.062,
+      "duration": "3:51"
+    },
+    {
+      "album": "He 4.0026",
+      "albumPage": "music/he-4-0026-infra.html",
+      "index": 1,
+      "title": "FUJIN",
+      "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/01-fujin.m4a",
+      "seconds": 161.147,
+      "duration": "2:41"
+    },
+    {
+      "album": "He 4.0026",
+      "albumPage": "music/he-4-0026-infra.html",
+      "index": 2,
+      "title": "NYQUIST",
+      "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/02-nyquist.m4a",
+      "seconds": 202.827,
+      "duration": "3:23"
+    },
+    {
+      "album": "He 4.0026",
+      "albumPage": "music/he-4-0026-infra.html",
+      "index": 3,
+      "title": "PHARMAKON",
+      "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/03-pharmakon.m4a",
+      "seconds": 160.659,
+      "duration": "2:41"
+    },
+    {
+      "album": "He 4.0026",
+      "albumPage": "music/he-4-0026-infra.html",
+      "index": 4,
+      "title": "VESTA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/04-vesta.m4a",
+      "seconds": 393.602,
+      "duration": "6:34"
+    },
+    {
+      "album": "He 4.0026",
+      "albumPage": "music/he-4-0026-infra.html",
+      "index": 5,
+      "title": "Co27",
+      "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/05-co27.m4a",
+      "seconds": 264.452,
+      "duration": "4:24"
+    },
+    {
+      "album": "He 4.0026",
+      "albumPage": "music/he-4-0026-infra.html",
+      "index": 6,
+      "title": "F = mω²r",
+      "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/06-f-momega2r.m4a",
+      "seconds": 166.673,
+      "duration": "2:47"
+    },
+    {
+      "album": "He 4.0026",
+      "albumPage": "music/he-4-0026-infra.html",
+      "index": 7,
+      "title": "ΜΑΣΣΑΛΙΑ",
+      "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/07-track.m4a",
+      "seconds": 231.132,
+      "duration": "3:51"
+    },
+    {
+      "album": "He 4.0026",
+      "albumPage": "music/he-4-0026-infra.html",
+      "index": 8,
+      "title": "MARSELHA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/08-marselha.m4a",
+      "seconds": 288.95,
+      "duration": "4:49"
+    },
+    {
+      "album": "He 4.0026",
+      "albumPage": "music/he-4-0026-infra.html",
+      "index": 9,
+      "title": "PHI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/09-phi.m4a",
+      "seconds": 65.156,
+      "duration": "1:05"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 1,
+      "title": "YOSHIMITSU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/01-yoshimitsu.m4a",
+      "seconds": 197.091,
+      "duration": "3:17"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 2,
+      "title": "KENGAN ASHURA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/02-kengan-ashura.m4a",
+      "seconds": 137.695,
+      "duration": "2:18"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 3,
+      "title": "FANKA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/03-fanka.m4a",
+      "seconds": 222.61,
+      "duration": "3:43"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 4,
+      "title": "LULO",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/04-lulo.m4a",
+      "seconds": 179.166,
+      "duration": "2:59"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 5,
+      "title": "H",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/05-h.m4a",
+      "seconds": 112.989,
+      "duration": "1:53"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 6,
+      "title": "22 A 6",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/06-22-a-6.m4a",
+      "seconds": 158.918,
+      "duration": "2:39"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 7,
+      "title": "NaOH",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/07-naoh.m4a",
+      "seconds": 129.545,
+      "duration": "2:10"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 8,
+      "title": "MISTRAL",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/08-mistral.m4a",
+      "seconds": 285.559,
+      "duration": "4:46"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 9,
+      "title": "BRUCE LEE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/09-bruce-lee.m4a",
+      "seconds": 127.873,
+      "duration": "2:08"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 10,
+      "title": "DEIMOS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/10-deimos.m4a",
+      "seconds": 450.63,
+      "duration": "7:31"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 11,
+      "title": "IRIS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/11-iris.m4a",
+      "seconds": 345.606,
+      "duration": "5:46"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 12,
+      "title": "GABIAN",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/12-gabian.m4a",
+      "seconds": 333.067,
+      "duration": "5:33"
+    },
+    {
+      "album": "H 1.008",
+      "albumPage": "music/h-1-008-infra.html",
+      "index": 13,
+      "title": "FRIOUL",
+      "src": "assets/music/streams/v20260617-aac320-itunes/h-1-008/13-frioul.m4a",
+      "seconds": 217.432,
+      "duration": "3:37"
+    },
+    {
+      "album": "KALI",
+      "albumPage": "music/kali-infra.html",
+      "index": 1,
+      "title": "COCO",
+      "src": "assets/music/streams/v20260617-aac320-itunes/kali/01-coco.m4a",
+      "seconds": 241.79,
+      "duration": "4:02"
+    },
+    {
+      "album": "KALI",
+      "albumPage": "music/kali-infra.html",
+      "index": 2,
+      "title": "OIZYS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/kali/02-oizys.m4a",
+      "seconds": 95.179,
+      "duration": "1:35"
+    },
+    {
+      "album": "KALI",
+      "albumPage": "music/kali-infra.html",
+      "index": 3,
+      "title": "ISFET",
+      "src": "assets/music/streams/v20260617-aac320-itunes/kali/03-isfet.m4a",
+      "seconds": 186.224,
+      "duration": "3:06"
+    },
+    {
+      "album": "KALI",
+      "albumPage": "music/kali-infra.html",
+      "index": 4,
+      "title": "YACATECUHTLI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/kali/04-yacatecuhtli.m4a",
+      "seconds": 147.703,
+      "duration": "2:28"
+    },
+    {
+      "album": "KALI",
+      "albumPage": "music/kali-infra.html",
+      "index": 5,
+      "title": "XOCHIPILLI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/kali/05-xochipilli.m4a",
+      "seconds": 170.969,
+      "duration": "2:51"
+    },
+    {
+      "album": "KALI",
+      "albumPage": "music/kali-infra.html",
+      "index": 6,
+      "title": "EVOLUTION",
+      "src": "assets/music/streams/v20260617-aac320-itunes/kali/06-evolution.m4a",
+      "seconds": 182.161,
+      "duration": "3:02"
+    },
+    {
+      "album": "KALI",
+      "albumPage": "music/kali-infra.html",
+      "index": 7,
+      "title": "MOKONZI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/kali/07-mokonzi.m4a",
+      "seconds": 157.989,
+      "duration": "2:38"
+    },
+    {
+      "album": "KALI",
+      "albumPage": "music/kali-infra.html",
+      "index": 8,
+      "title": "GALERA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/kali/08-galera.m4a",
+      "seconds": 181.627,
+      "duration": "3:02"
+    },
+    {
+      "album": "KALI",
+      "albumPage": "music/kali-infra.html",
+      "index": 9,
+      "title": "DE BOA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/kali/09-de-boa.m4a",
+      "seconds": 188.012,
+      "duration": "3:08"
+    },
+    {
+      "album": "KALI",
+      "albumPage": "music/kali-infra.html",
+      "index": 10,
+      "title": "SEREIA DO MAR",
+      "src": "assets/music/streams/v20260617-aac320-itunes/kali/10-sereia-do-mar.m4a",
+      "seconds": 154.506,
+      "duration": "2:35"
+    },
+    {
+      "album": "KALI",
+      "albumPage": "music/kali-infra.html",
+      "index": 11,
+      "title": "SAO",
+      "src": "assets/music/streams/v20260617-aac320-itunes/kali/11-sao.m4a",
+      "seconds": 225.234,
+      "duration": "3:45"
+    },
+    {
+      "album": "ASASE YAA",
+      "albumPage": "music/asase-yaa-infra.html",
+      "index": 1,
+      "title": "LINGUERE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/asase-yaa/01-linguere.m4a",
+      "seconds": 174.87,
+      "duration": "2:55"
+    },
+    {
+      "album": "ASASE YAA",
+      "albumPage": "music/asase-yaa-infra.html",
+      "index": 2,
+      "title": "OYÁ",
+      "src": "assets/music/streams/v20260617-aac320-itunes/asase-yaa/02-oya.m4a",
+      "seconds": 119.142,
+      "duration": "1:59"
+    },
+    {
+      "album": "ASASE YAA",
+      "albumPage": "music/asase-yaa-infra.html",
+      "index": 3,
+      "title": "OXALA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/asase-yaa/03-oxala.m4a",
+      "seconds": 178.074,
+      "duration": "2:58"
+    },
+    {
+      "album": "ASASE YAA",
+      "albumPage": "music/asase-yaa-infra.html",
+      "index": 4,
+      "title": "IKÚ",
+      "src": "assets/music/streams/v20260617-aac320-itunes/asase-yaa/04-iku.m4a",
+      "seconds": 192.006,
+      "duration": "3:12"
+    },
+    {
+      "album": "ASASE YAA",
+      "albumPage": "music/asase-yaa-infra.html",
+      "index": 5,
+      "title": "MONETA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/asase-yaa/05-moneta.m4a",
+      "seconds": 236.054,
+      "duration": "3:56"
+    },
+    {
+      "album": "ASASE YAA",
+      "albumPage": "music/asase-yaa-infra.html",
+      "index": 6,
+      "title": "SUIJIN",
+      "src": "assets/music/streams/v20260617-aac320-itunes/asase-yaa/06-suijin.m4a",
+      "seconds": 147.703,
+      "duration": "2:28"
+    },
+    {
+      "album": "ASASE YAA",
+      "albumPage": "music/asase-yaa-infra.html",
+      "index": 7,
+      "title": "MIZUHANOME",
+      "src": "assets/music/streams/v20260617-aac320-itunes/asase-yaa/07-mizuhanome.m4a",
+      "seconds": 159.173,
+      "duration": "2:39"
+    },
+    {
+      "album": "ASASE YAA",
+      "albumPage": "music/asase-yaa-infra.html",
+      "index": 8,
+      "title": "MAHSATI GANJAVI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/asase-yaa/08-mahsati-ganjavi.m4a",
+      "seconds": 192.006,
+      "duration": "3:12"
+    },
+    {
+      "album": "ASASE YAA",
+      "albumPage": "music/asase-yaa-infra.html",
+      "index": 9,
+      "title": "SHAJAR AL-DURR",
+      "src": "assets/music/streams/v20260617-aac320-itunes/asase-yaa/09-shajar-al-durr.m4a",
+      "seconds": 240.002,
+      "duration": "4:00"
+    },
+    {
+      "album": "ASASE YAA",
+      "albumPage": "music/asase-yaa-infra.html",
+      "index": 10,
+      "title": "TAKEMIKASUCHI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/asase-yaa/10-takemikasuchi.m4a",
+      "seconds": 162.47,
+      "duration": "2:42"
+    },
+    {
+      "album": "𒀭𒉣𒆠",
+      "albumPage": "music/anunnaki-infra.html",
+      "index": 1,
+      "title": "XAMIDIMURA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki/01-xamidimura.m4a",
+      "seconds": 120.512,
+      "duration": "2:01"
+    },
+    {
+      "album": "𒀭𒉣𒆠",
+      "albumPage": "music/anunnaki-infra.html",
+      "index": 2,
+      "title": "KITHARA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki/02-kithara.m4a",
+      "seconds": 130.914,
+      "duration": "2:11"
+    },
+    {
+      "album": "𒀭𒉣𒆠",
+      "albumPage": "music/anunnaki-infra.html",
+      "index": 3,
+      "title": "NZAMBICI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki/03-nzambici.m4a",
+      "seconds": 200.017,
+      "duration": "3:20"
+    },
+    {
+      "album": "𒀭𒉣𒆠",
+      "albumPage": "music/anunnaki-infra.html",
+      "index": 4,
+      "title": "OSUN",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki/04-osun.m4a",
+      "seconds": 211.209,
+      "duration": "3:31"
+    },
+    {
+      "album": "𒀭𒉣𒆠",
+      "albumPage": "music/anunnaki-infra.html",
+      "index": 5,
+      "title": "IEMANJA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki/05-iemanja.m4a",
+      "seconds": 186.48,
+      "duration": "3:06"
+    },
+    {
+      "album": "𒀭𒉣𒆠",
+      "albumPage": "music/anunnaki-infra.html",
+      "index": 6,
+      "title": "MEDEE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki/06-medee.m4a",
+      "seconds": 178.724,
+      "duration": "2:59"
+    },
+    {
+      "album": "𒀭𒉣𒆠",
+      "albumPage": "music/anunnaki-infra.html",
+      "index": 7,
+      "title": "ARRIANE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki/07-arriane.m4a",
+      "seconds": 162.47,
+      "duration": "2:42"
+    },
+    {
+      "album": "𒁀𒆷𒂵 𒈜",
+      "albumPage": "music/anunnaki-instru-infra.html",
+      "index": 1,
+      "title": "XAMIDIMURA_INSTRU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki-instru/01-xamidimura-instru.m4a",
+      "seconds": 124.506,
+      "duration": "2:05"
+    },
+    {
+      "album": "𒁀𒆷𒂵 𒈜",
+      "albumPage": "music/anunnaki-instru-infra.html",
+      "index": 2,
+      "title": "KITHARA_INSTRU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki-instru/02-kithara-instru.m4a",
+      "seconds": 130.914,
+      "duration": "2:11"
+    },
+    {
+      "album": "𒁀𒆷𒂵 𒈜",
+      "albumPage": "music/anunnaki-instru-infra.html",
+      "index": 3,
+      "title": "NZAMBICI_INSTRU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki-instru/03-nzambici-instru.m4a",
+      "seconds": 200.017,
+      "duration": "3:20"
+    },
+    {
+      "album": "𒁀𒆷𒂵 𒈜",
+      "albumPage": "music/anunnaki-instru-infra.html",
+      "index": 4,
+      "title": "IEMANJA_INSTRU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki-instru/04-iemanja-instru.m4a",
+      "seconds": 186.48,
+      "duration": "3:06"
+    },
+    {
+      "album": "𒁀𒆷𒂵 𒈜",
+      "albumPage": "music/anunnaki-instru-infra.html",
+      "index": 5,
+      "title": "OSUN_INSTRU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki-instru/05-osun-instru.m4a",
+      "seconds": 211.209,
+      "duration": "3:31"
+    },
+    {
+      "album": "𒁀𒆷𒂵 𒈜",
+      "albumPage": "music/anunnaki-instru-infra.html",
+      "index": 6,
+      "title": "MEDEE INSTRU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki-instru/06-medee-instru.m4a",
+      "seconds": 176.193,
+      "duration": "2:56"
+    },
+    {
+      "album": "𒁀𒆷𒂵 𒈜",
+      "albumPage": "music/anunnaki-instru-infra.html",
+      "index": 7,
+      "title": "ARRIANE_INSTRU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/anunnaki-instru/07-arriane-instru.m4a",
+      "seconds": 162.47,
+      "duration": "2:42"
+    },
+    {
+      "album": "IMPRESSION",
+      "albumPage": "music/impression-infra.html",
+      "index": 1,
+      "title": "CONTEMPLATION",
+      "src": "assets/music/streams/v20260617-aac320-itunes/impression/01-contemplation.m4a",
+      "seconds": 125.226,
+      "duration": "2:05"
+    },
+    {
+      "album": "IMPRESSION",
+      "albumPage": "music/impression-infra.html",
+      "index": 2,
+      "title": "VAPEUR",
+      "src": "assets/music/streams/v20260617-aac320-itunes/impression/02-vapeur.m4a",
+      "seconds": 150.001,
+      "duration": "2:30"
+    },
+    {
+      "album": "IMPRESSION",
+      "albumPage": "music/impression-infra.html",
+      "index": 3,
+      "title": "BONNHEURE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/impression/03-bonnheure.m4a",
+      "seconds": 177.981,
+      "duration": "2:58"
+    },
+    {
+      "album": "IMPRESSION",
+      "albumPage": "music/impression-infra.html",
+      "index": 4,
+      "title": "HECATE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/impression/04-hecate.m4a",
+      "seconds": 139.204,
+      "duration": "2:19"
+    },
+    {
+      "album": "IMPRESSION",
+      "albumPage": "music/impression-infra.html",
+      "index": 5,
+      "title": "ORANGE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/impression/05-orange.m4a",
+      "seconds": 302.556,
+      "duration": "5:03"
+    },
+    {
+      "album": "IMPRESSION",
+      "albumPage": "music/impression-infra.html",
+      "index": 6,
+      "title": "WACK",
+      "src": "assets/music/streams/v20260617-aac320-itunes/impression/06-wack.m4a",
+      "seconds": 342.866,
+      "duration": "5:43"
+    },
+    {
+      "album": "IMPRESSION",
+      "albumPage": "music/impression-infra.html",
+      "index": 7,
+      "title": "SANTA ANA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/impression/07-santa-ana.m4a",
+      "seconds": 196.209,
+      "duration": "3:16"
+    },
+    {
+      "album": "IMPRESSION",
+      "albumPage": "music/impression-infra.html",
+      "index": 8,
+      "title": "H2",
+      "src": "assets/music/streams/v20260617-aac320-itunes/impression/08-h2.m4a",
+      "seconds": 204.638,
+      "duration": "3:25"
+    },
+    {
+      "album": "IMPRESSION",
+      "albumPage": "music/impression-infra.html",
+      "index": 9,
+      "title": "HORUS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/impression/09-horus.m4a",
+      "seconds": 282.354,
+      "duration": "4:42"
+    },
+    {
+      "album": "IMPRESSION",
+      "albumPage": "music/impression-infra.html",
+      "index": 10,
+      "title": "GALLIUM",
+      "src": "assets/music/streams/v20260617-aac320-itunes/impression/10-gallium.m4a",
+      "seconds": 251.844,
+      "duration": "4:12"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 1,
+      "title": "DELOS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/01-delos.m4a",
+      "seconds": 405.189,
+      "duration": "6:45"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 2,
+      "title": "COMETE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/02-comete.m4a",
+      "seconds": 154.297,
+      "duration": "2:34"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 3,
+      "title": "NOUN",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/03-noun.m4a",
+      "seconds": 98.825,
+      "duration": "1:39"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 4,
+      "title": "R-PROCESS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/04-r-process.m4a",
+      "seconds": 96.015,
+      "duration": "1:36"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 5,
+      "title": "PELE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/05-pele.m4a",
+      "seconds": 111.317,
+      "duration": "1:51"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 6,
+      "title": "ATHENA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/06-athena.m4a",
+      "seconds": 305.459,
+      "duration": "5:05"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 7,
+      "title": "MICROGRAVITE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/07-microgravite.m4a",
+      "seconds": 128.012,
+      "duration": "2:08"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 8,
+      "title": "PLASMA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/08-plasma.m4a",
+      "seconds": 121.325,
+      "duration": "2:01"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 9,
+      "title": "VOSTOK 1",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/09-vostok-1.m4a",
+      "seconds": 167.672,
+      "duration": "2:48"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 10,
+      "title": "TELLER ULAM",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/10-teller-ulam.m4a",
+      "seconds": 198.113,
+      "duration": "3:18"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 11,
+      "title": "ASTATE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/11-astate.m4a",
+      "seconds": 128.825,
+      "duration": "2:09"
+    },
+    {
+      "album": "نهضة",
+      "albumPage": "music/nahda-infra.html",
+      "index": 12,
+      "title": "SUPERNOVA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/nahda/12-supernova.m4a",
+      "seconds": 140.319,
+      "duration": "2:20"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 1,
+      "title": "URANUS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/01-uranus.m4a",
+      "seconds": 164.142,
+      "duration": "2:44"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 2,
+      "title": "CENTAURUS A",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/02-centaurus-a.m4a",
+      "seconds": 136.209,
+      "duration": "2:16"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 3,
+      "title": "ALBEDRIO",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/03-albedrio.m4a",
+      "seconds": 113.616,
+      "duration": "1:54"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 4,
+      "title": "TOKAMAK",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/04-tokamak.m4a",
+      "seconds": 232.734,
+      "duration": "3:53"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 5,
+      "title": "RHEA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/05-rhea.m4a",
+      "seconds": 140.017,
+      "duration": "2:20"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 6,
+      "title": "HYDRA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/06-hydra.m4a",
+      "seconds": 151.58,
+      "duration": "2:32"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 7,
+      "title": "MORPHEA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/07-morphea.m4a",
+      "seconds": 133.12,
+      "duration": "2:13"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 8,
+      "title": "ANTARES",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/08-antares.m4a",
+      "seconds": 170.783,
+      "duration": "2:51"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 9,
+      "title": "ERIS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/09-eris.m4a",
+      "seconds": 313.865,
+      "duration": "5:14"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 10,
+      "title": "CERES",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/10-ceres.m4a",
+      "seconds": 164.792,
+      "duration": "2:45"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 11,
+      "title": "ARASY",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/11-arasy.m4a",
+      "seconds": 150.977,
+      "duration": "2:31"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 12,
+      "title": "NOMMO",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/12-nommo.m4a",
+      "seconds": 129.034,
+      "duration": "2:09"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 13,
+      "title": "TECHNETIUM",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/13-technetium.m4a",
+      "seconds": 176.751,
+      "duration": "2:57"
+    },
+    {
+      "album": "ETOILES",
+      "albumPage": "music/etoiles-infra.html",
+      "index": 14,
+      "title": "ESENGO",
+      "src": "assets/music/streams/v20260617-aac320-itunes/etoiles/14-esengo.m4a",
+      "seconds": 190.543,
+      "duration": "3:11"
+    },
+    {
+      "album": "سَلام",
+      "albumPage": "music/salam-infra.html",
+      "index": 1,
+      "title": "خَدِيجَة",
+      "src": "assets/music/streams/v20260617-aac320-itunes/salam/01-track.m4a",
+      "seconds": 209.375,
+      "duration": "3:29"
+    },
+    {
+      "album": "سَلام",
+      "albumPage": "music/salam-infra.html",
+      "index": 2,
+      "title": "غَضَبٌ",
+      "src": "assets/music/streams/v20260617-aac320-itunes/salam/02-track-2.m4a",
+      "seconds": 168.02,
+      "duration": "2:48"
+    },
+    {
+      "album": "سَلام",
+      "albumPage": "music/salam-infra.html",
+      "index": 3,
+      "title": "أمازيغ",
+      "src": "assets/music/streams/v20260617-aac320-itunes/salam/03-track-3.m4a",
+      "seconds": 133.654,
+      "duration": "2:14"
+    },
+    {
+      "album": "سَلام",
+      "albumPage": "music/salam-infra.html",
+      "index": 4,
+      "title": "الصحراء الكبرى",
+      "src": "assets/music/streams/v20260617-aac320-itunes/salam/04-track-4.m4a",
+      "seconds": 106.812,
+      "duration": "1:47"
+    },
+    {
+      "album": "سَلام",
+      "albumPage": "music/salam-infra.html",
+      "index": 5,
+      "title": "زيتون",
+      "src": "assets/music/streams/v20260617-aac320-itunes/salam/05-track-5.m4a",
+      "seconds": 168.902,
+      "duration": "2:49"
+    },
+    {
+      "album": "FOND DIFFUS",
+      "albumPage": "music/fond-diffus-infra.html",
+      "index": 1,
+      "title": "AMORE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/fond-diffus/01-amore.m4a",
+      "seconds": 187.711,
+      "duration": "3:08"
+    },
+    {
+      "album": "FOND DIFFUS",
+      "albumPage": "music/fond-diffus-infra.html",
+      "index": 2,
+      "title": "REVEILLE TOI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/fond-diffus/02-reveille-toi.m4a",
+      "seconds": 134.746,
+      "duration": "2:15"
+    },
+    {
+      "album": "FOND DIFFUS",
+      "albumPage": "music/fond-diffus-infra.html",
+      "index": 3,
+      "title": "JOLIE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/fond-diffus/03-jolie.m4a",
+      "seconds": 232.107,
+      "duration": "3:52"
+    },
+    {
+      "album": "FOND DIFFUS",
+      "albumPage": "music/fond-diffus-infra.html",
+      "index": 4,
+      "title": "MIEL",
+      "src": "assets/music/streams/v20260617-aac320-itunes/fond-diffus/04-miel.m4a",
+      "seconds": 71.309,
+      "duration": "1:11"
+    },
+    {
+      "album": "FOND DIFFUS",
+      "albumPage": "music/fond-diffus-infra.html",
+      "index": 5,
+      "title": "CHIAPAS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/fond-diffus/05-chiapas.m4a",
+      "seconds": 186.41,
+      "duration": "3:06"
+    },
+    {
+      "album": "FOND DIFFUS",
+      "albumPage": "music/fond-diffus-infra.html",
+      "index": 6,
+      "title": "CONNECTE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/fond-diffus/06-connecte.m4a",
+      "seconds": 234.917,
+      "duration": "3:55"
+    },
+    {
+      "album": "FOND DIFFUS",
+      "albumPage": "music/fond-diffus-infra.html",
+      "index": 7,
+      "title": "VISION",
+      "src": "assets/music/streams/v20260617-aac320-itunes/fond-diffus/07-vision.m4a",
+      "seconds": 154.297,
+      "duration": "2:34"
+    },
+    {
+      "album": "FOND DIFFUS",
+      "albumPage": "music/fond-diffus-infra.html",
+      "index": 8,
+      "title": "PIXEL",
+      "src": "assets/music/streams/v20260617-aac320-itunes/fond-diffus/08-pixel.m4a",
+      "seconds": 177.238,
+      "duration": "2:57"
+    },
+    {
+      "album": "FOND DIFFUS",
+      "albumPage": "music/fond-diffus-infra.html",
+      "index": 9,
+      "title": "DIAMANT",
+      "src": "assets/music/streams/v20260617-aac320-itunes/fond-diffus/09-diamant.m4a",
+      "seconds": 141.41,
+      "duration": "2:21"
+    },
+    {
+      "album": "FOND DIFFUS",
+      "albumPage": "music/fond-diffus-infra.html",
+      "index": 10,
+      "title": "DESIR",
+      "src": "assets/music/streams/v20260617-aac320-itunes/fond-diffus/10-desir.m4a",
+      "seconds": 246.155,
+      "duration": "4:06"
+    },
+    {
+      "album": "FOND DIFFUS",
+      "albumPage": "music/fond-diffus-infra.html",
+      "index": 11,
+      "title": "CONCENTRE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/fond-diffus/11-concentre.m4a",
+      "seconds": 157.501,
+      "duration": "2:38"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 1,
+      "title": "LIBERTA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/01-liberta.m4a",
+      "seconds": 277.34,
+      "duration": "4:37"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 2,
+      "title": "PKK",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/02-pkk.m4a",
+      "seconds": 289.321,
+      "duration": "4:49"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 3,
+      "title": "GOBELET EN PLASTIQUE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/03-gobelet-en-plastique.m4a",
+      "seconds": 234.383,
+      "duration": "3:54"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 4,
+      "title": "LITCHI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/04-litchi.m4a",
+      "seconds": 76.533,
+      "duration": "1:17"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 5,
+      "title": "CRISTAL",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/05-cristal.m4a",
+      "seconds": 233.407,
+      "duration": "3:53"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 6,
+      "title": "PLACE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/06-place.m4a",
+      "seconds": 168.02,
+      "duration": "2:48"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 7,
+      "title": "UFO",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/07-ufo.m4a",
+      "seconds": 191.402,
+      "duration": "3:11"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 8,
+      "title": "MONOCYCLE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/08-monocycle.m4a",
+      "seconds": 271.581,
+      "duration": "4:32"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 9,
+      "title": "FRAZIER",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/09-frazier.m4a",
+      "seconds": 259.785,
+      "duration": "4:20"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 10,
+      "title": "INVESTISSEMENT",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/10-investissement.m4a",
+      "seconds": 226.743,
+      "duration": "3:47"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 11,
+      "title": "NEIGE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/11-neige.m4a",
+      "seconds": 132.006,
+      "duration": "2:12"
+    },
+    {
+      "album": "BALLADES",
+      "albumPage": "music/ballades-infra.html",
+      "index": 12,
+      "title": "FLEXIBLE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ballades/12-flexible.m4a",
+      "seconds": 168.02,
+      "duration": "2:48"
+    },
+    {
+      "album": "TROU NOIR",
+      "albumPage": "music/trou-noir-infra.html",
+      "index": 1,
+      "title": "SENTIR",
+      "src": "assets/music/streams/v20260617-aac320-itunes/trou-noir/01-sentir.m4a",
+      "seconds": 191.126,
+      "duration": "3:11"
+    },
+    {
+      "album": "TROU NOIR",
+      "albumPage": "music/trou-noir-infra.html",
+      "index": 2,
+      "title": "BLEU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/trou-noir/02-bleu.m4a",
+      "seconds": 188.011,
+      "duration": "3:08"
+    },
+    {
+      "album": "TROU NOIR",
+      "albumPage": "music/trou-noir-infra.html",
+      "index": 3,
+      "title": "SUKI SUKI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/trou-noir/03-suki-suki.m4a",
+      "seconds": 208.957,
+      "duration": "3:29"
+    },
+    {
+      "album": "TROU NOIR",
+      "albumPage": "music/trou-noir-infra.html",
+      "index": 4,
+      "title": "PREGUNTAS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/trou-noir/04-preguntas.m4a",
+      "seconds": 169.579,
+      "duration": "2:50"
+    },
+    {
+      "album": "TROU NOIR",
+      "albumPage": "music/trou-noir-infra.html",
+      "index": 5,
+      "title": "CHEQUE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/trou-noir/05-cheque.m4a",
+      "seconds": 177.238,
+      "duration": "2:57"
+    },
+    {
+      "album": "TROU NOIR",
+      "albumPage": "music/trou-noir-infra.html",
+      "index": 6,
+      "title": "GIGGS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/trou-noir/06-giggs.m4a",
+      "seconds": 215.342,
+      "duration": "3:35"
+    },
+    {
+      "album": "TROU NOIR",
+      "albumPage": "music/trou-noir-infra.html",
+      "index": 7,
+      "title": "ECRAN TITRE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/trou-noir/07-ecran-titre.m4a",
+      "seconds": 294.806,
+      "duration": "4:55"
+    },
+    {
+      "album": "TROU NOIR",
+      "albumPage": "music/trou-noir-infra.html",
+      "index": 8,
+      "title": "POURPRE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/trou-noir/08-pourpre.m4a",
+      "seconds": 178.957,
+      "duration": "2:59"
+    },
+    {
+      "album": "TROU NOIR",
+      "albumPage": "music/trou-noir-infra.html",
+      "index": 9,
+      "title": "LIT",
+      "src": "assets/music/streams/v20260617-aac320-itunes/trou-noir/09-lit.m4a",
+      "seconds": 202.827,
+      "duration": "3:23"
+    },
+    {
+      "album": "TROU NOIR",
+      "albumPage": "music/trou-noir-infra.html",
+      "index": 10,
+      "title": "H-He",
+      "src": "assets/music/streams/v20260617-aac320-itunes/trou-noir/10-h-he.m4a",
+      "seconds": 145.473,
+      "duration": "2:25"
+    },
+    {
+      "album": "TROU NOIR",
+      "albumPage": "music/trou-noir-infra.html",
+      "index": 11,
+      "title": "VERDA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/trou-noir/11-verda.m4a",
+      "seconds": 182.858,
+      "duration": "3:03"
+    },
+    {
+      "album": "VOYAGER",
+      "albumPage": "music/voyager-infra.html",
+      "index": 1,
+      "title": "DECOLLAGE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/voyager/01-decollage.m4a",
+      "seconds": 161.195,
+      "duration": "2:41"
+    },
+    {
+      "album": "VOYAGER",
+      "albumPage": "music/voyager-infra.html",
+      "index": 2,
+      "title": "FRISSON",
+      "src": "assets/music/streams/v20260617-aac320-itunes/voyager/02-frisson.m4a",
+      "seconds": 127.979,
+      "duration": "2:08"
+    },
+    {
+      "album": "VOYAGER",
+      "albumPage": "music/voyager-infra.html",
+      "index": 3,
+      "title": "JULABES",
+      "src": "assets/music/streams/v20260617-aac320-itunes/voyager/03-julabes.m4a",
+      "seconds": 104.363,
+      "duration": "1:44"
+    },
+    {
+      "album": "VOYAGER",
+      "albumPage": "music/voyager-infra.html",
+      "index": 4,
+      "title": "MINTCH",
+      "src": "assets/music/streams/v20260617-aac320-itunes/voyager/04-mintch.m4a",
+      "seconds": 113.792,
+      "duration": "1:54"
+    },
+    {
+      "album": "VOYAGER",
+      "albumPage": "music/voyager-infra.html",
+      "index": 5,
+      "title": "CLIO",
+      "src": "assets/music/streams/v20260617-aac320-itunes/voyager/05-clio.m4a",
+      "seconds": 168.427,
+      "duration": "2:48"
+    },
+    {
+      "album": "VOYAGER",
+      "albumPage": "music/voyager-infra.html",
+      "index": 6,
+      "title": "TWINGO",
+      "src": "assets/music/streams/v20260617-aac320-itunes/voyager/06-twingo.m4a",
+      "seconds": 125.91,
+      "duration": "2:06"
+    },
+    {
+      "album": "VOYAGER",
+      "albumPage": "music/voyager-infra.html",
+      "index": 7,
+      "title": "OU JE VEUX",
+      "src": "assets/music/streams/v20260617-aac320-itunes/voyager/07-ou-je-veux.m4a",
+      "seconds": 365.014,
+      "duration": "6:05"
+    },
+    {
+      "album": "SANGUIN",
+      "albumPage": "music/sanguin-infra.html",
+      "index": 1,
+      "title": "BLOCK",
+      "src": "assets/music/streams/v20260617-aac320-itunes/sanguin/01-block.m4a",
+      "seconds": 108.011,
+      "duration": "1:48"
+    },
+    {
+      "album": "SANGUIN",
+      "albumPage": "music/sanguin-infra.html",
+      "index": 2,
+      "title": "GAMETE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/sanguin/02-gamete.m4a",
+      "seconds": 191.467,
+      "duration": "3:11"
+    },
+    {
+      "album": "SANGUIN",
+      "albumPage": "music/sanguin-infra.html",
+      "index": 3,
+      "title": "IRRESPECT",
+      "src": "assets/music/streams/v20260617-aac320-itunes/sanguin/03-irrespect.m4a",
+      "seconds": 153.6,
+      "duration": "2:34"
+    },
+    {
+      "album": "SANGUIN",
+      "albumPage": "music/sanguin-infra.html",
+      "index": 4,
+      "title": "FREQUENTATION",
+      "src": "assets/music/streams/v20260617-aac320-itunes/sanguin/04-frequentation.m4a",
+      "seconds": 204.8,
+      "duration": "3:25"
+    },
+    {
+      "album": "SANGUIN",
+      "albumPage": "music/sanguin-infra.html",
+      "index": 5,
+      "title": "RECONTRE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/sanguin/05-recontre.m4a",
+      "seconds": 164.224,
+      "duration": "2:44"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 1,
+      "title": "TOUS LES JOURS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/01-tous-les-jours.m4a",
+      "seconds": 190.443,
+      "duration": "3:10"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 2,
+      "title": "SANTORO",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/02-santoro.m4a",
+      "seconds": 158.187,
+      "duration": "2:38"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 3,
+      "title": "PROMESSE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/03-promesse.m4a",
+      "seconds": 211.008,
+      "duration": "3:31"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 4,
+      "title": "DEUX ROUES",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/04-deux-roues.m4a",
+      "seconds": 181.142,
+      "duration": "3:01"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 5,
+      "title": "CATALAN",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/05-catalan.m4a",
+      "seconds": 118.166,
+      "duration": "1:58"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 6,
+      "title": "RM",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/06-rm.m4a",
+      "seconds": 254.614,
+      "duration": "4:15"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 7,
+      "title": "CA IRA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/07-ca-ira.m4a",
+      "seconds": 245.056,
+      "duration": "4:05"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 8,
+      "title": "SALASTRE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/08-salastre.m4a",
+      "seconds": 316.907,
+      "duration": "5:17"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 9,
+      "title": "ARROSE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/09-arrose.m4a",
+      "seconds": 257.323,
+      "duration": "4:17"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 10,
+      "title": "A JEUN",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/10-a-jeun.m4a",
+      "seconds": 160,
+      "duration": "2:40"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 11,
+      "title": "COMMENT ON FAIT _",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/11-comment-on-fait.m4a",
+      "seconds": 128,
+      "duration": "2:08"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 12,
+      "title": "PAS BANDIT",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/12-pas-bandit.m4a",
+      "seconds": 176,
+      "duration": "2:56"
+    },
+    {
+      "album": "NAVIGUER",
+      "albumPage": "music/naviguer-infra.html",
+      "index": 13,
+      "title": "SENTIMENTS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/naviguer/13-sentiments.m4a",
+      "seconds": 183.446,
+      "duration": "3:03"
+    },
+    {
+      "album": "PBB",
+      "albumPage": "music/pbb-infra.html",
+      "index": 1,
+      "title": "VOISIN",
+      "src": "assets/music/streams/v20260617-aac320-itunes/pbb/01-voisin.m4a",
+      "seconds": 204.182,
+      "duration": "3:24"
+    },
+    {
+      "album": "PBB",
+      "albumPage": "music/pbb-infra.html",
+      "index": 2,
+      "title": "500",
+      "src": "assets/music/streams/v20260617-aac320-itunes/pbb/02-500.m4a",
+      "seconds": 167.446,
+      "duration": "2:47"
+    },
+    {
+      "album": "PBB",
+      "albumPage": "music/pbb-infra.html",
+      "index": 3,
+      "title": "TANGER",
+      "src": "assets/music/streams/v20260617-aac320-itunes/pbb/03-tanger.m4a",
+      "seconds": 192,
+      "duration": "3:12"
+    },
+    {
+      "album": "PBB",
+      "albumPage": "music/pbb-infra.html",
+      "index": 4,
+      "title": "FLACON ROUGE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/pbb/04-flacon-rouge.m4a",
+      "seconds": 199.126,
+      "duration": "3:19"
+    },
+    {
+      "album": "PBB",
+      "albumPage": "music/pbb-infra.html",
+      "index": 5,
+      "title": "MONSTER",
+      "src": "assets/music/streams/v20260617-aac320-itunes/pbb/05-monster.m4a",
+      "seconds": 231.958,
+      "duration": "3:52"
+    },
+    {
+      "album": "PBB",
+      "albumPage": "music/pbb-infra.html",
+      "index": 6,
+      "title": "NASCAR",
+      "src": "assets/music/streams/v20260617-aac320-itunes/pbb/06-nascar.m4a",
+      "seconds": 100.886,
+      "duration": "1:41"
+    },
+    {
+      "album": "RUE DE PARIS",
+      "albumPage": "music/rue-de-paris-infra.html",
+      "index": 1,
+      "title": "L'AMOUR EST MORT",
+      "src": "assets/music/streams/v20260617-aac320-itunes/rue-de-paris/01-lamour-est-mort.m4a",
+      "seconds": 116.054,
+      "duration": "1:56"
+    },
+    {
+      "album": "RUE DE PARIS",
+      "albumPage": "music/rue-de-paris-infra.html",
+      "index": 2,
+      "title": "FILM",
+      "src": "assets/music/streams/v20260617-aac320-itunes/rue-de-paris/02-film.m4a",
+      "seconds": 154.646,
+      "duration": "2:35"
+    },
+    {
+      "album": "RUE DE PARIS",
+      "albumPage": "music/rue-de-paris-infra.html",
+      "index": 3,
+      "title": "CROCO",
+      "src": "assets/music/streams/v20260617-aac320-itunes/rue-de-paris/03-croco.m4a",
+      "seconds": 166.976,
+      "duration": "2:47"
+    },
+    {
+      "album": "RUE DE PARIS",
+      "albumPage": "music/rue-de-paris-infra.html",
+      "index": 4,
+      "title": "X30",
+      "src": "assets/music/streams/v20260617-aac320-itunes/rue-de-paris/04-x30.m4a",
+      "seconds": 222.87,
+      "duration": "3:43"
+    },
+    {
+      "album": "BLACK STALLION",
+      "albumPage": "music/black-stallion-infra.html",
+      "index": 1,
+      "title": "LOUSIANA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/black-stallion/01-lousiana.m4a",
+      "seconds": 149.334,
+      "duration": "2:29"
+    },
+    {
+      "album": "BLACK STALLION",
+      "albumPage": "music/black-stallion-infra.html",
+      "index": 2,
+      "title": "DOUBLE JEU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/black-stallion/02-double-jeu.m4a",
+      "seconds": 165.163,
+      "duration": "2:45"
+    },
+    {
+      "album": "BLACK STALLION",
+      "albumPage": "music/black-stallion-infra.html",
+      "index": 3,
+      "title": "PREMISSE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/black-stallion/03-premisse.m4a",
+      "seconds": 178.432,
+      "duration": "2:58"
+    },
+    {
+      "album": "BLACK STALLION",
+      "albumPage": "music/black-stallion-infra.html",
+      "index": 4,
+      "title": "DECOUPE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/black-stallion/04-decoupe.m4a",
+      "seconds": 172.459,
+      "duration": "2:52"
+    },
+    {
+      "album": "BLACK STALLION",
+      "albumPage": "music/black-stallion-infra.html",
+      "index": 5,
+      "title": "STAR",
+      "src": "assets/music/streams/v20260617-aac320-itunes/black-stallion/05-star.m4a",
+      "seconds": 154.091,
+      "duration": "2:34"
+    },
+    {
+      "album": "BLACK STALLION",
+      "albumPage": "music/black-stallion-infra.html",
+      "index": 6,
+      "title": "INSIDE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/black-stallion/06-inside.m4a",
+      "seconds": 187.84,
+      "duration": "3:08"
+    },
+    {
+      "album": "BLACK STALLION",
+      "albumPage": "music/black-stallion-infra.html",
+      "index": 7,
+      "title": "REUSSI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/black-stallion/07-reussi.m4a",
+      "seconds": 176,
+      "duration": "2:56"
+    },
+    {
+      "album": "OSIRIS",
+      "albumPage": "music/osiris-infra.html",
+      "index": 1,
+      "title": "IMOTHEPE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/osiris/01-imothepe.m4a",
+      "seconds": 146.838,
+      "duration": "2:27"
+    },
+    {
+      "album": "OSIRIS",
+      "albumPage": "music/osiris-infra.html",
+      "index": 2,
+      "title": "JACK",
+      "src": "assets/music/streams/v20260617-aac320-itunes/osiris/02-jack.m4a",
+      "seconds": 180.011,
+      "duration": "3:00"
+    },
+    {
+      "album": "OSIRIS",
+      "albumPage": "music/osiris-infra.html",
+      "index": 3,
+      "title": "OMS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/osiris/03-oms.m4a",
+      "seconds": 183.104,
+      "duration": "3:03"
+    },
+    {
+      "album": "OSIRIS",
+      "albumPage": "music/osiris-infra.html",
+      "index": 4,
+      "title": "KILLU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/osiris/04-killu.m4a",
+      "seconds": 135.019,
+      "duration": "2:15"
+    },
+    {
+      "album": "OSIRIS",
+      "albumPage": "music/osiris-infra.html",
+      "index": 5,
+      "title": "120u",
+      "src": "assets/music/streams/v20260617-aac320-itunes/osiris/05-120u.m4a",
+      "seconds": 140.011,
+      "duration": "2:20"
+    },
+    {
+      "album": "OSIRIS",
+      "albumPage": "music/osiris-infra.html",
+      "index": 6,
+      "title": "SALAIRE D'UN SUISSE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/osiris/06-salaire-dun-suisse.m4a",
+      "seconds": 196.779,
+      "duration": "3:17"
+    },
+    {
+      "album": "OSIRIS",
+      "albumPage": "music/osiris-infra.html",
+      "index": 7,
+      "title": "QUETES",
+      "src": "assets/music/streams/v20260617-aac320-itunes/osiris/07-quetes.m4a",
+      "seconds": 190.443,
+      "duration": "3:10"
+    },
+    {
+      "album": "OSIRIS",
+      "albumPage": "music/osiris-infra.html",
+      "index": 8,
+      "title": "BATEAU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/osiris/08-bateau.m4a",
+      "seconds": 190.848,
+      "duration": "3:11"
+    },
+    {
+      "album": "OSIRIS",
+      "albumPage": "music/osiris-infra.html",
+      "index": 9,
+      "title": "SAOTOME",
+      "src": "assets/music/streams/v20260617-aac320-itunes/osiris/09-saotome.m4a",
+      "seconds": 146.838,
+      "duration": "2:27"
+    },
+    {
+      "album": "OSIRIS",
+      "albumPage": "music/osiris-infra.html",
+      "index": 10,
+      "title": "EMIRATS",
+      "src": "assets/music/streams/v20260617-aac320-itunes/osiris/10-emirats.m4a",
+      "seconds": 167.254,
+      "duration": "2:47"
+    },
+    {
+      "album": "CYBERPUNK",
+      "albumPage": "music/cyberpunk-infra.html",
+      "index": 1,
+      "title": "Crypto",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cyberpunk/01-crypto.m4a",
+      "seconds": 98.326,
+      "duration": "1:38"
+    },
+    {
+      "album": "CYBERPUNK",
+      "albumPage": "music/cyberpunk-infra.html",
+      "index": 2,
+      "title": "Design 2",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cyberpunk/02-design-2.m4a",
+      "seconds": 150.016,
+      "duration": "2:30"
+    },
+    {
+      "album": "CYBERPUNK",
+      "albumPage": "music/cyberpunk-infra.html",
+      "index": 3,
+      "title": "LIN",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cyberpunk/03-lin.m4a",
+      "seconds": 198.879,
+      "duration": "3:19"
+    },
+    {
+      "album": "CYBERPUNK",
+      "albumPage": "music/cyberpunk-infra.html",
+      "index": 4,
+      "title": "MUSIQUE MEURTRE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cyberpunk/04-musique-meurtre.m4a",
+      "seconds": 112,
+      "duration": "1:52"
+    },
+    {
+      "album": "CYBERPUNK",
+      "albumPage": "music/cyberpunk-infra.html",
+      "index": 5,
+      "title": "X30",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cyberpunk/05-x30.m4a",
+      "seconds": 222.87,
+      "duration": "3:43"
+    },
+    {
+      "album": "CYBERPUNK",
+      "albumPage": "music/cyberpunk-infra.html",
+      "index": 6,
+      "title": "PATISSERIE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cyberpunk/06-patisserie.m4a",
+      "seconds": 187.072,
+      "duration": "3:07"
+    },
+    {
+      "album": "CYBERPUNK",
+      "albumPage": "music/cyberpunk-infra.html",
+      "index": 7,
+      "title": "SAOTOME",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cyberpunk/07-saotome.m4a",
+      "seconds": 146.838,
+      "duration": "2:27"
+    },
+    {
+      "album": "ASPASIE",
+      "albumPage": "music/aspasie-infra.html",
+      "index": 1,
+      "title": "Ange de la Mort",
+      "src": "assets/music/streams/v20260617-aac320-itunes/aspasie/01-ange-de-la-mort.m4a",
+      "seconds": 186.006,
+      "duration": "3:06"
+    },
+    {
+      "album": "ASPASIE",
+      "albumPage": "music/aspasie-infra.html",
+      "index": 2,
+      "title": "LOLITA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/aspasie/02-lolita.m4a",
+      "seconds": 128.704,
+      "duration": "2:09"
+    },
+    {
+      "album": "ASPASIE",
+      "albumPage": "music/aspasie-infra.html",
+      "index": 3,
+      "title": "Manana",
+      "src": "assets/music/streams/v20260617-aac320-itunes/aspasie/03-manana.m4a",
+      "seconds": 130.923,
+      "duration": "2:11"
+    },
+    {
+      "album": "ASPASIE",
+      "albumPage": "music/aspasie-infra.html",
+      "index": 4,
+      "title": "Peinture",
+      "src": "assets/music/streams/v20260617-aac320-itunes/aspasie/04-peinture.m4a",
+      "seconds": 189.824,
+      "duration": "3:10"
+    },
+    {
+      "album": "ASPASIE",
+      "albumPage": "music/aspasie-infra.html",
+      "index": 5,
+      "title": "Puedo",
+      "src": "assets/music/streams/v20260617-aac320-itunes/aspasie/05-puedo.m4a",
+      "seconds": 136.619,
+      "duration": "2:17"
+    },
+    {
+      "album": "ASPASIE",
+      "albumPage": "music/aspasie-infra.html",
+      "index": 6,
+      "title": "Seul a la mort",
+      "src": "assets/music/streams/v20260617-aac320-itunes/aspasie/06-seul-a-la-mort.m4a",
+      "seconds": 142.422,
+      "duration": "2:22"
+    },
+    {
+      "album": "ASPASIE",
+      "albumPage": "music/aspasie-infra.html",
+      "index": 7,
+      "title": "AQUI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/aspasie/07-aqui.m4a",
+      "seconds": 120,
+      "duration": "2:00"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 1,
+      "title": "Seul",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/01-seul.m4a",
+      "seconds": 166.848,
+      "duration": "2:47"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 2,
+      "title": "baklava",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/02-baklava.m4a",
+      "seconds": 185.302,
+      "duration": "3:05"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 3,
+      "title": "Circonstance",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/03-circonstance.m4a",
+      "seconds": 140.502,
+      "duration": "2:21"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 4,
+      "title": "Dans la nuit",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/04-dans-la-nuit.m4a",
+      "seconds": 177.238,
+      "duration": "2:57"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 5,
+      "title": "Derriere toi",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/05-derriere-toi.m4a",
+      "seconds": 224,
+      "duration": "3:44"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 6,
+      "title": "OKOCHA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/06-okocha.m4a",
+      "seconds": 186.667,
+      "duration": "3:07"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 7,
+      "title": "Question avec réponse le zin",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/07-question-avec-reponse-le-zin.m4a",
+      "seconds": 188.374,
+      "duration": "3:08"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 8,
+      "title": "Tune",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/08-tune.m4a",
+      "seconds": 174.016,
+      "duration": "2:54"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 9,
+      "title": "VENT",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/09-vent.m4a",
+      "seconds": 190.976,
+      "duration": "3:11"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 10,
+      "title": "Wave",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/10-wave.m4a",
+      "seconds": 248.683,
+      "duration": "4:09"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 11,
+      "title": "Yeux Orangea mos",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/11-yeux-orangea-mos.m4a",
+      "seconds": 162.667,
+      "duration": "2:43"
+    },
+    {
+      "album": "CERISES",
+      "albumPage": "music/cerises-infra.html",
+      "index": 12,
+      "title": "14",
+      "src": "assets/music/streams/v20260617-aac320-itunes/cerises/12-14.m4a",
+      "seconds": 198.464,
+      "duration": "3:18"
+    },
+    {
+      "album": "LDC13",
+      "albumPage": "music/ldc13-infra.html",
+      "index": 1,
+      "title": "Pedicure",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ldc13/01-pedicure.m4a",
+      "seconds": 127.894,
+      "duration": "2:08"
+    },
+    {
+      "album": "LDC13",
+      "albumPage": "music/ldc13-infra.html",
+      "index": 2,
+      "title": "Connecté",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ldc13/02-connecte.m4a",
+      "seconds": 257.408,
+      "duration": "4:17"
+    },
+    {
+      "album": "LDC13",
+      "albumPage": "music/ldc13-infra.html",
+      "index": 3,
+      "title": "Andreï Markov",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ldc13/03-andrei-markov.m4a",
+      "seconds": 226.774,
+      "duration": "3:47"
+    },
+    {
+      "album": "LDC13",
+      "albumPage": "music/ldc13-infra.html",
+      "index": 4,
+      "title": "Obscur",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ldc13/04-obscur.m4a",
+      "seconds": 145.963,
+      "duration": "2:26"
+    },
+    {
+      "album": "LDC13",
+      "albumPage": "music/ldc13-infra.html",
+      "index": 5,
+      "title": "Miniature",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ldc13/05-miniature.m4a",
+      "seconds": 180.459,
+      "duration": "3:00"
+    },
+    {
+      "album": "LDC13",
+      "albumPage": "music/ldc13-infra.html",
+      "index": 6,
+      "title": "SSX",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ldc13/06-ssx.m4a",
+      "seconds": 158.806,
+      "duration": "2:39"
+    },
+    {
+      "album": "LDC13",
+      "albumPage": "music/ldc13-infra.html",
+      "index": 7,
+      "title": "Deux Tours",
+      "src": "assets/music/streams/v20260617-aac320-itunes/ldc13/07-deux-tours.m4a",
+      "seconds": 189.206,
+      "duration": "3:09"
+    },
+    {
+      "album": "MOREMI AJASORO",
+      "albumPage": "music/moremi-ajasoro-infra.html",
+      "index": 1,
+      "title": "HONNETE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/moremi-ajasoro/01-honnete.m4a",
+      "seconds": 89.707,
+      "duration": "1:30"
+    },
+    {
+      "album": "MOREMI AJASORO",
+      "albumPage": "music/moremi-ajasoro-infra.html",
+      "index": 2,
+      "title": "MOOD",
+      "src": "assets/music/streams/v20260617-aac320-itunes/moremi-ajasoro/02-mood.m4a",
+      "seconds": 151.403,
+      "duration": "2:31"
+    },
+    {
+      "album": "MOREMI AJASORO",
+      "albumPage": "music/moremi-ajasoro-infra.html",
+      "index": 3,
+      "title": "SENTIR",
+      "src": "assets/music/streams/v20260617-aac320-itunes/moremi-ajasoro/03-sentir.m4a",
+      "seconds": 125.803,
+      "duration": "2:06"
+    },
+    {
+      "album": "MOREMI AJASORO",
+      "albumPage": "music/moremi-ajasoro-infra.html",
+      "index": 4,
+      "title": "FAVORA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/moremi-ajasoro/04-favora.m4a",
+      "seconds": 225.238,
+      "duration": "3:45"
+    },
+    {
+      "album": "MOREMI AJASORO",
+      "albumPage": "music/moremi-ajasoro-infra.html",
+      "index": 5,
+      "title": "VOIR",
+      "src": "assets/music/streams/v20260617-aac320-itunes/moremi-ajasoro/05-voir.m4a",
+      "seconds": 121.856,
+      "duration": "2:02"
+    },
+    {
+      "album": "MOREMI AJASORO",
+      "albumPage": "music/moremi-ajasoro-infra.html",
+      "index": 6,
+      "title": "REVE",
+      "src": "assets/music/streams/v20260617-aac320-itunes/moremi-ajasoro/06-reve.m4a",
+      "seconds": 289.323,
+      "duration": "4:49"
+    },
+    {
+      "album": "GAIA",
+      "albumPage": "music/gaia-infra.html",
+      "index": 1,
+      "title": "Aie aie aie",
+      "src": "assets/music/streams/v20260617-aac320-itunes/gaia/01-aie-aie-aie.m4a",
+      "seconds": 221.952,
+      "duration": "3:42"
+    },
+    {
+      "album": "GAIA",
+      "albumPage": "music/gaia-infra.html",
+      "index": 2,
+      "title": "花咲耶姫",
+      "src": "assets/music/streams/v20260617-aac320-itunes/gaia/02-track.m4a",
+      "seconds": 177.024,
+      "duration": "2:57"
+    },
+    {
+      "album": "GAIA",
+      "albumPage": "music/gaia-infra.html",
+      "index": 3,
+      "title": "Flex",
+      "src": "assets/music/streams/v20260617-aac320-itunes/gaia/03-flex.m4a",
+      "seconds": 141.184,
+      "duration": "2:21"
+    },
+    {
+      "album": "GAIA",
+      "albumPage": "music/gaia-infra.html",
+      "index": 4,
+      "title": "Houston",
+      "src": "assets/music/streams/v20260617-aac320-itunes/gaia/04-houston.m4a",
+      "seconds": 157.91,
+      "duration": "2:38"
+    },
+    {
+      "album": "GAIA",
+      "albumPage": "music/gaia-infra.html",
+      "index": 5,
+      "title": "Hum",
+      "src": "assets/music/streams/v20260617-aac320-itunes/gaia/05-hum.m4a",
+      "seconds": 228.011,
+      "duration": "3:48"
+    },
+    {
+      "album": "GAIA",
+      "albumPage": "music/gaia-infra.html",
+      "index": 6,
+      "title": "NATA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/gaia/06-nata.m4a",
+      "seconds": 125.888,
+      "duration": "2:06"
+    },
+    {
+      "album": "GAIA",
+      "albumPage": "music/gaia-infra.html",
+      "index": 7,
+      "title": "Ninitoutou",
+      "src": "assets/music/streams/v20260617-aac320-itunes/gaia/07-ninitoutou.m4a",
+      "seconds": 184.128,
+      "duration": "3:04"
+    },
+    {
+      "album": "GAIA",
+      "albumPage": "music/gaia-infra.html",
+      "index": 8,
+      "title": "Posé",
+      "src": "assets/music/streams/v20260617-aac320-itunes/gaia/08-pose.m4a",
+      "seconds": 242.411,
+      "duration": "4:02"
+    },
+    {
+      "album": "GAIA",
+      "albumPage": "music/gaia-infra.html",
+      "index": 9,
+      "title": "Donner",
+      "src": "assets/music/streams/v20260617-aac320-itunes/gaia/09-donner.m4a",
+      "seconds": 198.87,
+      "duration": "3:19"
+    },
+    {
+      "album": "MAMI WATA",
+      "albumPage": "music/mami-wata-infra.html",
+      "index": 1,
+      "title": "Bolide",
+      "src": "assets/music/streams/v20260617-aac320-itunes/mami-wata/01-bolide.m4a",
+      "seconds": 157.718,
+      "duration": "2:38"
+    },
+    {
+      "album": "MAMI WATA",
+      "albumPage": "music/mami-wata-infra.html",
+      "index": 2,
+      "title": "Domicile",
+      "src": "assets/music/streams/v20260617-aac320-itunes/mami-wata/02-domicile.m4a",
+      "seconds": 164.118,
+      "duration": "2:44"
+    },
+    {
+      "album": "MAMI WATA",
+      "albumPage": "music/mami-wata-infra.html",
+      "index": 3,
+      "title": "Lèvre",
+      "src": "assets/music/streams/v20260617-aac320-itunes/mami-wata/03-levre.m4a",
+      "seconds": 217.792,
+      "duration": "3:38"
+    },
+    {
+      "album": "MAMI WATA",
+      "albumPage": "music/mami-wata-infra.html",
+      "index": 4,
+      "title": "Mapessa",
+      "src": "assets/music/streams/v20260617-aac320-itunes/mami-wata/04-mapessa.m4a",
+      "seconds": 161.323,
+      "duration": "2:41"
+    },
+    {
+      "album": "MAMI WATA",
+      "albumPage": "music/mami-wata-infra.html",
+      "index": 5,
+      "title": "Pellicule",
+      "src": "assets/music/streams/v20260617-aac320-itunes/mami-wata/05-pellicule.m4a",
+      "seconds": 124.523,
+      "duration": "2:05"
+    },
+    {
+      "album": "MAMI WATA",
+      "albumPage": "music/mami-wata-infra.html",
+      "index": 6,
+      "title": "Pom pom",
+      "src": "assets/music/streams/v20260617-aac320-itunes/mami-wata/06-pom-pom.m4a",
+      "seconds": 192,
+      "duration": "3:12"
+    },
+    {
+      "album": "MAMI WATA",
+      "albumPage": "music/mami-wata-infra.html",
+      "index": 7,
+      "title": "Reflexion",
+      "src": "assets/music/streams/v20260617-aac320-itunes/mami-wata/07-reflexion.m4a",
+      "seconds": 182.08,
+      "duration": "3:02"
+    },
+    {
+      "album": "MAMI WATA",
+      "albumPage": "music/mami-wata-infra.html",
+      "index": 8,
+      "title": "Trap Mama",
+      "src": "assets/music/streams/v20260617-aac320-itunes/mami-wata/08-trap-mama.m4a",
+      "seconds": 177.792,
+      "duration": "2:58"
+    },
+    {
+      "album": "MAMI WATA",
+      "albumPage": "music/mami-wata-infra.html",
+      "index": 9,
+      "title": "YAYA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/mami-wata/09-yaya.m4a",
+      "seconds": 157.718,
+      "duration": "2:38"
+    },
+    {
+      "album": "ADC13",
+      "albumPage": "music/adc-13-infra.html",
+      "index": 1,
+      "title": "Moteur",
+      "src": "assets/music/streams/v20260617-aac320-itunes/adc-13/01-moteur.m4a",
+      "seconds": 269.27,
+      "duration": "4:29"
+    },
+    {
+      "album": "ADC13",
+      "albumPage": "music/adc-13-infra.html",
+      "index": 2,
+      "title": "Machinal",
+      "src": "assets/music/streams/v20260617-aac320-itunes/adc-13/02-machinal.m4a",
+      "seconds": 212.672,
+      "duration": "3:33"
+    },
+    {
+      "album": "ADC13",
+      "albumPage": "music/adc-13-infra.html",
+      "index": 3,
+      "title": "Effort",
+      "src": "assets/music/streams/v20260617-aac320-itunes/adc-13/03-effort.m4a",
+      "seconds": 225.515,
+      "duration": "3:46"
+    },
+    {
+      "album": "ADC13",
+      "albumPage": "music/adc-13-infra.html",
+      "index": 4,
+      "title": "ARMANI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/adc-13/04-armani.m4a",
+      "seconds": 160,
+      "duration": "2:40"
+    },
+    {
+      "album": "ADC13",
+      "albumPage": "music/adc-13-infra.html",
+      "index": 5,
+      "title": "Choqué",
+      "src": "assets/music/streams/v20260617-aac320-itunes/adc-13/05-choque.m4a",
+      "seconds": 196.843,
+      "duration": "3:17"
+    },
+    {
+      "album": "ADC13",
+      "albumPage": "music/adc-13-infra.html",
+      "index": 6,
+      "title": "Pilote",
+      "src": "assets/music/streams/v20260617-aac320-itunes/adc-13/06-pilote.m4a",
+      "seconds": 144,
+      "duration": "2:24"
+    },
+    {
+      "album": "ADC13",
+      "albumPage": "music/adc-13-infra.html",
+      "index": 7,
+      "title": "Indica",
+      "src": "assets/music/streams/v20260617-aac320-itunes/adc-13/07-indica.m4a",
+      "seconds": 162.176,
+      "duration": "2:42"
+    },
+    {
+      "album": "ADC13",
+      "albumPage": "music/adc-13-infra.html",
+      "index": 8,
+      "title": "PASQUA",
+      "src": "assets/music/streams/v20260617-aac320-itunes/adc-13/08-pasqua.m4a",
+      "seconds": 217.856,
+      "duration": "3:38"
+    },
+    {
+      "album": "ADC13",
+      "albumPage": "music/adc-13-infra.html",
+      "index": 9,
+      "title": "Ndrangheta",
+      "src": "assets/music/streams/v20260617-aac320-itunes/adc-13/09-ndrangheta.m4a",
+      "seconds": 173.334,
+      "duration": "2:53"
+    },
+    {
+      "album": "ADC13",
+      "albumPage": "music/adc-13-infra.html",
+      "index": 10,
+      "title": "Chaque jour de plus",
+      "src": "assets/music/streams/v20260617-aac320-itunes/adc-13/10-chaque-jour-de-plus.m4a",
+      "seconds": 186.667,
+      "duration": "3:07"
+    },
+    {
+      "album": "ADC13",
+      "albumPage": "music/adc-13-infra.html",
+      "index": 11,
+      "title": "Guernesey",
+      "src": "assets/music/streams/v20260617-aac320-itunes/adc-13/11-guernesey.m4a",
+      "seconds": 194.902,
+      "duration": "3:15"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 1,
+      "title": "Haut",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/01-haut.m4a",
+      "seconds": 179.755,
+      "duration": "3:00"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 2,
+      "title": "OUI",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/02-oui.m4a",
+      "seconds": 188.31,
+      "duration": "3:08"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 3,
+      "title": "Eau Claire",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/03-eau-claire.m4a",
+      "seconds": 168,
+      "duration": "2:48"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 4,
+      "title": "Limpide",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/04-limpide.m4a",
+      "seconds": 176,
+      "duration": "2:56"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 5,
+      "title": "Camelia",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/05-camelia.m4a",
+      "seconds": 218.88,
+      "duration": "3:39"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 6,
+      "title": "Chaire de poule V1",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/06-chaire-de-poule-v1.m4a",
+      "seconds": 201.238,
+      "duration": "3:21"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 7,
+      "title": "Chaire de poule V2",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/07-chaire-de-poule-v2.m4a",
+      "seconds": 201.238,
+      "duration": "3:21"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 8,
+      "title": "Ancien Jean Rocky",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/08-ancien-jean-rocky.m4a",
+      "seconds": 216.683,
+      "duration": "3:37"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 9,
+      "title": "Mot Doux",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/09-mot-doux.m4a",
+      "seconds": 141.504,
+      "duration": "2:22"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 10,
+      "title": "Atlanta",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/10-atlanta.m4a",
+      "seconds": 129.238,
+      "duration": "2:09"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 11,
+      "title": "Atlanta INSTRU",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/11-atlanta-instru.m4a",
+      "seconds": 129.238,
+      "duration": "2:09"
+    },
+    {
+      "album": "ABRICOTS",
+      "albumPage": "music/abricot-infra.html",
+      "index": 12,
+      "title": "RAF",
+      "src": "assets/music/streams/v20260617-aac320-itunes/abricot/12-raf.m4a",
+      "seconds": 229.27,
+      "duration": "3:49"
+    },
+    {
+      "album": "PECHES",
+      "albumPage": "music/peches-infra.html",
+      "index": 1,
+      "title": "Soleil qui se leve",
+      "src": "assets/music/streams/v20260617-aac320-itunes/peches/01-soleil-qui-se-leve.m4a",
+      "seconds": 192,
+      "duration": "3:12"
+    },
+    {
+      "album": "PECHES",
+      "albumPage": "music/peches-infra.html",
+      "index": 2,
+      "title": "Silence",
+      "src": "assets/music/streams/v20260617-aac320-itunes/peches/02-silence.m4a",
+      "seconds": 256,
+      "duration": "4:16"
+    },
+    {
+      "album": "PECHES",
+      "albumPage": "music/peches-infra.html",
+      "index": 3,
+      "title": "Haut Do Brasil",
+      "src": "assets/music/streams/v20260617-aac320-itunes/peches/03-haut-do-brasil.m4a",
+      "seconds": 179.755,
+      "duration": "3:00"
+    },
+    {
+      "album": "PECHES",
+      "albumPage": "music/peches-infra.html",
+      "index": 4,
+      "title": "Favora",
+      "src": "assets/music/streams/v20260617-aac320-itunes/peches/04-favora.m4a",
+      "seconds": 225.238,
+      "duration": "3:45"
+    },
+    {
+      "album": "PECHES",
+      "albumPage": "music/peches-infra.html",
+      "index": 5,
+      "title": "Soleil qui se couche",
+      "src": "assets/music/streams/v20260617-aac320-itunes/peches/05-soleil-qui-se-couche.m4a",
+      "seconds": 218.198,
+      "duration": "3:38"
+    },
+    {
+      "album": "PECHES",
+      "albumPage": "music/peches-infra.html",
+      "index": 6,
+      "title": "Pas Bandit",
+      "src": "assets/music/streams/v20260617-aac320-itunes/peches/06-pas-bandit.m4a",
+      "seconds": 176,
+      "duration": "2:56"
+    }
+  ]
+}

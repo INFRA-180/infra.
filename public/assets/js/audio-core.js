@@ -61,6 +61,7 @@
     const syncRadioQueueToPlaylist = method(ctx, "syncRadioQueueToPlaylist");
     const updateProgressUi = method(ctx, "updateProgressUi");
     const saveResumeState = method(ctx, "saveResumeState");
+    const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () { return -1; });
 
     function seekCurrentAudioToRatio(ratio) {
       const audio = audioState.audio;
@@ -141,10 +142,25 @@
     }
 
     function getQueuePreviewIndices(limit) {
-      const list = audioState.playlist;
+      let list = audioState.playlist;
+      if (!Array.isArray(list) || !list.length) return [];
+      const currentIndex = getCurrentPlaylistIndexSafe();
+      if (
+        currentIndex >= 0 &&
+        currentIndex >= list.length - 1 &&
+        audioState.homeMode !== "radio" &&
+        !audioState.shuffleOn
+      ) {
+        const extendedIndex = extendAlbumPlaylistToNextAlbum({
+          reason: "queue_preview",
+          fromIndex: currentIndex
+        });
+        if (Number.isInteger(extendedIndex) && extendedIndex >= 0) {
+          list = audioState.playlist;
+        }
+      }
       if (!Array.isArray(list) || list.length < 2) return [];
       const max = Math.max(1, Math.min(Number(limit) || 8, list.length - 1));
-      const currentIndex = getCurrentPlaylistIndexSafe();
       if (currentIndex < 0 || currentIndex >= list.length) {
         return list.map((_track, index) => index).slice(0, max);
       }
@@ -617,7 +633,12 @@
       if (audioState.currentIndex < 0) return 0;
 
       if (direction > 0) {
-        return audioState.currentIndex < list.length - 1 ? audioState.currentIndex + 1 : -1;
+        if (audioState.currentIndex < list.length - 1) return audioState.currentIndex + 1;
+        const extendedIndex = extendAlbumPlaylistToNextAlbum({
+          reason: "next",
+          fromIndex: audioState.currentIndex
+        });
+        return Number.isInteger(extendedIndex) && extendedIndex >= 0 ? extendedIndex : -1;
       }
       return audioState.currentIndex > 0 ? audioState.currentIndex - 1 : -1;
     }

@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix252-20260625";
+window.INFRA_BUILD_TAG = "audiofix253-20260626";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -378,7 +378,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix252-20260625";
+  const runtimeVersion = "audiofix253-20260626";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -567,6 +567,7 @@ function openAppDownloadGatekeeper(appName, url) {
       recoverFromTrackFailure,
       updateProgressUi,
       isBlobObjectUrl,
+      extendAlbumPlaylistToNextAlbum,
       prefetchApi,
       PREFETCH_NEXT_CACHE_NAME,
       PREFETCH_NEXT_MAX_BYTES,
@@ -692,7 +693,8 @@ function openAppDownloadGatekeeper(appName, url) {
       ensureRadioPlaylistLoaded,
       syncRadioQueueToPlaylist,
       updateProgressUi,
-      saveResumeState
+      saveResumeState,
+      extendAlbumPlaylistToNextAlbum
     });
   }
 
@@ -3650,6 +3652,212 @@ function openAppDownloadGatekeeper(appName, url) {
     }
 
     return matched && matched.cover ? toRuntimeAbsoluteUrl(matched.cover) : "";
+  }
+
+  function normalizeAlbumContinuityPage(pageLike) {
+    const raw = String(pageLike || "").trim();
+    if (!raw) return "";
+
+    let href = "";
+    try {
+      href = new URL(raw, runtime.baseUrl).href;
+    } catch (_err) {
+      href = toAbsoluteUrlOrEmpty(raw);
+    }
+    if (!href) return "";
+
+    try {
+      const url = new URL(href);
+      url.hash = "";
+      url.search = "";
+      return url.href.replace(/\/index\.html$/i, "/");
+    } catch (_err) {
+      return href.split("#")[0].split("?")[0].replace(/\/index\.html$/i, "/");
+    }
+  }
+
+  function getAlbumContinuityTracksData() {
+    const tracksData = audioState.tracksData;
+    const albums = Array.isArray(tracksData && tracksData.albums) ? tracksData.albums : [];
+    return albums.filter(function (album) {
+      return album && Array.isArray(album.tracks) && album.tracks.some(function (track) {
+        return track && track.src;
+      });
+    });
+  }
+
+  function getAlbumContinuityCatalogAlbums() {
+    const catalog = catalogState.data && Array.isArray(catalogState.data.albums)
+      ? catalogState.data
+      : fallbackCatalog;
+    return Array.isArray(catalog && catalog.albums) ? catalog.albums : [];
+  }
+
+  function findTracksAlbumByCatalogEntry(catalogEntry, tracksAlbums) {
+    if (!catalogEntry) return null;
+    const catalogPage = normalizeAlbumContinuityPage(catalogEntry.page || "");
+    const catalogTitle = normalizeAlbumTitle(catalogEntry.title || "");
+
+    if (catalogPage) {
+      const byPage = tracksAlbums.find(function (album) {
+        return normalizeAlbumContinuityPage(album && album.page ? album.page : "") === catalogPage;
+      });
+      if (byPage) return byPage;
+    }
+
+    if (catalogTitle) {
+      return tracksAlbums.find(function (album) {
+        return normalizeAlbumTitle(album && album.title ? album.title : "") === catalogTitle;
+      }) || null;
+    }
+
+    return null;
+  }
+
+  function findTracksAlbumForContinuityTrack(track, tracksAlbums) {
+    const enriched = mergeTrackMetadata(track || null);
+    const page = normalizeAlbumContinuityPage(
+      enriched && enriched.page ? enriched.page : (track && track.page ? track.page : "")
+    );
+    const albumTitle = normalizeAlbumTitle(
+      enriched && enriched.album ? enriched.album : (track && track.album ? track.album : "")
+    );
+
+    if (page) {
+      const byPage = tracksAlbums.find(function (album) {
+        return normalizeAlbumContinuityPage(album && album.page ? album.page : "") === page;
+      });
+      if (byPage) return byPage;
+    }
+
+    if (albumTitle) {
+      const byTitle = tracksAlbums.find(function (album) {
+        return normalizeAlbumTitle(album && album.title ? album.title : "") === albumTitle;
+      });
+      if (byTitle) return byTitle;
+    }
+
+    const src = (track && track.src) || getCurrentLogicalAudioSrc();
+    if (!src) return null;
+    return tracksAlbums.find(function (album) {
+      const tracks = Array.isArray(album && album.tracks) ? album.tracks : [];
+      return tracks.some(function (candidate) {
+        return candidate && candidate.src && srcMatches(candidate.src, src);
+      });
+    }) || null;
+  }
+
+  function findNextAlbumForContinuity(currentAlbum, tracksAlbums) {
+    if (!currentAlbum || tracksAlbums.length < 2) return null;
+
+    const catalogAlbums = getAlbumContinuityCatalogAlbums();
+    const currentPage = normalizeAlbumContinuityPage(currentAlbum.page || "");
+    const currentTitle = normalizeAlbumTitle(currentAlbum.title || "");
+    const catalogIndex = catalogAlbums.findIndex(function (entry) {
+      const entryPage = normalizeAlbumContinuityPage(entry && entry.page ? entry.page : "");
+      const entryTitle = normalizeAlbumTitle(entry && entry.title ? entry.title : "");
+      return (currentPage && entryPage === currentPage) || (currentTitle && entryTitle === currentTitle);
+    });
+
+    if (catalogIndex >= 0 && catalogAlbums.length > 1) {
+      for (let offset = 1; offset <= catalogAlbums.length; offset += 1) {
+        const candidateCatalog = catalogAlbums[(catalogIndex + offset) % catalogAlbums.length];
+        const candidateAlbum = findTracksAlbumByCatalogEntry(candidateCatalog, tracksAlbums);
+        if (!candidateAlbum || candidateAlbum === currentAlbum) continue;
+        return {
+          album: candidateAlbum,
+          catalog: candidateCatalog || null,
+          wrapped: catalogIndex + offset >= catalogAlbums.length
+        };
+      }
+    }
+
+    const tracksIndex = tracksAlbums.indexOf(currentAlbum);
+    if (tracksIndex < 0) return null;
+    for (let offset = 1; offset <= tracksAlbums.length; offset += 1) {
+      const candidateAlbum = tracksAlbums[(tracksIndex + offset) % tracksAlbums.length];
+      if (!candidateAlbum || candidateAlbum === currentAlbum) continue;
+      return {
+        album: candidateAlbum,
+        catalog: null,
+        wrapped: tracksIndex + offset >= tracksAlbums.length
+      };
+    }
+    return null;
+  }
+
+  function buildAlbumContinuityTrack(track, album, catalogEntry) {
+    if (!track || !track.src || !album) return null;
+    const src = resolveManagedAudioSrc(track.src, runtime.baseUrl.href);
+    if (!src) return null;
+    const seconds = Number(track.seconds);
+    const duration = String(track.duration || "").trim() || formatTrackDuration(seconds);
+    const albumTitle = normalizeAlbumTitle(album.title || (catalogEntry && catalogEntry.title) || "");
+    const page = toRuntimeAbsoluteUrl(album.page || (catalogEntry && catalogEntry.page) || "");
+    const artwork = album.cover
+      ? toRuntimeAbsoluteUrl(album.cover)
+      : (catalogEntry && catalogEntry.thumb ? toRuntimeAbsoluteUrl(catalogEntry.thumb) : "");
+
+    return {
+      src,
+      name: normalizeTrackTitle(track.title || track.name || ""),
+      album: albumTitle,
+      page,
+      artist: "INFRA.",
+      artwork,
+      duration,
+      seconds
+    };
+  }
+
+  function extendAlbumPlaylistToNextAlbum(options) {
+    const list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
+    const currentIndex = Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1;
+    if (!list.length || currentIndex < 0 || currentIndex < list.length - 1) return -1;
+    if (audioState.homeMode === "radio" || audioState.shuffleOn) return -1;
+    if (audioState.playlistKind === "global" || audioState.playlistKind === "favorites") return -1;
+    if (String(audioState.playlistToken || "").startsWith("manual-")) return -1;
+
+    const tracksAlbums = getAlbumContinuityTracksData();
+    if (!tracksAlbums.length) {
+      loadTracksData().catch(function () {
+        // Keep the current playlist unchanged if metadata is unavailable.
+      });
+      return -1;
+    }
+
+    const currentTrack = list[currentIndex];
+    const currentAlbum = findTracksAlbumForContinuityTrack(currentTrack, tracksAlbums);
+    const nextAlbum = findNextAlbumForContinuity(currentAlbum, tracksAlbums);
+    if (!nextAlbum || !nextAlbum.album) return -1;
+
+    const nextTracks = nextAlbum.album.tracks
+      .map(function (track) { return buildAlbumContinuityTrack(track, nextAlbum.album, nextAlbum.catalog); })
+      .filter(Boolean);
+    if (!nextTracks.length) return -1;
+
+    const duplicateIndex = list.findIndex(function (existing, index) {
+      if (index <= currentIndex || !existing || !existing.src) return false;
+      return nextTracks.some(function (track) {
+        return track && track.src && srcMatches(existing.src, track.src);
+      });
+    });
+    if (duplicateIndex > currentIndex) return duplicateIndex;
+
+    const firstNextIndex = list.length;
+    audioState.playlist = list.concat(nextTracks);
+    audioState.playlistKind = "album";
+    syncPlaylistContext(audioState.playlist, { preserveRecent: true });
+    trackAudioRuntimeEvent("album_continuity_extend", {
+      from_index: currentIndex,
+      to_index: firstNextIndex,
+      from_album: normalizeAlbumTitle(currentAlbum && currentAlbum.title ? currentAlbum.title : ""),
+      to_album: normalizeAlbumTitle(nextAlbum.album.title || ""),
+      appended_count: nextTracks.length,
+      wrapped: Boolean(nextAlbum.wrapped),
+      reason: options && options.reason ? String(options.reason) : ""
+    });
+    return firstNextIndex;
   }
 
   function buildPreservedTrack(track, fallbackSrc) {

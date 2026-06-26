@@ -75,6 +75,7 @@
     const recoverFromTrackFailure = method(ctx, "recoverFromTrackFailure", function () {});
     const updateProgressUi = method(ctx, "updateProgressUi", function () {});
     const isBlobObjectUrl = method(ctx, "isBlobObjectUrl", function () { return false; });
+    const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () { return -1; });
 
   function readHomePlayMode() {
     return "album";
@@ -1873,7 +1874,12 @@
     if (currentIndex < 0 || currentIndex >= list.length) return -1;
     if (audioState.homeMode === "radio") return peekRadioNextIndexForPrefetch(currentIndex);
     if (audioState.shuffleOn) return getRandomIndex(currentIndex);
-    return currentIndex < list.length - 1 ? currentIndex + 1 : -1;
+    if (currentIndex < list.length - 1) return currentIndex + 1;
+    const extendedIndex = extendAlbumPlaylistToNextAlbum({
+      reason: "prefetch",
+      fromIndex: currentIndex
+    });
+    return Number.isInteger(extendedIndex) && extendedIndex >= 0 ? extendedIndex : -1;
   }
 
 

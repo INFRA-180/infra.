@@ -132,57 +132,43 @@
     return audioState.desktopTransportState;
   }
 
-  function readDesktopTransportLayout() {
+  function clearSavedDesktopTransportLayout() {
     try {
-      if (!window.localStorage) return null;
-      const current = JSON.parse(window.localStorage.getItem(DESKTOP_TRANSPORT_STORAGE_KEY) || "null");
-      const legacy = current
-        ? null
-        : JSON.parse(window.localStorage.getItem(DESKTOP_TRANSPORT_LEGACY_STORAGE_KEY) || "null");
-      const parsed = current || legacy;
-      if (!parsed) return null;
-      const position = parsed.position || parsed;
-      const activeSize = parsed.activeSize || parsed;
-      if (![position.x, position.y].every(Number.isFinite)) return null;
-      return {
-        x: position.x,
-        y: position.y,
-        width: Number.isFinite(activeSize.width) ? activeSize.width : null,
-        height: Number.isFinite(activeSize.height) ? activeSize.height : null
-      };
+      if (!window.localStorage) return;
+      window.localStorage.removeItem(DESKTOP_TRANSPORT_STORAGE_KEY);
+      window.localStorage.removeItem(DESKTOP_TRANSPORT_LEGACY_STORAGE_KEY);
     } catch (_err) {
-      return null;
+      // Storage can be unavailable in private or restricted browser contexts.
     }
   }
 
-  function writeDesktopTransportLayout(layout, includeActiveSize) {
-    try {
-      if (!window.localStorage || !layout) return false;
-      const payload = {
-        position: {
-          x: Math.round(layout.x),
-          y: Math.round(layout.y)
-        }
-      };
-      if (includeActiveSize && Number.isFinite(layout.width) && Number.isFinite(layout.height)) {
-        payload.activeSize = {
-          width: Math.round(layout.width),
-          height: Math.round(layout.height)
-        };
-      } else {
-        const state = getDesktopTransportState();
-        if (state.layout && Number.isFinite(state.layout.width) && Number.isFinite(state.layout.height)) {
-          payload.activeSize = {
-            width: Math.round(state.layout.width),
-            height: Math.round(state.layout.height)
-          };
-        }
-      }
-      window.localStorage.setItem(DESKTOP_TRANSPORT_STORAGE_KEY, JSON.stringify(payload));
-      return true;
-    } catch (_err) {
-      return false;
-    }
+  function readDesktopTransportLayout() {
+    clearSavedDesktopTransportLayout();
+    return null;
+  }
+
+  function writeDesktopTransportLayout() {
+    clearSavedDesktopTransportLayout();
+    return false;
+  }
+
+  function setTransportCoverVisible(root, cover, visible) {
+    const frame = root ? root.querySelector("[data-transport-cover-frame]") : null;
+    if (frame) frame.hidden = !visible;
+    if (cover) cover.hidden = !visible;
+  }
+
+  function ensureTransportCoverFrame(root) {
+    if (!root) return;
+    if (root.querySelector("[data-transport-cover-frame]")) return;
+    const cover = root.querySelector("[data-transport-cover]");
+    if (!cover || !cover.parentNode) return;
+    const frame = document.createElement("div");
+    frame.className = "global-transport-cover-frame";
+    frame.setAttribute("data-transport-cover-frame", "");
+    frame.hidden = true;
+    cover.parentNode.insertBefore(frame, cover);
+    frame.appendChild(cover);
   }
 
   function clampDesktopTransportLayout(layout) {
@@ -217,6 +203,7 @@
 
   function syncDesktopTransportCover(root) {
     if (!root) return;
+    ensureTransportCoverFrame(root);
     const cover = root.querySelector("[data-transport-cover]");
     if (!cover) return;
     const rect = root.getBoundingClientRect();
@@ -231,11 +218,11 @@
     const expanded = Boolean(largeEnough && track);
     root.classList.toggle("is-expanded", expanded);
     if (!track) {
-      cover.hidden = true;
+      setTransportCoverVisible(root, cover, false);
       return;
     }
     const artwork = resolveCoverUrl(track, { width: 900 });
-    cover.hidden = false;
+    setTransportCoverVisible(root, cover, true);
     cover.alt = `Pochette ${normalizeAlbumTitle(track.album || getCurrentAlbumTitle()) || "INFRA."}`;
     setCoverWhenReady(cover, artwork, getMediaSessionFallbackArtwork());
   }
@@ -281,7 +268,7 @@
     setTransportInteractionActive(false);
     root.classList.remove("has-custom-layout", "has-playback-session", "is-expanded", "is-desktop-dragging", "is-desktop-resizing");
     const cover = root.querySelector("[data-transport-cover]");
-    if (cover) cover.hidden = true;
+    if (cover) setTransportCoverVisible(root, cover, false);
   }
 
   function setTransportInteractionActive(active) {
@@ -486,7 +473,9 @@
       root.className = "global-transport";
       root.hidden = true;
       root.innerHTML = [
-        "<img class=\"global-transport-cover\" data-transport-cover alt=\"\" hidden decoding=\"async\">",
+        "<div class=\"global-transport-cover-frame\" data-transport-cover-frame hidden>",
+        "  <img class=\"global-transport-cover\" data-transport-cover alt=\"\" hidden decoding=\"async\">",
+        "</div>",
         "<div class=\"global-transport-now\" data-transport-now hidden aria-live=\"polite\">",
         "  <div class=\"global-transport-now-line global-transport-now-meta\" data-transport-now-meta>",
         "    <span class=\"global-transport-now-title\" data-transport-now-title></span>",
@@ -529,6 +518,7 @@
         "<span class=\"global-transport-resize global-transport-resize-w\" data-transport-resize=\"w\" aria-hidden=\"true\"></span>"
       ].join("");
     }
+    ensureTransportCoverFrame(root);
 
     if (!root.querySelector("[data-transport-favorite]")) {
       const favoriteBtn = document.createElement("button");

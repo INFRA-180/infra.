@@ -451,6 +451,7 @@ body.home-screen {
   }
 }
 
+.global-transport-cover-frame,
 .global-transport-cover,
 .global-transport-resize {
   display: none;
@@ -556,16 +557,30 @@ body.home-screen {
     gap: 8px;
   }
 
-  .global-transport.is-expanded .global-transport-cover:not([hidden]) {
+  .global-transport.is-expanded .global-transport-cover-frame:not([hidden]) {
     grid-column: 1;
     grid-row: 1 / -1;
-    display: block;
+    display: grid;
+    place-items: center;
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
     border-radius: 10px;
-    object-fit: cover;
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 9%, transparent);
+  }
+
+  .global-transport.is-expanded .global-transport-cover-frame:not([hidden]) .global-transport-cover:not([hidden]) {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: inherit;
+    object-fit: contain;
+    object-position: center;
     pointer-events: none;
   }
 

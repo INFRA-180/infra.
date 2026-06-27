@@ -77,6 +77,11 @@
     const isBlobObjectUrl = method(ctx, "isBlobObjectUrl", function () { return false; });
     const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () { return -1; });
 
+  function resyncMediaSessionControls() {
+    bindMediaSessionActions({ force: true, quiet: true });
+    syncMediaSessionMetadata({ forcePosition: true });
+  }
+
   function readHomePlayMode() {
     return "album";
   }
@@ -1477,7 +1482,7 @@
       clearWaitingRecovery();
       audioState.resumeOnVisible = false;
       syncAudioUi();
-      syncMediaSessionMetadata({ forcePosition: true });
+      resyncMediaSessionControls();
       stopAudioRaf();
       stopAudioTelemetryHeartbeat();
       clearFadeTimer();
@@ -1716,6 +1721,12 @@
         saveResumeState();
         revokeActiveBlobUrl();
       });
+      window.addEventListener("pageshow", function () {
+        resyncMediaSessionControls();
+      });
+      window.addEventListener("focus", function () {
+        resyncMediaSessionControls();
+      });
       document.addEventListener("visibilitychange", function () {
         const currentAudio = audioState.audio;
         if (document.visibilityState === "hidden") {
@@ -1731,7 +1742,7 @@
               // Ignore autoplay resume errors.
             });
           }
-          syncMediaSessionMetadata({ forcePosition: true });
+          resyncMediaSessionControls();
           scheduleDeferredServiceWorkerReload();
         }
       });

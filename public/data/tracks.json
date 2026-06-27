@@ -1,14 +1,15 @@
 {
-  "version": "catalog-20260621T193632Z-musicmeta",
-  "generatedAt": "2026-06-21",
+  "version": "audiofix254-20260627",
+  "generatedAt": "2026-06-27",
   "source": "Music macOS masters AAC 320 R2",
   "audioPrefix": "mixed",
   "audioPrefixes": [
     "assets/music/streams/v20260617-aac320-itunes",
     "assets/music/streams/v20260617-aac320-itunes-v2",
-    "assets/music/streams/v20260621T184111Z-b7670e3daa",
     "assets/music/streams/v20260621T184756Z-c23fa36a5f",
-    "assets/music/streams/v20260621T185645Z-68a2576edc"
+    "assets/music/streams/v20260621T185645Z-68a2576edc",
+    "assets/music/streams/v20260625T123301Z-79a00b2188",
+    "assets/music/streams/v20260627T000443Z-4c7beed7fb"
   ],
   "albums": [
     {
@@ -69,9 +70,23 @@
         {
           "index": 8,
           "title": "PANAREA",
-          "src": "assets/music/streams/v20260621T184111Z-b7670e3daa/v-23pi56/07-panarea.m4a",
-          "duration": "3:51",
-          "seconds": 231.062
+          "src": "assets/music/streams/v20260627T000443Z-4c7beed7fb/v-23pi56/08-panarea.m4a",
+          "duration": "3:58",
+          "seconds": 238.33
+        },
+        {
+          "index": 9,
+          "title": "AMIATA",
+          "src": "assets/music/streams/v20260625T123301Z-79a00b2188/v-23pi56/09-amiata.m4a",
+          "duration": "4:05",
+          "seconds": 245.296
+        },
+        {
+          "index": 10,
+          "title": "MgFeSiO-T>Tliq",
+          "src": "assets/music/streams/v20260627T000443Z-4c7beed7fb/v-23pi56/10-mgfesio-t-tliq.m4a",
+          "duration": "2:32",
+          "seconds": 151.673
         }
       ]
     },

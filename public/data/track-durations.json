@@ -1,7 +1,7 @@
 {
-  "version": "catalog-20260621T193632Z-musicmeta",
-  "generatedAt": "2026-06-21",
-  "trackCount": 278,
+  "version": "audiofix254-20260627",
+  "generatedAt": "2026-06-27",
+  "trackCount": 280,
   "tracks": [
     {
       "album": "V-23π56",
@@ -71,9 +71,27 @@
       "albumPage": "music/v-23pi56-infra.html",
       "index": 8,
       "title": "PANAREA",
-      "src": "assets/music/streams/v20260621T184111Z-b7670e3daa/v-23pi56/07-panarea.m4a",
-      "seconds": 231.062,
-      "duration": "3:51"
+      "src": "assets/music/streams/v20260627T000443Z-4c7beed7fb/v-23pi56/08-panarea.m4a",
+      "seconds": 238.33,
+      "duration": "3:58"
+    },
+    {
+      "album": "V-23π56",
+      "albumPage": "music/v-23pi56-infra.html",
+      "index": 9,
+      "title": "AMIATA",
+      "src": "assets/music/streams/v20260625T123301Z-79a00b2188/v-23pi56/09-amiata.m4a",
+      "seconds": 245.296,
+      "duration": "4:05"
+    },
+    {
+      "album": "V-23π56",
+      "albumPage": "music/v-23pi56-infra.html",
+      "index": 10,
+      "title": "MgFeSiO-T>Tliq",
+      "src": "assets/music/streams/v20260627T000443Z-4c7beed7fb/v-23pi56/10-mgfesio-t-tliq.m4a",
+      "seconds": 151.673,
+      "duration": "2:32"
     },
     {
       "album": "He 4.0026",

@@ -1,5 +1,5 @@
 {
-  "version": "audiofix254-20260627",
+  "version": "audiofix255-20260627",
   "generatedAt": "2026-06-27",
   "source": "Music macOS masters AAC 320 R2",
   "audioPrefix": "mixed",
@@ -9,7 +9,8 @@
     "assets/music/streams/v20260621T184756Z-c23fa36a5f",
     "assets/music/streams/v20260621T185645Z-68a2576edc",
     "assets/music/streams/v20260625T123301Z-79a00b2188",
-    "assets/music/streams/v20260627T000443Z-4c7beed7fb"
+    "assets/music/streams/v20260627T000443Z-4c7beed7fb",
+    "assets/music/streams/v20260627T001059Z-5a2620b3bb"
   ],
   "albums": [
     {
@@ -84,9 +85,9 @@
         {
           "index": 10,
           "title": "MgFeSiO-T>Tliq",
-          "src": "assets/music/streams/v20260627T000443Z-4c7beed7fb/v-23pi56/10-mgfesio-t-tliq.m4a",
-          "duration": "2:32",
-          "seconds": 151.673
+          "src": "assets/music/streams/v20260627T001059Z-5a2620b3bb/v-23pi56/10-mgfesio-t-tliq.m4a",
+          "duration": "2:33",
+          "seconds": 153.461
         }
       ]
     },
@@ -559,7 +560,7 @@
         },
         {
           "index": 3,
-          "title": "BONNHEURE",
+          "title": "BONHEUR",
           "src": "assets/music/streams/v20260617-aac320-itunes/impression/03-bonnheure.m4a",
           "duration": "2:58",
           "seconds": 177.981
@@ -1411,7 +1412,7 @@
       "tracks": [
         {
           "index": 1,
-          "title": "LOUSIANA",
+          "title": "LOUISIANA",
           "src": "assets/music/streams/v20260617-aac320-itunes/black-stallion/01-lousiana.m4a",
           "duration": "2:29",
           "seconds": 149.334
@@ -1468,7 +1469,7 @@
       "tracks": [
         {
           "index": 1,
-          "title": "IMOTHEPE",
+          "title": "IMHOTEP",
           "src": "assets/music/streams/v20260617-aac320-itunes/osiris/01-imothepe.m4a",
           "duration": "2:27",
           "seconds": 146.838
@@ -1617,7 +1618,7 @@
         },
         {
           "index": 3,
-          "title": "Manana",
+          "title": "Mañana",
           "src": "assets/music/streams/v20260617-aac320-itunes/aspasie/03-manana.m4a",
           "duration": "2:11",
           "seconds": 130.923
@@ -1688,7 +1689,7 @@
         },
         {
           "index": 5,
-          "title": "Derriere toi",
+          "title": "Derrière toi",
           "src": "assets/music/streams/v20260617-aac320-itunes/cerises/05-derriere-toi.m4a",
           "duration": "3:44",
           "seconds": 224

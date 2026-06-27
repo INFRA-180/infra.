@@ -1,5 +1,5 @@
 {
-  "version": "audiofix254-20260627",
+  "version": "audiofix255-20260627",
   "generatedAt": "2026-06-27",
   "trackCount": 280,
   "tracks": [
@@ -89,9 +89,9 @@
       "albumPage": "music/v-23pi56-infra.html",
       "index": 10,
       "title": "MgFeSiO-T>Tliq",
-      "src": "assets/music/streams/v20260627T000443Z-4c7beed7fb/v-23pi56/10-mgfesio-t-tliq.m4a",
-      "seconds": 151.673,
-      "duration": "2:32"
+      "src": "assets/music/streams/v20260627T001059Z-5a2620b3bb/v-23pi56/10-mgfesio-t-tliq.m4a",
+      "seconds": 153.461,
+      "duration": "2:33"
     },
     {
       "album": "He 4.0026",
@@ -628,7 +628,7 @@
       "album": "IMPRESSION",
       "albumPage": "music/impression-infra.html",
       "index": 3,
-      "title": "BONNHEURE",
+      "title": "BONHEUR",
       "src": "assets/music/streams/v20260617-aac320-itunes/impression/03-bonnheure.m4a",
       "seconds": 177.981,
       "duration": "2:58"
@@ -1600,7 +1600,7 @@
       "album": "BLACK STALLION",
       "albumPage": "music/black-stallion-infra.html",
       "index": 1,
-      "title": "LOUSIANA",
+      "title": "LOUISIANA",
       "src": "assets/music/streams/v20260617-aac320-itunes/black-stallion/01-lousiana.m4a",
       "seconds": 149.334,
       "duration": "2:29"
@@ -1663,7 +1663,7 @@
       "album": "OSIRIS",
       "albumPage": "music/osiris-infra.html",
       "index": 1,
-      "title": "IMOTHEPE",
+      "title": "IMHOTEP",
       "src": "assets/music/streams/v20260617-aac320-itunes/osiris/01-imothepe.m4a",
       "seconds": 146.838,
       "duration": "2:27"
@@ -1834,7 +1834,7 @@
       "album": "ASPASIE",
       "albumPage": "music/aspasie-infra.html",
       "index": 3,
-      "title": "Manana",
+      "title": "Mañana",
       "src": "assets/music/streams/v20260617-aac320-itunes/aspasie/03-manana.m4a",
       "seconds": 130.923,
       "duration": "2:11"
@@ -1915,7 +1915,7 @@
       "album": "CERISES",
       "albumPage": "music/cerises-infra.html",
       "index": 5,
-      "title": "Derriere toi",
+      "title": "Derrière toi",
       "src": "assets/music/streams/v20260617-aac320-itunes/cerises/05-derriere-toi.m4a",
       "seconds": 224,
       "duration": "3:44"

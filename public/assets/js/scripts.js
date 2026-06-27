@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix254-20260627";
+window.INFRA_BUILD_TAG = "audiofix255-20260627";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -357,7 +357,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix254-20260627";
+  const LOCAL_CATALOG_VERSION = "audiofix255-20260627";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -378,7 +378,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix254-20260627";
+  const runtimeVersion = "audiofix255-20260627";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||

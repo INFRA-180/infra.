@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix262-20260628";
+window.INFRA_BUILD_TAG = "audiofix263-20260628";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -381,7 +381,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix262-20260628";
+  const runtimeVersion = "audiofix263-20260628";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -410,6 +410,28 @@ function openAppDownloadGatekeeper(appName, url) {
       query: (scriptUrl && scriptUrl.search) || `?v=${runtimeVersion}`
     };
   })();
+
+  function normalizePwaHeadAssetLinks() {
+    document.querySelectorAll("link[href]").forEach(function (link) {
+      const raw = String(link.getAttribute("href") || "").trim();
+      if (!raw || /^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("//")) return;
+
+      let path = raw;
+      while (path.startsWith("./")) path = path.slice(2);
+      while (path.startsWith("../")) path = path.slice(3);
+      while (path.startsWith("/")) path = path.slice(1);
+
+      if (!path.startsWith("assets/pwa/") && !path.startsWith("manifest.webmanifest")) return;
+
+      try {
+        link.setAttribute("href", new URL(path, runtime.baseUrl).href);
+      } catch (_err) {
+        // Keep the original link if URL normalization is not available.
+      }
+    });
+  }
+
+  normalizePwaHeadAssetLinks();
 
   const audioTelemetryApi = createAudioTelemetryApi();
 

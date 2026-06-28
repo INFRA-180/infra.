@@ -310,9 +310,22 @@
 
     if (pwaCoverMode) {
       const currentCover = document.querySelector(".album-layout .cover");
+      const sourceHref = (() => {
+        try {
+          return new URL(sourceUrl || window.location.href, window.location.href).href;
+        } catch (_err) {
+          return "";
+        }
+      })();
+      const placeholderMap = spaState.albumCoverPlaceholderByUrl instanceof Map
+        ? spaState.albumCoverPlaceholderByUrl
+        : null;
+      const linkedCoverSrc = placeholderMap && sourceHref
+        ? String(placeholderMap.get(sourceHref) || "")
+        : "";
       const currentCoverSrc = currentCover
         ? (currentCover.currentSrc || currentCover.src || getImagePreferredSrc(currentCover, window.location.href, { preferredWidth: 480 }))
-        : "";
+        : linkedCoverSrc;
       function applyTargetCover() {
         image.setAttribute("src", target);
         image.setAttribute("srcset", `${target} 480w`);
@@ -340,6 +353,7 @@
           const apply = function () {
             rememberReady(target, probe);
             if (image.isConnected) applyTargetCover();
+            if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
           };
           if (typeof probe.decode === "function") {
             probe.decode().then(apply, apply);
@@ -347,18 +361,22 @@
           }
           apply();
         };
+        probe.onerror = function () {
+          if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
+        };
         probe.src = target;
       }
       image.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), 290px");
       image.setAttribute("loading", "eager");
       image.setAttribute("decoding", "async");
       image.setAttribute("fetchpriority", "high");
+      applyTemporaryCover();
       return waitWithCacheHint().then(function (decoded) {
         if (decoded) {
           applyTargetCover();
+          if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
           return;
         }
-        applyTemporaryCover();
         swapTargetAfterDecode();
       });
     }

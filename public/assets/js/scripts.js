@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix260-20260628";
+window.INFRA_BUILD_TAG = "audiofix262-20260628";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -175,6 +175,7 @@ function openAppDownloadGatekeeper(appName, url) {
     lastNavTs: 0,
     navToken: 0,
     navigationActive: false,
+    albumCoverPlaceholderByUrl: new Map(),
     pageCacheApi: null
   };
 
@@ -380,7 +381,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix260-20260628";
+  const runtimeVersion = "audiofix262-20260628";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -2019,19 +2020,28 @@ function openAppDownloadGatekeeper(appName, url) {
   }
 
   function primeLinkedAlbumCoverForPwa(link, targetUrl) {
-    if (!isMobilePwaCoverNavigation()) return;
-    if (!link || !targetUrl || !isAlbumOpenUrl(targetUrl)) return;
+    if (!isMobilePwaCoverNavigation()) return "";
+    if (!link || !targetUrl || !isAlbumOpenUrl(targetUrl)) return "";
 
     const img = typeof link.querySelector === "function"
       ? link.querySelector("img.album-cover, img.cover")
       : null;
-    if (!img) return;
+    if (!img) return "";
 
-    const preferred = choosePreferredSrcsetSource(img.getAttribute("srcset") || "", 480)
+    const preferred = img.currentSrc
+      || choosePreferredSrcsetSource(img.getAttribute("srcset") || "", 480)
       || String(img.getAttribute("src") || "").trim();
     const url = preferred ? normalizeUrlAgainstBase(preferred, window.location.href) : "";
-    if (!url) return;
-    if (audioState.albumCoverReadyUrls.has(url) || audioState.albumCoverPrimeUrls.has(url)) return;
+    if (!url) return "";
+
+    spaState.albumCoverPlaceholderByUrl.set(new URL(targetUrl, window.location.href).href, url);
+    while (spaState.albumCoverPlaceholderByUrl.size > 12) {
+      const oldest = spaState.albumCoverPlaceholderByUrl.keys().next();
+      if (oldest.done) break;
+      spaState.albumCoverPlaceholderByUrl.delete(oldest.value);
+    }
+
+    if (audioState.albumCoverReadyUrls.has(url) || audioState.albumCoverPrimeUrls.has(url)) return url;
 
     audioState.albumCoverPrimeUrls.add(url);
     preloadImage(url, { highPriority: true }).then(function (result) {
@@ -2039,6 +2049,7 @@ function openAppDownloadGatekeeper(appName, url) {
         audioState.albumCoverReadyUrls.add(url);
       }
     }).catch(function () {});
+    return url;
   }
 
   function orderAlbumCoverWarmupUrls(covers) {
@@ -5034,7 +5045,11 @@ function openAppDownloadGatekeeper(appName, url) {
       }
 
       event.preventDefault();
-      spaNavigate(url.href, { history: "push" });
+      const coverPlaceholderSrc = primeLinkedAlbumCoverForPwa(link, url.href);
+      spaNavigate(url.href, {
+        history: "push",
+        coverPlaceholderSrc
+      });
     }, true);
 
     window.addEventListener("popstate", function (event) {

@@ -27,6 +27,7 @@
     const parseSrcsetCandidates = method(ctx, "parseSrcsetCandidates", function () { return []; });
     const normalizeUrlAgainstBase = method(ctx, "normalizeUrlAgainstBase", function (value) { return String(value || ""); });
     const prepareAlbumCoversForSession = method(ctx, "prepareAlbumCoversForSession", function () { return Promise.resolve(); });
+    const rememberAlbumCoverImage = method(ctx, "rememberAlbumCoverImage");
     const saveCurrentScrollPositionInHistory = method(ctx, "saveCurrentScrollPositionInHistory");
     const buildSpaHistoryState = method(ctx, "buildSpaHistoryState", function (urlLike) { return { __infraSpa: 1, url: String(urlLike || "") }; });
     const getAlbumNameFromUrlLike = method(ctx, "getAlbumNameFromUrlLike", function () { return ""; });
@@ -211,7 +212,7 @@
     const target = getImagePreferredSrc(image, sourceUrl, {
       preferredWidth: pwaCoverMode ? 480 : 900
     });
-    const timeoutMs = pwaCoverMode ? 220 : 55;
+    const timeoutMs = pwaCoverMode ? 900 : 55;
     if (!target) {
       trackAudioRuntimeEvent("cover_decode_duration", Object.assign({}, telemetry || {}, {
         image_count: 1,
@@ -225,11 +226,9 @@
 
     function rememberReady(urlValue, imageValue) {
       if (!urlValue) return;
-      if (audioState.albumCoverReadyUrls && typeof audioState.albumCoverReadyUrls.add === "function") {
+      rememberAlbumCoverImage(urlValue, imageValue);
+      if (!imageValue && audioState.albumCoverReadyUrls && typeof audioState.albumCoverReadyUrls.add === "function") {
         audioState.albumCoverReadyUrls.add(urlValue);
-      }
-      if (imageValue && audioState.albumCoverImageCache && typeof audioState.albumCoverImageCache.set === "function") {
-        audioState.albumCoverImageCache.set(urlValue, imageValue);
       }
     }
 
@@ -264,7 +263,7 @@
           settled = true;
           if (timeoutId) window.clearTimeout(timeoutId);
           finish(decoded, timedOut, cacheHint);
-          resolve();
+          resolve(Boolean(decoded));
         }
         timeoutId = window.setTimeout(function () {
           done(false, true);
@@ -310,13 +309,58 @@
     };
 
     if (pwaCoverMode) {
-      image.setAttribute("src", target);
-      image.setAttribute("srcset", `${target} 480w`);
+      const currentCover = document.querySelector(".album-layout .cover");
+      const currentCoverSrc = currentCover
+        ? (currentCover.currentSrc || currentCover.src || getImagePreferredSrc(currentCover, window.location.href, { preferredWidth: 480 }))
+        : "";
+      function applyTargetCover() {
+        image.setAttribute("src", target);
+        image.setAttribute("srcset", `${target} 480w`);
+        image.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), 290px");
+        image.setAttribute("loading", "eager");
+        image.setAttribute("decoding", "async");
+        image.setAttribute("fetchpriority", "high");
+      }
+      function applyTemporaryCover() {
+        if (!currentCoverSrc) {
+          applyTargetCover();
+          return;
+        }
+        image.setAttribute("src", currentCoverSrc);
+        image.removeAttribute("srcset");
+        image.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), 290px");
+        image.setAttribute("loading", "eager");
+        image.setAttribute("decoding", "async");
+        image.setAttribute("fetchpriority", "high");
+      }
+      function swapTargetAfterDecode() {
+        const probe = new Image();
+        probe.decoding = "async";
+        probe.onload = function () {
+          const apply = function () {
+            rememberReady(target, probe);
+            if (image.isConnected) applyTargetCover();
+          };
+          if (typeof probe.decode === "function") {
+            probe.decode().then(apply, apply);
+            return;
+          }
+          apply();
+        };
+        probe.src = target;
+      }
       image.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), 290px");
       image.setAttribute("loading", "eager");
       image.setAttribute("decoding", "async");
       image.setAttribute("fetchpriority", "high");
-      return waitWithCacheHint();
+      return waitWithCacheHint().then(function (decoded) {
+        if (decoded) {
+          applyTargetCover();
+          return;
+        }
+        applyTemporaryCover();
+        swapTargetAfterDecode();
+      });
     }
 
     if (COVER_SESSION_NAVIGATION_GATE_ENABLED && COVER_SESSION_PREPARE_ENABLED) {

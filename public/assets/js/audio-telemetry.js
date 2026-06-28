@@ -14,9 +14,13 @@
     "cover_loaded",
     "cover_request",
     "error",
+    "album_continuity_extend",
     "album_open_done",
     "album_open_fail",
     "album_open_tap",
+    "canplay",
+    "external_play_resume",
+    "external_play_start",
     "fav:path_missing",
     "fav:path_resolved",
     "fav:write",
@@ -82,7 +86,7 @@
   const QUEUE_CAP = 500;
   const FLUSH_THRESHOLD = 40;
   const FLUSH_INTERVAL_MS = 60000;
-  const HEARTBEAT_MS = 5000;
+  const HEARTBEAT_MS = 15000;
 
   function now() {
     return typeof performance !== "undefined" && typeof performance.now === "function"
@@ -123,6 +127,8 @@
     let heartbeatTimer = null;
     let eventCounter = 0;
     let lifecycleInitialized = false;
+    let healthSessionActive = false;
+    let healthSessionStartedAt = 0;
 
     function getWorkerUrl() {
       return String(call(ctx, "getWorkerUrl") || "").trim();
@@ -209,6 +215,21 @@
         duration: audio && Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) / 1000 : null,
         ready_state: audio ? audio.readyState : null,
         network_state: audio ? audio.networkState : null
+      };
+    }
+
+    function markHealthSessionActive() {
+      if (healthSessionActive) return;
+      healthSessionActive = true;
+      healthSessionStartedAt = Date.now();
+    }
+
+    function getHealthSessionState() {
+      return {
+        health_session_active: Boolean(healthSessionActive),
+        health_session_age_ms: healthSessionActive && healthSessionStartedAt
+          ? Math.max(0, Date.now() - healthSessionStartedAt)
+          : 0
       };
     }
 
@@ -416,6 +437,10 @@
       const requestToken = Number(source.request_token);
       const eventNow = now();
 
+      if (eventType === "playing" || eventType === "play_resolved" || eventType === "heartbeat") {
+        markHealthSessionActive();
+      }
+
       if (eventType === "click_track" && Number.isFinite(requestToken)) {
         fineStarts.set(requestToken, eventNow);
         fineAuto.set(requestToken, getAutoFlag(eventType, source, requestToken));
@@ -436,7 +461,7 @@
         ? Math.max(0, Math.round(providedDeltaMs))
         : (eventType === "click_track" ? 0 : deltaMs);
 
-      const body = Object.assign({}, source, getEnvironment(), {
+      const body = Object.assign({}, source, getEnvironment(), getHealthSessionState(), {
         event: eventType,
         fine_event: true,
         session_id: sessionId,
@@ -466,6 +491,7 @@
     function sendMonitoringLog(track, index, src, data) {
       const workerUrl = getWorkerUrl();
       if (typeof fetch !== "function" || !workerUrl) return;
+      if (!data || data.error !== true) markHealthSessionActive();
       const payload = buildMonitorPayload(track, index, src);
       const audioState = getAudioState();
       const elapsed = audioState.playRequestTs ? Date.now() - audioState.playRequestTs : null;
@@ -494,6 +520,7 @@
         const audio = getAudio();
         const playableSrc = call(ctx, "getCurrentPlayableAudioSrc", audio);
         if (!audio || audio.paused || !playableSrc) return;
+        if (!healthSessionActive) return;
         trackRuntimeEvent("heartbeat", Object.assign(
           buildMonitorPayload(
             call(ctx, "getCurrentPlaylistTrack"),

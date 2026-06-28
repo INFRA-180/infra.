@@ -253,6 +253,34 @@
       return Boolean(payload && Array.isArray(payload.tracks) && Number(payload.trackCount) === payload.tracks.length);
     }
 
+    function isCatalogLatestDocument(payload) {
+      if (!payload || typeof payload !== "object") return false;
+      const documents = payload.documents;
+      if (!documents || typeof documents !== "object") return false;
+      if (!isCatalogDocument(documents.catalog)) return false;
+      if (!isTracksDocument(documents.tracks)) return false;
+      if (!isDurationsDocument(documents.durations)) return false;
+      const trackCount = documents.tracks.albums.reduce(function (total, album) {
+        return total + (Array.isArray(album.tracks) ? album.tracks.length : 0);
+      }, 0);
+      return Boolean(
+        String(payload.releaseId || "").trim() &&
+        trackCount > 0 &&
+        trackCount === documents.durations.tracks.length &&
+        Number(documents.durations.trackCount) === trackCount &&
+        documents.catalog.albums.length === documents.tracks.albums.length
+      );
+    }
+
+    function catalogDocumentFromLatest(latestPayload, fileName) {
+      const documents = latestPayload && latestPayload.documents ? latestPayload.documents : null;
+      if (!documents) return null;
+      if (fileName === "catalog.json") return documents.catalog || null;
+      if (fileName === "tracks.json") return documents.tracks || null;
+      if (fileName === "track-durations.json") return documents.durations || null;
+      return null;
+    }
+
     async function cacheLiveCatalogDocument(url, payload) {
       if (!("caches" in window)) return;
       try {
@@ -278,28 +306,42 @@
       }
     }
 
-    async function fetchLiveCatalogDocument(fileName, validate) {
-      const url = `${WORKER_URL.replace(/\/+$/, "")}/catalog/${fileName}`;
+    async function fetchLiveCatalogLatest() {
+      if (catalogState.latestCatalogPayload) return catalogState.latestCatalogPayload;
+      if (catalogState.latestCatalogPromise) return catalogState.latestCatalogPromise;
+      if (!WORKER_URL) return Promise.reject(new Error("live catalog worker unavailable"));
+
+      const url = `${WORKER_URL.replace(/\/+$/, "")}/catalog/latest`;
       const controller = typeof AbortController === "function" ? new AbortController() : null;
       const timeout = controller ? setTimeout(function () { controller.abort(); }, LIVE_CATALOG_TIMEOUT_MS) : 0;
-      try {
-        const response = await fetch(url, {
-          cache: "no-store",
-          signal: controller ? controller.signal : undefined,
-          headers: { "Accept": "application/json" }
-        });
-        if (!response.ok) throw new Error(`live catalog fetch failed: ${response.status}`);
-        const payload = await response.json();
-        if (!validate(payload)) throw new Error("live catalog validation failed");
-        cacheLiveCatalogDocument(url, payload);
-        return payload;
-      } catch (_err) {
-        const cached = await readCachedLiveCatalogDocument(url, validate);
-        if (cached) return cached;
-        throw _err;
-      } finally {
-        if (timeout) clearTimeout(timeout);
-      }
+      catalogState.latestCatalogPromise = (async function () {
+        try {
+          const response = await fetch(url, {
+            cache: "no-store",
+            signal: controller ? controller.signal : undefined,
+            headers: { "Accept": "application/json" }
+          });
+          if (!response.ok) throw new Error(`live catalog latest fetch failed: ${response.status}`);
+          const payload = await response.json();
+          if (!isCatalogLatestDocument(payload)) throw new Error("live catalog latest validation failed");
+          cacheLiveCatalogDocument(url, payload);
+          catalogState.latestCatalogPayload = payload;
+          return payload;
+        } catch (_err) {
+          const cached = await readCachedLiveCatalogDocument(url, isCatalogLatestDocument);
+          if (cached) {
+            catalogState.latestCatalogPayload = cached;
+            return cached;
+          }
+          throw _err;
+        } finally {
+          if (timeout) clearTimeout(timeout);
+        }
+      })().finally(function () {
+        catalogState.latestCatalogPromise = null;
+      });
+
+      return catalogState.latestCatalogPromise;
     }
 
     async function fetchLocalCatalogDocument(fileName) {
@@ -313,6 +355,68 @@
       return response.json();
     }
 
+    async function fetchLocalCatalogBundle() {
+      if (catalogState.localCatalogPayload) return catalogState.localCatalogPayload;
+      if (catalogState.localCatalogPromise) return catalogState.localCatalogPromise;
+
+      catalogState.localCatalogPromise = Promise.all([
+        fetchLocalCatalogDocument("catalog.json"),
+        fetchLocalCatalogDocument("tracks.json"),
+        fetchLocalCatalogDocument("track-durations.json")
+      ]).then(function (results) {
+        const payload = {
+          schemaVersion: 1,
+          releaseId: `local-${LOCAL_CATALOG_VERSION || "catalog"}`,
+          documents: {
+            catalog: results[0],
+            tracks: results[1],
+            durations: results[2]
+          }
+        };
+        if (!isCatalogLatestDocument(payload)) throw new Error("local catalog bundle validation failed");
+        catalogState.localCatalogPayload = payload;
+        return payload;
+      }).finally(function () {
+        catalogState.localCatalogPromise = null;
+      });
+
+      return catalogState.localCatalogPromise;
+    }
+
+    async function loadCatalogBundle() {
+      if (catalogState.catalogBundlePayload) return catalogState.catalogBundlePayload;
+      if (catalogState.catalogBundlePromise) return catalogState.catalogBundlePromise;
+
+      catalogState.catalogBundlePromise = (async function () {
+        try {
+          const live = await fetchLiveCatalogLatest();
+          catalogState.catalogBundlePayload = live;
+          catalogState.catalogBundleSource = "live";
+          catalogState.catalogBundleReleaseId = live.releaseId || "";
+          return live;
+        } catch (_err) {
+          const local = await fetchLocalCatalogBundle();
+          catalogState.catalogBundlePayload = local;
+          catalogState.catalogBundleSource = "local";
+          catalogState.catalogBundleReleaseId = local.releaseId || "";
+          return local;
+        }
+      })().finally(function () {
+        catalogState.catalogBundlePromise = null;
+      });
+
+      return catalogState.catalogBundlePromise;
+    }
+
+    async function fetchLiveCatalogDocument(fileName, validate) {
+      const latest = await loadCatalogBundle();
+      const payload = catalogDocumentFromLatest(latest, fileName);
+      if (!payload || (typeof validate === "function" && !validate(payload))) {
+        throw new Error(`catalog document unavailable: ${fileName}`);
+      }
+      return payload;
+    }
+
     async function loadCatalogData() {
       if (catalogState.data) return catalogState.data;
       if (catalogState.loadingPromise) return catalogState.loadingPromise;
@@ -322,11 +426,7 @@
         try {
           payload = await fetchLiveCatalogDocument("catalog.json", isCatalogDocument);
         } catch (_err) {
-          try {
-            payload = await fetchLocalCatalogDocument("catalog.json");
-          } catch (_localErr) {
-            payload = fallbackCatalog;
-          }
+          payload = fallbackCatalog;
         }
 
         const safe = sanitizeCatalog(payload);
@@ -433,8 +533,11 @@
       isCatalogDocument,
       isTracksDocument,
       isDurationsDocument,
+      isCatalogLatestDocument,
+      fetchLiveCatalogLatest,
       fetchLiveCatalogDocument,
       fetchLocalCatalogDocument,
+      loadCatalogBundle,
       loadCatalogData,
       loadTracksData,
       indexTrackMetadata,

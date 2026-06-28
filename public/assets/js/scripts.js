@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix259-20260627";
+window.INFRA_BUILD_TAG = "audiofix260-20260628";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -348,6 +348,8 @@ function openAppDownloadGatekeeper(appName, url) {
     ? Boolean(coverConstants.SESSION_NAVIGATION_GATE_ENABLED)
     : true;
   // ROLLBACK: passer a false pour ne plus attendre les covers avant ouverture album.
+  const ALBUM_COVER_IMAGE_CACHE_LIMIT = isStandaloneDisplayMode() ? 12 : 24;
+  const PWA_COVER_PREPARE_LIMIT = 18;
   const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(prefetchConstants.MAX_BYTES))
     ? Number(prefetchConstants.MAX_BYTES)
     : 15 * 1024 * 1024;
@@ -357,7 +359,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix259-20260627";
+  const LOCAL_CATALOG_VERSION = "audiofix255-20260627";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -378,7 +380,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix259-20260627";
+  const runtimeVersion = "audiofix260-20260628";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -783,6 +785,7 @@ function openAppDownloadGatekeeper(appName, url) {
       parseSrcsetCandidates,
       normalizeUrlAgainstBase,
       prepareAlbumCoversForSession,
+      rememberAlbumCoverImage,
       saveCurrentScrollPositionInHistory,
       buildSpaHistoryState,
       getAlbumNameFromUrlLike,
@@ -2052,6 +2055,12 @@ function openAppDownloadGatekeeper(appName, url) {
     });
   }
 
+  function limitAlbumCoverWarmupUrls(covers) {
+    if (!Array.isArray(covers) || !covers.length) return [];
+    if (!isMobilePwaCoverNavigation()) return covers;
+    return covers.slice(0, Math.min(PWA_COVER_PREPARE_LIMIT, covers.length));
+  }
+
   function decodeCoverForSession(url) {
     return new Promise(function (resolve) {
       if (!url) {
@@ -2059,6 +2068,9 @@ function openAppDownloadGatekeeper(appName, url) {
         return;
       }
       if (audioState.albumCoverImageCache && audioState.albumCoverImageCache.has(url)) {
+        const cachedImage = audioState.albumCoverImageCache.get(url);
+        audioState.albumCoverImageCache.delete(url);
+        audioState.albumCoverImageCache.set(url, cachedImage);
         audioState.albumCoverReadyUrls.add(url);
         resolve(true);
         return;
@@ -2066,8 +2078,7 @@ function openAppDownloadGatekeeper(appName, url) {
       const image = new Image();
       image.decoding = "async";
       function remember() {
-        audioState.albumCoverReadyUrls.add(url);
-        if (audioState.albumCoverImageCache) audioState.albumCoverImageCache.set(url, image);
+        rememberAlbumCoverImage(url, image);
         resolve(true);
       }
       image.onload = function () {
@@ -2145,6 +2156,26 @@ function openAppDownloadGatekeeper(appName, url) {
     return Boolean(spaState.navigationActive && isMobilePwaCoverNavigation());
   }
 
+  function rememberAlbumCoverImage(url, image) {
+    if (!url) return;
+    if (audioState.albumCoverReadyUrls && typeof audioState.albumCoverReadyUrls.add === "function") {
+      audioState.albumCoverReadyUrls.add(url);
+    }
+    if (!image || !audioState.albumCoverImageCache || typeof audioState.albumCoverImageCache.set !== "function") return;
+    if (audioState.albumCoverImageCache.has(url)) {
+      audioState.albumCoverImageCache.delete(url);
+    }
+    audioState.albumCoverImageCache.set(url, image);
+    while (audioState.albumCoverImageCache.size > ALBUM_COVER_IMAGE_CACHE_LIMIT) {
+      const oldest = audioState.albumCoverImageCache.keys().next();
+      if (oldest.done) break;
+      audioState.albumCoverImageCache.delete(oldest.value);
+      if (audioState.albumCoverReadyUrls && typeof audioState.albumCoverReadyUrls.delete === "function") {
+        audioState.albumCoverReadyUrls.delete(oldest.value);
+      }
+    }
+  }
+
   function prepareAlbumCoversForSession(reason) {
     if (!COVER_SESSION_PREPARE_ENABLED) return warmAlbumCoverCache(reason);
     if (audioState.albumCoverCacheWarmupDone) return Promise.resolve();
@@ -2154,7 +2185,7 @@ function openAppDownloadGatekeeper(appName, url) {
     audioState.albumCoverCacheWarmupScheduled = true;
     const startedAt = getAudioTelemetryNow();
     audioState.albumCoverPreparePromise = loadTracksData().then(function (tracksData) {
-      const covers = orderAlbumCoverWarmupUrls(getAlbumCoverWarmupUrls(tracksData));
+      const covers = limitAlbumCoverWarmupUrls(orderAlbumCoverWarmupUrls(getAlbumCoverWarmupUrls(tracksData)));
       if (!covers.length) {
         audioState.albumCoverCacheWarmupDone = true;
         return;
@@ -2220,7 +2251,7 @@ function openAppDownloadGatekeeper(appName, url) {
       return Promise.resolve();
     }
     return loadTracksData().then(function (tracksData) {
-      const covers = getAlbumCoverWarmupUrls(tracksData);
+      const covers = limitAlbumCoverWarmupUrls(orderAlbumCoverWarmupUrls(getAlbumCoverWarmupUrls(tracksData)));
       if (!covers.length) {
         audioState.albumCoverCacheWarmupDone = true;
         return;

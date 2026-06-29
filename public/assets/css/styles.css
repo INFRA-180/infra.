@@ -184,6 +184,13 @@ body.album-screen .cover {
   }
 }
 
+html.pwa-native-swap::view-transition-group(root),
+html.pwa-native-swap::view-transition-old(root),
+html.pwa-native-swap::view-transition-new(root) {
+  animation: none !important;
+  mix-blend-mode: normal;
+}
+
 html,
 body {
   min-height: 100%;

@@ -208,6 +208,30 @@
     return src ? normalizeUrlAgainstBase(src, sourceUrl || window.location.href) : "";
   }
 
+  function lockSpaCoverSource(image, sourceUrl, preferredWidth) {
+    if (!image) return "";
+    const width = Number(preferredWidth) <= 480 ? 480 : 900;
+    const target = getImagePreferredSrc(image, sourceUrl, { preferredWidth: width });
+    if (!target) return "";
+    image.setAttribute("src", target);
+    image.setAttribute("srcset", `${target} ${width}w`);
+    image.setAttribute("sizes", width <= 480 ? "480px" : "900px");
+    image.setAttribute("loading", "eager");
+    image.setAttribute("decoding", "async");
+    image.setAttribute("fetchpriority", "high");
+    return target;
+  }
+
+  function lockSpaHomeCoverSources(fragment, sourceUrl, limit) {
+    if (!fragment || typeof fragment.querySelectorAll !== "function") return 0;
+    const maxImages = Math.max(1, Number(limit) || 4);
+    return Array.from(fragment.querySelectorAll("img.album-cover"))
+      .slice(0, maxImages)
+      .reduce(function (count, image) {
+        return count + (lockSpaCoverSource(image, sourceUrl, 900) ? 1 : 0);
+      }, 0);
+  }
+
   function waitForSpaAlbumCoverReady(fragment, sourceUrl, telemetry) {
     const image = getSpaAlbumCoverImage(fragment);
     const startedAt = getAudioTelemetryNow();
@@ -224,7 +248,7 @@
 
     const pwaCoverMode = isMobilePwaCoverNavigation();
     const target = getImagePreferredSrc(image, sourceUrl, {
-      preferredWidth: pwaCoverMode ? 480 : 900
+      preferredWidth: 900
     });
     const timeoutMs = pwaCoverMode ? 900 : 55;
     if (!target) {
@@ -258,12 +282,17 @@
       }));
     }
 
-    if (audioState.albumCoverReadyUrls && audioState.albumCoverReadyUrls.has(target)) {
+    const targetReady = Boolean(
+      audioState.albumCoverReadyUrls &&
+      audioState.albumCoverReadyUrls.has(target)
+    );
+
+    if (!pwaCoverMode && targetReady) {
       finish(true, false, "memory");
       return Promise.resolve();
     }
 
-    if (image.complete && image.naturalWidth > 0) {
+    if (!pwaCoverMode && image.complete && image.naturalWidth > 0) {
       finish(true, false, "memory");
       return Promise.resolve();
     }
@@ -338,15 +367,11 @@
         ? String(placeholderMap.get(sourceHref) || "")
         : "";
       const currentCoverSrc = currentCover
-        ? (currentCover.currentSrc || currentCover.src || getImagePreferredSrc(currentCover, window.location.href, { preferredWidth: 480 }))
+        ? (currentCover.currentSrc || currentCover.src || getImagePreferredSrc(currentCover, window.location.href, { preferredWidth: 900 }))
         : linkedCoverSrc;
       function applyTargetCover() {
-        image.setAttribute("src", target);
-        image.setAttribute("srcset", `${target} 480w`);
+        lockSpaCoverSource(image, sourceUrl, 900);
         image.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), 290px");
-        image.setAttribute("loading", "eager");
-        image.setAttribute("decoding", "async");
-        image.setAttribute("fetchpriority", "high");
       }
       function applyTemporaryCover() {
         if (!currentCoverSrc) {
@@ -385,6 +410,12 @@
       image.setAttribute("decoding", "async");
       image.setAttribute("fetchpriority", "high");
       applyTemporaryCover();
+      if (targetReady) {
+        applyTargetCover();
+        finish(true, false, "memory_locked");
+        if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
+        return Promise.resolve();
+      }
       return waitWithCacheHint().then(function (decoded) {
         if (decoded) {
           applyTargetCover();
@@ -426,33 +457,140 @@
     return waitWithCacheHint();
   }
 
+  function getPaintImageState(image) {
+    if (!image) {
+      return {
+        present: false,
+        complete: false,
+        naturalWidth: 0,
+        currentSrc: ""
+      };
+    }
+    let currentSrc = String(image.currentSrc || image.src || "");
+    try {
+      currentSrc = new URL(currentSrc, window.location.href).pathname;
+    } catch (_err) {
+      // Keep the raw value.
+    }
+    return {
+      present: true,
+      complete: Boolean(image.complete && image.naturalWidth > 0),
+      naturalWidth: Number(image.naturalWidth) || 0,
+      currentSrc
+    };
+  }
+
+  function captureSpaPaintState() {
+    const main = document.querySelector("main");
+    const albumCover = getPaintImageState(document.querySelector(".album-layout .cover"));
+    const homeCovers = Array.from(document.querySelectorAll("[data-catalog-grid='albums'] img.album-cover"))
+      .slice(0, 4)
+      .map(getPaintImageState);
+    let mainOpacity = null;
+    try {
+      mainOpacity = main ? Number.parseFloat(window.getComputedStyle(main).opacity) : null;
+    } catch (_err) {
+      mainOpacity = null;
+    }
+    return {
+      paint_main_opacity: Number.isFinite(mainOpacity) ? mainOpacity : null,
+      paint_album_cover_present: albumCover.present,
+      paint_album_cover_complete: albumCover.complete,
+      paint_album_cover_natural_width: albumCover.naturalWidth,
+      paint_album_cover_src: albumCover.currentSrc,
+      paint_home_cover_count: homeCovers.length,
+      paint_home_cover_ready_count: homeCovers.filter(function (cover) { return cover.complete; }).length,
+      paint_home_cover_srcs: homeCovers.map(function (cover) { return cover.currentSrc; }).join("|")
+    };
+  }
+
+  function waitForSpaFirstPaint() {
+    const startedAt = getAudioTelemetryNow();
+    if (typeof window.requestAnimationFrame !== "function") {
+      return Promise.resolve({
+        first_paint_wait_ms: 0
+      });
+    }
+    return new Promise(function (resolve) {
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(function () {
+          resolve(Object.assign({
+            first_paint_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
+          }, captureSpaPaintState()));
+        });
+      });
+    });
+  }
+
   function swapSpaFragment(fragment, bodyClassName, persistRoot) {
     const entering = fragment && fragment.querySelector ? fragment.querySelector("main") : null;
     const instantPwaSwap = isMobilePwaCoverNavigation();
     const animateEntry = Boolean(entering && !instantPwaSwap);
+    const scheduledAt = getAudioTelemetryNow();
     if (entering) {
       entering.classList.toggle("spa-page-entering", animateEntry);
     }
 
+    let applied = false;
+    let domMutationMs = 0;
+    function applySwap() {
+      if (applied) return;
+      applied = true;
+      const mutationStartedAt = getAudioTelemetryNow();
+      document.body.className = bodyClassName;
+      Array.from(document.body.childNodes).forEach((node) => {
+        if (node === persistRoot) return;
+        node.remove();
+      });
+      document.body.appendChild(fragment);
+
+      if (document.body.firstChild !== persistRoot) {
+        document.body.insertBefore(persistRoot, document.body.firstChild);
+      }
+
+      if (animateEntry) {
+        window.requestAnimationFrame(function () {
+          entering.classList.remove("spa-page-entering");
+        });
+      }
+      domMutationMs = Math.max(0, Math.round(getAudioTelemetryNow() - mutationStartedAt));
+    }
+
+    function finish(mode) {
+      const base = {
+        swap_mode: mode,
+        swap_schedule_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - scheduledAt)),
+        swap_dom_mutation_ms: domMutationMs
+      };
+      if (!instantPwaSwap) return Promise.resolve(base);
+      return waitForSpaFirstPaint().then(function (paintState) {
+        return Object.assign(base, paintState || {});
+      });
+    }
+
+    if (instantPwaSwap && typeof document.startViewTransition === "function") {
+      document.documentElement.classList.add("pwa-native-swap");
+      try {
+        const transition = document.startViewTransition(function () {
+          applySwap();
+        });
+        return transition.updateCallbackDone
+          .catch(function () {
+            applySwap();
+          })
+          .then(function () {
+            return finish("view_transition");
+          });
+      } catch (_err) {
+        applySwap();
+        return finish("instant_fallback");
+      }
+    }
+
     return new Promise(function (resolve) {
       const run = function () {
-        document.body.className = bodyClassName;
-        Array.from(document.body.childNodes).forEach((node) => {
-          if (node === persistRoot) return;
-          node.remove();
-        });
-        document.body.appendChild(fragment);
-
-        if (document.body.firstChild !== persistRoot) {
-          document.body.insertBefore(persistRoot, document.body.firstChild);
-        }
-
-        if (animateEntry) {
-          window.requestAnimationFrame(function () {
-            entering.classList.remove("spa-page-entering");
-          });
-        }
-        resolve();
+        applySwap();
+        finish(instantPwaSwap ? "instant_raf" : "animated_raf").then(resolve);
       };
 
       if (typeof window.requestAnimationFrame === "function") {
@@ -476,9 +614,11 @@
     if (isAlbumPage) {
       await waitForSpaAlbumCoverReady(fragment, sourceUrl, telemetry);
     } else if (isHomePage && isMobilePwaCoverNavigation()) {
+      const lockedCoverCount = lockSpaHomeCoverSources(fragment, sourceUrl, 4);
       await decodeSpaCriticalImages(fragment, Object.assign({}, telemetry || {}, {
         blocking: true,
-        pwa_home_mode: true
+        pwa_home_mode: true,
+        source_locked_count: lockedCoverCount
       }), {
         imageLimit: 4,
         timeoutMs: 260
@@ -491,8 +631,8 @@
 
     const startedAt = getAudioTelemetryNow();
     trackAudioRuntimeEvent("spa_swap_start", Object.assign({}, telemetry || {}));
-    await swapSpaFragment(fragment, bodyClassName, persistRoot);
-    trackAudioRuntimeEvent("spa_swap_done", Object.assign({}, telemetry || {}, {
+    const swapResult = await swapSpaFragment(fragment, bodyClassName, persistRoot);
+    trackAudioRuntimeEvent("spa_swap_done", Object.assign({}, telemetry || {}, swapResult || {}, {
       duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
     }));
   }

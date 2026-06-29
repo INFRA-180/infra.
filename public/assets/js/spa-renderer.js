@@ -152,12 +152,18 @@
       document.body,
       renderedUrl && renderedUrl.href
     );
+    const documentHeight = Math.max(
+      document.documentElement ? document.documentElement.scrollHeight : 0,
+      document.body ? document.body.scrollHeight : 0,
+      window.innerHeight || 0
+    );
     return {
       url: getComparableSpaUrl(renderedUrl && renderedUrl.href),
       title: document.title,
       bodyClassName: document.body.className,
       scrollX: Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0)),
       scrollY: Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0)),
+      documentHeight: Math.max(0, Math.round(documentHeight)),
       anchorHref: getComparableSpaUrl(targetUrl && targetUrl.href),
       anchorViewportTop: targetRect ? Math.round(targetRect.top) : null,
       coverStates,
@@ -865,19 +871,24 @@
     if (!route || !canRestoreLiveHomeRoute(urlLike)) return null;
 
     const startedAt = getAudioTelemetryNow();
-    const holdShown = showPwaHomeReturnHold(route, "live_home_restore");
-    const coverResult = await prepareLiveHomeRouteCovers(route);
-    if (Number.isFinite(opts.navToken) && spaState.navToken !== opts.navToken) {
-      if (holdShown) releasePwaCoverHold("stale_home_restore");
-      return null;
-    }
-    const persistRoot = getSpaPersistRoot();
     const requested = opts.restoreScroll
       ? getScrollFromHistoryState(opts.restoreScroll)
       : {
           x: Math.max(0, Number(route.scrollX) || 0),
           y: Math.max(0, Number(route.scrollY) || 0)
         };
+    const holdShown = showPwaHomeReturnHold(route, {
+      reason: "live_home_restore",
+      scrollX: requested.x,
+      scrollY: requested.y,
+      navToken: opts.navToken
+    });
+    const coverResult = await prepareLiveHomeRouteCovers(route);
+    if (Number.isFinite(opts.navToken) && spaState.navToken !== opts.navToken) {
+      if (holdShown) releasePwaCoverHold("stale_home_restore");
+      return null;
+    }
+    const persistRoot = getSpaPersistRoot();
 
     document.documentElement.classList.remove("pwa-native-swap");
     Array.from(document.body.childNodes).forEach(function (node) {

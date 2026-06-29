@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix272-20260629";
+window.INFRA_BUILD_TAG = "audiofix273-20260629";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -384,7 +384,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix272-20260629";
+  const runtimeVersion = "audiofix273-20260629";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -2094,16 +2094,39 @@ function openAppDownloadGatekeeper(appName, url) {
       return;
     }
 
+    const reasonText = String(reason || "done");
+    const forceRelease = /^(replace|timeout|home_return_timeout|stale_|.*_aborted|fallback|fetch_error)$/i.test(reasonText);
+    const now = getAudioTelemetryNow();
+    const minVisibleUntil = Number(hold.minVisibleUntil) || 0;
+    if (!forceRelease && minVisibleUntil > now) {
+      if (!hold.releaseTimer) {
+        hold.releaseTimer = window.setTimeout(function () {
+          if (spaState.pwaCoverHold === hold) {
+            hold.releaseTimer = 0;
+            releasePwaCoverHold(reasonText);
+          }
+        }, Math.max(0, Math.round(minVisibleUntil - now)));
+      }
+      return;
+    }
+
     spaState.pwaCoverHold = null;
     if (hold.timer) {
       window.clearTimeout(hold.timer);
     }
+    if (hold.releaseTimer) {
+      window.clearTimeout(hold.releaseTimer);
+    }
     const node = hold.node;
-    node.dataset.reason = String(reason || "done");
+    const isHomeReturnHold = Boolean(node.classList && node.classList.contains("pwa-home-return-hold"));
+    node.dataset.reason = reasonText;
     node.style.opacity = "0";
     node.style.transition = "opacity 70ms ease-out";
     window.setTimeout(function () {
       if (node && node.parentNode) node.parentNode.removeChild(node);
+      if (isHomeReturnHold && document.documentElement) {
+        document.documentElement.classList.remove("pwa-home-restore-active");
+      }
     }, 90);
   }
 
@@ -2202,21 +2225,141 @@ function openAppDownloadGatekeeper(appName, url) {
     }
   }
 
-  function showPwaHomeReturnHold(route, reason) {
+  function getComparablePwaSnapshotUrl(urlLike, baseUrl) {
+    try {
+      const url = new URL(String(urlLike || ""), baseUrl || window.location.href);
+      return `${url.origin}${url.pathname}${url.search}`;
+    } catch (_err) {
+      return "";
+    }
+  }
+
+  function findPwaSnapshotAlbumCard(route, state) {
+    const fragment = route && route.fragment;
+    if (!fragment || typeof fragment.querySelectorAll !== "function" || !state || !state.href) return null;
+    const target = getComparablePwaSnapshotUrl(state.href, route.url || window.location.href);
+    if (!target) return null;
+    return Array.from(fragment.querySelectorAll("a.album-card[href]")).find(function (card) {
+      return getComparablePwaSnapshotUrl(card.getAttribute("href"), route.url || window.location.href) === target;
+    }) || null;
+  }
+
+  function createPwaSnapshotCoverVisual(route, state) {
+    const card = findPwaSnapshotAlbumCard(route, state);
+    const sourceImage = card && card.querySelector("img.album-cover");
+    const width = Math.max(24, Math.round(Number(state && state.displayWidth) || 0));
+    const height = Math.max(24, Math.round(Number(state && state.displayHeight) || width));
+
+    if (sourceImage && sourceImage.complete && sourceImage.naturalWidth > 0) {
+      try {
+        const ratio = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(width * ratio));
+        canvas.height = Math.max(1, Math.round(height * ratio));
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        canvas.style.display = "block";
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(sourceImage, 0, 0, canvas.width, canvas.height);
+          return canvas;
+        }
+      } catch (_err) {
+        // Fall back to a normal image below.
+      }
+    }
+
+    const src = normalizeCoverUrl(state && state.source, { width: 480 });
+    if (!src) return null;
+    const image = new Image();
+    image.decoding = "async";
+    image.loading = "eager";
+    image.setAttribute("fetchpriority", "high");
+    image.src = src;
+    Object.assign(image.style, {
+      display: "block",
+      width: `${width}px`,
+      height: `${height}px`,
+      objectFit: "contain"
+    });
+    return image;
+  }
+
+  function sanitizePwaHomeSnapshotClone(root, route) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    root.querySelectorAll("script, template, style, noscript").forEach(function (node) {
+      node.remove();
+    });
+    root.querySelectorAll("[id]").forEach(function (node) {
+      node.removeAttribute("id");
+    });
+    root.querySelectorAll("a[href]").forEach(function (node) {
+      node.removeAttribute("href");
+    });
+    root.querySelectorAll("*").forEach(function (node) {
+      Array.from(node.attributes || []).forEach(function (attribute) {
+        if (/^data-/i.test(attribute.name)) node.removeAttribute(attribute.name);
+      });
+    });
+    root.querySelectorAll("img").forEach(function (image) {
+      const srcset = image.getAttribute("srcset") || "";
+      const preferred = image.classList && image.classList.contains("album-cover")
+        ? normalizeCoverUrl(
+            choosePreferredSrcsetSource(srcset, 480) || image.getAttribute("src") || image.src || "",
+            { width: 480 }
+          )
+        : normalizeUrlAgainstBase(image.getAttribute("src") || image.src || "", route && route.url);
+      if (preferred) image.setAttribute("src", preferred);
+      if (image.classList && image.classList.contains("album-cover")) {
+        image.setAttribute("srcset", preferred ? `${preferred} 480w` : "");
+        image.setAttribute("sizes", "480px");
+      }
+      image.setAttribute("loading", "eager");
+      image.setAttribute("decoding", "async");
+      image.setAttribute("fetchpriority", "high");
+    });
+  }
+
+  function appendPwaHomeSnapshotChildren(target, route) {
+    const fragment = route && route.fragment;
+    if (!target || !fragment || typeof fragment.cloneNode !== "function") return 0;
+    const clone = fragment.cloneNode(true);
+    let count = 0;
+    Array.from(clone.childNodes || []).forEach(function (node) {
+      if (node.nodeType === 1) {
+        const tagName = String(node.tagName || "").toLowerCase();
+        if (/^(script|template|style|noscript)$/i.test(tagName)) return;
+        if (node.id === "infraSpaPersist" || node.id === "infraPwaInstallModal") return;
+      }
+      target.appendChild(node);
+      count += 1;
+    });
+    sanitizePwaHomeSnapshotClone(target, route);
+    return count;
+  }
+
+  function showPwaHomeReturnHold(route, options) {
     if (!isMobilePwaCoverNavigation()) return false;
+    const opts = options && typeof options === "object" ? options : { reason: options };
     const states = Array.isArray(route && route.coverStates)
       ? route.coverStates.filter(function (state) {
           return Boolean(state && state.source);
         }).slice(0, 10)
       : [];
-    if (!states.length) return false;
+    if (!route || !route.fragment) return false;
 
     releasePwaCoverHold("replace");
     const root = getSpaPersistRoot();
+    const scrollY = Math.max(0, Math.round(Number(opts.scrollY) || Number(route.scrollY) || 0));
+    const documentHeight = Math.max(
+      window.innerHeight,
+      Math.round(Number(route.documentHeight) || 0),
+      scrollY + window.innerHeight
+    );
     const wrapper = document.createElement("div");
     wrapper.className = "pwa-cover-hold pwa-home-return-hold";
     wrapper.setAttribute("aria-hidden", "true");
-    wrapper.dataset.reason = String(reason || "home_return");
+    wrapper.dataset.reason = String(opts.reason || "home_return");
     Object.assign(wrapper.style, {
       position: "fixed",
       inset: "0",
@@ -2230,21 +2373,56 @@ function openAppDownloadGatekeeper(appName, url) {
       contain: "layout paint style"
     });
 
+    const routeClasses = String(route.bodyClassName || "home-screen").split(/\s+/).filter(Boolean);
+    const shell = document.createElement("div");
+    shell.className = ["pwa-home-return-shell"].concat(routeClasses.filter(function (name) {
+      return name !== "home-screen";
+    })).join(" ");
+    Object.assign(shell.style, {
+      position: "absolute",
+      left: "0",
+      top: `${-scrollY}px`,
+      width: "100%",
+      minHeight: `${documentHeight}px`,
+      pointerEvents: "none",
+      transform: "translateZ(0)",
+      WebkitTransform: "translateZ(0)"
+    });
+
+    const page = document.createElement("div");
+    page.className = "pwa-home-return-page home-screen";
+    Object.assign(page.style, {
+      position: "relative",
+      width: "100%",
+      minHeight: `${documentHeight}px`,
+      pointerEvents: "none"
+    });
+    const clonedChildCount = appendPwaHomeSnapshotChildren(page, route);
+    shell.appendChild(page);
+    wrapper.appendChild(shell);
+
+    const coverLayer = document.createElement("div");
+    coverLayer.className = "pwa-home-return-cover-layer";
+    Object.assign(coverLayer.style, {
+      position: "fixed",
+      inset: "0",
+      zIndex: "2",
+      pointerEvents: "none",
+      overflow: "hidden",
+      transform: "translateZ(0)",
+      WebkitTransform: "translateZ(0)"
+    });
+
     states.forEach(function (state) {
-      const src = normalizeCoverUrl(state.source, { width: 480 });
-      if (!src) return;
       const width = Math.max(24, Math.round(Number(state.displayWidth) || 0));
       const height = Math.max(24, Math.round(Number(state.displayHeight) || width));
       const left = Math.round(Number(state.viewportLeft) || 0);
       const top = Math.round(Number(state.viewportTop) || 0);
       if (top > window.innerHeight + 120 || top + height < -120) return;
 
-      const image = new Image();
-      image.decoding = "async";
-      image.loading = "eager";
-      image.setAttribute("fetchpriority", "high");
-      image.src = src;
-      Object.assign(image.style, {
+      const visual = createPwaSnapshotCoverVisual(route, state);
+      if (!visual) return;
+      Object.assign(visual.style, {
         position: "absolute",
         left: `${left}px`,
         top: `${top}px`,
@@ -2257,15 +2435,21 @@ function openAppDownloadGatekeeper(appName, url) {
         transform: "translateZ(0)",
         WebkitTransform: "translateZ(0)"
       });
-      wrapper.appendChild(image);
+      coverLayer.appendChild(visual);
     });
+    if (coverLayer.childNodes.length) wrapper.appendChild(coverLayer);
 
-    if (!wrapper.childNodes.length) return false;
+    if (!clonedChildCount && !coverLayer.childNodes.length) return false;
+    if (document.documentElement) {
+      document.documentElement.classList.add("pwa-home-restore-active");
+    }
     root.appendChild(wrapper);
+    const startedAt = getAudioTelemetryNow();
     spaState.pwaCoverHold = {
       node: wrapper,
       src: "home-return",
-      startedAt: getAudioTelemetryNow(),
+      startedAt,
+      minVisibleUntil: startedAt + 320,
       timer: window.setTimeout(function () {
         releasePwaCoverHold("home_return_timeout");
       }, 1200)

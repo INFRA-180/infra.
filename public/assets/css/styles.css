@@ -242,6 +242,12 @@ body.album-screen {
   --pwa-status-bg: var(--bg-mid);
 }
 
+html.pwa-home-restore-active,
+html.pwa-home-restore-active body,
+html.pwa-home-restore-active body::before {
+  transition: none !important;
+}
+
 body.home-screen {
   overflow-x: hidden;
   overflow-y: auto;

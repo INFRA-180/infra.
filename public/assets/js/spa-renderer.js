@@ -136,6 +136,10 @@
     });
 
     const targetRect = targetCard ? targetCard.getBoundingClientRect() : null;
+    const frozenResourceCount = freezeLiveHomeResourceUrls(
+      document.body,
+      renderedUrl && renderedUrl.href
+    );
     return {
       url: getComparableSpaUrl(renderedUrl && renderedUrl.href),
       title: document.title,
@@ -145,6 +149,7 @@
       anchorHref: getComparableSpaUrl(targetUrl && targetUrl.href),
       anchorViewportTop: targetRect ? Math.round(targetRect.top) : null,
       coverStates,
+      frozenResourceCount,
       fragment: null
     };
   }
@@ -739,10 +744,6 @@
         else node.remove();
       });
       if (liveHomeFragment && liveHomeCapture) {
-        liveHomeCapture.frozenResourceCount = freezeLiveHomeResourceUrls(
-          liveHomeFragment,
-          liveHomeCapture.url
-        );
         liveHomeCapture.fragment = liveHomeFragment;
         spaState.liveHomeRoute = liveHomeCapture;
       }

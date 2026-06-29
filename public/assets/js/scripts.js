@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix266-20260629";
+window.INFRA_BUILD_TAG = "audiofix267-20260629";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -176,6 +176,7 @@ function openAppDownloadGatekeeper(appName, url) {
     navToken: 0,
     navigationActive: false,
     albumCoverPlaceholderByUrl: new Map(),
+    liveHomeRoute: null,
     pageCacheApi: null
   };
 
@@ -382,7 +383,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix266-20260629";
+  const runtimeVersion = "audiofix267-20260629";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -821,6 +822,7 @@ function openAppDownloadGatekeeper(appName, url) {
       createAlbumOpenTelemetryContext,
       finishAlbumOpenTelemetry,
       initPage,
+      resumeLiveHomeRoute,
       logAudioRuntimeAlbumSwitch,
       getScrollFromHistoryState,
       prefetchSpaPage,
@@ -5156,6 +5158,37 @@ function openAppDownloadGatekeeper(appName, url) {
     const appsMenu = document.querySelector(".apps-menu");
     if (!appsMenu) return;
     appsMenu.open = false;
+  }
+
+  function resumeLiveHomeRoute() {
+    if (!document.body.classList.contains("home-screen")) return;
+    const adminMode = isAdminModeEnabled();
+    document.body.classList.toggle("ios-device", isIosDevice());
+    closeNowPlayingOverlay();
+    initThemePreset();
+    if (!adminMode) applyThemePreset("blanc", false);
+
+    cleanupIdleAudioContext({ preserveMode: true });
+    ensureGlobalAudio();
+    ensurePlayablePlaylistContext();
+    syncFavoriteButtons();
+    syncFavoritesRoute();
+    syncTransportUi();
+    enforceHomeModuleOrder();
+    enforceHomeAppsCollapsed(adminMode);
+
+    resetHomePlaybackModeIfIdle();
+    if (audioState.homeMode !== "radio") {
+      setHomePlayMode("album", { force: true });
+    } else {
+      syncAudioUi();
+    }
+
+    scheduleFavoritesPreload("home_restore");
+    scheduleSpaPagePrefetch();
+    scheduleAlbumCoverCacheWarmup("home_restore");
+    snapshotCurrentSpaPage(spaState.currentUrl || window.location.href);
+    initPwaInstallPrompt(adminMode);
   }
 
   async function initPage() {

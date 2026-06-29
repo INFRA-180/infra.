@@ -35,6 +35,7 @@
     const createAlbumOpenTelemetryContext = method(ctx, "createAlbumOpenTelemetryContext", function () { return null; });
     const finishAlbumOpenTelemetry = method(ctx, "finishAlbumOpenTelemetry");
     const initPage = method(ctx, "initPage", function () { return Promise.resolve(); });
+    const resumeLiveHomeRoute = method(ctx, "resumeLiveHomeRoute");
     const logAudioRuntimeAlbumSwitch = method(ctx, "logAudioRuntimeAlbumSwitch");
     const getScrollFromHistoryState = method(ctx, "getScrollFromHistoryState", function () { return { x: 0, y: 0 }; });
     const prefetchSpaPage = method(ctx, "prefetchSpaPage");
@@ -73,6 +74,141 @@
     if (!html) return;
     const target = urlLike || spaState.currentUrl || window.location.href;
     setSpaCachedHtml(target, html);
+  }
+
+  function getComparableSpaUrl(urlLike) {
+    try {
+      const url = new URL(String(urlLike || ""), window.location.href);
+      return `${url.origin}${url.pathname}${url.search}`;
+    } catch (_err) {
+      return "";
+    }
+  }
+
+  function findAlbumCardByUrl(root, urlLike) {
+    if (!root || typeof root.querySelectorAll !== "function") return null;
+    const target = getComparableSpaUrl(urlLike);
+    if (!target) return null;
+    return Array.from(root.querySelectorAll("a.album-card[href]")).find(function (card) {
+      return getComparableSpaUrl(card.getAttribute("href")) === target;
+    }) || null;
+  }
+
+  function captureLiveHomeRoute(targetUrl, renderedUrl) {
+    if (!isMobilePwaCoverNavigation()) return null;
+    if (!document.body.classList.contains("home-screen")) return null;
+    if (!/\/music\/[^/]+\.html$/i.test(String(targetUrl && targetUrl.pathname || ""))) return null;
+    if (String(window.location.search || "").includes("edit=1")) return null;
+
+    const cards = Array.from(document.querySelectorAll("a.album-card[href]"));
+    const targetCard = findAlbumCardByUrl(document, targetUrl && targetUrl.href);
+    const priorityCards = [];
+    const seenCards = new Set();
+    function addCard(card) {
+      if (!card || seenCards.has(card)) return;
+      seenCards.add(card);
+      priorityCards.push(card);
+    }
+
+    cards.forEach(function (card) {
+      const rect = card.getBoundingClientRect();
+      if (rect.bottom > -24 && rect.top < window.innerHeight + 24) addCard(card);
+    });
+    const targetIndex = targetCard ? cards.indexOf(targetCard) : -1;
+    if (targetIndex >= 0) {
+      addCard(cards[targetIndex - 1]);
+      addCard(targetCard);
+      addCard(cards[targetIndex + 1]);
+    }
+
+    const coverStates = priorityCards.slice(0, 5).map(function (card) {
+      const image = card.querySelector("img.album-cover");
+      const rect = card.getBoundingClientRect();
+      return {
+        href: getComparableSpaUrl(card.getAttribute("href")),
+        source: image ? String(image.currentSrc || image.src || "") : "",
+        displayWidth: image ? Math.max(1, Math.round(image.getBoundingClientRect().width)) : 0,
+        viewportTop: Math.round(rect.top)
+      };
+    }).filter(function (state) {
+      return Boolean(state.href && state.source);
+    });
+
+    const targetRect = targetCard ? targetCard.getBoundingClientRect() : null;
+    return {
+      url: getComparableSpaUrl(renderedUrl && renderedUrl.href),
+      title: document.title,
+      bodyClassName: document.body.className,
+      scrollX: Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0)),
+      scrollY: Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0)),
+      anchorHref: getComparableSpaUrl(targetUrl && targetUrl.href),
+      anchorViewportTop: targetRect ? Math.round(targetRect.top) : null,
+      coverStates,
+      fragment: null
+    };
+  }
+
+  function canRestoreLiveHomeRoute(urlLike) {
+    const route = spaState.liveHomeRoute;
+    if (!route || !route.fragment || !route.fragment.childNodes.length) return false;
+    return Boolean(route.url && route.url === getComparableSpaUrl(urlLike));
+  }
+
+  function lockLiveHomeCover(image, state) {
+    if (!image || !state || !state.source) return;
+    const source = String(state.source);
+    let width = Number(image.naturalWidth) || 900;
+    const match = source.match(/-cover-(\d+)\.webp(?:$|\?)/i);
+    if (match) width = Number(match[1]) || width;
+    image.setAttribute("src", source);
+    image.setAttribute("srcset", `${source} ${width}w`);
+    image.setAttribute("sizes", `${Math.max(1, Number(state.displayWidth) || width)}px`);
+    image.setAttribute("loading", "eager");
+    image.setAttribute("decoding", "async");
+    image.setAttribute("fetchpriority", "high");
+    image.dataset.spaCoverLocked = "1";
+  }
+
+  function prepareLiveHomeRouteCovers(route) {
+    const states = Array.isArray(route && route.coverStates) ? route.coverStates : [];
+    if (!route || !route.fragment || !states.length) {
+      return Promise.resolve({ requested: 0, decoded: 0, timedOut: false });
+    }
+
+    const images = states.map(function (state) {
+      const card = findAlbumCardByUrl(route.fragment, state.href);
+      const image = card && card.querySelector("img.album-cover");
+      if (image) lockLiveHomeCover(image, state);
+      return image;
+    }).filter(Boolean);
+    if (!images.length) {
+      return Promise.resolve({ requested: 0, decoded: 0, timedOut: false });
+    }
+
+    let decoded = 0;
+    let timeoutId = 0;
+    let timedOut = false;
+    const decodePromise = Promise.all(images.map(function (image) {
+      return decodeSpaImage(image).then(function (ready) {
+        if (ready) decoded += 1;
+        return ready;
+      });
+    }));
+    const timeoutPromise = new Promise(function (resolve) {
+      timeoutId = window.setTimeout(function () {
+        timedOut = true;
+        resolve();
+      }, 260);
+    });
+
+    return Promise.race([decodePromise, timeoutPromise]).then(function () {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      return {
+        requested: images.length,
+        decoded,
+        timedOut
+      };
+    });
   }
 
   function parseSpaDocument(html) {
@@ -496,9 +632,12 @@
   function captureSpaPaintState() {
     const main = document.querySelector("main");
     const albumCover = getPaintImageState(document.querySelector(".album-layout .cover"));
-    const homeCovers = Array.from(document.querySelectorAll("[data-catalog-grid='albums'] img.album-cover"))
-      .slice(0, 4)
-      .map(getPaintImageState);
+    const homeCoverImages = Array.from(document.querySelectorAll("[data-catalog-grid='albums'] img.album-cover"));
+    const homeCovers = homeCoverImages.slice(0, 4).map(getPaintImageState);
+    const visibleHomeCovers = homeCoverImages.filter(function (image) {
+      const rect = image.getBoundingClientRect();
+      return rect.bottom > 0 && rect.top < window.innerHeight;
+    }).map(getPaintImageState);
     let mainOpacity = null;
     try {
       mainOpacity = main ? Number.parseFloat(window.getComputedStyle(main).opacity) : null;
@@ -513,7 +652,12 @@
       paint_album_cover_src: albumCover.currentSrc,
       paint_home_cover_count: homeCovers.length,
       paint_home_cover_ready_count: homeCovers.filter(function (cover) { return cover.complete; }).length,
-      paint_home_cover_srcs: homeCovers.map(function (cover) { return cover.currentSrc; }).join("|")
+      paint_home_cover_srcs: homeCovers.map(function (cover) { return cover.currentSrc; }).join("|"),
+      paint_visible_home_cover_count: visibleHomeCovers.length,
+      paint_visible_home_cover_ready_count: visibleHomeCovers.filter(function (cover) { return cover.complete; }).length,
+      paint_visible_home_cover_srcs: visibleHomeCovers.map(function (cover) { return cover.currentSrc; }).join("|"),
+      paint_scroll_x: Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0)),
+      paint_scroll_y: Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0))
     };
   }
 
@@ -535,10 +679,14 @@
     });
   }
 
-  function swapSpaFragment(fragment, bodyClassName, persistRoot) {
+  function swapSpaFragment(fragment, bodyClassName, persistRoot, options) {
+    const opts = options || {};
     const entering = fragment && fragment.querySelector ? fragment.querySelector("main") : null;
     const instantPwaSwap = isMobilePwaCoverNavigation();
     const animateEntry = Boolean(entering && !instantPwaSwap);
+    const requestedScroll = opts.restoreScroll
+      ? getScrollFromHistoryState(opts.restoreScroll)
+      : null;
     const scheduledAt = getAudioTelemetryNow();
     if (entering) {
       entering.classList.toggle("spa-page-entering", animateEntry);
@@ -546,19 +694,40 @@
 
     let applied = false;
     let domMutationMs = 0;
+    let appliedScrollX = null;
+    let appliedScrollY = null;
     function applySwap() {
       if (applied) return;
       applied = true;
       const mutationStartedAt = getAudioTelemetryNow();
-      document.body.className = bodyClassName;
+      const liveHomeCapture = opts.liveHomeCapture;
+      const preserveHome = Boolean(
+        liveHomeCapture &&
+        document.body.classList.contains("home-screen")
+      );
+      const liveHomeFragment = preserveHome ? document.createDocumentFragment() : null;
+
       Array.from(document.body.childNodes).forEach((node) => {
         if (node === persistRoot) return;
-        node.remove();
+        if (liveHomeFragment) liveHomeFragment.appendChild(node);
+        else node.remove();
       });
+      if (liveHomeFragment && liveHomeCapture) {
+        liveHomeCapture.fragment = liveHomeFragment;
+        spaState.liveHomeRoute = liveHomeCapture;
+      }
+
+      document.body.className = bodyClassName;
       document.body.appendChild(fragment);
 
       if (document.body.firstChild !== persistRoot) {
         document.body.insertBefore(persistRoot, document.body.firstChild);
+      }
+
+      if (requestedScroll) {
+        window.scrollTo(requestedScroll.x, requestedScroll.y);
+        appliedScrollX = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
+        appliedScrollY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
       }
 
       if (animateEntry) {
@@ -573,7 +742,11 @@
       const base = {
         swap_mode: mode,
         swap_schedule_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - scheduledAt)),
-        swap_dom_mutation_ms: domMutationMs
+        swap_dom_mutation_ms: domMutationMs,
+        scroll_restore_requested_x: requestedScroll ? requestedScroll.x : null,
+        scroll_restore_requested_y: requestedScroll ? requestedScroll.y : null,
+        scroll_restore_applied_x: appliedScrollX,
+        scroll_restore_applied_y: appliedScrollY
       };
       if (!instantPwaSwap) return Promise.resolve(base);
       return waitForSpaFirstPaint().then(function (paintState) {
@@ -581,7 +754,11 @@
       });
     }
 
-    if (instantPwaSwap && typeof document.startViewTransition === "function") {
+    if (
+      instantPwaSwap &&
+      !opts.avoidViewTransition &&
+      typeof document.startViewTransition === "function"
+    ) {
       document.documentElement.classList.add("pwa-native-swap");
       try {
         const transition = document.startViewTransition(function () {
@@ -590,8 +767,11 @@
         if (transition.ready && typeof transition.ready.catch === "function") {
           transition.ready.catch(function () {});
         }
-        if (transition.finished && typeof transition.finished.catch === "function") {
-          transition.finished.catch(function () {});
+        if (transition.finished && typeof transition.finished.then === "function") {
+          transition.finished.then(
+            function () { document.documentElement.classList.remove("pwa-native-swap"); },
+            function () { document.documentElement.classList.remove("pwa-native-swap"); }
+          );
         }
         return transition.updateCallbackDone
           .catch(function () {
@@ -601,6 +781,7 @@
             return finish("view_transition");
           });
       } catch (_err) {
+        document.documentElement.classList.remove("pwa-native-swap");
         applySwap();
         return finish("instant_fallback");
       }
@@ -620,7 +801,72 @@
     });
   }
 
-  async function renderSpaDocument(doc, sourceUrl, telemetry) {
+  async function restoreLiveHomeRoute(urlLike, options, telemetry) {
+    const opts = options || {};
+    const route = spaState.liveHomeRoute;
+    if (!route || !canRestoreLiveHomeRoute(urlLike)) return null;
+
+    const startedAt = getAudioTelemetryNow();
+    const coverResult = await prepareLiveHomeRouteCovers(route);
+    if (Number.isFinite(opts.navToken) && spaState.navToken !== opts.navToken) return null;
+    const persistRoot = getSpaPersistRoot();
+    const requested = opts.restoreScroll
+      ? getScrollFromHistoryState(opts.restoreScroll)
+      : {
+          x: Math.max(0, Number(route.scrollX) || 0),
+          y: Math.max(0, Number(route.scrollY) || 0)
+        };
+
+    document.documentElement.classList.remove("pwa-native-swap");
+    Array.from(document.body.childNodes).forEach(function (node) {
+      if (node !== persistRoot) node.remove();
+    });
+    document.body.className = route.bodyClassName || "home-screen";
+    document.body.appendChild(route.fragment);
+    if (document.body.firstChild !== persistRoot) {
+      document.body.insertBefore(persistRoot, document.body.firstChild);
+    }
+    if (route.title) document.title = route.title;
+
+    window.scrollTo(requested.x, requested.y);
+    let anchorCorrection = 0;
+    const anchor = findAlbumCardByUrl(document, route.anchorHref);
+    if (anchor && Number.isFinite(route.anchorViewportTop)) {
+      anchorCorrection = Math.round(anchor.getBoundingClientRect().top - route.anchorViewportTop);
+      if (Math.abs(anchorCorrection) > 0) {
+        window.scrollBy(0, anchorCorrection);
+      }
+    }
+
+    spaState.liveHomeRoute = null;
+    resumeLiveHomeRoute();
+    const appliedX = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
+    const appliedY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
+    const paintState = await waitForSpaFirstPaint();
+    const result = Object.assign({
+      swap_mode: "live_dom_restore",
+      swap_schedule_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
+      swap_dom_mutation_ms: 0,
+      home_dom_reused: true,
+      scroll_restore_requested_x: requested.x,
+      scroll_restore_requested_y: requested.y,
+      scroll_restore_applied_x: appliedX,
+      scroll_restore_applied_y: appliedY,
+      scroll_restore_anchor_correction: anchorCorrection,
+      scroll_restore_delta_y: appliedY - requested.y,
+      restore_cover_requested_count: coverResult.requested,
+      restore_cover_decoded_count: coverResult.decoded,
+      restore_cover_timed_out: coverResult.timedOut
+    }, paintState || {});
+
+    trackAudioRuntimeEvent("spa_scroll_restore", Object.assign({}, telemetry || {}, result, {
+      duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
+    }));
+    return result;
+  }
+
+  async function renderSpaDocument(doc, sourceUrl, telemetry, options) {
+    const opts = options || {};
     const persistRoot = getSpaPersistRoot();
 
     normalizeCoverElementsForBase(doc, sourceUrl || window.location.href);
@@ -650,7 +896,16 @@
 
     const startedAt = getAudioTelemetryNow();
     trackAudioRuntimeEvent("spa_swap_start", Object.assign({}, telemetry || {}));
-    const swapResult = await swapSpaFragment(fragment, bodyClassName, persistRoot);
+    const swapResult = await swapSpaFragment(fragment, bodyClassName, persistRoot, {
+      liveHomeCapture: opts.liveHomeCapture,
+      restoreScroll: opts.restoreScroll,
+      avoidViewTransition: Boolean(isHomePage && opts.restoreScroll && isIosDevice())
+    });
+    if (opts.restoreScroll) {
+      trackAudioRuntimeEvent("spa_scroll_restore", Object.assign({}, telemetry || {}, swapResult || {}, {
+        home_dom_reused: false
+      }));
+    }
     trackAudioRuntimeEvent("spa_swap_done", Object.assign({}, telemetry || {}, swapResult || {}, {
       duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
     }));
@@ -680,6 +935,7 @@
 
     const same = url.pathname === rendered.pathname && url.search === rendered.search && url.hash === rendered.hash;
     if (same) return;
+    const liveHomeCapture = captureLiveHomeRoute(url, rendered);
 
     const navNow = getAudioTelemetryNow();
     const sameRecentTarget = spaState.lastNavHref === url.href && spaState.lastNavTs && navNow - spaState.lastNavTs < 650;
@@ -731,6 +987,71 @@
     }
     snapshotCurrentSpaPage(spaState.currentUrl || window.location.href);
 
+    if (canRestoreLiveHomeRoute(url.href)) {
+      if (spaState.controller) {
+        try {
+          spaState.controller.abort();
+        } catch (_err) {
+          // Ignore abort errors.
+        }
+        spaState.controller = null;
+      }
+
+      if (opts.history === "push") {
+        history.pushState(buildSpaHistoryState(url.href, 0, 0), "", url.href);
+      } else if (opts.history === "replace") {
+        history.replaceState(buildSpaHistoryState(url.href, 0, 0), "", url.href);
+      }
+
+      spaState.currentUrl = url.href;
+      const liveRenderStartedAt = getAudioTelemetryNow();
+      const liveSpaTelemetry = {
+        album: "home",
+        from_album: audioSwitchContext.fromAlbum || "",
+        to_album: "home",
+        from_url: rendered.href,
+        to_url: url.href,
+        cached: true,
+        live_dom: true
+      };
+      trackAudioRuntimeEvent("spa_render_start", liveSpaTelemetry);
+      trackAudioRuntimeEvent("spa_swap_start", liveSpaTelemetry);
+      let liveRestoreResult = null;
+      try {
+        liveRestoreResult = await restoreLiveHomeRoute(url.href, {
+          restoreScroll: opts.restoreScroll,
+          navToken
+        }, liveSpaTelemetry);
+      } catch (_err) {
+        spaState.liveHomeRoute = null;
+      }
+
+      if (spaState.navToken !== navToken) {
+        finishSpaNavigation();
+        return;
+      }
+      if (liveRestoreResult) {
+        trackAudioRuntimeEvent("spa_swap_done", Object.assign({}, liveSpaTelemetry, liveRestoreResult, {
+          duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - liveRenderStartedAt))
+        }));
+        trackAudioRuntimeEvent("spa_render_done", Object.assign({}, liveSpaTelemetry, {
+          duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - liveRenderStartedAt))
+        }));
+        trackAudioRuntimeEvent("nav:album_done", {
+          track: "album_open",
+          album: "home",
+          cached: true,
+          live_dom: true,
+          to_url: url.href
+        });
+        logAudioRuntimeAlbumSwitch(audioSwitchContext, true);
+        snapshotCurrentSpaPage(url.href);
+        prefetchSpaPage(url.href, { force: true, cacheMode: "default" });
+        finishSpaNavigation();
+        return;
+      }
+    }
+
     const cachedHtml = getSpaCachedHtml(url);
     if (cachedHtml) {
       const cachedDoc = parseSpaDocument(cachedHtml);
@@ -762,7 +1083,10 @@
         };
         trackAudioRuntimeEvent("spa_render_start", cachedSpaTelemetry);
         try {
-          await renderSpaDocument(cachedDoc, url.href, cachedSpaTelemetry);
+          await renderSpaDocument(cachedDoc, url.href, cachedSpaTelemetry, {
+            liveHomeCapture,
+            restoreScroll: opts.restoreScroll
+          });
         } catch (_err) {
           fallbackToDocumentNavigation("cached_render_error");
           return;
@@ -801,11 +1125,6 @@
 
         if (opts.scroll !== false) {
           window.scrollTo(0, 0);
-        } else if (opts.restoreScroll) {
-          const restoredFromCache = getScrollFromHistoryState(opts.restoreScroll);
-          requestAnimationFrame(function () {
-            window.scrollTo(restoredFromCache.x, restoredFromCache.y);
-          });
         }
 
         snapshotCurrentSpaPage(url.href);
@@ -900,7 +1219,10 @@
     };
     trackAudioRuntimeEvent("spa_render_start", spaTelemetry);
     try {
-      await renderSpaDocument(doc, url.href, spaTelemetry);
+      await renderSpaDocument(doc, url.href, spaTelemetry, {
+        liveHomeCapture,
+        restoreScroll: opts.restoreScroll
+      });
     } catch (_err) {
       fallbackToDocumentNavigation("render_error");
       return;
@@ -939,11 +1261,6 @@
 
     if (opts.scroll !== false) {
       window.scrollTo(0, 0);
-    } else if (opts.restoreScroll) {
-      const restored = getScrollFromHistoryState(opts.restoreScroll);
-      requestAnimationFrame(function () {
-        window.scrollTo(restored.x, restored.y);
-      });
     }
 
     snapshotCurrentSpaPage(url.href);

@@ -73,6 +73,7 @@
     "seek",
     "spa_swap_done",
     "spa_swap_start",
+    "spa_scroll_restore",
     "spa_render_done",
     "spa_render_start",
     "nav:album_abort",

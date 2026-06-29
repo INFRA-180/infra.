@@ -428,7 +428,11 @@
 
   function swapSpaFragment(fragment, bodyClassName, persistRoot) {
     const entering = fragment && fragment.querySelector ? fragment.querySelector("main") : null;
-    if (entering) entering.classList.add("spa-page-entering");
+    const instantPwaSwap = isMobilePwaCoverNavigation();
+    const animateEntry = Boolean(entering && !instantPwaSwap);
+    if (entering) {
+      entering.classList.toggle("spa-page-entering", animateEntry);
+    }
 
     return new Promise(function (resolve) {
       const run = function () {
@@ -443,7 +447,7 @@
           document.body.insertBefore(persistRoot, document.body.firstChild);
         }
 
-        if (entering) {
+        if (animateEntry) {
           window.requestAnimationFrame(function () {
             entering.classList.remove("spa-page-entering");
           });

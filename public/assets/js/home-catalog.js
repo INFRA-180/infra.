@@ -198,6 +198,23 @@
       return String((node && node.getAttribute(name)) || "").trim();
     }
 
+    function getAssetFileName(value) {
+      const clean = String(value || "").trim().split("?")[0];
+      if (!clean) return "";
+      return clean.slice(clean.lastIndexOf("/") + 1);
+    }
+
+    function lockedCoverMatchesCatalog(image, expectedSrcset) {
+      if (!image || image.dataset.spaCoverLocked !== "1") return false;
+      const fileName = getAssetFileName(image.getAttribute("src"));
+      if (!fileName) return false;
+      return String(expectedSrcset || "")
+        .split(",")
+        .some(function (entry) {
+          return getAssetFileName(String(entry || "").trim().split(/\s+/)[0]) === fileName;
+        });
+    }
+
     function homeAlbumGridMatchesCatalog(grid, albums) {
       if (!grid || grid.dataset.staticCatalog !== "albums") return false;
       const expected = getStaticHomeAlbumOrder(albums);
@@ -218,16 +235,17 @@
         const shouldEager = index < 4;
         const expectedSrcset = String(item.thumbSrcset || "").trim();
         const expectedSizes = String(item.thumbSizes || "").trim();
+        const lockedCover = lockedCoverMatchesCatalog(image, expectedSrcset);
 
         if (getCardAttribute(card, "href") !== String(item.page || "").trim()) return false;
-        if (getCardAttribute(image, "src") !== String(item.thumb || "").trim()) return false;
+        if (!lockedCover && getCardAttribute(image, "src") !== String(item.thumb || "").trim()) return false;
         if (getCardAttribute(image, "alt") !== String(item.thumbAlt || item.title || "").trim()) return false;
         if (getCardAttribute(image, "width") !== String(item.width || "")) return false;
         if (getCardAttribute(image, "height") !== String(item.height || "")) return false;
         if (getCardAttribute(image, "loading") !== (shouldEager ? "eager" : "lazy")) return false;
         if (getCardAttribute(image, "fetchpriority") !== (shouldEager ? "high" : "low")) return false;
-        if (expectedSrcset && getCardAttribute(image, "srcset") !== expectedSrcset) return false;
-        if (expectedSizes && getCardAttribute(image, "sizes") !== expectedSizes) return false;
+        if (!lockedCover && expectedSrcset && getCardAttribute(image, "srcset") !== expectedSrcset) return false;
+        if (!lockedCover && expectedSizes && getCardAttribute(image, "sizes") !== expectedSizes) return false;
         if (String(label.textContent || "").trim() !== displayTitle) return false;
         return true;
       });

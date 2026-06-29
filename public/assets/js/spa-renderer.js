@@ -219,6 +219,7 @@
     image.setAttribute("loading", "eager");
     image.setAttribute("decoding", "async");
     image.setAttribute("fetchpriority", "high");
+    image.dataset.spaCoverLocked = "1";
     return target;
   }
 
@@ -370,8 +371,20 @@
         ? (currentCover.currentSrc || currentCover.src || getImagePreferredSrc(currentCover, window.location.href, { preferredWidth: 900 }))
         : linkedCoverSrc;
       function applyTargetCover() {
-        lockSpaCoverSource(image, sourceUrl, 900);
+        image.setAttribute("src", target);
+        image.setAttribute("srcset", `${target} 900w`);
         image.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), 290px");
+        image.setAttribute("loading", "eager");
+        image.setAttribute("decoding", "async");
+        image.setAttribute("fetchpriority", "high");
+        image.dataset.spaCoverLocked = "1";
+      }
+      function decodeTargetCoverElement() {
+        applyTargetCover();
+        return decodeSpaImage(image).then(function (decoded) {
+          if (decoded) rememberReady(target, image);
+          return decoded;
+        });
       }
       function applyTemporaryCover() {
         if (!currentCoverSrc) {
@@ -411,16 +424,16 @@
       image.setAttribute("fetchpriority", "high");
       applyTemporaryCover();
       if (targetReady) {
-        applyTargetCover();
-        finish(true, false, "memory_locked");
-        if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
-        return Promise.resolve();
+        return decodeTargetCoverElement().then(function (decoded) {
+          finish(decoded, false, "memory_locked");
+          if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
+        });
       }
       return waitWithCacheHint().then(function (decoded) {
         if (decoded) {
-          applyTargetCover();
-          if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
-          return;
+          return decodeTargetCoverElement().then(function () {
+            if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
+          });
         }
         swapTargetAfterDecode();
       });
@@ -574,6 +587,12 @@
         const transition = document.startViewTransition(function () {
           applySwap();
         });
+        if (transition.ready && typeof transition.ready.catch === "function") {
+          transition.ready.catch(function () {});
+        }
+        if (transition.finished && typeof transition.finished.catch === "function") {
+          transition.finished.catch(function () {});
+        }
         return transition.updateCallbackDone
           .catch(function () {
             applySwap();

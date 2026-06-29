@@ -127,7 +127,7 @@
       const rect = card.getBoundingClientRect();
       return {
         href: getComparableSpaUrl(card.getAttribute("href")),
-        source: image ? String(image.currentSrc || image.src || "") : "",
+        source: image ? preferPwaCoverSource(image.currentSrc || image.src || "") : "",
         displayWidth: image ? Math.max(1, Math.round(image.getBoundingClientRect().width)) : 0,
         viewportTop: Math.round(rect.top)
       };
@@ -375,6 +375,18 @@
     return src ? normalizeUrlAgainstBase(src, sourceUrl || window.location.href) : "";
   }
 
+  function preferPwaCoverSource(source) {
+    const value = String(source || "").trim();
+    if (!value || !isMobilePwaCoverNavigation()) return value;
+    return value
+      .replace(/(\/assets\/music\/responsive\/[^/?#]+-cover-)900(\.webp)(?=$|[?#])/i, function (_match, prefix, suffix) {
+        return `${prefix}480${suffix}`;
+      })
+      .replace(/(\/assets\/music\/)([^/?#]+-cover)\.(?:jpe?g|png)(?=$|[?#])/i, function (_match, prefix, stem) {
+        return `${prefix}responsive/${stem}-480.webp`;
+      });
+  }
+
   function lockSpaCoverSource(image, sourceUrl, preferredWidth) {
     if (!image) return "";
     const width = Number(preferredWidth) <= 480 ? 480 : 900;
@@ -393,10 +405,11 @@
   function lockSpaHomeCoverSources(fragment, sourceUrl, limit) {
     if (!fragment || typeof fragment.querySelectorAll !== "function") return 0;
     const maxImages = Math.max(1, Number(limit) || 4);
+    const width = isMobilePwaCoverNavigation() ? 480 : 900;
     return Array.from(fragment.querySelectorAll("img.album-cover"))
       .slice(0, maxImages)
       .reduce(function (count, image) {
-        return count + (lockSpaCoverSource(image, sourceUrl, 900) ? 1 : 0);
+        return count + (lockSpaCoverSource(image, sourceUrl, width) ? 1 : 0);
       }, 0);
   }
 
@@ -415,8 +428,9 @@
     }
 
     const pwaCoverMode = isMobilePwaCoverNavigation();
+    const coverWidth = pwaCoverMode ? 480 : 900;
     const target = getImagePreferredSrc(image, sourceUrl, {
-      preferredWidth: 900
+      preferredWidth: coverWidth
     });
     const timeoutMs = pwaCoverMode ? 900 : 55;
     if (!target) {
@@ -445,6 +459,7 @@
         timed_out: Boolean(timedOut),
         album_cover_only: true,
         pwa_cover_mode: Boolean(pwaCoverMode),
+        target_width: coverWidth,
         cache_hint: cacheHint || "unknown",
         duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
       }));
@@ -535,11 +550,11 @@
         ? String(placeholderMap.get(sourceHref) || "")
         : "";
       const currentCoverSrc = currentCover
-        ? (currentCover.currentSrc || currentCover.src || getImagePreferredSrc(currentCover, window.location.href, { preferredWidth: 900 }))
+        ? preferPwaCoverSource(currentCover.currentSrc || currentCover.src || getImagePreferredSrc(currentCover, window.location.href, { preferredWidth: coverWidth }))
         : linkedCoverSrc;
       function applyTargetCover() {
         image.setAttribute("src", target);
-        image.setAttribute("srcset", `${target} 900w`);
+        image.setAttribute("srcset", `${target} ${coverWidth}w`);
         image.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), 290px");
         image.setAttribute("loading", "eager");
         image.setAttribute("decoding", "async");

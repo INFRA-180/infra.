@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix269-20260629";
+window.INFRA_BUILD_TAG = "audiofix270-20260629";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -383,7 +383,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix269-20260629";
+  const runtimeVersion = "audiofix270-20260629";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -2040,8 +2040,9 @@ function openAppDownloadGatekeeper(appName, url) {
   function getVisibleHomeCoverUrls() {
     const urls = [];
     const seen = new Set();
+    const preferredWidth = isMobilePwaCoverNavigation() ? 480 : 900;
     Array.from(document.querySelectorAll("img.album-cover")).forEach(function (img) {
-      const url = getImagePreferredSrc(img, window.location.href);
+      const url = getImagePreferredSrc(img, window.location.href, { preferredWidth });
       if (!url || seen.has(url)) return;
       seen.add(url);
       urls.push(url);
@@ -2058,10 +2059,11 @@ function openAppDownloadGatekeeper(appName, url) {
       : null;
     if (!img) return "";
 
-    const preferred = img.currentSrc
-      || choosePreferredSrcsetSource(img.getAttribute("srcset") || "", 480)
+    const srcset = img.getAttribute("srcset") || "";
+    const preferred = choosePreferredSrcsetSource(srcset, 480)
+      || img.currentSrc
       || String(img.getAttribute("src") || "").trim();
-    const url = preferred ? normalizeUrlAgainstBase(preferred, window.location.href) : "";
+    const url = preferred ? normalizeCoverUrl(preferred, { width: 480 }) : "";
     if (!url) return "";
 
     spaState.albumCoverPlaceholderByUrl.set(new URL(targetUrl, window.location.href).href, url);
@@ -2099,7 +2101,11 @@ function openAppDownloadGatekeeper(appName, url) {
   function limitAlbumCoverWarmupUrls(covers) {
     if (!Array.isArray(covers) || !covers.length) return [];
     if (!isMobilePwaCoverNavigation()) return covers;
-    return covers.slice(0, Math.min(PWA_COVER_PREPARE_LIMIT, covers.length));
+    const pwaCovers = covers.filter(function (entry) {
+      return entry && Number(entry.width) === 480;
+    });
+    const selected = pwaCovers.length ? pwaCovers : covers;
+    return selected.slice(0, Math.min(PWA_COVER_PREPARE_LIMIT, selected.length));
   }
 
   function decodeCoverForSession(url) {
@@ -2391,6 +2397,7 @@ function openAppDownloadGatekeeper(appName, url) {
     const base = match[2];
     const small = `${prefix}responsive/${base}-480.webp`;
     const large = `${prefix}responsive/${base}-900.webp`;
+    const pwaCoverMode = isMobilePwaCoverNavigation();
     const coverStartedAt = getAudioTelemetryNow();
     logCoverRuntimeEvent("cover_request", {
       album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(window.location.href),
@@ -2417,8 +2424,14 @@ function openAppDownloadGatekeeper(appName, url) {
       }, { once: true });
     }
 
-    cover.setAttribute("srcset", `${small} 480w, ${large} 900w, ${rawSrc} 3333w`);
-    cover.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), min(34vw, 430px)");
+    if (pwaCoverMode) {
+      cover.setAttribute("src", small);
+      cover.setAttribute("srcset", `${small} 480w`);
+      cover.setAttribute("sizes", "min(76vw, 290px)");
+    } else {
+      cover.setAttribute("srcset", `${small} 480w, ${large} 900w, ${rawSrc} 3333w`);
+      cover.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), min(34vw, 430px)");
+    }
     cover.setAttribute("decoding", "async");
     cover.setAttribute("fetchpriority", "high");
     cover.setAttribute("loading", "eager");

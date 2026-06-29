@@ -1,8 +1,9 @@
-const VERSION = "infra-shell-20260628-audio263";
+const VERSION = "infra-shell-20260629-audio264";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
 const NEXT_TRACK_CACHE = "infra-next-track";
+const MAX_COVER_CACHE_ENTRIES = 80;
 const R2_AUDIO_HOST = "pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev";
 
 const SHELL_ASSETS = [
@@ -11,27 +12,27 @@ const SHELL_ASSETS = [
   "./sphragis/",
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
-  "./assets/css/styles.css?v=audiofix263-20260628",
-  "./assets/js/covers.js?v=audiofix263-20260628",
-  "./assets/js/favorites.js?v=audiofix263-20260628",
-  "./assets/js/favorites-ui.js?v=audiofix263-20260628",
-  "./assets/js/transport-ui.js?v=audiofix263-20260628",
-  "./assets/js/now-playing.js?v=audiofix263-20260628",
-  "./assets/js/album-player-ui.js?v=audiofix263-20260628",
-  "./assets/js/spa-renderer.js?v=audiofix263-20260628",
-  "./assets/js/audio-radio.js?v=audiofix263-20260628",
-  "./assets/js/media-session.js?v=audiofix263-20260628",
-  "./assets/js/audio-prefetch.js?v=audiofix263-20260628",
-  "./assets/js/spa-router.js?v=audiofix263-20260628",
-  "./assets/js/catalog-fallback.js?v=audiofix263-20260628",
-  "./assets/js/catalog-loader.js?v=audiofix263-20260628",
-  "./assets/js/audio-telemetry.js?v=audiofix263-20260628",
-  "./assets/js/downloads.js?v=audiofix263-20260628",
-  "./assets/js/home-catalog.js?v=audiofix263-20260628",
-  "./assets/js/audio-core.js?v=audiofix263-20260628",
-  "./assets/js/pwa-install.js?v=audiofix263-20260628",
-  "./assets/js/scripts.js?v=audiofix263-20260628",
-  "./assets/js/scripts.admin.js?v=audiofix263-20260628",
+  "./assets/css/styles.css?v=audiofix264-20260629",
+  "./assets/js/covers.js?v=audiofix264-20260629",
+  "./assets/js/favorites.js?v=audiofix264-20260629",
+  "./assets/js/favorites-ui.js?v=audiofix264-20260629",
+  "./assets/js/transport-ui.js?v=audiofix264-20260629",
+  "./assets/js/now-playing.js?v=audiofix264-20260629",
+  "./assets/js/album-player-ui.js?v=audiofix264-20260629",
+  "./assets/js/spa-renderer.js?v=audiofix264-20260629",
+  "./assets/js/audio-radio.js?v=audiofix264-20260629",
+  "./assets/js/media-session.js?v=audiofix264-20260629",
+  "./assets/js/audio-prefetch.js?v=audiofix264-20260629",
+  "./assets/js/spa-router.js?v=audiofix264-20260629",
+  "./assets/js/catalog-fallback.js?v=audiofix264-20260629",
+  "./assets/js/catalog-loader.js?v=audiofix264-20260629",
+  "./assets/js/audio-telemetry.js?v=audiofix264-20260629",
+  "./assets/js/downloads.js?v=audiofix264-20260629",
+  "./assets/js/home-catalog.js?v=audiofix264-20260629",
+  "./assets/js/audio-core.js?v=audiofix264-20260629",
+  "./assets/js/pwa-install.js?v=audiofix264-20260629",
+  "./assets/js/scripts.js?v=audiofix264-20260629",
+  "./assets/js/scripts.admin.js?v=audiofix264-20260629",
   "./assets/js/sphragis.js?v=sphragis20260625",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
@@ -52,7 +53,6 @@ self.addEventListener("install", (event) => {
     caches
       .open(SHELL_CACHE)
       .then((cache) => cache.addAll(SHELL_ASSETS))
-      .catch(() => undefined)
       .then(() => self.skipWaiting())
   );
 });
@@ -186,9 +186,29 @@ async function cacheFirst(request, cacheName, options) {
 
   const response = await fetch(request);
   if (response && response.ok) {
-    cache.put(request, response.clone()).catch(() => undefined);
+    const writePromise = cache.put(request, response.clone())
+      .then(() => pruneCacheEntries(cache, opts.maxEntries))
+      .catch(() => undefined);
+    if (opts.event && typeof opts.event.waitUntil === "function") {
+      try {
+        opts.event.waitUntil(writePromise);
+      } catch (_err) {
+        await writePromise;
+      }
+    } else {
+      await writePromise;
+    }
   }
   return response;
+}
+
+async function pruneCacheEntries(cache, maxEntries) {
+  const limit = Math.max(0, Number(maxEntries) || 0);
+  if (!cache || !limit) return;
+  const keys = await cache.keys();
+  const excess = Math.max(0, keys.length - limit);
+  if (!excess) return;
+  await Promise.all(keys.slice(0, excess).map((key) => cache.delete(key)));
 }
 
 function notifyPrefetchHit(url, details) {
@@ -330,7 +350,10 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isResponsiveCoverAsset(url)) {
-    event.respondWith(cacheFirst(request, COVERS_CACHE));
+    event.respondWith(cacheFirst(request, COVERS_CACHE, {
+      event,
+      maxEntries: MAX_COVER_CACHE_ENTRIES
+    }));
     return;
   }
 

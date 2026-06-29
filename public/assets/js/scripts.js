@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix263-20260628";
+window.INFRA_BUILD_TAG = "audiofix264-20260629";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -225,6 +225,7 @@ function openAppDownloadGatekeeper(appName, url) {
     waitingRecoveryTimer: null,
     mediaSessionResyncTimer: null,
     mediaSessionPositionTs: 0,
+    audioSessionTelemetryBound: false,
     resumeOnVisible: false,
     recentPlayed: [],
     recentPlayedLimit: 12,
@@ -350,7 +351,7 @@ function openAppDownloadGatekeeper(appName, url) {
     : true;
   // ROLLBACK: passer a false pour ne plus attendre les covers avant ouverture album.
   const ALBUM_COVER_IMAGE_CACHE_LIMIT = isStandaloneDisplayMode() ? 12 : 24;
-  const PWA_COVER_PREPARE_LIMIT = 18;
+  const PWA_COVER_PREPARE_LIMIT = 8;
   const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(prefetchConstants.MAX_BYTES))
     ? Number(prefetchConstants.MAX_BYTES)
     : 15 * 1024 * 1024;
@@ -381,7 +382,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix263-20260628";
+  const runtimeVersion = "audiofix264-20260629";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -461,6 +462,7 @@ function openAppDownloadGatekeeper(appName, url) {
       getBufferedEnd: function () { return null; },
       getRuntimeProbeState: function () { return {}; },
       flushQueue: function () { return Promise.resolve(false); },
+      markHealthSessionInactive: function () {},
       startHeartbeat: function () {},
       stopHeartbeat: function () {},
       trackRuntimeEvent: function () {},
@@ -579,6 +581,7 @@ function openAppDownloadGatekeeper(appName, url) {
       getTrackByIndex,
       startAudioTelemetryHeartbeat,
       stopAudioTelemetryHeartbeat,
+      markAudioTelemetryInactive,
       buildAudioMonitorPayload,
       getAudioBufferedEnd,
       scheduleDeferredServiceWorkerReload,
@@ -645,6 +648,7 @@ function openAppDownloadGatekeeper(appName, url) {
       saveResumeState: function () {},
       restoreResumeState: function () {},
       ensurePlayablePlaylistContext: function () {},
+      markAudioPauseIntent: function () {},
       playFromExternalControl: function () {},
       handleGlobalTransportToggle: function () {},
       ensureGlobalAudio: function () {},
@@ -719,6 +723,7 @@ function openAppDownloadGatekeeper(appName, url) {
       syncRadioQueueToPlaylist,
       updateProgressUi,
       saveResumeState,
+      markAudioPauseIntent,
       extendAlbumPlaylistToNextAlbum
     });
   }
@@ -2008,7 +2013,7 @@ function openAppDownloadGatekeeper(appName, url) {
     const seen = new Set();
     albums.forEach(function (album) {
       const raw = album && album.cover ? String(album.cover).trim() : "";
-      if (!raw || !/\/assets\/music\/responsive\/[^/]+-cover-900\.webp(?:$|\?)/i.test(raw)) return;
+      if (!raw || !/(?:^|\/)assets\/music\/responsive\/[^/]+-cover-900\.webp(?:$|\?)/i.test(raw)) return;
       const variants = [
         raw.replace(/-cover-900\.webp(?:$|\?)/i, "-cover-480.webp"),
         raw
@@ -4312,6 +4317,26 @@ function openAppDownloadGatekeeper(appName, url) {
     return Boolean(isIOS && (legacyStandalone || standaloneDisplay));
   }
 
+  function initAudioSessionTelemetry() {
+    if (audioState.audioSessionTelemetryBound) return;
+    const audioSession = navigator && navigator.audioSession ? navigator.audioSession : null;
+    if (!audioSession || typeof audioSession.addEventListener !== "function") return;
+    audioState.audioSessionTelemetryBound = true;
+
+    const reportState = function (trigger) {
+      trackAudioRuntimeEvent("audio_session_state", {
+        trigger: trigger || "statechange",
+        audio_session_state: String(audioSession.state || "unknown"),
+        audio_session_type: String(audioSession.type || "auto")
+      });
+    };
+
+    audioSession.addEventListener("statechange", function () {
+      reportState("statechange");
+    });
+    reportState("init");
+  }
+
   function bindMediaSessionActions(options) {
     const opts = options || {};
     if (audioState.mediaSessionBound && !opts.force) return;
@@ -4340,7 +4365,19 @@ function openAppDownloadGatekeeper(appName, url) {
     safeSet("pause", function () {
       const audio = audioState.audio;
       if (!audio) return;
-      if (!audio.paused) audio.pause();
+      trackAudioRuntimeEvent("media_session_pause", Object.assign(
+        buildAudioMonitorPayload(
+          getCurrentPlaylistTrack(),
+          audioState.currentIndex,
+          audioState.activeLogicalSrc || audio.currentSrc || audio.src
+        ),
+        getAudioRuntimeProbeState(),
+        { surface: "media_session" }
+      ));
+      if (!audio.paused) {
+        markAudioPauseIntent("media_session", "media_session");
+        audio.pause();
+      }
     });
 
     safeSet("previoustrack", function () {
@@ -4563,6 +4600,10 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function stopAudioTelemetryHeartbeat() {
     audioTelemetryApi.stopHeartbeat();
+  }
+
+  function markAudioTelemetryInactive() {
+    audioTelemetryApi.markHealthSessionInactive();
   }
 
   function getPrefetchCacheRequest() {
@@ -4843,6 +4884,9 @@ function openAppDownloadGatekeeper(appName, url) {
   }
   function ensurePlayablePlaylistContext() {
     return callAudioRadio("ensurePlayablePlaylistContext", arguments);
+  }
+  function markAudioPauseIntent() {
+    return callAudioRadio("markAudioPauseIntent", arguments);
   }
   function syncPlaylistContext(list, options) {
     return audioCoreApi.syncPlaylistContext(list, options);
@@ -5131,6 +5175,7 @@ function openAppDownloadGatekeeper(appName, url) {
       : Promise.resolve();
     if (isHomeScreen || audioFeaturesNeeded) {
       ensureGlobalAudio();
+      initAudioSessionTelemetry();
       ensurePlayablePlaylistContext();
     }
 

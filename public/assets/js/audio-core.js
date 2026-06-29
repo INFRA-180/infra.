@@ -61,6 +61,7 @@
     const syncRadioQueueToPlaylist = method(ctx, "syncRadioQueueToPlaylist");
     const updateProgressUi = method(ctx, "updateProgressUi");
     const saveResumeState = method(ctx, "saveResumeState");
+    const markAudioPauseIntent = method(ctx, "markAudioPauseIntent");
     const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () { return -1; });
 
     function seekCurrentAudioToRatio(ratio) {
@@ -206,6 +207,7 @@
       if (!audio || !src) return false;
       revokeActiveBlobUrl();
       try {
+        markAudioPauseIntent("source_reset", "recovery");
         audio.pause();
       } catch (_err) {
         // Ignore.
@@ -290,6 +292,7 @@
       setTimeout(function () {
         if (Number.isInteger(requestToken) && requestToken !== audioState.startRequestToken) return;
         if (audioState.currentIndex !== index) return;
+        if (!audio.paused) return;
         resetAudioElementForSource(audio, src);
         audio.play().catch(function () {
           if (Number.isInteger(requestToken) && requestToken !== audioState.startRequestToken) return;
@@ -313,7 +316,9 @@
       const isAutoAdvance = Boolean(opts.auto);
       const isFromMediaSession = Boolean(opts.fromMediaSession);
       const isFromTransportControl = Boolean(opts.fromTransportControl);
-      const isFastSkip = isAutoAdvance || isFromMediaSession || isFromTransportControl;
+      const preparedNextIndex = getAutoPrefetchedNextIndex();
+      const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index;
+      const isFastSkip = isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
 
       if (!isFastSkip && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
@@ -470,19 +475,17 @@
           click_perf_ms: audioState.audioClickPerfTs
         });
         if (playErr && playErr.name === "AbortError" && !isRetry) {
-          setTimeout(function () {
+          waitForAudioReadiness(audio, requestToken, isIosDevice() ? 900 : 700).then(function () {
             if (requestToken !== audioState.startRequestToken) return;
             attemptPlay({ retry: true, sync: isFastSkip });
-          }, 120);
+          });
           return;
         }
         audioState.trackStartInFlight = false;
         clearFadeTimer();
         setTrackStatus(rowTrack, "Chargement du fichier audio...");
         syncAudioUi();
-        if (!isFastSkip) {
-          recoverFromTrackFailure(index, target.src, requestToken);
-        }
+        recoverFromTrackFailure(index, target.src, requestToken);
       }
 
       function attemptPlay(playMeta) {
@@ -542,6 +545,7 @@
 
         if (!shouldFastSourceSwitch) {
           try {
+            markAudioPauseIntent("source_switch", opts.surface || "track_change");
             audio.pause();
           } catch (_err) {
             // Ignore pause failures during source switches.
@@ -887,6 +891,7 @@
         return;
       }
 
+      markAudioPauseIntent("ui", "toggle");
       audio.pause();
     }
 

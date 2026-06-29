@@ -3,6 +3,9 @@
 
   const FINE_EVENTS = new Set([
     "album_switch",
+    "audio_pause",
+    "audio_play",
+    "audio_session_state",
     "cache_hit",
     "click_track",
     "cover_error",
@@ -45,6 +48,8 @@
     "startTrack_enter",
     "load_called",
     "media_session_nexttrack",
+    "media_session_pause",
+    "media_session_play",
     "media_session_previoustrack",
     "transport_nexttrack",
     "transport_previoustrack",
@@ -56,6 +61,7 @@
     "prefetch_start",
     "ready_wait_start",
     "ready_wait_end",
+    "resume_probe",
     "served_from_prefetch",
     "silent_check",
     "ended",
@@ -222,6 +228,11 @@
       if (healthSessionActive) return;
       healthSessionActive = true;
       healthSessionStartedAt = Date.now();
+    }
+
+    function markHealthSessionInactive() {
+      healthSessionActive = false;
+      healthSessionStartedAt = 0;
     }
 
     function getHealthSessionState() {
@@ -590,6 +601,7 @@
       getRuntimeProbeState,
       flushQueue,
       enqueue,
+      markHealthSessionInactive,
       startHeartbeat,
       stopHeartbeat,
       trackRuntimeEvent,

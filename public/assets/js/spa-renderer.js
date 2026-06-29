@@ -95,15 +95,16 @@
     return fragment;
   }
 
-  function getSpaCriticalImages(fragment) {
+  function getSpaCriticalImages(fragment, limit) {
     if (!fragment || typeof fragment.querySelectorAll !== "function") return [];
+    const maxImages = Math.max(1, Number(limit) || 8);
     return Array.from(fragment.querySelectorAll("img")).filter(function (img, index) {
       if (img.classList.contains("cover")) return true;
       if (img.classList.contains("album-cover") && index < 8) return true;
       if (String(img.getAttribute("loading") || "").toLowerCase() === "eager") return true;
       if (String(img.getAttribute("fetchpriority") || "").toLowerCase() === "high") return true;
       return false;
-    }).slice(0, 8);
+    }).slice(0, maxImages);
   }
 
   function decodeSpaImage(img) {
@@ -122,8 +123,11 @@
     return Promise.resolve(Boolean(img.complete));
   }
 
-  function decodeSpaCriticalImages(fragment, telemetry) {
-    const images = getSpaCriticalImages(fragment);
+  function decodeSpaCriticalImages(fragment, telemetry, options) {
+    const opts = options || {};
+    const imageLimit = Math.max(1, Number(opts.imageLimit) || 8);
+    const timeoutMs = Math.max(50, Number(opts.timeoutMs) || 150);
+    const images = getSpaCriticalImages(fragment, imageLimit);
     const startedAt = getAudioTelemetryNow();
     if (!images.length) {
       trackAudioRuntimeEvent("cover_decode_duration", Object.assign({}, telemetry || {}, {
@@ -137,16 +141,25 @@
 
     let timeoutId = 0;
     let timedOut = false;
-    const decodePromise = Promise.all(images.map(decodeSpaImage)).then(function (results) {
+    let decodedCount = 0;
+    let settledCount = 0;
+    const decodePromise = Promise.all(images.map(function (image) {
+      return decodeSpaImage(image).then(function (decoded) {
+        settledCount += 1;
+        if (decoded) decodedCount += 1;
+        return decoded;
+      });
+    })).then(function () {
       return {
-        decodedCount: results.filter(Boolean).length
+        decodedCount,
+        settledCount
       };
     });
     const timeoutPromise = new Promise(function (resolve) {
       timeoutId = window.setTimeout(function () {
         timedOut = true;
-        resolve({ decodedCount: 0 });
-      }, 150);
+        resolve({ decodedCount, settledCount });
+      }, timeoutMs);
     });
 
     return Promise.race([decodePromise, timeoutPromise]).then(function (result) {
@@ -154,6 +167,7 @@
       trackAudioRuntimeEvent("cover_decode_duration", Object.assign({}, telemetry || {}, {
         image_count: images.length,
         decoded_count: result && Number.isFinite(result.decodedCount) ? result.decodedCount : 0,
+        settled_count: result && Number.isFinite(result.settledCount) ? result.settledCount : 0,
         timed_out: timedOut,
         duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
       }));
@@ -454,8 +468,17 @@
     const bodyClassName = doc.body ? doc.body.className : document.body.className;
     const fragment = buildSpaDocumentFragment(doc);
     const isAlbumPage = doc.body && doc.body.classList && doc.body.classList.contains("album-screen");
+    const isHomePage = doc.body && doc.body.classList && doc.body.classList.contains("home-screen");
     if (isAlbumPage) {
       await waitForSpaAlbumCoverReady(fragment, sourceUrl, telemetry);
+    } else if (isHomePage && isMobilePwaCoverNavigation()) {
+      await decodeSpaCriticalImages(fragment, Object.assign({}, telemetry || {}, {
+        blocking: true,
+        pwa_home_mode: true
+      }), {
+        imageLimit: 4,
+        timeoutMs: 260
+      });
     } else {
       decodeSpaCriticalImages(fragment, Object.assign({}, telemetry || {}, {
         blocking: false

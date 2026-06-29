@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix271-20260629";
+window.INFRA_BUILD_TAG = "audiofix272-20260629";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -384,7 +384,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix271-20260629";
+  const runtimeVersion = "audiofix272-20260629";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -829,6 +829,7 @@ function openAppDownloadGatekeeper(appName, url) {
       getScrollFromHistoryState,
       prefetchSpaPage,
       releasePwaCoverHold,
+      showPwaHomeReturnHold,
       isStandaloneDisplayMode,
       isIosDevice,
       isAndroidDevice
@@ -2185,6 +2186,89 @@ function openAppDownloadGatekeeper(appName, url) {
       timer: window.setTimeout(function () {
         releasePwaCoverHold("timeout");
       }, 1400)
+    };
+    return true;
+  }
+
+  function getPwaHomeReturnHoldBackground() {
+    try {
+      const rootStyles = window.getComputedStyle(document.documentElement);
+      const start = rootStyles.getPropertyValue("--bg-start").trim() || "#ffffff";
+      const mid = rootStyles.getPropertyValue("--bg-mid").trim() || start;
+      const end = rootStyles.getPropertyValue("--bg-end").trim() || mid;
+      return `linear-gradient(180deg, ${start} 0%, ${mid} 52%, ${end} 100%)`;
+    } catch (_err) {
+      return "#ffffff";
+    }
+  }
+
+  function showPwaHomeReturnHold(route, reason) {
+    if (!isMobilePwaCoverNavigation()) return false;
+    const states = Array.isArray(route && route.coverStates)
+      ? route.coverStates.filter(function (state) {
+          return Boolean(state && state.source);
+        }).slice(0, 10)
+      : [];
+    if (!states.length) return false;
+
+    releasePwaCoverHold("replace");
+    const root = getSpaPersistRoot();
+    const wrapper = document.createElement("div");
+    wrapper.className = "pwa-cover-hold pwa-home-return-hold";
+    wrapper.setAttribute("aria-hidden", "true");
+    wrapper.dataset.reason = String(reason || "home_return");
+    Object.assign(wrapper.style, {
+      position: "fixed",
+      inset: "0",
+      zIndex: "11980",
+      pointerEvents: "none",
+      overflow: "hidden",
+      background: getPwaHomeReturnHoldBackground(),
+      opacity: "1",
+      transform: "translateZ(0)",
+      WebkitTransform: "translateZ(0)",
+      contain: "layout paint style"
+    });
+
+    states.forEach(function (state) {
+      const src = normalizeCoverUrl(state.source, { width: 480 });
+      if (!src) return;
+      const width = Math.max(24, Math.round(Number(state.displayWidth) || 0));
+      const height = Math.max(24, Math.round(Number(state.displayHeight) || width));
+      const left = Math.round(Number(state.viewportLeft) || 0);
+      const top = Math.round(Number(state.viewportTop) || 0);
+      if (top > window.innerHeight + 120 || top + height < -120) return;
+
+      const image = new Image();
+      image.decoding = "async";
+      image.loading = "eager";
+      image.setAttribute("fetchpriority", "high");
+      image.src = src;
+      Object.assign(image.style, {
+        position: "absolute",
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${width}px`,
+        height: `${height}px`,
+        display: "block",
+        objectFit: "contain",
+        borderRadius: state.borderRadius || "6px",
+        background: "rgba(17, 17, 17, 0.06)",
+        transform: "translateZ(0)",
+        WebkitTransform: "translateZ(0)"
+      });
+      wrapper.appendChild(image);
+    });
+
+    if (!wrapper.childNodes.length) return false;
+    root.appendChild(wrapper);
+    spaState.pwaCoverHold = {
+      node: wrapper,
+      src: "home-return",
+      startedAt: getAudioTelemetryNow(),
+      timer: window.setTimeout(function () {
+        releasePwaCoverHold("home_return_timeout");
+      }, 1200)
     };
     return true;
   }

@@ -41,6 +41,7 @@
     const getScrollFromHistoryState = method(ctx, "getScrollFromHistoryState", function () { return { x: 0, y: 0 }; });
     const prefetchSpaPage = method(ctx, "prefetchSpaPage");
     const releasePwaCoverHold = method(ctx, "releasePwaCoverHold");
+    const showPwaHomeReturnHold = method(ctx, "showPwaHomeReturnHold", function () { return false; });
     const isStandaloneDisplayMode = method(ctx, "isStandaloneDisplayMode", function () { return false; });
     const isIosDevice = method(ctx, "isIosDevice", function () { return false; });
     const isAndroidDevice = method(ctx, "isAndroidDevice", function () { return false; });
@@ -126,11 +127,21 @@
     const coverStates = priorityCards.slice(0, 5).map(function (card) {
       const image = card.querySelector("img.album-cover");
       const rect = card.getBoundingClientRect();
+      const imageRect = image ? image.getBoundingClientRect() : rect;
+      let borderRadius = "6px";
+      try {
+        borderRadius = image ? window.getComputedStyle(image).borderRadius || borderRadius : borderRadius;
+      } catch (_err) {
+        borderRadius = "6px";
+      }
       return {
         href: getComparableSpaUrl(card.getAttribute("href")),
         source: image ? preferPwaCoverSource(image.currentSrc || image.src || "") : "",
-        displayWidth: image ? Math.max(1, Math.round(image.getBoundingClientRect().width)) : 0,
-        viewportTop: Math.round(rect.top)
+        displayWidth: image ? Math.max(1, Math.round(imageRect.width)) : 0,
+        displayHeight: image ? Math.max(1, Math.round(imageRect.height)) : 0,
+        viewportLeft: Math.round(imageRect.left),
+        viewportTop: Math.round(imageRect.top),
+        borderRadius
       };
     }).filter(function (state) {
       return Boolean(state.href && state.source);
@@ -854,8 +865,12 @@
     if (!route || !canRestoreLiveHomeRoute(urlLike)) return null;
 
     const startedAt = getAudioTelemetryNow();
+    const holdShown = showPwaHomeReturnHold(route, "live_home_restore");
     const coverResult = await prepareLiveHomeRouteCovers(route);
-    if (Number.isFinite(opts.navToken) && spaState.navToken !== opts.navToken) return null;
+    if (Number.isFinite(opts.navToken) && spaState.navToken !== opts.navToken) {
+      if (holdShown) releasePwaCoverHold("stale_home_restore");
+      return null;
+    }
     const persistRoot = getSpaPersistRoot();
     const requested = opts.restoreScroll
       ? getScrollFromHistoryState(opts.restoreScroll)
@@ -890,6 +905,7 @@
     const appliedX = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
     const appliedY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
     const paintState = await waitForSpaFirstPaint();
+    if (holdShown) releasePwaCoverHold("home_first_paint");
     const result = Object.assign({
       swap_mode: "live_dom_restore",
       swap_schedule_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
@@ -959,6 +975,8 @@
     }));
     if (isAlbumPage && isMobilePwaCoverNavigation()) {
       releasePwaCoverHold("album_first_paint");
+    } else if (isHomePage && isMobilePwaCoverNavigation()) {
+      releasePwaCoverHold("home_first_paint");
     }
   }
 

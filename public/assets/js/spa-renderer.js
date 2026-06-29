@@ -40,6 +40,7 @@
     const logAudioRuntimeAlbumSwitch = method(ctx, "logAudioRuntimeAlbumSwitch");
     const getScrollFromHistoryState = method(ctx, "getScrollFromHistoryState", function () { return { x: 0, y: 0 }; });
     const prefetchSpaPage = method(ctx, "prefetchSpaPage");
+    const releasePwaCoverHold = method(ctx, "releasePwaCoverHold");
     const isStandaloneDisplayMode = method(ctx, "isStandaloneDisplayMode", function () { return false; });
     const isIosDevice = method(ctx, "isIosDevice", function () { return false; });
     const isAndroidDevice = method(ctx, "isAndroidDevice", function () { return false; });
@@ -956,6 +957,9 @@
     trackAudioRuntimeEvent("spa_swap_done", Object.assign({}, telemetry || {}, swapResult || {}, {
       duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
     }));
+    if (isAlbumPage && isMobilePwaCoverNavigation()) {
+      releasePwaCoverHold("album_first_paint");
+    }
   }
 
   async function spaNavigate(href, options) {
@@ -981,12 +985,16 @@
     }
 
     const same = url.pathname === rendered.pathname && url.search === rendered.search && url.hash === rendered.hash;
-    if (same) return;
+    if (same) {
+      releasePwaCoverHold("same_url");
+      return;
+    }
     const liveHomeCapture = captureLiveHomeRoute(url, rendered);
 
     const navNow = getAudioTelemetryNow();
     const sameRecentTarget = spaState.lastNavHref === url.href && spaState.lastNavTs && navNow - spaState.lastNavTs < 650;
     if (sameRecentTarget && opts.history === "push") {
+      releasePwaCoverHold("duplicate_tap");
       trackAudioRuntimeEvent("nav:album_abort", {
         track: "album_open",
         album: getAlbumNameFromUrlLike(url.href),
@@ -1023,6 +1031,7 @@
 
     function fallbackToDocumentNavigation(reason, extra) {
       finishSpaNavigation();
+      releasePwaCoverHold(reason || "fallback");
       finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", Object.assign({
         reason: reason || "fallback"
       }, extra || {}));
@@ -1140,6 +1149,7 @@
         }
         if (spaState.navToken !== navToken) {
           finishSpaNavigation();
+          releasePwaCoverHold("stale_cached_render");
           finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "stale_cached_render" });
           trackAudioRuntimeEvent("nav:album_abort", {
             track: "album_open",
@@ -1208,6 +1218,7 @@
       if (!controller.signal.aborted) fallbackToDocumentNavigation("fetch_error");
       else {
         finishSpaNavigation();
+        releasePwaCoverHold("fetch_aborted");
         finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "fetch_aborted" });
       }
       return;
@@ -1230,6 +1241,7 @@
 
     if (controller.signal.aborted) {
       finishSpaNavigation();
+      releasePwaCoverHold("render_aborted");
       finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "render_aborted" });
       trackAudioRuntimeEvent("nav:album_abort", {
         track: "album_open",
@@ -1276,6 +1288,7 @@
     }
     if (spaState.navToken !== navToken) {
       finishSpaNavigation();
+      releasePwaCoverHold("stale_render");
       finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "stale_render" });
       trackAudioRuntimeEvent("nav:album_abort", {
         track: "album_open",

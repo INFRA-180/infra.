@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix270-20260629";
+window.INFRA_BUILD_TAG = "audiofix271-20260629";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -176,6 +176,7 @@ function openAppDownloadGatekeeper(appName, url) {
     navToken: 0,
     navigationActive: false,
     albumCoverPlaceholderByUrl: new Map(),
+    pwaCoverHold: null,
     liveHomeRoute: null,
     pageCacheApi: null
   };
@@ -383,7 +384,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix270-20260629";
+  const runtimeVersion = "audiofix271-20260629";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -827,6 +828,7 @@ function openAppDownloadGatekeeper(appName, url) {
       logAudioRuntimeAlbumSwitch,
       getScrollFromHistoryState,
       prefetchSpaPage,
+      releasePwaCoverHold,
       isStandaloneDisplayMode,
       isIosDevice,
       isAndroidDevice
@@ -2082,6 +2084,109 @@ function openAppDownloadGatekeeper(appName, url) {
       }
     }).catch(function () {});
     return url;
+  }
+
+  function releasePwaCoverHold(reason) {
+    const hold = spaState.pwaCoverHold;
+    if (!hold || !hold.node) {
+      spaState.pwaCoverHold = null;
+      return;
+    }
+
+    spaState.pwaCoverHold = null;
+    if (hold.timer) {
+      window.clearTimeout(hold.timer);
+    }
+    const node = hold.node;
+    node.dataset.reason = String(reason || "done");
+    node.style.opacity = "0";
+    node.style.transition = "opacity 70ms ease-out";
+    window.setTimeout(function () {
+      if (node && node.parentNode) node.parentNode.removeChild(node);
+    }, 90);
+  }
+
+  function showPwaCoverHold(link, coverSrc) {
+    if (!isMobilePwaCoverNavigation()) return false;
+    if (!link || typeof link.querySelector !== "function") return false;
+    const image = link.querySelector("img.album-cover, img.cover");
+    if (!image) return false;
+
+    releasePwaCoverHold("replace");
+    const rect = image.getBoundingClientRect();
+    if (!rect || rect.width < 8 || rect.height < 8) return false;
+
+    const url = normalizeCoverUrl(
+      coverSrc || choosePreferredSrcsetSource(image.getAttribute("srcset") || "", 480) || image.currentSrc || image.src || "",
+      { width: 480 }
+    );
+    if (!url) return false;
+
+    const root = getSpaPersistRoot();
+    const wrapper = document.createElement("div");
+    wrapper.className = "pwa-cover-hold";
+    wrapper.setAttribute("aria-hidden", "true");
+    Object.assign(wrapper.style, {
+      position: "fixed",
+      left: `${Math.round(rect.left)}px`,
+      top: `${Math.round(rect.top)}px`,
+      width: `${Math.round(rect.width)}px`,
+      height: `${Math.round(rect.height)}px`,
+      zIndex: "11990",
+      pointerEvents: "none",
+      overflow: "hidden",
+      borderRadius: window.getComputedStyle(image).borderRadius || "6px",
+      background: "transparent",
+      opacity: "1",
+      transform: "translateZ(0)",
+      WebkitTransform: "translateZ(0)",
+      contain: "layout paint style"
+    });
+
+    let visual = null;
+    if (image.complete && image.naturalWidth > 0 && typeof document.createElement === "function") {
+      try {
+        const ratio = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(rect.width * ratio));
+        canvas.height = Math.max(1, Math.round(rect.height * ratio));
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+        canvas.style.display = "block";
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+          visual = canvas;
+        }
+      } catch (_err) {
+        visual = null;
+      }
+    }
+
+    if (!visual) {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = url;
+      Object.assign(img.style, {
+        display: "block",
+        width: "100%",
+        height: "100%",
+        objectFit: "contain"
+      });
+      visual = img;
+    }
+
+    wrapper.appendChild(visual);
+    root.appendChild(wrapper);
+    spaState.pwaCoverHold = {
+      node: wrapper,
+      src: url,
+      startedAt: getAudioTelemetryNow(),
+      timer: window.setTimeout(function () {
+        releasePwaCoverHold("timeout");
+      }, 1400)
+    };
+    return true;
   }
 
   function orderAlbumCoverWarmupUrls(covers) {
@@ -5128,6 +5233,7 @@ function openAppDownloadGatekeeper(appName, url) {
 
       event.preventDefault();
       const coverPlaceholderSrc = primeLinkedAlbumCoverForPwa(link, url.href);
+      showPwaCoverHold(link, coverPlaceholderSrc);
       spaNavigate(url.href, {
         history: "push",
         coverPlaceholderSrc

@@ -22,6 +22,7 @@
     const getSpaCachedHtml = method(ctx, "getSpaCachedHtml", function () { return ""; });
     const getSpaPersistRoot = method(ctx, "getSpaPersistRoot", function () { return document.body; });
     const normalizeCoverElementsForBase = method(ctx, "normalizeCoverElementsForBase");
+    const absolutizeSrcsetForBase = method(ctx, "absolutizeSrcsetForBase", function (value) { return String(value || ""); });
     const getAudioTelemetryNow = method(ctx, "getAudioTelemetryNow", function () { return Date.now(); });
     const trackAudioRuntimeEvent = method(ctx, "trackAudioRuntimeEvent");
     const parseSrcsetCandidates = method(ctx, "parseSrcsetCandidates", function () { return []; });
@@ -152,6 +153,31 @@
     const route = spaState.liveHomeRoute;
     if (!route || !route.fragment || !route.fragment.childNodes.length) return false;
     return Boolean(route.url && route.url === getComparableSpaUrl(urlLike));
+  }
+
+  function freezeLiveHomeResourceUrls(root, baseUrl) {
+    if (!root || typeof root.querySelectorAll !== "function") return 0;
+    let frozen = 0;
+
+    root.querySelectorAll("img[src], source[src]").forEach(function (element) {
+      const value = String(element.getAttribute("src") || "").trim();
+      if (!value) return;
+      element.setAttribute("src", normalizeUrlAgainstBase(value, baseUrl));
+      frozen += 1;
+    });
+    root.querySelectorAll("[srcset]").forEach(function (element) {
+      const value = String(element.getAttribute("srcset") || "").trim();
+      if (!value) return;
+      element.setAttribute("srcset", absolutizeSrcsetForBase(value, baseUrl));
+      frozen += 1;
+    });
+    root.querySelectorAll("video[poster]").forEach(function (element) {
+      const value = String(element.getAttribute("poster") || "").trim();
+      if (!value) return;
+      element.setAttribute("poster", normalizeUrlAgainstBase(value, baseUrl));
+      frozen += 1;
+    });
+    return frozen;
   }
 
   function lockLiveHomeCover(image, state) {
@@ -713,6 +739,10 @@
         else node.remove();
       });
       if (liveHomeFragment && liveHomeCapture) {
+        liveHomeCapture.frozenResourceCount = freezeLiveHomeResourceUrls(
+          liveHomeFragment,
+          liveHomeCapture.url
+        );
         liveHomeCapture.fragment = liveHomeFragment;
         spaState.liveHomeRoute = liveHomeCapture;
       }
@@ -856,7 +886,8 @@
       scroll_restore_delta_y: appliedY - requested.y,
       restore_cover_requested_count: coverResult.requested,
       restore_cover_decoded_count: coverResult.decoded,
-      restore_cover_timed_out: coverResult.timedOut
+      restore_cover_timed_out: coverResult.timedOut,
+      frozen_resource_url_count: Math.max(0, Number(route.frozenResourceCount) || 0)
     }, paintState || {});
 
     trackAudioRuntimeEvent("spa_scroll_restore", Object.assign({}, telemetry || {}, result, {

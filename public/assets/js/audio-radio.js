@@ -72,6 +72,7 @@
     const setTrackStatus = method(ctx, "setTrackStatus", function () {});
     const scheduleWaitingRecovery = method(ctx, "scheduleWaitingRecovery", function () {});
     const getAudioRuntimeProbeState = method(ctx, "getAudioRuntimeProbeState", function () { return {}; });
+    const confirmAudioRecovery = method(ctx, "confirmAudioRecovery", function () {});
     const sendAudioMonitoringLog = method(ctx, "sendAudioMonitoringLog", function () {});
     const recoverFromTrackFailure = method(ctx, "recoverFromTrackFailure", function () {});
     const updateProgressUi = method(ctx, "updateProgressUi", function () {});
@@ -104,9 +105,117 @@
     };
   }
 
+  function clearExternalResumeProbeTimers() {
+    const timers = Array.isArray(audioState.externalResumeProbeTimers)
+      ? audioState.externalResumeProbeTimers
+      : [];
+    timers.forEach(function (timer) {
+      window.clearTimeout(timer);
+    });
+    audioState.externalResumeProbeTimers = [];
+  }
+
+  function cancelExternalResumeCommand() {
+    clearExternalResumeProbeTimers();
+    audioState.externalPlaybackCommand = null;
+    audioState.externalResumeRecoveryInFlight = false;
+  }
+
+  function recoverStuckExternalResume(audio, commandId, surface, startTime) {
+    const command = audioState.externalPlaybackCommand;
+    if (
+      !audio ||
+      !command ||
+      command.id !== commandId ||
+      audio.paused ||
+      audioState.externalResumeRecoveryInFlight
+    ) {
+      return;
+    }
+
+    audioState.externalResumeRecoveryInFlight = true;
+    const recoveryStartedAt = Date.now();
+    const recoveryStartTime = Number.isFinite(audio.currentTime) ? audio.currentTime : startTime;
+    const payload = Object.assign(
+      buildAudioMonitorPayload(
+        getCurrentPlaylistTrack(),
+        audioState.currentIndex,
+        audioState.activeLogicalSrc || audio.currentSrc || audio.src
+      ),
+      getAudioRuntimeProbeState(),
+      {
+        command_id: commandId,
+        surface: surface || "",
+        advanced_ms: Math.max(0, Math.round((recoveryStartTime - startTime) * 1000))
+      }
+    );
+    trackAudioRuntimeEvent("external_resume_stuck", payload);
+    trackAudioRuntimeEvent("external_resume_recovery_start", payload);
+
+    markAudioPauseIntent("external_resume_recovery", surface || "media_session");
+    try {
+      audio.pause();
+    } catch (_err) {
+      // Continue with the single guarded play attempt.
+    }
+
+    Promise.resolve().then(function () {
+      return audio.play();
+    }).then(function () {
+      const timer = window.setTimeout(function () {
+        const activeCommand = audioState.externalPlaybackCommand;
+        if (!activeCommand || activeCommand.id !== commandId) return;
+        const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : recoveryStartTime;
+        const advanced = Math.max(0, currentTime - recoveryStartTime);
+        const recovered = Boolean(!audio.paused && advanced >= 0.2);
+        trackAudioRuntimeEvent(
+          recovered ? "external_resume_recovery_resolved" : "external_resume_recovery_failed",
+          Object.assign(
+            buildAudioMonitorPayload(
+              getCurrentPlaylistTrack(),
+              audioState.currentIndex,
+              audioState.activeLogicalSrc || audio.currentSrc || audio.src
+            ),
+            getAudioRuntimeProbeState(),
+            {
+              command_id: commandId,
+              surface: surface || "",
+              advanced_ms: Math.round(advanced * 1000),
+              recovery_ms: Date.now() - recoveryStartedAt,
+              paused: Boolean(audio.paused)
+            }
+          )
+        );
+        audioState.externalResumeRecoveryInFlight = false;
+      }, 900);
+      audioState.externalResumeProbeTimers.push(timer);
+    }).catch(function (err) {
+      if (!audioState.externalPlaybackCommand || audioState.externalPlaybackCommand.id !== commandId) return;
+      trackAudioRuntimeEvent("external_resume_recovery_failed", Object.assign(
+        buildAudioMonitorPayload(
+          getCurrentPlaylistTrack(),
+          audioState.currentIndex,
+          audioState.activeLogicalSrc || audio.currentSrc || audio.src
+        ),
+        getAudioRuntimeProbeState(),
+        {
+          command_id: commandId,
+          surface: surface || "",
+          recovery_ms: Date.now() - recoveryStartedAt,
+          paused: Boolean(audio.paused),
+          error_name: err && err.name ? err.name : "Error",
+          error_message: err && err.message ? err.message : "external_resume_recovery_rejected"
+        }
+      ));
+      audioState.externalResumeRecoveryInFlight = false;
+    });
+  }
+
   function scheduleExternalResumeProbes(audio, commandId, surface, startTime) {
-    [600, 3000].forEach(function (delayMs) {
-      window.setTimeout(function () {
+    [600, 1500, 3000].forEach(function (delayMs) {
+      const timer = window.setTimeout(function () {
+        const command = audioState.externalPlaybackCommand;
+        if (!command || command.id !== commandId) return;
         if (!audio || !getCurrentPlayableAudioSrc(audio)) return;
         const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
         const advanced = Math.max(0, currentTime - startTime);
@@ -126,7 +235,11 @@
             paused: Boolean(audio.paused)
           }
         ));
+        if (delayMs === 1500 && !audio.paused && advanced < 0.35) {
+          recoverStuckExternalResume(audio, commandId, surface, startTime);
+        }
       }, delayMs);
+      audioState.externalResumeProbeTimers.push(timer);
     });
   }
 
@@ -956,6 +1069,7 @@
 
   function toggleAlbumShuffleMode() {
     audioState.shuffleOn = !audioState.shuffleOn;
+    clearNextTrackPrefetch("shuffle_mode_change");
     savePlaybackQueueContext();
     syncMediaSessionMetadata({ forcePosition: true });
     syncAudioUi();
@@ -1397,9 +1511,35 @@
 
   function playFromExternalControl(surface) {
     const audio = audioState.audio || ensureGlobalAudio();
-    if (!audio || !audio.paused) return;
+    if (!audio) return;
+    const commandNow = Date.now();
+    const previousCommand = audioState.externalPlaybackCommand;
+    if (previousCommand && commandNow - previousCommand.at < 400) {
+      trackAudioRuntimeEvent("external_play_duplicate", Object.assign(
+        buildAudioMonitorPayload(
+          getCurrentPlaylistTrack(),
+          audioState.currentIndex,
+          audioState.activeLogicalSrc || audio.currentSrc || audio.src
+        ),
+        getAudioRuntimeProbeState(),
+        {
+          command_id: previousCommand.id,
+          surface: surface || "",
+          duplicate_after_ms: Math.max(0, commandNow - previousCommand.at),
+          paused: Boolean(audio.paused)
+        }
+      ));
+      return;
+    }
+    if (!audio.paused) return;
+    cancelExternalResumeCommand();
     audioState.externalPlaybackCommandSeq = Number(audioState.externalPlaybackCommandSeq || 0) + 1;
     const commandId = `external-${Date.now().toString(36)}-${audioState.externalPlaybackCommandSeq}`;
+    audioState.externalPlaybackCommand = {
+      id: commandId,
+      at: commandNow,
+      surface: surface || ""
+    };
 
     if (!getCurrentPlayableAudioSrc(audio)) {
       trackAudioRuntimeEvent("media_session_play", {
@@ -1472,7 +1612,7 @@
           surface: surface || "",
           delay_ms: 0,
           stage: "play_promise",
-          confirmed: true,
+          confirmed: Boolean(!audio.paused),
           paused: Boolean(audio.paused)
         }
       ));
@@ -1592,6 +1732,9 @@
 
     audio.addEventListener("pause", function () {
       const pauseIntent = consumeAudioPauseIntent();
+      if (pauseIntent.reason !== "external_resume_recovery") {
+        cancelExternalResumeCommand();
+      }
       audioState.mediaSessionAudioPlaying = false;
       clearWaitingRecovery();
       audioState.resumeOnVisible = false;
@@ -1698,6 +1841,7 @@
     audio.addEventListener("timeupdate", function () {
       syncMediaSessionMetadata();
       audioState.lastAudioCurrentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+      confirmAudioRecovery(audio);
       maybePrefetchNextTrack("timeupdate");
       const now = Date.now();
       if (!audioState.lastResumeSaveTs || now - audioState.lastResumeSaveTs >= 5000) {
@@ -1947,6 +2091,9 @@
     audioState.nextPrefetchFromIndex = -1;
     audioState.nextPrefetchDoneSrc = "";
     audioState.nextPrefetchServedSrc = "";
+    audioState.nextPrefetchAttemptedSrc = "";
+    audioState.nextPrefetchFailedSrc = "";
+    audioState.nextPrefetchFailureReason = "";
   }
 
 
@@ -2072,6 +2219,9 @@
     audioState.nextPrefetchAbortController = abortController;
     audioState.nextPrefetchInFlight = true;
     rememberNextTrackPrefetch(index, src);
+    audioState.nextPrefetchAttemptedSrc = src;
+    audioState.nextPrefetchFailedSrc = "";
+    audioState.nextPrefetchFailureReason = "";
     trackAudioRuntimeEvent("prefetch_start", Object.assign(
       buildAudioMonitorPayload(track, index, src),
       {
@@ -2101,7 +2251,12 @@
         ? prefetchApi.getContentLength(response)
         : Number(response.headers.get("Content-Length") || response.headers.get("content-length") || 0);
       if (!Number.isFinite(bytes) || bytes <= 0) throw new Error("prefetch_missing_content_length");
-      if (bytes > PREFETCH_NEXT_MAX_BYTES) throw new Error("prefetch_too_large");
+      if (bytes > PREFETCH_NEXT_MAX_BYTES) {
+        if (response.body && typeof response.body.cancel === "function") {
+          response.body.cancel().catch(function () {});
+        }
+        throw new Error("prefetch_too_large");
+      }
       if (prefetchApi && typeof prefetchApi.putSingle === "function") {
         return prefetchApi.putSingle(src, response).then(function () {
           return bytes;
@@ -2131,6 +2286,8 @@
     }).catch(function (err) {
       if (token !== audioState.nextPrefetchToken) return;
       audioState.nextPrefetchDoneSrc = "";
+      audioState.nextPrefetchFailedSrc = src;
+      audioState.nextPrefetchFailureReason = err && err.message ? err.message : "prefetch_failed";
       trackAudioRuntimeEvent("prefetch_error", Object.assign(
         buildAudioMonitorPayload(track, index, src),
         {
@@ -2156,16 +2313,48 @@
     if (!PREFETCH_NEXT_ENABLED) return;
     if (audioState.nextPrefetchInFlight) return;
     if (!shouldPrefetchNextTrackNow(reason)) return;
-    const nextIndex = peekNextIndexForPrefetch();
+    const currentIndex = getCurrentPlaylistIndexSafe();
+    let nextIndex = -1;
+    if (
+      audioState.nextPrefetchFromIndex === currentIndex &&
+      Number.isInteger(audioState.nextPrefetchIndex) &&
+      audioState.nextPrefetchIndex >= 0 &&
+      audioState.nextPrefetchIndex < audioState.playlist.length
+    ) {
+      const selectedTrack = audioState.playlist[audioState.nextPrefetchIndex];
+      const selectedSrc = normalizeAudioSourceUrl(selectedTrack && selectedTrack.src ? selectedTrack.src : "");
+      if (selectedSrc && srcMatches(selectedSrc, audioState.nextPrefetchSrc)) {
+        nextIndex = audioState.nextPrefetchIndex;
+      }
+    }
+    if (nextIndex < 0) {
+      nextIndex = peekNextIndexForPrefetch();
+      if (nextIndex >= 0 && nextIndex < audioState.playlist.length) {
+        const selectedTrack = audioState.playlist[nextIndex];
+        const selectedSrc = normalizeAudioSourceUrl(selectedTrack && selectedTrack.src ? selectedTrack.src : "");
+        audioState.nextPrefetchDoneSrc = "";
+        audioState.nextPrefetchServedSrc = "";
+        audioState.nextPrefetchAttemptedSrc = "";
+        audioState.nextPrefetchFailedSrc = "";
+        audioState.nextPrefetchFailureReason = "";
+        rememberNextTrackPrefetch(nextIndex, selectedSrc);
+      }
+    }
     if (nextIndex < 0 || nextIndex >= audioState.playlist.length) return;
     const nextTrack = audioState.playlist[nextIndex];
     const nextSrc = normalizeAudioSourceUrl(nextTrack && nextTrack.src ? nextTrack.src : "");
     if (!nextSrc || !isCloudflareAudioUrl(nextSrc)) return;
-    const currentIndex = getCurrentPlaylistIndexSafe();
     if (
       audioState.nextPrefetchDoneSrc &&
       audioState.nextPrefetchFromIndex === currentIndex &&
       srcMatches(audioState.nextPrefetchDoneSrc, nextSrc)
+    ) {
+      return;
+    }
+    if (
+      audioState.nextPrefetchAttemptedSrc &&
+      audioState.nextPrefetchFromIndex === currentIndex &&
+      srcMatches(audioState.nextPrefetchAttemptedSrc, nextSrc)
     ) {
       return;
     }
@@ -2251,6 +2440,7 @@
       restoreResumeState,
       ensurePlayablePlaylistContext,
       markAudioPauseIntent,
+      cancelExternalResumeCommand,
       playFromExternalControl,
       handleGlobalTransportToggle,
       ensureGlobalAudio,
@@ -2316,6 +2506,7 @@
       restoreResumeState: function () {},
       ensurePlayablePlaylistContext: function () {},
       markAudioPauseIntent: function () {},
+      cancelExternalResumeCommand: function () {},
       playFromExternalControl: function () {},
       handleGlobalTransportToggle: function () {},
       ensureGlobalAudio: function () { return null; },

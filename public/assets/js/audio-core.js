@@ -63,6 +63,8 @@
     const saveResumeState = method(ctx, "saveResumeState");
     const markAudioPauseIntent = method(ctx, "markAudioPauseIntent");
     const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () { return -1; });
+    const beginAudioRecovery = method(ctx, "beginAudioRecovery");
+    const failAudioRecovery = method(ctx, "failAudioRecovery");
 
     function seekCurrentAudioToRatio(ratio) {
       const audio = audioState.audio;
@@ -282,6 +284,11 @@
       const track = getTrackByIndex(index);
       const maxRetries = 1;
       if (failures > maxRetries) {
+        failAudioRecovery({
+          request_token: requestToken,
+          reason: "retry_limit",
+          strategy: "reset_source"
+        });
         setTrackStatus(track, "Chargement du fichier audio, réessaie dans quelques secondes.", { retry: true });
         clearFadeTimer();
         syncAudioUi();
@@ -289,6 +296,11 @@
       }
 
       setTrackStatus(track, "Chargement du fichier audio...");
+      beginAudioRecovery({
+        request_token: requestToken,
+        reason: "playback_failure",
+        strategy: "reset_source"
+      });
       setTimeout(function () {
         if (Number.isInteger(requestToken) && requestToken !== audioState.startRequestToken) return;
         if (audioState.currentIndex !== index) return;
@@ -296,6 +308,11 @@
         resetAudioElementForSource(audio, src);
         audio.play().catch(function () {
           if (Number.isInteger(requestToken) && requestToken !== audioState.startRequestToken) return;
+          failAudioRecovery({
+            request_token: requestToken,
+            reason: "reset_play_rejected",
+            strategy: "reset_source"
+          });
           setTrackStatus(track, "Chargement du fichier audio, réessaie dans quelques secondes.", { retry: true });
         });
       }, 360);
@@ -475,6 +492,11 @@
           click_perf_ms: audioState.audioClickPerfTs
         });
         if (playErr && playErr.name === "AbortError" && !isRetry) {
+          beginAudioRecovery({
+            request_token: requestToken,
+            reason: "AbortError",
+            strategy: "wait_retry"
+          });
           waitForAudioReadiness(audio, requestToken, isIosDevice() ? 900 : 700).then(function () {
             if (requestToken !== audioState.startRequestToken) return;
             attemptPlay({ retry: true, sync: isFastSkip });
@@ -482,6 +504,7 @@
           return;
         }
         audioState.trackStartInFlight = false;
+        clearWaitingRecovery();
         clearFadeTimer();
         setTrackStatus(rowTrack, "Chargement du fichier audio...");
         syncAudioUi();

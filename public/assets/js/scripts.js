@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix273-20260629";
+window.INFRA_BUILD_TAG = "audiofix274-20260701";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -228,6 +228,11 @@ function openAppDownloadGatekeeper(appName, url) {
     mediaSessionResyncTimer: null,
     mediaSessionPositionTs: 0,
     audioSessionTelemetryBound: false,
+    externalPlaybackCommandSeq: 0,
+    externalPlaybackCommand: null,
+    externalResumeProbeTimers: [],
+    externalResumeRecoveryInFlight: false,
+    activeAudioRecovery: null,
     resumeOnVisible: false,
     recentPlayed: [],
     recentPlayedLimit: 12,
@@ -281,6 +286,9 @@ function openAppDownloadGatekeeper(appName, url) {
     nextPrefetchToken: 0,
     nextPrefetchDoneSrc: "",
     nextPrefetchServedSrc: "",
+    nextPrefetchAttemptedSrc: "",
+    nextPrefetchFailedSrc: "",
+    nextPrefetchFailureReason: "",
     spaSwitchContext: null,
     favoriteEntries: [],
     favoritePaths: new Set(),
@@ -384,7 +392,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix273-20260629";
+  const runtimeVersion = "audiofix274-20260701";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -593,6 +601,7 @@ function openAppDownloadGatekeeper(appName, url) {
       setTrackStatus,
       scheduleWaitingRecovery,
       getAudioRuntimeProbeState,
+      confirmAudioRecovery,
       sendAudioMonitoringLog,
       recoverFromTrackFailure,
       updateProgressUi,
@@ -651,6 +660,7 @@ function openAppDownloadGatekeeper(appName, url) {
       restoreResumeState: function () {},
       ensurePlayablePlaylistContext: function () {},
       markAudioPauseIntent: function () {},
+      cancelExternalResumeCommand: function () {},
       playFromExternalControl: function () {},
       handleGlobalTransportToggle: function () {},
       ensureGlobalAudio: function () {},
@@ -726,7 +736,9 @@ function openAppDownloadGatekeeper(appName, url) {
       updateProgressUi,
       saveResumeState,
       markAudioPauseIntent,
-      extendAlbumPlaylistToNextAlbum
+      extendAlbumPlaylistToNextAlbum,
+      beginAudioRecovery,
+      failAudioRecovery
     });
   }
 
@@ -4754,6 +4766,7 @@ function openAppDownloadGatekeeper(appName, url) {
     safeSet("pause", function () {
       const audio = audioState.audio;
       if (!audio) return;
+      cancelExternalResumeCommand();
       trackAudioRuntimeEvent("media_session_pause", Object.assign(
         buildAudioMonitorPayload(
           getCurrentPlaylistTrack(),
@@ -4993,6 +5006,97 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function markAudioTelemetryInactive() {
     audioTelemetryApi.markHealthSessionInactive();
+  }
+
+  function clearActiveAudioRecovery() {
+    const recovery = audioState.activeAudioRecovery;
+    if (recovery && recovery.timer) {
+      window.clearTimeout(recovery.timer);
+    }
+    audioState.activeAudioRecovery = null;
+  }
+
+  function buildAudioRecoveryPayload(recovery, extra) {
+    const audio = audioState.audio;
+    return Object.assign(
+      buildAudioMonitorPayload(
+        getCurrentPlaylistTrack(),
+        audioState.currentIndex,
+        audioState.activeLogicalSrc || (audio && (audio.currentSrc || audio.src)) || ""
+      ),
+      getAudioRuntimeProbeState(),
+      {
+        request_token: recovery && recovery.requestToken,
+        reason: recovery && recovery.reason,
+        strategy: recovery && recovery.strategy,
+        recovery_ms: recovery ? Math.max(0, Date.now() - recovery.startedAt) : 0
+      },
+      extra || {}
+    );
+  }
+
+  function beginAudioRecovery(details) {
+    const source = details || {};
+    const requestToken = Number(source.request_token);
+    if (!Number.isFinite(requestToken) || requestToken !== audioState.startRequestToken) return;
+    const existing = audioState.activeAudioRecovery;
+    if (existing && existing.requestToken === requestToken) {
+      existing.reason = source.reason || existing.reason;
+      existing.strategy = source.strategy || existing.strategy;
+      return;
+    }
+
+    clearActiveAudioRecovery();
+    const audio = audioState.audio;
+    const recovery = {
+      requestToken,
+      reason: String(source.reason || "playback_failure"),
+      strategy: String(source.strategy || "retry"),
+      startedAt: Date.now(),
+      startTime: audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+      timer: null
+    };
+    audioState.activeAudioRecovery = recovery;
+    trackAudioRuntimeEvent("recovery_start", buildAudioRecoveryPayload(recovery));
+    recovery.timer = window.setTimeout(function () {
+      if (audioState.activeAudioRecovery !== recovery) return;
+      failAudioRecovery({
+        request_token: requestToken,
+        reason: "progress_timeout",
+        strategy: recovery.strategy
+      });
+    }, 7000);
+  }
+
+  function confirmAudioRecovery(audio) {
+    const recovery = audioState.activeAudioRecovery;
+    if (!recovery) return;
+    if (recovery.requestToken !== audioState.startRequestToken) {
+      clearActiveAudioRecovery();
+      return;
+    }
+    if (!audio || audio.paused || !Number.isFinite(audio.currentTime)) return;
+    const advanced = Math.max(0, audio.currentTime - recovery.startTime);
+    if (advanced < 0.2) return;
+    trackAudioRuntimeEvent("recovery_resolved", buildAudioRecoveryPayload(recovery, {
+      advanced_ms: Math.round(advanced * 1000),
+      paused: false
+    }));
+    clearActiveAudioRecovery();
+  }
+
+  function failAudioRecovery(details) {
+    const source = details || {};
+    const recovery = audioState.activeAudioRecovery;
+    if (!recovery) return;
+    const requestToken = Number(source.request_token);
+    if (Number.isFinite(requestToken) && requestToken !== recovery.requestToken) return;
+    recovery.reason = String(source.reason || recovery.reason || "recovery_failed");
+    recovery.strategy = String(source.strategy || recovery.strategy || "retry");
+    trackAudioRuntimeEvent("recovery_failed", buildAudioRecoveryPayload(recovery, {
+      paused: Boolean(audioState.audio && audioState.audio.paused)
+    }));
+    clearActiveAudioRecovery();
   }
 
   function getPrefetchCacheRequest() {
@@ -5276,6 +5380,9 @@ function openAppDownloadGatekeeper(appName, url) {
   }
   function markAudioPauseIntent() {
     return callAudioRadio("markAudioPauseIntent", arguments);
+  }
+  function cancelExternalResumeCommand() {
+    return callAudioRadio("cancelExternalResumeCommand", arguments);
   }
   function syncPlaylistContext(list, options) {
     return audioCoreApi.syncPlaylistContext(list, options);

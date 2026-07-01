@@ -1536,7 +1536,9 @@ body.home-screen {
   max-height: calc(100dvh - 32px);
   margin: auto;
   padding: 0;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: #111111;
   background: transparent;
   border: 0;

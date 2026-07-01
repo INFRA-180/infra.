@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix277-20260701";
+window.INFRA_BUILD_TAG = "audiofix278-20260701";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -392,7 +392,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix277-20260701";
+  const runtimeVersion = "audiofix278-20260701";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -1298,6 +1298,8 @@ function openAppDownloadGatekeeper(appName, url) {
   let serviceWorkerControllerReloading = false;
   let serviceWorkerControllerReloadPending = false;
   let serviceWorkerControllerReloadTimer = 0;
+  let serviceWorkerRegistrationRef = null;
+  let serviceWorkerLastUpdateCheckAt = 0;
   const pageOpenedAt = getAudioTelemetryNow();
   let serviceWorkerControllerChangeAt = 0;
   let serviceWorkerReloadExecutedAt = 0;
@@ -1305,6 +1307,7 @@ function openAppDownloadGatekeeper(appName, url) {
   let documentVisibleSinceAt = document.visibilityState === "visible" ? getAudioTelemetryNow() : 0;
   const SERVICE_WORKER_RELOAD_MIN_IDLE_MS = 8000;
   const SERVICE_WORKER_RELOAD_MIN_VISIBLE_MS = 2000;
+  const SERVICE_WORKER_UPDATE_CHECK_MIN_MS = 60000;
 
   function purgeAdminUi() {
     // Public mode must not rely on CSS to hide admin UI. Remove it from the DOM.
@@ -3135,10 +3138,23 @@ function openAppDownloadGatekeeper(appName, url) {
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState !== "visible") return;
     documentVisibleSinceAt = getAudioTelemetryNow();
+    requestServiceWorkerUpdateCheck("visible");
     if (serviceWorkerControllerReloadPending) {
       scheduleDeferredServiceWorkerReload(SERVICE_WORKER_RELOAD_MIN_VISIBLE_MS + 180);
     }
   });
+
+  function requestServiceWorkerUpdateCheck(reason) {
+    if (!serviceWorkerRegistrationRef || typeof serviceWorkerRegistrationRef.update !== "function") return;
+    const now = getAudioTelemetryNow();
+    if (reason !== "registered" && serviceWorkerLastUpdateCheckAt && now - serviceWorkerLastUpdateCheckAt < SERVICE_WORKER_UPDATE_CHECK_MIN_MS) {
+      return;
+    }
+    serviceWorkerLastUpdateCheckAt = now;
+    serviceWorkerRegistrationRef.update().catch(function () {
+      // Ignore update probe failures; the app keeps using the active shell.
+    });
+  }
 
   function registerServiceWorker() {
     if (serviceWorkerRegistered) return;
@@ -3160,11 +3176,13 @@ function openAppDownloadGatekeeper(appName, url) {
 
     const swUrl = new URL(`sw.js${runtime.query}`, runtime.baseUrl).href;
     navigator.serviceWorker
-      .register(swUrl, { scope: runtime.baseUrl.pathname })
+      .register(swUrl, { scope: runtime.baseUrl.pathname, updateViaCache: "none" })
       .then(function (registration) {
+        serviceWorkerRegistrationRef = registration;
         if (registration.waiting) {
           registration.waiting.postMessage({ type: "SKIP_WAITING" });
         }
+        requestServiceWorkerUpdateCheck("registered");
 
         registration.addEventListener("updatefound", function () {
           const worker = registration.installing;

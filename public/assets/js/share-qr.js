@@ -20,7 +20,9 @@
   let dialogInvoker = null;
   let currentShareUrl = "";
   let openToken = 0;
-  let toastTimer = 0;
+  let copyStateTimer = 0;
+  let backdropPointer = null;
+  let shareSelectionElement = null;
 
   function cleanUrl(urlLike) {
     const url = new URL(String(urlLike || ""), window.location.href);
@@ -82,13 +84,42 @@
   function closeDialog() {
     if (!dialogParts) return;
     const dialog = dialogParts.dialog;
+    dialog.classList.remove("is-fallback-open");
     if (typeof dialog.close === "function" && dialog.open) {
       dialog.close();
       return;
     }
     dialog.removeAttribute("open");
-    dialog.classList.remove("is-fallback-open");
-    restoreDialogFocus();
+    handleDialogClosed();
+  }
+
+  function clearShareSelection() {
+    if (shareSelectionElement && shareSelectionElement.isConnected) {
+      shareSelectionElement.classList.remove("is-share-pressing", "is-share-selected");
+    }
+    shareSelectionElement = null;
+  }
+
+  function markSharePress(element) {
+    if (shareSelectionElement && shareSelectionElement !== element && shareSelectionElement.isConnected) {
+      shareSelectionElement.classList.remove("is-share-pressing", "is-share-selected");
+    }
+    shareSelectionElement = element || null;
+    if (shareSelectionElement && shareSelectionElement.isConnected) {
+      shareSelectionElement.classList.add("is-share-pressing");
+      shareSelectionElement.classList.remove("is-share-selected");
+    }
+  }
+
+  function markShareSelected(element) {
+    if (shareSelectionElement && shareSelectionElement !== element && shareSelectionElement.isConnected) {
+      shareSelectionElement.classList.remove("is-share-pressing", "is-share-selected");
+    }
+    shareSelectionElement = element || null;
+    if (shareSelectionElement && shareSelectionElement.isConnected) {
+      shareSelectionElement.classList.remove("is-share-pressing");
+      shareSelectionElement.classList.add("is-share-selected");
+    }
   }
 
   function restoreDialogFocus() {
@@ -99,18 +130,27 @@
     }
   }
 
-  function showToast(message, state) {
+  function resetCopyButton() {
     if (!dialogParts) return;
-    window.clearTimeout(toastTimer);
-    dialogParts.toast.textContent = message;
-    dialogParts.toast.dataset.state = state || "info";
-    dialogParts.toast.classList.add("is-visible");
-    toastTimer = window.setTimeout(function () {
-      if (!dialogParts) return;
-      dialogParts.toast.classList.remove("is-visible");
-      dialogParts.toast.textContent = "";
-      delete dialogParts.toast.dataset.state;
-    }, 2200);
+    window.clearTimeout(copyStateTimer);
+    dialogParts.copyButton.textContent = "Copier le lien";
+    delete dialogParts.copyButton.dataset.state;
+  }
+
+  function showCopyButtonState(message, state) {
+    if (!dialogParts) return;
+    window.clearTimeout(copyStateTimer);
+    dialogParts.copyButton.textContent = message;
+    dialogParts.copyButton.dataset.state = state || "info";
+    copyStateTimer = window.setTimeout(resetCopyButton, 1600);
+  }
+
+  function handleDialogClosed() {
+    window.clearTimeout(copyStateTimer);
+    backdropPointer = null;
+    clearShareSelection();
+    resetCopyButton();
+    restoreDialogFocus();
   }
 
   function ensureDialog() {
@@ -119,42 +159,70 @@
     const dialog = document.createElement("dialog");
     dialog.id = "infraShareDialog";
     dialog.className = "share-dialog";
+    dialog.setAttribute("closedby", "any");
     dialog.setAttribute("aria-labelledby", "infraShareTitle");
     dialog.innerHTML = [
-      '<div class="share-dialog-panel">',
+      '<div class="share-dialog-panel" data-share-dialog-panel>',
       '  <header class="share-dialog-head">',
       '    <h2 id="infraShareTitle"></h2>',
-      '    <button class="share-dialog-close" type="button" aria-label="Fermer">&times;</button>',
+      '    <button class="share-dialog-close" type="button" aria-label="Fermer" autofocus>&times;</button>',
       "  </header>",
       '  <div class="share-qr" data-share-qr aria-live="off"></div>',
       '  <input class="share-link" type="url" readonly spellcheck="false" aria-label="Lien de partage" />',
-      '  <button class="share-copy" type="button">Copier le lien</button>',
-      '  <div class="share-toast" role="status" aria-live="polite" aria-atomic="true"></div>',
+      '  <div class="share-actions">',
+      '    <button class="share-copy" type="button">Copier le lien</button>',
+      '    <button class="share-dismiss" type="button">Fermer</button>',
+      "  </div>",
       "</div>"
     ].join("");
 
     const closeButton = dialog.querySelector(".share-dialog-close");
     const copyButton = dialog.querySelector(".share-copy");
+    const dismissButton = dialog.querySelector(".share-dismiss");
+    const panel = dialog.querySelector("[data-share-dialog-panel]");
     const title = dialog.querySelector("#infraShareTitle");
     const qr = dialog.querySelector("[data-share-qr]");
     const link = dialog.querySelector(".share-link");
-    const toast = dialog.querySelector(".share-toast");
 
     closeButton.addEventListener("click", closeDialog);
-    dialog.addEventListener("click", function (event) {
-      if (event.target === dialog) closeDialog();
+    closeButton.addEventListener("pointerup", closeDialog);
+    dismissButton.addEventListener("click", closeDialog);
+    dismissButton.addEventListener("pointerup", closeDialog);
+    dialog.addEventListener("pointerdown", function (event) {
+      if (event.target !== dialog) return;
+      backdropPointer = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY
+      };
+    }, { passive: true });
+    dialog.addEventListener("pointerup", function (event) {
+      if (!backdropPointer || event.pointerId !== backdropPointer.pointerId || event.target !== dialog) return;
+      const dx = event.clientX - backdropPointer.startX;
+      const dy = event.clientY - backdropPointer.startY;
+      backdropPointer = null;
+      if (Math.hypot(dx, dy) > MOVE_TOLERANCE_PX) return;
+      event.preventDefault();
+      closeDialog();
     });
-    dialog.addEventListener("close", restoreDialogFocus);
+    dialog.addEventListener("pointercancel", function () {
+      backdropPointer = null;
+    });
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog || (panel && !panel.contains(event.target))) closeDialog();
+    });
+    dialog.addEventListener("close", handleDialogClosed);
     dialog.addEventListener("cancel", function () {
-      window.clearTimeout(toastTimer);
+      backdropPointer = null;
+      window.clearTimeout(copyStateTimer);
     });
     copyButton.addEventListener("click", async function () {
       const copied = await copyText(currentShareUrl, dialog);
-      showToast(copied ? "Lien copié" : "Copie impossible", copied ? "success" : "error");
+      showCopyButtonState(copied ? "Lien copié" : "Copie impossible", copied ? "success" : "error");
     });
 
     getPersistRoot().appendChild(dialog);
-    dialogParts = { dialog, closeButton, copyButton, title, qr, link, toast };
+    dialogParts = { dialog, closeButton, copyButton, dismissButton, title, qr, link };
     return dialogParts;
   }
 
@@ -262,12 +330,11 @@
     const token = ++openToken;
     currentShareUrl = intent.url;
     dialogInvoker = invoker || intent.element || document.activeElement;
+    markShareSelected(intent.element);
     parts.title.textContent = intent.title;
     parts.link.value = intent.url;
     parts.qr.classList.remove("is-error");
-    window.clearTimeout(toastTimer);
-    parts.toast.classList.remove("is-visible");
-    parts.toast.textContent = "";
+    resetCopyButton();
 
     if (typeof parts.dialog.showModal === "function") {
       if (!parts.dialog.open) parts.dialog.showModal();
@@ -278,14 +345,14 @@
     parts.closeButton.focus({ preventScroll: true });
 
     renderQr(intent.url, token);
-    const copied = await copyText(intent.url, parts.dialog);
-    if (token === openToken) {
-      showToast(copied ? "Lien copié" : "Lien prêt à copier", copied ? "success" : "info");
-    }
   }
 
   function clearGesture() {
     if (!activeGesture) return;
+    if (!activeGesture.activated && activeGesture.intent && activeGesture.intent.element) {
+      activeGesture.intent.element.classList.remove("is-share-pressing");
+      if (shareSelectionElement === activeGesture.intent.element) shareSelectionElement = null;
+    }
     window.clearTimeout(activeGesture.timer);
     activeGesture = null;
   }
@@ -304,6 +371,7 @@
       activated: false,
       timer: 0
     };
+    markSharePress(intent.element);
     const gesture = activeGesture;
     gesture.timer = window.setTimeout(function () {
       if (activeGesture !== gesture) return;

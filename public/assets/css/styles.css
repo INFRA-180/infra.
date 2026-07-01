@@ -274,6 +274,10 @@ body.home-screen {
   pointer-events: auto;
 }
 
+#infraSpaPersist .share-dialog {
+  pointer-events: auto;
+}
+
 #infraSpaPersist .global-transport [data-transport-now] {
   pointer-events: auto;
 }
@@ -1530,6 +1534,21 @@ body.home-screen {
   -webkit-touch-callout: none;
 }
 
+.hero-title-link.is-share-pressing .hero-title-logo,
+.hero-title-link.is-share-selected .hero-title-logo {
+  transform: scale(0.985);
+  filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.9));
+}
+
+.album-card.is-share-pressing .album-cover,
+.album-card.is-share-selected .album-cover,
+.album-layout .cover.is-share-pressing,
+.album-layout .cover.is-share-selected {
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 1px rgba(17, 17, 17, 0.26), 0 0 22px rgba(255, 255, 255, 0.72);
+}
+
 .share-dialog {
   width: min(380px, calc(100vw - 32px));
   max-width: none;
@@ -1545,15 +1564,26 @@ body.home-screen {
 }
 
 .share-dialog::backdrop {
-  background: rgba(10, 10, 10, 0.58);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(10, 10, 10, 0.34);
+  backdrop-filter: blur(12px) saturate(128%);
+  -webkit-backdrop-filter: blur(12px) saturate(128%);
 }
 
 .share-dialog.is-fallback-open {
   position: fixed;
   inset: 0;
   z-index: 180;
+  display: grid;
+  width: 100vw;
+  max-height: none;
+  place-items: center;
+  background: rgba(10, 10, 10, 0.34);
+  backdrop-filter: blur(12px) saturate(128%);
+  -webkit-backdrop-filter: blur(12px) saturate(128%);
+}
+
+.share-dialog.is-fallback-open .share-dialog-panel {
+  width: min(380px, calc(100vw - 32px));
 }
 
 .share-dialog-panel {
@@ -1563,10 +1593,12 @@ body.home-screen {
   width: 100%;
   padding: 18px;
   overflow: hidden;
-  background: #ffffff;
-  border: 1px solid rgba(17, 17, 17, 0.2);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.54);
   border-radius: 8px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(22px) saturate(145%);
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
 }
 
 .share-dialog-head {
@@ -1589,21 +1621,22 @@ body.home-screen {
 
 .share-dialog-close {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   padding: 0;
   place-items: center;
   color: #111111;
   font: 400 1.65rem/1 Arial, sans-serif;
-  background: transparent;
-  border: 0;
+  background: rgba(255, 255, 255, 0.34);
+  border: 1px solid rgba(17, 17, 17, 0.14);
   border-radius: 4px;
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 .share-dialog-close:hover,
 .share-dialog-close:focus-visible {
-  background: rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.72);
   outline: 2px solid rgba(17, 17, 17, 0.72);
   outline-offset: 1px;
 }
@@ -1618,6 +1651,7 @@ body.home-screen {
   color: rgba(17, 17, 17, 0.68);
   background: #ffffff;
   border: 1px solid rgba(17, 17, 17, 0.14);
+  border-radius: 4px;
 }
 
 .share-qr.is-loading::before {
@@ -1649,49 +1683,55 @@ body.home-screen {
   border-radius: 4px;
 }
 
-.share-copy {
-  width: 100%;
+.share-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, 0.42fr);
+  gap: 10px;
+}
+
+.share-copy,
+.share-dismiss {
   min-height: 44px;
   padding: 10px 14px;
-  color: #ffffff;
   font: 700 0.86rem/1.2 "IBM Plex Sans", Arial, sans-serif;
   letter-spacing: 0;
-  background: #111111;
-  border: 1px solid #111111;
   border-radius: 4px;
   cursor: pointer;
+  touch-action: manipulation;
+}
+
+.share-copy {
+  color: #ffffff;
+  background: #111111;
+  border: 1px solid #111111;
+}
+
+.share-dismiss {
+  color: #111111;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(17, 17, 17, 0.2);
 }
 
 .share-copy:hover,
-.share-copy:focus-visible {
+.share-copy:focus-visible,
+.share-copy[data-state="success"] {
   color: #111111;
   background: #ffffff;
   outline: 2px solid rgba(17, 17, 17, 0.72);
   outline-offset: 1px;
 }
 
-.share-toast {
-  position: absolute;
-  right: 18px;
-  bottom: 72px;
-  left: 18px;
-  z-index: 2;
-  padding: 9px 12px;
+.share-copy[data-state="error"] {
   color: #ffffff;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-align: center;
-  pointer-events: none;
-  background: rgba(17, 17, 17, 0.94);
-  border-radius: 4px;
-  opacity: 0;
-  transform: translateY(6px);
-  transition: opacity 140ms ease, transform 140ms ease;
+  background: #7a1010;
+  border-color: #7a1010;
 }
 
-.share-toast.is-visible {
-  opacity: 1;
-  transform: translateY(0);
+.share-dismiss:hover,
+.share-dismiss:focus-visible {
+  background: rgba(255, 255, 255, 0.82);
+  outline: 2px solid rgba(17, 17, 17, 0.72);
+  outline-offset: 1px;
 }
 
 .share-copy-source {
@@ -1715,9 +1755,11 @@ body.home-screen {
   .share-qr.is-loading::before {
     animation: none;
   }
+}
 
-  .share-toast {
-    transition: none;
+@media (max-width: 420px) {
+  .share-actions {
+    grid-template-columns: 1fr;
   }
 }
 

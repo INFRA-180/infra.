@@ -274,7 +274,7 @@
       parts.qr.replaceChildren();
       QrCreator.render({
         text: url,
-        radius: 0,
+        radius: 0.5,
         ecLevel: "M",
         fill: QR_FILL,
         background: "#ffffff",

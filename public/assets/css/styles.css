@@ -1685,12 +1685,10 @@ body.home-screen {
 
 .share-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(96px, 0.42fr);
-  gap: 10px;
+  grid-template-columns: 1fr;
 }
 
-.share-copy,
-.share-dismiss {
+.share-copy {
   min-height: 44px;
   padding: 10px 14px;
   font: 700 0.86rem/1.2 "IBM Plex Sans", Arial, sans-serif;
@@ -1698,18 +1696,9 @@ body.home-screen {
   border-radius: 4px;
   cursor: pointer;
   touch-action: manipulation;
-}
-
-.share-copy {
   color: #ffffff;
   background: #111111;
   border: 1px solid #111111;
-}
-
-.share-dismiss {
-  color: #111111;
-  background: rgba(255, 255, 255, 0.58);
-  border: 1px solid rgba(17, 17, 17, 0.2);
 }
 
 .share-copy:hover,
@@ -1725,13 +1714,6 @@ body.home-screen {
   color: #ffffff;
   background: #7a1010;
   border-color: #7a1010;
-}
-
-.share-dismiss:hover,
-.share-dismiss:focus-visible {
-  background: rgba(255, 255, 255, 0.82);
-  outline: 2px solid rgba(17, 17, 17, 0.72);
-  outline-offset: 1px;
 }
 
 .share-copy-source {
@@ -1754,12 +1736,6 @@ body.home-screen {
 @media (prefers-reduced-motion: reduce) {
   .share-qr.is-loading::before {
     animation: none;
-  }
-}
-
-@media (max-width: 420px) {
-  .share-actions {
-    grid-template-columns: 1fr;
   }
 }
 

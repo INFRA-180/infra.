@@ -7,6 +7,8 @@
   const LONG_PRESS_MS = 600;
   const MOVE_TOLERANCE_PX = 12;
   const CLICK_SUPPRESSION_MS = 1200;
+  const CLOSE_CLICK_SUPPRESSION_MS = 650;
+  const QR_FILL = "#e5232f";
   const moduleScript = document.currentScript;
   const vendorUrl = new URL(
     "../vendor/qr-creator.min.js?v=1.0.0",
@@ -21,6 +23,7 @@
   let currentShareUrl = "";
   let openToken = 0;
   let copyStateTimer = 0;
+  let closeClickSuppressionUntil = 0;
   let backdropPointer = null;
   let shareSelectionElement = null;
 
@@ -91,6 +94,17 @@
     }
     dialog.removeAttribute("open");
     handleDialogClosed();
+  }
+
+  function closeFromPointer(event) {
+    closeClickSuppressionUntil = Date.now() + CLOSE_CLICK_SUPPRESSION_MS;
+    if (event && typeof event.preventDefault === "function") event.preventDefault();
+    if (event && typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    } else if (event && typeof event.stopPropagation === "function") {
+      event.stopPropagation();
+    }
+    closeDialog();
   }
 
   function clearShareSelection() {
@@ -171,23 +185,19 @@
       '  <input class="share-link" type="url" readonly spellcheck="false" aria-label="Lien de partage" />',
       '  <div class="share-actions">',
       '    <button class="share-copy" type="button">Copier le lien</button>',
-      '    <button class="share-dismiss" type="button">Fermer</button>',
       "  </div>",
       "</div>"
     ].join("");
 
     const closeButton = dialog.querySelector(".share-dialog-close");
     const copyButton = dialog.querySelector(".share-copy");
-    const dismissButton = dialog.querySelector(".share-dismiss");
     const panel = dialog.querySelector("[data-share-dialog-panel]");
     const title = dialog.querySelector("#infraShareTitle");
     const qr = dialog.querySelector("[data-share-qr]");
     const link = dialog.querySelector(".share-link");
 
-    closeButton.addEventListener("click", closeDialog);
-    closeButton.addEventListener("pointerup", closeDialog);
-    dismissButton.addEventListener("click", closeDialog);
-    dismissButton.addEventListener("pointerup", closeDialog);
+    closeButton.addEventListener("click", closeFromPointer);
+    closeButton.addEventListener("pointerup", closeFromPointer);
     dialog.addEventListener("pointerdown", function (event) {
       if (event.target !== dialog) return;
       backdropPointer = {
@@ -202,14 +212,13 @@
       const dy = event.clientY - backdropPointer.startY;
       backdropPointer = null;
       if (Math.hypot(dx, dy) > MOVE_TOLERANCE_PX) return;
-      event.preventDefault();
-      closeDialog();
+      closeFromPointer(event);
     });
     dialog.addEventListener("pointercancel", function () {
       backdropPointer = null;
     });
     dialog.addEventListener("click", function (event) {
-      if (event.target === dialog || (panel && !panel.contains(event.target))) closeDialog();
+      if (event.target === dialog || (panel && !panel.contains(event.target))) closeFromPointer(event);
     });
     dialog.addEventListener("close", handleDialogClosed);
     dialog.addEventListener("cancel", function () {
@@ -222,7 +231,7 @@
     });
 
     getPersistRoot().appendChild(dialog);
-    dialogParts = { dialog, closeButton, copyButton, dismissButton, title, qr, link };
+    dialogParts = { dialog, closeButton, copyButton, title, qr, link };
     return dialogParts;
   }
 
@@ -267,7 +276,7 @@
         text: url,
         radius: 0,
         ecLevel: "M",
-        fill: "#000000",
+        fill: QR_FILL,
         background: "#ffffff",
         size: 256
       }, parts.qr);
@@ -402,6 +411,11 @@
   }
 
   function suppressActivatedClick(event) {
+    if (Date.now() < closeClickSuppressionUntil) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
     if (!suppressedClick) return;
     if (Date.now() > suppressedClick.until) {
       suppressedClick = null;

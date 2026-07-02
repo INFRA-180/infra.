@@ -51,6 +51,7 @@
     "source_resolved",
     "source_assigned",
     "startTrack_enter",
+    "system_auto_resume_blocked",
     "load_called",
     "media_session_nexttrack",
     "media_session_pause",

@@ -19,6 +19,8 @@
     const PREFETCH_NEXT_CACHE_NAME = ctx.PREFETCH_NEXT_CACHE_NAME || "infra-next-track";
     const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_MAX_BYTES)) ? Number(ctx.PREFETCH_NEXT_MAX_BYTES) : 12 * 1024 * 1024;
     const PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS)) ? Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS) : 24;
+    const SYSTEM_INTERRUPTION_GUARD_MS = 2 * 60 * 1000;
+    const SYSTEM_INTERRUPTION_NEAR_END_SECONDS = 2.5;
     const loadTracksData = method(ctx, "loadTracksData", function () { return Promise.resolve({ albums: [] }); });
     const toRuntimeAbsoluteUrl = method(ctx, "toRuntimeAbsoluteUrl", function (value) { return String(value || ""); });
     const normalizeAlbumTitle = method(ctx, "normalizeAlbumTitle", function (value) { return String(value || "").trim(); });
@@ -119,6 +121,66 @@
     clearExternalResumeProbeTimers();
     audioState.externalPlaybackCommand = null;
     audioState.externalResumeRecoveryInFlight = false;
+  }
+
+  function getAudioRemainingSeconds(audio) {
+    if (!audio || !Number.isFinite(audio.duration) || !Number.isFinite(audio.currentTime)) return null;
+    return Math.max(0, audio.duration - audio.currentTime);
+  }
+
+  function getCurrentAudioResumeKey(audio) {
+    return String(audioState.activeLogicalSrc || (audio && (audio.currentSrc || audio.src)) || "");
+  }
+
+  function classifyAudioPause(audio, pauseIntent) {
+    const reason = pauseIntent && pauseIntent.reason ? pauseIntent.reason : "system_suspected";
+    const remaining = getAudioRemainingSeconds(audio);
+    const nearEnd = audio && (
+      audio.ended ||
+      (Number.isFinite(remaining) && remaining <= SYSTEM_INTERRUPTION_NEAR_END_SECONDS)
+    );
+    if (nearEnd) return "ended";
+    if (reason === "ui" || reason === "media_session") return "explicit";
+    if (reason === "source_reset" || reason === "source_switch" || reason === "external_resume_recovery") return "internal";
+    if (reason === "system_suspected" && document.visibilityState === "hidden") return "system_midtrack";
+    if (reason === "system_suspected") return "system_suspected";
+    return reason;
+  }
+
+  function clearSystemInterruptionGuard() {
+    audioState.systemInterruptionGuard = null;
+  }
+
+  function rememberSystemInterruption(audio, pauseContext) {
+    if (pauseContext !== "system_midtrack") return;
+    audioState.systemInterruptionGuard = {
+      at: Date.now(),
+      src: getCurrentAudioResumeKey(audio),
+      currentTime: audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0
+    };
+    audioState.resumeOnVisible = false;
+  }
+
+  function hasFreshExternalPlaybackCommand() {
+    const command = audioState.externalPlaybackCommand;
+    return Boolean(command && Number.isFinite(command.at) && Date.now() - command.at < 5000);
+  }
+
+  function shouldBlockHiddenSystemAutoResume(audio) {
+    const guard = audioState.systemInterruptionGuard;
+    if (!guard || !Number.isFinite(guard.at)) return false;
+    if (Date.now() - guard.at > SYSTEM_INTERRUPTION_GUARD_MS) {
+      clearSystemInterruptionGuard();
+      return false;
+    }
+    if (!audio || audio.paused || document.visibilityState !== "hidden") return false;
+    if (audioState.trackStartInFlight || hasFreshExternalPlaybackCommand()) return false;
+    const currentSrc = getCurrentAudioResumeKey(audio);
+    if (guard.src && currentSrc && !srcMatches(guard.src, currentSrc)) {
+      clearSystemInterruptionGuard();
+      return false;
+    }
+    return true;
   }
 
   function recoverStuckExternalResume(audio, commandId, surface, startTime) {
@@ -1533,6 +1595,7 @@
     }
     if (!audio.paused) return;
     cancelExternalResumeCommand();
+    clearSystemInterruptionGuard();
     audioState.externalPlaybackCommandSeq = Number(audioState.externalPlaybackCommandSeq || 0) + 1;
     const commandId = `external-${Date.now().toString(36)}-${audioState.externalPlaybackCommandSeq}`;
     audioState.externalPlaybackCommand = {
@@ -1711,6 +1774,32 @@
     bindMediaSessionActions();
 
     audio.addEventListener("play", function () {
+      if (shouldBlockHiddenSystemAutoResume(audio)) {
+        const guard = audioState.systemInterruptionGuard || {};
+        trackAudioRuntimeEvent("system_auto_resume_blocked", Object.assign(
+          buildAudioMonitorPayload(
+            getCurrentPlaylistTrack(),
+            audioState.currentIndex,
+            audioState.activeLogicalSrc || audio.currentSrc || audio.src
+          ),
+          getAudioRuntimeProbeState(),
+          {
+            guard_age_ms: Number.isFinite(guard.at) ? Math.max(0, Date.now() - guard.at) : null,
+            guard_current_time: Number.isFinite(guard.currentTime) ? guard.currentTime : null,
+            visibility_state: document.visibilityState || ""
+          }
+        ));
+        markAudioPauseIntent("system_auto_resume_blocked", "interruption_guard");
+        try {
+          audio.pause();
+        } catch (_err) {
+          // Ignore pause failures while blocking an unsafe hidden resume.
+        }
+        return;
+      }
+      if (document.visibilityState === "visible" || hasFreshExternalPlaybackCommand()) {
+        clearSystemInterruptionGuard();
+      }
       clearWaitingRecovery();
       clearTrackFailureForCurrent();
       clearTrackStatus(getTrackByIndex(audioState.currentIndex));
@@ -1732,8 +1821,14 @@
 
     audio.addEventListener("pause", function () {
       const pauseIntent = consumeAudioPauseIntent();
+      const pauseContext = classifyAudioPause(audio, pauseIntent);
       if (pauseIntent.reason !== "external_resume_recovery") {
         cancelExternalResumeCommand();
+      }
+      if (pauseContext === "system_midtrack") {
+        rememberSystemInterruption(audio, pauseContext);
+      } else if (pauseContext !== "system_suspected") {
+        clearSystemInterruptionGuard();
       }
       audioState.mediaSessionAudioPlaying = false;
       clearWaitingRecovery();
@@ -1755,8 +1850,10 @@
         getAudioRuntimeProbeState(),
         {
           pause_reason: pauseIntent.reason,
+          pause_context: pauseContext,
           surface: pauseIntent.surface,
           intent_age_ms: pauseIntent.age_ms,
+          remaining_seconds: getAudioRemainingSeconds(audio),
           ended: Boolean(audio.ended)
         }
       ));

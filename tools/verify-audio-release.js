@@ -25,7 +25,7 @@ function countMatches(value, expression) {
 
 function readReleaseVersion() {
   const scripts = read("public/assets/js/scripts.js");
-  const match = scripts.match(/const LOCAL_CATALOG_VERSION = "([^"]+)"/);
+  const match = scripts.match(/(?:const\s+LOCAL_CATALOG_VERSION\s*=|LOCAL_CATALOG_VERSION\s*:)\s*"([^"]+)"/);
   assert(match, "LOCAL_CATALOG_VERSION is missing from scripts.js");
   return match[1];
 }
@@ -68,11 +68,15 @@ function verifyRuntimeWiring(version) {
   const scripts = read("public/assets/js/scripts.js");
   const serviceWorker = read("public/sw.js");
   const telemetry = read("public/assets/js/audio-telemetry.js");
+  const mediaSession = read("public/assets/js/media-session.js");
+  const pwaRuntime = read("public/assets/js/pwa-runtime.js");
+  const siteRuntime = read("public/assets/js/site-runtime.js");
+  const spaController = read("public/assets/js/spa-controller.js");
 
   assert(!albumUi.includes("track-controls"), "album UI must not inject transport controls");
   assert(!albumUi.includes("data-track-prev"), "album UI must not own previous-track control");
   assert(covers.includes("function createRuntime(context)"), "covers module must own the cover runtime");
-  assert(scripts.includes("const coverRuntimeApi = createCoverRuntimeApi();"), "scripts must bootstrap the cover runtime");
+  assert(scripts.includes("coverRuntimeApi"), "scripts must bootstrap the cover runtime");
   assert(!scripts.includes("function warmAlbumCoverCache(reason)"), "cover cache runtime must not remain in scripts.js");
   assert(!css.includes(".track-controls"), "unused album transport CSS remains");
   assert(!css.includes(".track-ctrl"), "unused album transport control CSS remains");
@@ -81,6 +85,27 @@ function verifyRuntimeWiring(version) {
   assert(serviceWorker.includes(`./data/track-durations.json?v=${version}`), "service worker duration version differs");
   assert(telemetry.includes("const RETRY_INTERVAL_MS = 5 * 60 * 1000"), "telemetry retry cadence is not bounded");
   assert(telemetry.includes('document.visibilityState === "hidden"'), "telemetry must flush when the app is hidden");
+  assert(scripts.split(/\r?\n/).length <= 2500, "scripts.js exceeds the 2,500-line bootstrap limit");
+  assert(pwaRuntime.includes("function createPwaRuntime(context)"), "PWA runtime factory is missing");
+  assert(siteRuntime.includes("function createSiteRuntime(context)"), "site runtime factory is missing");
+  assert(spaController.includes("function createSpaController(context)"), "SPA controller factory is missing");
+  assert(mediaSession.includes("function createMediaSessionRuntime(context)"), "Media Session runtime factory is missing");
+  assert(!scripts.includes("function registerServiceWorker() {\n    if (serviceWorkerRegistered)"), "legacy Service Worker lifecycle remains in scripts.js");
+  assert(!scripts.includes("function initSpaNavigation() {\n    if (!spaState.enabled)"), "legacy SPA controller remains in scripts.js");
+
+  const pages = ["public/index.html"]
+    .concat(fs.readdirSync(path.join(publicRoot, "music")).filter((file) => file.endsWith(".html")).map((file) => `public/music/${file}`))
+    .concat(fs.readdirSync(path.join(publicRoot, "apps")).filter((file) => file.endsWith(".html")).map((file) => `public/apps/${file}`));
+  for (const relative of pages) {
+    const html = read(relative);
+    for (const file of ["pwa-runtime.js", "site-runtime.js", "spa-controller.js"]) {
+      assert(countMatches(html, new RegExp(`${file.replace(".", "\\.")}`, "g")) === 1, `${relative}: ${file} must be loaded once`);
+      assert(html.indexOf(file) < html.indexOf("scripts.js"), `${relative}: ${file} must load before scripts.js`);
+    }
+  }
+  for (const file of ["pwa-runtime.js", "site-runtime.js", "spa-controller.js"]) {
+    assert(serviceWorker.includes(`./assets/js/${file}?v=${version}`), `service worker does not precache ${file}`);
+  }
 }
 
 try {

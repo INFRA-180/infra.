@@ -100,9 +100,11 @@
   const DB_NAME = "infra_audio_telemetry_v1";
   const DB_STORE = "events";
   const QUEUE_CAP = 500;
-  const FLUSH_THRESHOLD = 40;
-  const FLUSH_INTERVAL_MS = 60000;
-  const HEARTBEAT_MS = 15000;
+  const FLUSH_THRESHOLD = 12;
+  const FLUSH_DELAY_MS = 6000;
+  const RETRY_INTERVAL_MS = 5 * 60 * 1000;
+  const FLUSH_BATCH_CAP = 24;
+  const HEARTBEAT_MS = 5 * 60 * 1000;
 
   function now() {
     return typeof performance !== "undefined" && typeof performance.now === "function"
@@ -371,14 +373,16 @@
       deleteEvents(Array.from(ids));
     }
 
-    function postBatch(batch) {
+    function postBatch(batch, options) {
+      const opts = options || {};
       const workerUrl = getWorkerUrl();
       if (!batch.length || typeof fetch !== "function" || !workerUrl) return Promise.resolve(false);
       return fetch(`${workerUrl.replace(/\/+$/, "")}/log`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // A simple content type avoids a CORS preflight during page lifecycle transitions.
+        headers: { "Content-Type": "text/plain;charset=UTF-8" },
         body: JSON.stringify(batch),
-        keepalive: false
+        keepalive: Boolean(opts.keepalive)
       }).then(function (response) {
         return response && response.ok;
       }).catch(function () {
@@ -392,12 +396,11 @@
       flushInFlight = true;
       return loadQueue().then(function () {
         if (!queue.length) return false;
-        const batch = queue.slice(0, QUEUE_CAP);
-        const workerUrl = getWorkerUrl();
-        if (opts.beacon && navigator.sendBeacon && workerUrl) {
+        const batch = queue.slice(0, FLUSH_BATCH_CAP);
+        if (typeof fetch !== "function" && opts.beacon && navigator.sendBeacon && getWorkerUrl()) {
           try {
-            const blob = new Blob([JSON.stringify(batch)], { type: "application/json" });
-            const queued = navigator.sendBeacon(`${workerUrl.replace(/\/+$/, "")}/log`, blob);
+            const blob = new Blob([JSON.stringify(batch)], { type: "text/plain;charset=UTF-8" });
+            const queued = navigator.sendBeacon(`${getWorkerUrl().replace(/\/+$/, "")}/log`, blob);
             if (queued) {
               removeBatch(batch);
               return true;
@@ -406,8 +409,13 @@
             // Fall through to fetch below when possible.
           }
         }
-        return postBatch(batch).then(function (ok) {
-          if (ok) removeBatch(batch);
+        return postBatch(batch, { keepalive: Boolean(opts.keepalive) }).then(function (ok) {
+          if (ok) {
+            removeBatch(batch);
+            if (queue.length) scheduleFlush(queue.length >= FLUSH_THRESHOLD ? 1200 : FLUSH_DELAY_MS);
+          } else {
+            scheduleFlush(RETRY_INTERVAL_MS);
+          }
           return ok;
         });
       }).finally(function () {
@@ -429,9 +437,7 @@
       queue.push(queued);
       pruneQueue();
       persistEvent(queued);
-      if (queue.length >= FLUSH_THRESHOLD) {
-        scheduleFlush(0);
-      }
+      scheduleFlush(queue.length >= FLUSH_THRESHOLD ? 0 : FLUSH_DELAY_MS);
     }
 
     function getMonitorTrackValue(payload) {
@@ -572,19 +578,15 @@
       }).catch(function () {});
 
       window.setInterval(function () {
-        if (queue.length) flushQueue();
-      }, FLUSH_INTERVAL_MS);
+        if (queue.length) flushQueue({ keepalive: document.visibilityState === "hidden" });
+      }, RETRY_INTERVAL_MS);
 
       window.addEventListener("online", function () {
         flushQueue();
       });
 
       window.addEventListener("pagehide", function () {
-        flushQueue({ beacon: true });
-      });
-
-      window.addEventListener("beforeunload", function () {
-        flushQueue({ beacon: true });
+        flushQueue({ keepalive: true, beacon: true });
       });
 
       document.addEventListener("visibilitychange", function () {
@@ -599,7 +601,9 @@
           getRuntimeProbeState(),
           { visibility_state: document.visibilityState || "" }
         ));
-        if (document.visibilityState === "visible") {
+        if (document.visibilityState === "hidden") {
+          flushQueue({ keepalive: true, beacon: true });
+        } else {
           flushQueue();
         }
       });

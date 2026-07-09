@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix280-20260703";
+window.INFRA_BUILD_TAG = "audiofix281-20260709";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -323,10 +323,6 @@ function openAppDownloadGatekeeper(appName, url) {
   };
   const pwaInstallApi = createPwaInstallApi();
   const NOW_PLAYING_OVERLAY_ENABLED = true;
-  const PLAYER_ICON_PLAY = "<svg class=\"player-glyph player-glyph-play\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M8 5v14l11-7z\"/></svg>";
-  const PLAYER_ICON_STOP = "<svg class=\"player-glyph player-glyph-stop\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"7\" y=\"7\" width=\"10\" height=\"10\" rx=\"1.5\" fill=\"currentColor\"/></svg>";
-  const PLAYER_ICON_PREVIOUS = "<svg class=\"player-glyph player-glyph-prev\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M6 6h3v12H6zM10 12l10-6v12z\"/></svg>";
-  const PLAYER_ICON_NEXT = "<svg class=\"player-glyph player-glyph-next\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M14 12L4 6v12zM18 6h3v12h-3z\"/></svg>";
   const RADIO_ICON = "<svg class=\"radio-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"2.25\" fill=\"currentColor\"/><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-width=\"2\" d=\"M8.4 15.6a5.1 5.1 0 0 1 0-7.2M15.6 8.4a5.1 5.1 0 0 1 0 7.2M5.2 18.8a9.6 9.6 0 0 1 0-13.6M18.8 5.2a9.6 9.6 0 0 1 0 13.6\"/></svg>";
   const SHUFFLE_ICON = "<svg class=\"shuffle-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.15\" d=\"M3 6h2.7c2.25 0 3.75 1 5.15 3.15l2.3 3.7C14.55 15 16.05 16 18.3 16H21\"/><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.15\" d=\"M3 18h2.7c1.8 0 3.1-.65 4.25-2.05\"/><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.15\" d=\"M14.05 8.05C15.2 6.65 16.5 6 18.3 6H21\"/><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.15\" d=\"m18 3 3 3-3 3\"/><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.15\" d=\"m18 13 3 3-3 3\"/></svg>";
   const HEART_ICON_OUTLINE = "<svg class=\"heart-icon heart-icon-outline\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.9\" d=\"M19.5 12.572 12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.566Z\"/></svg>";
@@ -371,7 +367,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix255-20260627";
+  const LOCAL_CATALOG_VERSION = "audiofix281-20260709";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -392,7 +388,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix280-20260703";
+  const runtimeVersion = "audiofix281-20260709";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -905,10 +901,6 @@ function openAppDownloadGatekeeper(appName, url) {
     return factory({
       audioState,
       runtime,
-      PLAYER_ICON_PLAY,
-      PLAYER_ICON_STOP,
-      PLAYER_ICON_PREVIOUS,
-      PLAYER_ICON_NEXT,
       TRACK_CLICK_COOLDOWN_MS,
       getAudioAssetPathKey,
       fetchLiveCatalogDocument,
@@ -922,7 +914,6 @@ function openAppDownloadGatekeeper(appName, url) {
       savePlaybackQueueContext,
       syncMediaSessionMetadata,
       ensureGlobalAudio,
-      ensureAlbumHeaderActions,
       ensureAlbumFavoriteSelectionToolbar,
       toAbsoluteUrl,
       getCurrentAlbumTitle,
@@ -939,10 +930,6 @@ function openAppDownloadGatekeeper(appName, url) {
       startTrack,
       cleanupForeignAlbumAudioWhenIdle,
       syncPlaylistContext,
-      playPrevious,
-      playNext,
-      toggleAlbumShuffleMode,
-      bindGlobalKeyboardShortcuts,
       syncRadioQueueToPlaylist,
       buildPreservedTrack,
       injectCurrentTrackIntoRadioQueue

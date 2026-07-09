@@ -346,7 +346,7 @@
 
     async function fetchLocalCatalogDocument(fileName) {
       const url = new URL(`data/${fileName}`, runtime.baseUrl);
-      if (fileName !== "catalog.json") url.searchParams.set("v", LOCAL_CATALOG_VERSION);
+      if (LOCAL_CATALOG_VERSION) url.searchParams.set("v", LOCAL_CATALOG_VERSION);
       const response = await fetch(url.href, {
         cache: "default",
         headers: { "Accept": "application/json" }

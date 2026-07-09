@@ -8,7 +8,7 @@ const repoRoot = path.resolve(__dirname, "..");
 const publicRoot = path.join(repoRoot, "public");
 const gitignorePath = path.join(repoRoot, ".gitignore");
 
-const allowedTrackedRoots = new Set([".github", ".gitignore", "public", "tools"]);
+const allowedTrackedRoots = new Set([".github", ".gitignore", "DOCS", "public", "tools"]);
 const binaryExtensions = new Set([
   ".avif",
   ".gif",

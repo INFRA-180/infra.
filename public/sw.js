@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260701-audio279";
+const VERSION = "infra-shell-20260709-audio281";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
@@ -12,35 +12,35 @@ const SHELL_ASSETS = [
   "./sphragis/",
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
-  "./assets/css/styles.css?v=audiofix280-20260703",
-  "./assets/js/covers.js?v=audiofix280-20260703",
-  "./assets/js/favorites.js?v=audiofix280-20260703",
-  "./assets/js/favorites-ui.js?v=audiofix280-20260703",
-  "./assets/js/transport-ui.js?v=audiofix280-20260703",
-  "./assets/js/now-playing.js?v=audiofix280-20260703",
-  "./assets/js/album-player-ui.js?v=audiofix280-20260703",
-  "./assets/js/spa-renderer.js?v=audiofix280-20260703",
-  "./assets/js/audio-radio.js?v=audiofix280-20260703",
-  "./assets/js/media-session.js?v=audiofix280-20260703",
-  "./assets/js/audio-prefetch.js?v=audiofix280-20260703",
-  "./assets/js/spa-router.js?v=audiofix280-20260703",
-  "./assets/js/catalog-fallback.js?v=audiofix280-20260703",
-  "./assets/js/catalog-loader.js?v=audiofix280-20260703",
-  "./assets/js/audio-telemetry.js?v=audiofix280-20260703",
-  "./assets/js/downloads.js?v=audiofix280-20260703",
-  "./assets/js/home-catalog.js?v=audiofix280-20260703",
-  "./assets/js/audio-core.js?v=audiofix280-20260703",
-  "./assets/js/pwa-install.js?v=audiofix280-20260703",
-  "./assets/js/share-qr.js?v=audiofix280-20260703",
-  "./assets/js/scripts.js?v=audiofix280-20260703",
-  "./assets/js/scripts.admin.js?v=audiofix280-20260703",
+  "./assets/css/styles.css?v=audiofix281-20260709",
+  "./assets/js/covers.js?v=audiofix281-20260709",
+  "./assets/js/favorites.js?v=audiofix281-20260709",
+  "./assets/js/favorites-ui.js?v=audiofix281-20260709",
+  "./assets/js/transport-ui.js?v=audiofix281-20260709",
+  "./assets/js/now-playing.js?v=audiofix281-20260709",
+  "./assets/js/album-player-ui.js?v=audiofix281-20260709",
+  "./assets/js/spa-renderer.js?v=audiofix281-20260709",
+  "./assets/js/audio-radio.js?v=audiofix281-20260709",
+  "./assets/js/media-session.js?v=audiofix281-20260709",
+  "./assets/js/audio-prefetch.js?v=audiofix281-20260709",
+  "./assets/js/spa-router.js?v=audiofix281-20260709",
+  "./assets/js/catalog-fallback.js?v=audiofix281-20260709",
+  "./assets/js/catalog-loader.js?v=audiofix281-20260709",
+  "./assets/js/audio-telemetry.js?v=audiofix281-20260709",
+  "./assets/js/downloads.js?v=audiofix281-20260709",
+  "./assets/js/home-catalog.js?v=audiofix281-20260709",
+  "./assets/js/audio-core.js?v=audiofix281-20260709",
+  "./assets/js/pwa-install.js?v=audiofix281-20260709",
+  "./assets/js/share-qr.js?v=audiofix281-20260709",
+  "./assets/js/scripts.js?v=audiofix281-20260709",
+  "./assets/js/scripts.admin.js?v=audiofix281-20260709",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./assets/js/sphragis.js?v=sphragis20260625",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json",
-  "./data/track-durations.json?v=audiofix255-20260627",
-  "./data/tracks.json?v=audiofix255-20260627",
+  "./data/catalog.json?v=audiofix281-20260709",
+  "./data/track-durations.json?v=audiofix281-20260709",
+  "./data/tracks.json?v=audiofix281-20260709",
   "./assets/branding/infra-logo-white-photoroom-title.png",
   "./assets/pwa/favicon-logo-white-64.png",
   "./assets/pwa/icon-192-logo-white.png",
@@ -342,7 +342,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isHtmlRequest(request)) {
-    event.respondWith(networkFirst(request, SHELL_CACHE, "./index.html"));
+    event.respondWith(networkFirst(request, RUNTIME_CACHE));
     return;
   }
 

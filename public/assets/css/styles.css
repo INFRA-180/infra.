@@ -2165,14 +2165,6 @@ body.home-screen {
   color: color-mix(in srgb, var(--ink) 42%, transparent);
 }
 
-.track-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 0 auto;
-  margin: 0;
-}
-
 .album-selection-toolbar {
   display: none;
   align-items: center;
@@ -2200,40 +2192,6 @@ body.home-screen {
 
 .album-selection-toggle.is-on {
   color: var(--ink);
-}
-
-.track-ctrl {
-  border: 0;
-  background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  min-width: 28px;
-  min-height: 28px;
-  padding: 0 6px;
-  cursor: pointer;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  text-decoration: none;
-  display: inline-grid;
-  place-items: center;
-}
-
-.track-ctrl.is-on {
-  color: var(--ink);
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-}
-
-.track-ctrl:hover {
-  background: transparent;
-  color: var(--ink);
-}
-
-.track-ctrl[data-track-shuffle] {
-  padding: 0 10px;
 }
 
 .infra-track-list,
@@ -2334,23 +2292,6 @@ body.home-screen {
 .track-eq span:nth-child(4) {
   height: 13px;
   animation-delay: -520ms;
-}
-
-.player-glyph {
-  width: 0.92em;
-  height: 0.92em;
-  display: block;
-  pointer-events: none;
-}
-
-.play-btn .player-glyph {
-  width: 13px;
-  height: 13px;
-}
-
-.track-ctrl .player-glyph {
-  width: 16px;
-  height: 16px;
 }
 
 .play-btn.is-disabled {
@@ -3040,35 +2981,11 @@ audio {
     min-width: 0;
   }
 
-  .album-screen .track-controls {
-    height: 44px;
-    display: inline-flex;
-    align-items: center;
-    gap: 0;
-    flex: 0 0 auto;
-  }
-
   .album-screen .album-selection-toolbar {
     display: flex;
     position: relative;
     z-index: 1;
     margin: 0;
-  }
-
-  .album-screen .track-ctrl {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-    min-height: 44px;
-    border: 0;
-    color: var(--ink-soft);
-    background: transparent;
-    font-size: 0.72rem;
-    padding: 0;
-  }
-
-  .album-screen .track-ctrl[data-track-shuffle] {
-    display: none;
   }
 
   @media (max-width: 340px) {
@@ -3077,7 +2994,6 @@ audio {
       letter-spacing: 0;
     }
 
-    .album-screen .track-ctrl,
     .album-header-actions .album-download-icon.btn-right,
     .album-header-actions .btn-right[data-download-url],
     .album-header-actions .album-selection-toggle {

@@ -1,6 +1,6 @@
 {
-  "version": "audiofix255-20260627",
-  "generatedAt": "2026-06-27",
+  "version": "audiofix281-20260709",
+  "generatedAt": "2026-07-09",
   "source": "Music macOS masters AAC 320 R2",
   "audioPrefix": "mixed",
   "audioPrefixes": [
@@ -10,7 +10,9 @@
     "assets/music/streams/v20260621T185645Z-68a2576edc",
     "assets/music/streams/v20260625T123301Z-79a00b2188",
     "assets/music/streams/v20260627T000443Z-4c7beed7fb",
-    "assets/music/streams/v20260627T001059Z-5a2620b3bb"
+    "assets/music/streams/v20260627T001059Z-5a2620b3bb",
+    "assets/music/streams/v20260709T092710Z-4c2d59f693",
+    "assets/music/streams/v20260709T092817Z-fed565bcb4"
   ],
   "albums": [
     {
@@ -88,6 +90,13 @@
           "src": "assets/music/streams/v20260627T001059Z-5a2620b3bb/v-23pi56/10-mgfesio-t-tliq.m4a",
           "duration": "2:33",
           "seconds": 153.461
+        },
+        {
+          "index": 11,
+          "title": "MAGGIORE",
+          "src": "assets/music/streams/v20260709T092817Z-fed565bcb4/v-23pi56/11-maggiore.m4a",
+          "duration": "2:15",
+          "seconds": 134.839
         }
       ]
     },
@@ -159,6 +168,13 @@
           "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/09-phi.m4a",
           "duration": "1:05",
           "seconds": 65.156
+        },
+        {
+          "index": 10,
+          "title": "CDM",
+          "src": "assets/music/streams/v20260709T092710Z-4c2d59f693/he-4-0026/10-cdm.m4a",
+          "duration": "1:57",
+          "seconds": 116.634
         }
       ]
     },

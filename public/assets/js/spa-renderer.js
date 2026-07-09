@@ -1189,6 +1189,17 @@
           return;
         }
         await initPage();
+        if (spaState.navToken !== navToken) {
+          releasePwaCoverHold("stale_cached_init");
+          finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "stale_cached_init" });
+          trackAudioRuntimeEvent("nav:album_abort", {
+            track: "album_open",
+            album: getAlbumNameFromUrlLike(url.href),
+            reason: "stale_cached_init",
+            to_url: url.href
+          });
+          return;
+        }
         trackAudioRuntimeEvent("spa_render_done", {
           album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
           from_album: audioSwitchContext.fromAlbum || "",
@@ -1328,6 +1339,17 @@
       return;
     }
     await initPage();
+    if (spaState.navToken !== navToken) {
+      releasePwaCoverHold("stale_init");
+      finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "stale_init" });
+      trackAudioRuntimeEvent("nav:album_abort", {
+        track: "album_open",
+        album: getAlbumNameFromUrlLike(url.href),
+        reason: "stale_init",
+        to_url: url.href
+      });
+      return;
+    }
     trackAudioRuntimeEvent("spa_render_done", {
       album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
       from_album: audioSwitchContext.fromAlbum || "",

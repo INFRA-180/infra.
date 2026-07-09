@@ -63,12 +63,17 @@ function verifyGeneratedCatalog(version) {
 
 function verifyRuntimeWiring(version) {
   const albumUi = read("public/assets/js/album-player-ui.js");
+  const covers = read("public/assets/js/covers.js");
   const css = read("public/assets/css/styles.css");
+  const scripts = read("public/assets/js/scripts.js");
   const serviceWorker = read("public/sw.js");
   const telemetry = read("public/assets/js/audio-telemetry.js");
 
   assert(!albumUi.includes("track-controls"), "album UI must not inject transport controls");
   assert(!albumUi.includes("data-track-prev"), "album UI must not own previous-track control");
+  assert(covers.includes("function createRuntime(context)"), "covers module must own the cover runtime");
+  assert(scripts.includes("const coverRuntimeApi = createCoverRuntimeApi();"), "scripts must bootstrap the cover runtime");
+  assert(!scripts.includes("function warmAlbumCoverCache(reason)"), "cover cache runtime must not remain in scripts.js");
   assert(!css.includes(".track-controls"), "unused album transport CSS remains");
   assert(!css.includes(".track-ctrl"), "unused album transport control CSS remains");
   assert(serviceWorker.includes(`./data/catalog.json?v=${version}`), "service worker catalog version differs");

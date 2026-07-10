@@ -513,7 +513,7 @@
             reason: "AbortError",
             strategy: "wait_retry"
           });
-          const recoveryReadinessTimeout = isIosDevice() ? 8000 : 700;
+          const recoveryReadinessTimeout = isIosDevice() ? null : 700;
           waitForAudioReadiness(audio, requestToken, recoveryReadinessTimeout).then(function (ready) {
             if (requestToken !== audioState.startRequestToken) return;
             if (ready) {
@@ -583,7 +583,7 @@
 
           // A cold iOS source may not accept play() until metadata is available.
           // Wait for that browser event instead of triggering the reset recovery.
-          waitForAudioReadiness(audio, requestToken, 8000).then(function (eventReady) {
+          waitForAudioReadiness(audio, requestToken, null).then(function (eventReady) {
             if (requestToken !== audioState.startRequestToken) return;
             if (eventReady) {
               attemptPlay({ sync: false });

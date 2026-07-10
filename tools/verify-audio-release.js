@@ -104,6 +104,7 @@ function verifyRuntimeWiring(version) {
   assert(audioCore.includes("const readinessTimeout = isIosDevice() ? 110 : 220"), "short Safari readiness guard is missing");
   assert(audioCore.includes("const recoveryReadinessTimeout = isIosDevice() ? null : 700"), "Safari recovery must wait for real readiness before resetting");
   assert(audioCore.includes("waitForAudioReadiness(audio, requestToken, null)"), "cold Safari playback must wait for a media event instead of a reset timeout");
+  assert(audioCore.includes("const shouldPrimeColdIosSource = isIosDevice() && !getCurrentPlayableAudioSrc(audio)"), "cold iOS source must be primed after a user action");
   assert(!audioCore.includes("IOS_INITIAL_READINESS_TIMEOUT_MS"), "slow iOS readiness wait must not block normal playback");
   assert(!audioCore.includes("audio.src = nextSrc;\n            loadMediaElementForPlayback(audio);"), "normal source assignment must not force media reload");
   assert(!audioRadio.includes('performancePolicy.decide("audio"'), "performance policy must not override historic N+1 timing");

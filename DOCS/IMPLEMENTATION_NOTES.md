@@ -51,5 +51,6 @@
 - An in-app next/previous action uses the no-pause fast path only when its N+1 target is fully ready. This restores the safeguard introduced after measured iPhone `AbortError` failures caused by an in-flight preparation racing the requested track.
 - Cold Safari starts retain the original bounded 110 ms readiness guard. This is distinct from the later multi-second Safari delay: it prevents a rejected `play()` from entering the slow source-reset recovery loop.
 - If that initial guard expires on iOS, the player waits for the browser's actual media-ready event instead of issuing an early `play()` and cycling through source resets. A genuine media error, not a timer, is the only trigger for recovery.
+- Because the global audio element normally uses `preload="none"`, a cold iOS source is explicitly loaded for metadata once and only after the user's play action. Track changes and background work never force this load.
 - A transport source change remains immediate and has no deliberate pause or fade. An incomplete N+1 is still cancelled before that change, so it cannot compete with the requested track.
 - `performance-policy.js` continues to govern SPA and cover preparation. It no longer alters the established audio N+1 controller.

@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix290-20260710";
+window.INFRA_BUILD_TAG = "audiofix291-20260710";
 
 try {
     document.documentElement.dataset.build = window.INFRA_BUILD_TAG, document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG),
@@ -204,7 +204,7 @@ function openAppDownloadGatekeeper(appName, url) {
         return {
             scriptUrl: scriptUrl || new URL("assets/js/scripts.js", baseUrl.href),
             baseUrl: baseUrl,
-            query: scriptUrl && scriptUrl.search || "?v=audiofix290-20260710"
+            query: scriptUrl && scriptUrl.search || "?v=audiofix291-20260710"
         };
     }(), mediaSessionRuntimeApi = function() {
         const factory = mediaSessionApi && "function" == typeof mediaSessionApi.createMediaSessionRuntime ? mediaSessionApi.createMediaSessionRuntime : null;
@@ -279,7 +279,7 @@ function openAppDownloadGatekeeper(appName, url) {
                 return WORKER_URL;
             },
             getRuntimeVersion: function() {
-                return "audiofix290-20260710";
+                return "audiofix291-20260710";
             },
             getAudioState: function() {
                 return audioState;
@@ -312,7 +312,7 @@ function openAppDownloadGatekeeper(appName, url) {
         return factory({
             audioState: audioState,
             runtime: runtime,
-            runtimeVersion: "audiofix290-20260710",
+            runtimeVersion: "audiofix291-20260710",
             now: getAudioTelemetryNow,
             getCurrentPlayableAudioSrc: getCurrentPlayableAudioSrc,
             trackAudioRuntimeEvent: trackAudioRuntimeEvent,
@@ -962,7 +962,7 @@ function openAppDownloadGatekeeper(appName, url) {
             WORKER_URL: WORKER_URL,
             LIVE_CATALOG_CACHE_NAME: "infra-live-catalog-v1",
             LIVE_CATALOG_TIMEOUT_MS: 3500,
-            LOCAL_CATALOG_VERSION: "audiofix290-20260710",
+            LOCAL_CATALOG_VERSION: "audiofix291-20260710",
             normalizeAlbumTitle: normalizeAlbumTitle,
             normalizeTrackTitle: normalizeTrackTitle,
             toRuntimeAbsoluteUrl: toRuntimeAbsoluteUrl,

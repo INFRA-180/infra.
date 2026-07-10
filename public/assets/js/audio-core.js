@@ -438,7 +438,14 @@
           audioState.activeLogicalSrc = nextSrc;
           audioState.mediaSessionAudioPlaying = false;
           if (!sameTrack) {
+            const shouldPrimeColdIosSource = isIosDevice() && !getCurrentPlayableAudioSrc(audio);
             audio.src = nextSrc;
+            if (shouldPrimeColdIosSource) {
+              // preload="none" avoids background audio traffic. A user-initiated
+              // cold iOS start still needs one metadata load before it can play.
+              audio.preload = "metadata";
+              audio.load();
+            }
           }
           logAudioAuditEvent("source_assigned", target, index, nextSrc, {
             request_token: requestToken,

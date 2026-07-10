@@ -102,6 +102,7 @@ function verifyRuntimeWiring(version) {
   assert(audioCore.includes("const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3"), "previous-track restart threshold is missing");
   assert(audioPrefetch.includes('CACHE_NAME: "infra-next-track-v2"'), "segmented audio warmup cache is missing");
   assert(audioPrefetch.includes("WARMUP_BYTES: 512 * 1024"), "audio startup warmup budget is missing");
+  assert(audioPrefetch.includes("status: 200") && audioPrefetch.includes("cachedResponse"), "partial warmup responses must be normalized before Cache.put");
   assert(audioRadio.includes('if (reason === "playing") return true;'), "N+1 warmup must start on real playback");
   assert(serviceWorker.includes("cachedRangeMatch"), "service worker must preserve partial audio range metadata");
   assert(audioCore.includes("const isDirectStart = opts.waitForReadiness !== true"), "normal playback must use the direct start path");

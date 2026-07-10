@@ -70,3 +70,10 @@
 - The Service Worker preserves the original `Content-Range`, serves only bytes held by the startup segment, and returns later ranges to the network. It never reads the complete track to answer the first media range.
 - The segmented cache uses `infra-next-track-v2`; activation removes the incompatible complete-file cache from previous releases.
 - Runtime and Worker tests assert the immediate warmup decision, bounded Range request, partial response metadata, and network handoff beyond the prepared segment.
+
+## 2026-07-11 - audiofix295 cacheable partial warmup
+
+- Public runtime inspection found that the 512 KB request completed but Cache Storage remained empty. The Cache API rejects direct `206 Partial Content` entries, so `audiofix294` downloaded the warmup without retaining it.
+- `audio-prefetch.js` now stores the segment as an internal `200 OK` cache response while preserving `Content-Range`, `Content-Length`, content type, and immutable cache headers.
+- The Service Worker remains the protocol boundary: it reads the preserved range metadata and returns a valid `206 Partial Content` response to the media element.
+- `test-audio-prefetch-cache.js` simulates a Cache API that rejects status 206 and proves that the normalized segment is retained with its complete 512 KB body.

@@ -66,11 +66,17 @@
 
   function putSingle(src, response) {
     const request = createRequest(src);
+    const cachedHeaders = new Headers(response.headers);
+    const cachedResponse = new Response(response.clone().body, {
+      status: 200,
+      statusText: "OK",
+      headers: cachedHeaders
+    });
     return clearCache().then(function () {
       return openCache();
     }).then(function (cache) {
       if (!cache) return false;
-      return cache.put(request, response.clone()).then(function () {
+      return cache.put(request, cachedResponse).then(function () {
         return true;
       });
     });

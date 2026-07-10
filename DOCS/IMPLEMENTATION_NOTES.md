@@ -77,3 +77,11 @@
 - `audio-prefetch.js` now stores the segment as an internal `200 OK` cache response while preserving `Content-Range`, `Content-Length`, content type, and immutable cache headers.
 - The Service Worker remains the protocol boundary: it reads the preserved range metadata and returns a valid `206 Partial Content` response to the media element.
 - `test-audio-prefetch-cache.js` simulates a Cache API that rejects status 206 and proves that the normalized segment is retained with its complete 512 KB body.
+
+## 2026-07-11 - audiofix296 persistent Range handoff
+
+- Code-only R2 checks confirmed correct `206 Partial Content`, CORS, `Content-Range`, `Accept-Ranges`, immutable caching, and stable ETags; transfer time remained variable enough that the browser-side N+1 path must remain reusable.
+- The Service Worker no longer deletes a valid 512 KB startup segment when Safari requests a later Range outside that segment. The later Range falls back to R2 while the prepared beginning remains available for a subsequent startup request.
+- Cached partial metadata and body length are now validated before reconstruction. Corrupt entries are deleted, while valid unsupported or out-of-window ranges use the original network request unchanged.
+- `test-audio-prefetch-sw.js` now exercises the complete cache-to-network-to-cache sequence and rejects truncated finite overlap responses.
+- No `preload`, radio queue, Media Session, or source-switch behavior changed in this release; those cross-cutting changes require a separate state-model patch and dedicated tests.

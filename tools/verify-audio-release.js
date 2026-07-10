@@ -100,7 +100,9 @@ function verifyRuntimeWiring(version) {
   assert(mediaSession.includes("function createMediaSessionRuntime(context)"), "Media Session runtime factory is missing");
   assert(audioCore.includes("const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3"), "previous-track restart threshold is missing");
   assert(audioCore.includes("isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget"), "transport fast path must require a completed N+1");
+  assert(audioCore.includes("isAutoAdvance || isFromMediaSession || isFromTransportControl"), "transport source switch must not pause deliberately");
   assert(audioCore.includes("const readinessTimeout = isIosDevice() ? 110 : 220"), "short Safari readiness guard is missing");
+  assert(audioCore.includes("const recoveryReadinessTimeout = isIosDevice() ? 8000 : 700"), "Safari recovery must wait for real readiness before resetting");
   assert(!audioCore.includes("IOS_INITIAL_READINESS_TIMEOUT_MS"), "slow iOS readiness wait must not block normal playback");
   assert(!audioCore.includes("audio.src = nextSrc;\n            loadMediaElementForPlayback(audio);"), "normal source assignment must not force media reload");
   assert(!audioRadio.includes('performancePolicy.decide("audio"'), "performance policy must not override historic N+1 timing");

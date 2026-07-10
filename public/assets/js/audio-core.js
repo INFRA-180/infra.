@@ -248,14 +248,15 @@
         }
 
         let settled = false;
-        const timeout = setTimeout(function () {
-          done(false);
-        }, Math.max(80, Number(timeoutMs) || 180));
+        const requestedTimeout = Number(timeoutMs);
+        const timeout = Number.isFinite(requestedTimeout) && requestedTimeout > 0
+          ? setTimeout(function () { done(false); }, Math.max(80, requestedTimeout))
+          : null;
 
         function done(ready) {
           if (settled) return;
           settled = true;
-          clearTimeout(timeout);
+          if (timeout) clearTimeout(timeout);
           audio.removeEventListener("loadedmetadata", onReady);
           audio.removeEventListener("canplay", onReady);
           audio.removeEventListener("canplaythrough", onReady);
@@ -402,7 +403,9 @@
         }
       ));
       audioState.trackStartInFlight = true;
-      const shouldFastSourceSwitch = isFastSkip;
+      // A transport action must not add a deliberate pause or fade. It still
+      // clears an incomplete N+1 through isFastSkip above before switching.
+      const shouldFastSourceSwitch = isAutoAdvance || isFromMediaSession || isFromTransportControl;
       const shouldFadeSwitch = !shouldFastSourceSwitch && !sameTrack && !audio.paused && Boolean(getCurrentPlayableAudioSrc(audio));
 
       if (sameTrack && !opts.resume) {
@@ -510,9 +513,15 @@
             reason: "AbortError",
             strategy: "wait_retry"
           });
-          waitForAudioReadiness(audio, requestToken, isIosDevice() ? 900 : 700).then(function () {
+          const recoveryReadinessTimeout = isIosDevice() ? 8000 : 700;
+          waitForAudioReadiness(audio, requestToken, recoveryReadinessTimeout).then(function (ready) {
             if (requestToken !== audioState.startRequestToken) return;
-            attemptPlay({ retry: true, sync: isFastSkip });
+            if (ready) {
+              attemptPlay({ retry: true, sync: isFastSkip });
+              return;
+            }
+            audioState.trackStartInFlight = false;
+            recoverFromTrackFailure(index, target.src, requestToken);
           });
           return;
         }
@@ -567,7 +576,22 @@
             network_state: audio.networkState,
             click_perf_ms: audioState.audioClickPerfTs
           });
-          attemptPlay({ sync: false });
+          if (ready || !isIosDevice()) {
+            attemptPlay({ sync: false });
+            return;
+          }
+
+          // A cold iOS source may not accept play() until metadata is available.
+          // Wait for that browser event instead of triggering the reset recovery.
+          waitForAudioReadiness(audio, requestToken, 8000).then(function (eventReady) {
+            if (requestToken !== audioState.startRequestToken) return;
+            if (eventReady) {
+              attemptPlay({ sync: false });
+              return;
+            }
+            audioState.trackStartInFlight = false;
+            recoverFromTrackFailure(index, target.src, requestToken);
+          });
         });
       }
 

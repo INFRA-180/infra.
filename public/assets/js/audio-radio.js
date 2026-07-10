@@ -86,6 +86,39 @@
     syncMediaSessionMetadata({ forcePosition: true });
   }
 
+  function getActiveMediaRequestContext(audio) {
+    const currentAudio = audio || audioState.audio;
+    if (!currentAudio) return null;
+    const request = audioState.activeMediaRequest;
+    const actualSrc = normalizeAudioSourceUrl(currentAudio.currentSrc || currentAudio.src || "");
+    const logicalSrc = normalizeAudioSourceUrl(getCurrentLogicalAudioSrc());
+    if (request) {
+      if (request.token !== audioState.startRequestToken) return null;
+      if (request.src && actualSrc && !srcMatches(request.src, actualSrc)) return null;
+      if (request.src && logicalSrc && !srcMatches(request.src, logicalSrc)) return null;
+      return request;
+    }
+    if (!actualSrc || !logicalSrc || !srcMatches(actualSrc, logicalSrc)) return null;
+    return {
+      token: audioState.startRequestToken,
+      index: audioState.currentIndex,
+      src: logicalSrc
+    };
+  }
+
+  function scheduleCurrentWaitingRecovery(audio) {
+    const request = getActiveMediaRequestContext(audio);
+    if (!request) return;
+    const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    scheduleWaitingRecovery({
+      requestToken: request.token,
+      index: request.index,
+      src: request.src,
+      currentTime,
+      hadProgress: currentTime > 0.25 || Number(audioState.lastAudioCurrentTime || 0) > 0.25
+    });
+  }
+
   function markAudioPauseIntent(reason, surface) {
     audioState.audioPauseIntent = {
       reason: String(reason || "internal"),
@@ -1177,6 +1210,7 @@
     audioState.pendingStartTime = null;
     audioState.trackStartInFlight = false;
     audioState.startRequestToken += 1;
+    audioState.activeMediaRequest = null;
     if (!opts.preserveMode || audioState.homeMode !== "radio") {
       audioState.homeMode = "album";
     }
@@ -1709,6 +1743,15 @@
       audio &&
       audio.paused &&
       !getCurrentPlayableAudioSrc(audio) &&
+      audioState.homeMode === "radio"
+    ) {
+      startRadioPlaybackFromIdle();
+      return;
+    }
+    if (
+      audio &&
+      audio.paused &&
+      !getCurrentPlayableAudioSrc(audio) &&
       document.body.classList.contains("home-screen") &&
       !audioState.globalRandomStartInFlight
     ) {
@@ -1873,6 +1916,7 @@
     });
 
     audio.addEventListener("ended", function () {
+      if (!getActiveMediaRequestContext(audio)) return;
       audioState.mediaSessionAudioPlaying = false;
       const track = getCurrentPlaylistTrack();
       trackAudioRuntimeEvent("ended", Object.assign(
@@ -1901,6 +1945,8 @@
     });
 
     audio.addEventListener("loadedmetadata", function () {
+      const request = getActiveMediaRequestContext(audio);
+      if (!request) return;
       if (Number.isFinite(audioState.pendingStartTime) && audioState.pendingStartTime !== null) {
         try {
           audio.currentTime = audioState.pendingStartTime;
@@ -1918,7 +1964,7 @@
         }
         audioState.pendingSeekRatio = null;
       }
-      syncCurrentTrackDurationFromAudio(audio);
+      syncCurrentTrackDurationFromAudio(audio, request.src);
       clearWaitingRecovery();
       clearTrackFailureForCurrent();
       syncMediaSessionMetadata({ forcePosition: true });
@@ -1926,7 +1972,9 @@
     });
 
     audio.addEventListener("durationchange", function () {
-      syncCurrentTrackDurationFromAudio(audio);
+      const request = getActiveMediaRequestContext(audio);
+      if (!request) return;
+      syncCurrentTrackDurationFromAudio(audio, request.src);
       syncMediaSessionMetadata({ forcePosition: true });
       syncAudioUi();
     });
@@ -1981,20 +2029,22 @@
     });
 
     audio.addEventListener("waiting", function () {
+      if (!getActiveMediaRequestContext(audio)) return;
       trackAudioRuntimeEvent("waiting", Object.assign(
         buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
         getAudioRuntimeProbeState()
       ));
       setTrackStatus(getTrackByIndex(audioState.currentIndex), "Chargement du fichier audio...");
-      scheduleWaitingRecovery();
+      scheduleCurrentWaitingRecovery(audio);
     });
     audio.addEventListener("stalled", function () {
+      if (!getActiveMediaRequestContext(audio)) return;
       trackAudioRuntimeEvent("stalled", Object.assign(
         buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
         getAudioRuntimeProbeState()
       ));
       setTrackStatus(getTrackByIndex(audioState.currentIndex), "Chargement du fichier audio...");
-      scheduleWaitingRecovery();
+      scheduleCurrentWaitingRecovery(audio);
     });
     audio.addEventListener("suspend", function () {
       trackAudioRuntimeEvent("suspend", Object.assign(
@@ -2003,6 +2053,7 @@
       ));
     });
     audio.addEventListener("canplay", function () {
+      if (!getActiveMediaRequestContext(audio)) return;
       const track = getCurrentPlaylistTrack();
       const delay = audioState.playRequestTs ? Date.now() - audioState.playRequestTs : null;
       logAudioAuditEvent("canplay", track, audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src, {
@@ -2025,10 +2076,12 @@
       clearTrackStatus(getTrackByIndex(audioState.currentIndex));
     });
     audio.addEventListener("canplaythrough", function () {
+      if (!getActiveMediaRequestContext(audio)) return;
       clearWaitingRecovery();
       clearTrackStatus(getTrackByIndex(audioState.currentIndex));
     });
     audio.addEventListener("playing", function () {
+      if (!getActiveMediaRequestContext(audio)) return;
       audioState.mediaSessionAudioPlaying = true;
       logAudioAuditEvent("playing", getCurrentPlaylistTrack(), audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src, {
         request_token: audioState.playRequestToken,
@@ -2058,6 +2111,8 @@
         // MEDIA_ERR_ABORTED can happen during normal source switches.
         return;
       }
+      if (!getActiveMediaRequestContext(audio)) return;
+      audioState.trackStartInFlight = false;
       trackAudioRuntimeEvent("error", Object.assign(
         buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
         {
@@ -2083,7 +2138,7 @@
         recoverFromTrackFailure(index, currentSrc);
         return;
       }
-      scheduleWaitingRecovery();
+      scheduleCurrentWaitingRecovery(audio);
     });
 
     if (!audioState.resumeBound) {

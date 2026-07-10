@@ -338,13 +338,11 @@
       const isFromMediaSession = Boolean(opts.fromMediaSession);
       const isFromTransportControl = Boolean(opts.fromTransportControl);
       const preparedNextIndex = getAutoPrefetchedNextIndex();
-      const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index;
-      // Preserve the proven transport contract: only a completed N+1 may bypass
-      // the source-transition safeguards for an in-app next/previous action.
-      const isFastSkip = isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget;
+      const hasPreparedTarget = preparedNextIndex === index;
+      const isDirectStart = opts.waitForReadiness !== true;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
 
-      if (!isFastSkip && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
+      if (!hasPreparedTarget && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
         clearNextTrackPrefetch("manual_start");
         resetPreparedInitialGlobalRandomPlayback();
       }
@@ -364,6 +362,11 @@
       clearOtherTrackStatuses(rowTrack);
       clearTrackStatus(rowTrack);
       const requestToken = ++audioState.startRequestToken;
+      audioState.activeMediaRequest = {
+        token: requestToken,
+        index,
+        src: nextSrc || target.src
+      };
       audioState.lastTrackChangeTs = Date.now();
       audioState.audioClickPerfTs = getAudioTelemetryNow();
       audioState.playRequestTs = audioState.lastTrackChangeTs;
@@ -402,7 +405,7 @@
         }
       ));
       audioState.trackStartInFlight = true;
-      const shouldFastSourceSwitch = isFastSkip;
+      const shouldFastSourceSwitch = isDirectStart;
       const shouldFadeSwitch = !shouldFastSourceSwitch && !sameTrack && !audio.paused && Boolean(getCurrentPlayableAudioSrc(audio));
 
       if (sameTrack && !opts.resume) {
@@ -471,10 +474,9 @@
           network_state: audio.networkState,
           click_perf_ms: audioState.audioClickPerfTs
         });
-        audioState.trackStartInFlight = false;
         clearTrackFailure(target.src);
         clearTrackStatus(rowTrack);
-        if (!sameTrack && !(isFastSkip || shouldSeamless)) {
+        if (!sameTrack && !(isDirectStart || shouldSeamless)) {
           fadeInAudio(audio, 100);
         } else if (sameTrack && !shouldSeamless) {
           fadeInAudio(audio, 120);
@@ -512,7 +514,7 @@
           });
           waitForAudioReadiness(audio, requestToken, isIosDevice() ? 900 : 700).then(function () {
             if (requestToken !== audioState.startRequestToken) return;
-            attemptPlay({ retry: true, sync: isFastSkip });
+            attemptPlay({ retry: true, sync: isDirectStart });
           });
           return;
         }
@@ -546,7 +548,7 @@
 
       function beginPlayback() {
         if (requestToken !== audioState.startRequestToken) return;
-        if (isFastSkip) {
+        if (isDirectStart) {
           attemptPlay({ sync: true });
           return;
         }

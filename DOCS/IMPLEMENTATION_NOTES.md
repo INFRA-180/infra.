@@ -52,3 +52,13 @@
 - Cold Safari starts retain the original bounded 110 ms readiness guard. This is distinct from the later multi-second Safari delay.
 - A completed N+1 uses the established fast source switch. When it is incomplete, the controller cancels it and follows the mature transition path, avoiding the prefetch race measured on iPhone.
 - `performance-policy.js` continues to govern SPA and cover preparation. It no longer alters the established audio N+1 controller.
+
+## 2026-07-10 - audiofix293 radio transition correction
+
+- Public WebKit reproduction on `audiofix292` showed that the historical guard was not sufficient: five rapid radio Next commands delayed each `play()` by the readiness gate, and the final startup was reset by `audio.load()` 700 ms after `waiting`.
+- Explicit track, next, previous, auto-advance, and Media Session transitions now assign the target source and call `play()` immediately. An incomplete N+1 is still cancelled first, but its completion never gates playback.
+- Every active source owns a `{ token, index, src }` request context. Metadata, duration, ended, waiting, stalled, canplay, playing, error, and recovery callbacks ignore obsolete requests.
+- Startup `waiting` never schedules destructive recovery. A guarded `audio.load()` is reserved for a same-source mid-play stall that had already progressed and remains blocked after 1.2 seconds.
+- Cold mini-player Play respects radio mode instead of entering the global random album path.
+- The mini-player displays catalog duration before browser metadata arrives; verified WebKit sequence kept five successive durations visible with no `--:--` fallback.
+- `tools/test-audio-runtime.js` covers direct no-pause transition, N+1 cancellation, cold radio ownership, stale recovery rejection, and same-source mid-play recovery. GitHub Pages runs this test and `verify-audio-release` before deployment.

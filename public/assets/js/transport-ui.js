@@ -1467,8 +1467,14 @@
       return;
     }
 
+    const currentTrack = getCurrentPlaylistTrack();
+    const catalogDuration = String(currentTrack && currentTrack.duration || "").trim() || (
+      Number.isFinite(Number(currentTrack && currentTrack.seconds))
+        ? formatTrackDuration(Number(currentTrack.seconds))
+        : ""
+    );
     const currentTime = hasDuration ? formatTrackDuration(audio.currentTime) : "0:00";
-    const duration = hasDuration ? formatTrackDuration(audio.duration) : "--:--";
+    const duration = hasDuration ? formatTrackDuration(audio.duration) : (catalogDuration || "--:--");
     const percent = hasDuration ? Math.max(0, Math.min(100, (audio.currentTime / audio.duration) * 100)) : 0;
 
     if (transport.miniCurrent) transport.miniCurrent.textContent = currentTime;

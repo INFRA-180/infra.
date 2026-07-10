@@ -104,6 +104,8 @@
     const track = fn("trackAudioRuntimeEvent");
     const monitorPayload = fn("buildAudioMonitorPayload", function () { return {}; });
     const probeState = fn("getAudioRuntimeProbeState", function () { return {}; });
+    const srcMatches = fn("srcMatches", function (left, right) { return String(left || "") === String(right || ""); });
+    const getCurrentLogicalAudioSrc = fn("getCurrentLogicalAudioSrc", function () { return ""; });
 
     function parseSrcsetCandidates(value) {
       return String(value || "").split(",").map(function (entry) {
@@ -174,20 +176,34 @@
       state.waitingRecoveryTimer = null;
       state.prefetchPausedUntil = 0;
     }
-    function scheduleWaitingRecovery() {
+    function scheduleWaitingRecovery(context) {
       clearWaitingRecovery();
       state.prefetchPausedUntil = Date.now() + (isIOSStandalone() ? 2600 : 1600);
+      const recovery = context || {};
+      if (!recovery.hadProgress) return;
       state.waitingRecoveryTimer = setTimeout(function () {
         state.waitingRecoveryTimer = null;
         const audio = state.audio;
+        if (recovery.requestToken !== state.startRequestToken) return;
+        if (Number.isInteger(recovery.index) && recovery.index !== state.currentIndex) return;
+        if (recovery.src && !srcMatches(recovery.src, getCurrentLogicalAudioSrc())) return;
+        if (recovery.src && audio && audio.currentSrc && !srcMatches(recovery.src, audio.currentSrc)) return;
         if (!audio || audio.paused || state.trackStartInFlight || audio.readyState >= 3) return;
         const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-        try { audio.load(); } catch (_err) {}
-        audio.addEventListener("canplay", function () {
+        if (currentTime > Number(recovery.currentTime || 0) + 0.15) return;
+        const resume = function () {
+          if (recovery.requestToken !== state.startRequestToken) return;
+          if (recovery.src && !srcMatches(recovery.src, getCurrentLogicalAudioSrc())) return;
           try { audio.currentTime = currentTime; } catch (_err) {}
           audio.play().catch(function () {});
-        }, { once: true });
-      }, 700);
+        };
+        audio.addEventListener("canplay", resume, { once: true });
+        try {
+          audio.load();
+        } catch (_err) {
+          audio.removeEventListener("canplay", resume);
+        }
+      }, 1200);
     }
     return { parseSrcsetCandidates, choosePreferredSrcsetSource, getSourceFromSrcset, getAlbumCoverFromDoc, getMediaSessionFallbackArtwork: fallbackArtwork, normalizeArtworkUrl, normalizeCoverUrl, resolveCoverUrl, buildMediaSessionArtwork, isIOSStandaloneMediaSession: isIOSStandalone, initAudioSessionTelemetry, bindMediaSessionActions, syncMediaSessionMetadata, scheduleMediaSessionResync, clearWaitingRecovery, scheduleWaitingRecovery };
   }

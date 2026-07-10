@@ -157,16 +157,23 @@
     }
   }
 
-  function syncCurrentTrackDurationFromAudio(audio) {
+  function syncCurrentTrackDurationFromAudio(audio, srcOverride) {
     const currentAudio = audio || audioState.audio;
     if (!currentAudio || !Number.isFinite(currentAudio.duration) || currentAudio.duration <= 0) return;
-    const src = getCurrentLogicalAudioSrc();
+    const src = String(srcOverride || getCurrentLogicalAudioSrc() || "");
     if (!src) return;
     const displayValue = formatTrackDuration(currentAudio.duration);
     if (!displayValue || displayValue === "--:--") return;
     rememberTrackDuration(src, displayValue);
 
     const ui = audioState.ui;
+    const playlistTrack = Array.isArray(audioState.playlist)
+      ? audioState.playlist.find((item) => item && srcMatches(item.src, src))
+      : null;
+    if (playlistTrack) {
+      playlistTrack.duration = displayValue;
+      playlistTrack.seconds = currentAudio.duration;
+    }
     if (!ui || !Array.isArray(ui.tracks)) return;
     const track = ui.tracks.find((item) => item && item.durationEl && srcMatches(item.src, src));
     if (track && track.durationEl) {

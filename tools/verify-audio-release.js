@@ -69,6 +69,7 @@ function verifyRuntimeWiring(version) {
   const serviceWorker = read("public/sw.js");
   const telemetry = read("public/assets/js/audio-telemetry.js");
   const mediaSession = read("public/assets/js/media-session.js");
+  const audioCore = read("public/assets/js/audio-core.js");
   const pwaRuntime = read("public/assets/js/pwa-runtime.js");
   const siteRuntime = read("public/assets/js/site-runtime.js");
   const spaController = read("public/assets/js/spa-controller.js");
@@ -90,6 +91,8 @@ function verifyRuntimeWiring(version) {
   assert(siteRuntime.includes("function createSiteRuntime(context)"), "site runtime factory is missing");
   assert(spaController.includes("function createSpaController(context)"), "SPA controller factory is missing");
   assert(mediaSession.includes("function createMediaSessionRuntime(context)"), "Media Session runtime factory is missing");
+  assert(audioCore.includes("const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3"), "previous-track restart threshold is missing");
+  assert(audioCore.includes('trackAudioRuntimeEvent("track_restart_previous"'), "previous-track restart telemetry is missing");
   assert(!scripts.includes("function registerServiceWorker() {\n    if (serviceWorkerRegistered)"), "legacy Service Worker lifecycle remains in scripts.js");
   assert(!scripts.includes("function initSpaNavigation() {\n    if (!spaState.enabled)"), "legacy SPA controller remains in scripts.js");
 

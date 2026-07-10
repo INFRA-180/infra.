@@ -21,6 +21,7 @@
 - `spa-controller.js` owns history, page cache coordination, link intent prefetch, SPA page initialization, and home-route restoration. `spa-router.js` remains URL/cache oriented and `spa-renderer.js` remains responsible for DOM rendering and swaps.
 - `media-session.js` exposes `createMediaSessionRuntime` for system controls, metadata, artwork, seek position, iOS standalone restrictions, and resynchronisation.
 - `scripts.js` is the shared state and dependency-injection bootstrap. Its adapter section is mechanically compacted during the release build; public behavior remains in dedicated modules.
+- `playPrevious` implements restart-or-previous behavior: above three seconds it seeks the current track to zero; at or below three seconds it selects the preceding track. The same central action is used by mini-player, now-playing, Media Session, lock screen, and AirPods.
 
 ### iPhone PWA validation protocol
 

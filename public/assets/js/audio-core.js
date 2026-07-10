@@ -14,6 +14,7 @@
     const ctx = context || {};
     const audioState = ctx.audioState || {};
     const PREFETCH_NEXT_ENABLED = Boolean(ctx.PREFETCH_NEXT_ENABLED);
+    const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3;
 
     const savePlaybackQueueContext = method(ctx, "savePlaybackQueueContext");
     const getCurrentLogicalAudioSrc = method(ctx, "getCurrentLogicalAudioSrc", function () { return ""; });
@@ -756,6 +757,37 @@
       const useSeamless = Object.prototype.hasOwnProperty.call(opts, "seamless")
         ? Boolean(opts.seamless)
         : true;
+      const audio = audioState.audio;
+      const currentTime = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+
+      if (audio && currentTime > PREVIOUS_RESTART_THRESHOLD_SECONDS) {
+        const currentTrack = getTrackByIndex(audioState.currentIndex);
+        try {
+          audio.currentTime = 0;
+        } catch (_err) {
+          // Fall through to track navigation when the media element cannot seek.
+        }
+
+        if (audio.currentTime === 0) {
+          updateProgressUi();
+          saveResumeState();
+          syncMediaSessionMetadata({ forcePosition: true });
+          trackAudioRuntimeEvent("track_restart_previous", Object.assign(
+            buildAudioMonitorPayload(
+              currentTrack,
+              audioState.currentIndex,
+              audioState.activeLogicalSrc || audio.currentSrc || audio.src
+            ),
+            {
+              trigger: opts.fromMediaSession ? "media_session" : "transport",
+              from_transport_control: Boolean(opts.fromTransportControl),
+              surface: opts.surface || "",
+              previous_position_ms: Math.round(currentTime * 1000)
+            }
+          ));
+          return;
+        }
+      }
       console.info(
         "[INFRA] nav previous",
         `homeMode=${audioState.homeMode}`,

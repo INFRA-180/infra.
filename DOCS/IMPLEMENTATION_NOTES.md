@@ -40,7 +40,7 @@
 - The service worker installs the offline player shell with `cache.addAll()` and warms QR/admin extras independently. A failed optional resource is reported to the page but cannot block activation of the new worker.
 - `tools/audit-performance.js` reports static shell/request-budget evidence for each release. Browser validation remains the authority for request counts, first sound, and SPA timing.
 
-## 2026-07-10 - Safari cold-start recovery
+## 2026-07-10 - Audio transport reference behavior
 
-- Safari/WebKit can cancel an initial R2 media request before metadata becomes available. The audio core now explicitly loads a newly assigned source, waits up to 1.5 seconds for initial readiness on iOS, and preserves an in-flight source during recovery before attempting a reset.
-- iOS has one additional bounded recovery attempt. The behavior is instrumented as `ios_recovery_wait`; desktop timing and the single next-track prefetch limit remain unchanged.
+- Normal track starts call `play()` immediately after source assignment. Safari recovery remains an error-only fallback and never delays the first playback attempt.
+- Transport next/previous always uses the fast source-switch path, independently of prefetch availability. One N+1 warmup is allowed only after stable playback, including constrained mobile mode; `save-data` remains opt-out.

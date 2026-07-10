@@ -4,7 +4,7 @@
   const METRIC_SAMPLE_RATE = 0.25;
   const BACKGROUND_BUDGETS = {
     full: { spaHome: 12, spaPage: 4, covers: 2, audio: 1 },
-    constrained: { spaHome: 4, spaPage: 1, covers: 1, audio: 0 },
+    constrained: { spaHome: 4, spaPage: 1, covers: 1, audio: 1 },
     "save-data": { spaHome: 0, spaPage: 0, covers: 0, audio: 0 }
   };
 

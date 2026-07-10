@@ -1,8 +1,9 @@
-const VERSION = "infra-shell-20260710-audio293";
+const VERSION = "infra-shell-20260710-audio294";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
-const NEXT_TRACK_CACHE = "infra-next-track";
+const NEXT_TRACK_CACHE = "infra-next-track-v2";
+const LEGACY_NEXT_TRACK_CACHE = "infra-next-track";
 const MAX_COVER_CACHE_ENTRIES = 80;
 const R2_AUDIO_HOST = "pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev";
 
@@ -12,36 +13,36 @@ const SHELL_ASSETS = [
   "./sphragis/",
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
-  "./assets/css/styles.css?v=audiofix293-20260710",
-  "./assets/js/performance-policy.js?v=audiofix293-20260710",
-  "./assets/js/covers.js?v=audiofix293-20260710",
-  "./assets/js/favorites.js?v=audiofix293-20260710",
-  "./assets/js/favorites-ui.js?v=audiofix293-20260710",
-  "./assets/js/transport-ui.js?v=audiofix293-20260710",
-  "./assets/js/now-playing.js?v=audiofix293-20260710",
-  "./assets/js/album-player-ui.js?v=audiofix293-20260710",
-  "./assets/js/spa-renderer.js?v=audiofix293-20260710",
-  "./assets/js/audio-radio.js?v=audiofix293-20260710",
-  "./assets/js/media-session.js?v=audiofix293-20260710",
-  "./assets/js/audio-prefetch.js?v=audiofix293-20260710",
-  "./assets/js/spa-router.js?v=audiofix293-20260710",
-  "./assets/js/catalog-fallback.js?v=audiofix293-20260710",
-  "./assets/js/catalog-loader.js?v=audiofix293-20260710",
-  "./assets/js/audio-telemetry.js?v=audiofix293-20260710",
-  "./assets/js/downloads.js?v=audiofix293-20260710",
-  "./assets/js/home-catalog.js?v=audiofix293-20260710",
-  "./assets/js/audio-core.js?v=audiofix293-20260710",
-  "./assets/js/pwa-install.js?v=audiofix293-20260710",
-  "./assets/js/spa-controller.js?v=audiofix293-20260710",
-  "./assets/js/site-runtime.js?v=audiofix293-20260710",
-  "./assets/js/pwa-runtime.js?v=audiofix293-20260710",
-  "./assets/js/scripts.js?v=audiofix293-20260710",
+  "./assets/css/styles.css?v=audiofix294-20260710",
+  "./assets/js/performance-policy.js?v=audiofix294-20260710",
+  "./assets/js/covers.js?v=audiofix294-20260710",
+  "./assets/js/favorites.js?v=audiofix294-20260710",
+  "./assets/js/favorites-ui.js?v=audiofix294-20260710",
+  "./assets/js/transport-ui.js?v=audiofix294-20260710",
+  "./assets/js/now-playing.js?v=audiofix294-20260710",
+  "./assets/js/album-player-ui.js?v=audiofix294-20260710",
+  "./assets/js/spa-renderer.js?v=audiofix294-20260710",
+  "./assets/js/audio-radio.js?v=audiofix294-20260710",
+  "./assets/js/media-session.js?v=audiofix294-20260710",
+  "./assets/js/audio-prefetch.js?v=audiofix294-20260710",
+  "./assets/js/spa-router.js?v=audiofix294-20260710",
+  "./assets/js/catalog-fallback.js?v=audiofix294-20260710",
+  "./assets/js/catalog-loader.js?v=audiofix294-20260710",
+  "./assets/js/audio-telemetry.js?v=audiofix294-20260710",
+  "./assets/js/downloads.js?v=audiofix294-20260710",
+  "./assets/js/home-catalog.js?v=audiofix294-20260710",
+  "./assets/js/audio-core.js?v=audiofix294-20260710",
+  "./assets/js/pwa-install.js?v=audiofix294-20260710",
+  "./assets/js/spa-controller.js?v=audiofix294-20260710",
+  "./assets/js/site-runtime.js?v=audiofix294-20260710",
+  "./assets/js/pwa-runtime.js?v=audiofix294-20260710",
+  "./assets/js/scripts.js?v=audiofix294-20260710",
   "./assets/js/sphragis.js?v=sphragis20260625",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix293-20260710",
-  "./data/track-durations.json?v=audiofix293-20260710",
-  "./data/tracks.json?v=audiofix293-20260710",
+  "./data/catalog.json?v=audiofix294-20260710",
+  "./data/track-durations.json?v=audiofix294-20260710",
+  "./data/tracks.json?v=audiofix294-20260710",
   "./assets/branding/infra-logo-white-photoroom-title.png",
   "./assets/pwa/favicon-logo-white-64.png",
   "./assets/pwa/icon-192-logo-white.png",
@@ -52,8 +53,8 @@ const SHELL_ASSETS = [
 ];
 
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/share-qr.js?v=audiofix293-20260710",
-  "./assets/js/scripts.admin.js?v=audiofix293-20260710",
+  "./assets/js/share-qr.js?v=audiofix294-20260710",
+  "./assets/js/scripts.admin.js?v=audiofix294-20260710",
   "./assets/vendor/qr-creator.min.js?v=1.0.0"
 ];
 
@@ -88,7 +89,10 @@ self.addEventListener("activate", (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((key) => isVersionedSiteCache(key) && key !== SHELL_CACHE && key !== RUNTIME_CACHE)
+          .filter((key) => (
+            key === LEGACY_NEXT_TRACK_CACHE ||
+            (isVersionedSiteCache(key) && key !== SHELL_CACHE && key !== RUNTIME_CACHE)
+          ))
           .map((key) => caches.delete(key))
       );
       await self.clients.claim();
@@ -285,17 +289,25 @@ async function deletePrefetchedAudio(cache, request, url) {
 }
 
 async function buildRangeResponseFromCachedAudio(cached, rangeHeader) {
-  const total = Number(cached.headers.get("Content-Length") || cached.headers.get("content-length") || 0);
+  const contentLength = Number(cached.headers.get("Content-Length") || cached.headers.get("content-length") || 0);
+  const cachedContentRange = String(cached.headers.get("Content-Range") || cached.headers.get("content-range") || "");
+  const cachedRangeMatch = cachedContentRange.match(/^bytes\s+(\d+)-(\d+)\/(\d+)$/i);
+  const cachedStart = cachedRangeMatch ? Number(cachedRangeMatch[1]) : 0;
+  const cachedEnd = cachedRangeMatch ? Number(cachedRangeMatch[2]) : contentLength - 1;
+  const total = cachedRangeMatch ? Number(cachedRangeMatch[3]) : contentLength;
   const range = parseRangeHeader(rangeHeader, total);
   if (!range) return null;
+  const servedStart = Math.max(range.start, cachedStart);
+  const servedEnd = Math.min(range.end, cachedEnd);
+  if (servedStart > servedEnd || range.start < cachedStart) return null;
   const buffer = await cached.arrayBuffer();
-  if (!buffer || buffer.byteLength !== total) return null;
+  if (!buffer || buffer.byteLength !== contentLength) return null;
 
-  const sliced = buffer.slice(range.start, range.end + 1);
+  const sliced = buffer.slice(servedStart - cachedStart, servedEnd - cachedStart + 1);
   const headers = new Headers();
   headers.set("Content-Type", cached.headers.get("Content-Type") || cached.headers.get("content-type") || "audio/mp4");
   headers.set("Accept-Ranges", "bytes");
-  headers.set("Content-Range", `bytes ${range.start}-${range.end}/${total}`);
+  headers.set("Content-Range", `bytes ${servedStart}-${servedEnd}/${total}`);
   headers.set("Content-Length", String(sliced.byteLength));
   headers.set("Access-Control-Allow-Origin", cached.headers.get("Access-Control-Allow-Origin") || "*");
   headers.set("Access-Control-Expose-Headers", "Accept-Ranges,Content-Range,Content-Length,Content-Type,ETag");
@@ -328,6 +340,10 @@ async function servePrefetchedAudioOrNetwork(request, url) {
       return fetch(request);
     }
     await deletePrefetchedAudio(cache, request, url);
+    return fetch(request);
+  }
+
+  if ((cached.headers.get("Content-Range") || cached.headers.get("content-range")) && !rangeHeader) {
     return fetch(request);
   }
 

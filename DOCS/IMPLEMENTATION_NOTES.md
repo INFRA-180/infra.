@@ -62,3 +62,11 @@
 - Cold mini-player Play respects radio mode instead of entering the global random album path.
 - The mini-player displays catalog duration before browser metadata arrives; verified WebKit sequence kept five successive durations visible with no `--:--` fallback.
 - `tools/test-audio-runtime.js` covers direct no-pause transition, N+1 cancellation, cold radio ownership, stale recovery rejection, and same-source mid-play recovery. GitHub Pages runs this test and `verify-audio-release` before deployment.
+
+## 2026-07-10 - audiofix294 segmented audio warmup
+
+- The remaining delay was in the N+1 cache, not in the transport command: it downloaded each complete M4A (9.6 MB and 12 seconds in the measured sample) and the Service Worker rebuilt a Range response by reading that complete body into memory.
+- N+1 now starts on the first real `playing` event and caches only bytes `0-524287`. The measured segment takes about 0.78 seconds and contains the M4A metadata plus several seconds of audio.
+- The Service Worker preserves the original `Content-Range`, serves only bytes held by the startup segment, and returns later ranges to the network. It never reads the complete track to answer the first media range.
+- The segmented cache uses `infra-next-track-v2`; activation removes the incompatible complete-file cache from previous releases.
+- Runtime and Worker tests assert the immediate warmup decision, bounded Range request, partial response metadata, and network handoff beyond the prepared segment.

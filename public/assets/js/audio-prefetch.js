@@ -7,8 +7,9 @@
 
   const constants = Object.freeze({
     ENABLED: true,
-    CACHE_NAME: "infra-next-track",
+    CACHE_NAME: "infra-next-track-v2",
     MAX_BYTES: 15 * 1024 * 1024,
+    WARMUP_BYTES: 512 * 1024,
     THRESHOLD_SECONDS: 30
   });
 
@@ -21,13 +22,19 @@
     );
   }
 
-  function createRequest(src) {
+  function createRequest(src, options) {
+    const opts = options || {};
+    const headers = new Headers(opts.headers || {});
+    if (Number.isFinite(opts.warmupBytes) && opts.warmupBytes > 0) {
+      headers.set("Range", `bytes=0-${Math.floor(opts.warmupBytes) - 1}`);
+    }
     try {
       return new Request(src, {
         method: "GET",
         mode: "cors",
         credentials: "omit",
-        cache: "default"
+        cache: "default",
+        headers
       });
     } catch (_err) {
       return src;

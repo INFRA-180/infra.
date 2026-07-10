@@ -9,6 +9,10 @@ const vm = require("vm");
 const root = path.resolve(__dirname, "..");
 const sandbox = {
   URL,
+  Request,
+  Response,
+  Headers,
+  AbortController,
   Promise,
   Map,
   Set,
@@ -56,6 +60,12 @@ function createAudio() {
     removeEventListener(type, handler) { if (listeners.get(type) === handler) listeners.delete(type); }
   };
 }
+
+load("public/assets/js/audio-prefetch.js");
+const warmupRequest = sandbox.InfraAudioPrefetch.createRequest("https://media.test/warm.m4a", {
+  warmupBytes: 512 * 1024
+});
+assert.strictEqual(warmupRequest.headers.get("Range"), "bytes=0-524287", "audio warmup must request only the startup segment");
 
 load("public/assets/js/audio-core.js");
 load("public/assets/js/audio-radio.js");
@@ -113,6 +123,18 @@ radio.handleGlobalTransportToggle();
 assert.strictEqual(radioStarts, 1, "cold transport play must start the radio queue");
 assert.strictEqual(randomStarts, 0, "cold transport play must not leave radio mode");
 
+const warmAudio = createAudio();
+warmAudio.paused = false;
+warmAudio.duration = 240;
+warmAudio.currentTime = 1;
+warmAudio.src = "https://media.test/current.m4a";
+const prefetchRadio = sandbox.InfraAudioRadio.createAudioRadio({
+  audioState: { audio: warmAudio },
+  PREFETCH_NEXT_ENABLED: true,
+  getCurrentPlayableAudioSrc: (item) => item.currentSrc || item.src || ""
+});
+assert.strictEqual(prefetchRadio.shouldPrefetchNextTrackNow("playing"), true, "N+1 warmup must start as soon as playback is real");
+
 let queuedTimers = [];
 sandbox.setTimeout = (handler) => { queuedTimers.push(handler); return queuedTimers.length; };
 sandbox.clearTimeout = () => {};
@@ -146,4 +168,4 @@ mediaRuntime.scheduleWaitingRecovery({ requestToken: 5, index: 2, src: recoveryA
 queuedTimers.shift()();
 assert.strictEqual(recoveryAudio.loadCalls, 1, "a confirmed same-track mid-play stall may recover once");
 
-console.log(JSON.stringify({ ok: true, checks: 9 }, null, 2));
+console.log(JSON.stringify({ ok: true, checks: 11 }, null, 2));

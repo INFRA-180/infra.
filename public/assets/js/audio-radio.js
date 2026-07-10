@@ -18,6 +18,9 @@
     const prefetchApi = ctx.prefetchApi || null;
     const PREFETCH_NEXT_CACHE_NAME = ctx.PREFETCH_NEXT_CACHE_NAME || "infra-next-track";
     const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_MAX_BYTES)) ? Number(ctx.PREFETCH_NEXT_MAX_BYTES) : 12 * 1024 * 1024;
+    const PREFETCH_NEXT_WARMUP_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_WARMUP_BYTES))
+      ? Number(ctx.PREFETCH_NEXT_WARMUP_BYTES)
+      : Number(prefetchApi && prefetchApi.constants && prefetchApi.constants.WARMUP_BYTES) || 512 * 1024;
     const PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS)) ? Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS) : 24;
     const SYSTEM_INTERRUPTION_GUARD_MS = 2 * 60 * 1000;
     const SYSTEM_INTERRUPTION_NEAR_END_SECONDS = 2.5;
@@ -2303,13 +2306,14 @@
   function shouldPrefetchNextTrackNow(reason) {
     const audio = audioState.audio;
     if (!audio || audio.paused || !getCurrentPlayableAudioSrc(audio)) return false;
+    if (reason === "playing") return true;
     const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
     const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
     const bufferedEnd = getCurrentBufferedEndForPrefetch(audio);
     if (duration <= 0) return false;
     if (bufferedEnd >= duration * 0.98) return true;
     if (duration - currentTime <= PREFETCH_NEXT_THRESHOLD_SECONDS) return true;
-    return reason === "playing" && duration <= PREFETCH_NEXT_THRESHOLD_SECONDS;
+    return false;
   }
 
 
@@ -2383,14 +2387,19 @@
       }
     ));
 
-    const baseRequest = getPrefetchCacheRequest(src);
+    const supportsWarmupRequest = prefetchApi && typeof prefetchApi.createRequest === "function";
+    const baseRequest = supportsWarmupRequest
+      ? prefetchApi.createRequest(src, { warmupBytes: PREFETCH_NEXT_WARMUP_BYTES })
+      : getPrefetchCacheRequest(src);
     let fetchRequest = baseRequest;
-    let fetchOptions;
+    let fetchOptions = supportsWarmupRequest
+      ? undefined
+      : { headers: { Range: `bytes=0-${PREFETCH_NEXT_WARMUP_BYTES - 1}` } };
     if (abortController) {
       try {
         fetchRequest = new Request(baseRequest, { signal: abortController.signal });
       } catch (_err) {
-        fetchOptions = { signal: abortController.signal };
+        fetchOptions = Object.assign({}, fetchOptions, { signal: abortController.signal });
       }
     }
 
@@ -2403,7 +2412,11 @@
         ? prefetchApi.getContentLength(response)
         : Number(response.headers.get("Content-Length") || response.headers.get("content-length") || 0);
       if (!Number.isFinite(bytes) || bytes <= 0) throw new Error("prefetch_missing_content_length");
-      if (bytes > PREFETCH_NEXT_MAX_BYTES) {
+      const contentRange = response.headers.get("Content-Range") || response.headers.get("content-range") || "";
+      if (response.status !== 206 || !/^bytes\s+0-/i.test(contentRange)) {
+        throw new Error("prefetch_range_unsupported");
+      }
+      if (bytes > Math.min(PREFETCH_NEXT_MAX_BYTES, PREFETCH_NEXT_WARMUP_BYTES)) {
         if (response.body && typeof response.body.cancel === "function") {
           response.body.cancel().catch(function () {});
         }

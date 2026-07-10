@@ -71,6 +71,7 @@ function verifyRuntimeWiring(version) {
   const mediaSession = read("public/assets/js/media-session.js");
   const audioCore = read("public/assets/js/audio-core.js");
   const audioRadio = read("public/assets/js/audio-radio.js");
+  const audioPrefetch = read("public/assets/js/audio-prefetch.js");
   const pwaRuntime = read("public/assets/js/pwa-runtime.js");
   const siteRuntime = read("public/assets/js/site-runtime.js");
   const spaController = read("public/assets/js/spa-controller.js");
@@ -99,6 +100,10 @@ function verifyRuntimeWiring(version) {
   assert(telemetry.includes('"perf_audio_start"') && telemetry.includes('"perf_cover_render"'), "performance telemetry events are missing");
   assert(mediaSession.includes("function createMediaSessionRuntime(context)"), "Media Session runtime factory is missing");
   assert(audioCore.includes("const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3"), "previous-track restart threshold is missing");
+  assert(audioPrefetch.includes('CACHE_NAME: "infra-next-track-v2"'), "segmented audio warmup cache is missing");
+  assert(audioPrefetch.includes("WARMUP_BYTES: 512 * 1024"), "audio startup warmup budget is missing");
+  assert(audioRadio.includes('if (reason === "playing") return true;'), "N+1 warmup must start on real playback");
+  assert(serviceWorker.includes("cachedRangeMatch"), "service worker must preserve partial audio range metadata");
   assert(audioCore.includes("const isDirectStart = opts.waitForReadiness !== true"), "normal playback must use the direct start path");
   assert(audioCore.includes('if (!hasPreparedTarget && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED)'), "incomplete N+1 must be cancelled without blocking playback");
   assert(audioCore.includes("const shouldFastSourceSwitch = isDirectStart"), "normal source switches must not pause before playback");

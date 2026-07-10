@@ -70,6 +70,7 @@ function verifyRuntimeWiring(version) {
   const telemetry = read("public/assets/js/audio-telemetry.js");
   const mediaSession = read("public/assets/js/media-session.js");
   const audioCore = read("public/assets/js/audio-core.js");
+  const audioRadio = read("public/assets/js/audio-radio.js");
   const pwaRuntime = read("public/assets/js/pwa-runtime.js");
   const siteRuntime = read("public/assets/js/site-runtime.js");
   const spaController = read("public/assets/js/spa-controller.js");
@@ -98,10 +99,11 @@ function verifyRuntimeWiring(version) {
   assert(telemetry.includes('"perf_audio_start"') && telemetry.includes('"perf_cover_render"'), "performance telemetry events are missing");
   assert(mediaSession.includes("function createMediaSessionRuntime(context)"), "Media Session runtime factory is missing");
   assert(audioCore.includes("const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3"), "previous-track restart threshold is missing");
-  assert(audioCore.includes("isFromTransportControl || hasPreparedTransportTarget"), "transport transitions must remain fast without a prefetch");
+  assert(audioCore.includes("isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget"), "transport fast path must require a completed N+1");
+  assert(audioCore.includes("const readinessTimeout = isIosDevice() ? 110 : 220"), "short Safari readiness guard is missing");
   assert(!audioCore.includes("IOS_INITIAL_READINESS_TIMEOUT_MS"), "slow iOS readiness wait must not block normal playback");
   assert(!audioCore.includes("audio.src = nextSrc;\n            loadMediaElementForPlayback(audio);"), "normal source assignment must not force media reload");
-  assert(performancePolicy.includes("constrained: { spaHome: 4, spaPage: 1, covers: 1, audio: 1 }"), "constrained mode must retain one post-playback audio warmup");
+  assert(!audioRadio.includes('performancePolicy.decide("audio"'), "performance policy must not override historic N+1 timing");
   assert(audioCore.includes('trackAudioRuntimeEvent("track_restart_previous"'), "previous-track restart telemetry is missing");
   assert(!scripts.includes("function registerServiceWorker() {\n    if (serviceWorkerRegistered)"), "legacy Service Worker lifecycle remains in scripts.js");
   assert(!scripts.includes("function initSpaNavigation() {\n    if (!spaState.enabled)"), "legacy SPA controller remains in scripts.js");

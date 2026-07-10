@@ -12,9 +12,6 @@
 
   function createAudioRadio(context) {
     const ctx = context || {};
-    const performancePolicy = window.InfraPerformancePolicy && typeof window.InfraPerformancePolicy.getPolicy === "function"
-      ? window.InfraPerformancePolicy.getPolicy()
-      : null;
     const audioState = ctx.audioState || {};
     const runtime = ctx.runtime || { baseUrl: new URL(".", window.location.href) };
     const PREFETCH_NEXT_ENABLED = Boolean(ctx.PREFETCH_NEXT_ENABLED);
@@ -2311,14 +2308,6 @@
       ? prefetchApi.isSupported()
       : ("caches" in window && typeof fetch === "function");
     if (!PREFETCH_NEXT_ENABLED || !prefetchSupported) return;
-    const audio = audioState.audio;
-    const decision = performancePolicy && typeof performancePolicy.decide === "function"
-      ? performancePolicy.decide("audio", {
-        pageKind: document.body.classList.contains("home-screen") ? "home" : "album",
-        playbackFragile: !audio || audio.paused || audio.readyState < 3 || audio.currentTime < 3
-      })
-      : { allowed: true };
-    if (!decision.allowed) return;
     const token = ++audioState.nextPrefetchToken;
     const startedAt = Date.now();
     const abortController = typeof AbortController === "function"
@@ -2421,14 +2410,6 @@
     if (!PREFETCH_NEXT_ENABLED) return;
     if (audioState.nextPrefetchInFlight) return;
     if (!shouldPrefetchNextTrackNow(reason)) return;
-    const audio = audioState.audio;
-    const decision = performancePolicy && typeof performancePolicy.decide === "function"
-      ? performancePolicy.decide("audio", {
-        pageKind: document.body.classList.contains("home-screen") ? "home" : "album",
-        playbackFragile: !audio || audio.paused || audio.readyState < 3 || audio.currentTime < 3
-      })
-      : { allowed: true };
-    if (!decision.allowed) return;
     const currentIndex = getCurrentPlaylistIndexSafe();
     let nextIndex = -1;
     if (

@@ -40,7 +40,14 @@
 - The service worker installs the offline player shell with `cache.addAll()` and warms QR/admin extras independently. A failed optional resource is reported to the page but cannot block activation of the new worker.
 - `tools/audit-performance.js` reports static shell/request-budget evidence for each release. Browser validation remains the authority for request counts, first sound, and SPA timing.
 
-## 2026-07-10 - Audio transport reference behavior
+## 2026-07-10 - Superseded audio transport experiment
 
-- Normal track starts call `play()` immediately after source assignment. Safari recovery remains an error-only fallback and never delays the first playback attempt.
-- Transport next/previous always uses the fast source-switch path, independently of prefetch availability. One N+1 warmup is allowed only after stable playback, including constrained mobile mode; `save-data` remains opt-out.
+- This release experiment made normal starts call `play()` immediately after source assignment and made every in-app next/previous action use the fast source-switch path.
+- It was superseded because it removed the historic bounded Safari guard and reintroduced the prefetch race previously measured on iPhone when the N+1 target was still downloading.
+
+## 2026-07-10 - Historical audio flow restoration
+
+- The N+1 controller returns to the mature behavior established before the performance-policy release: one bounded next-track cache, original timing, and cancellation when a user action supersedes an incomplete preparation.
+- An in-app next/previous action uses the no-pause fast path only when its N+1 target is fully ready. This restores the safeguard introduced after measured iPhone `AbortError` failures caused by an in-flight preparation racing the requested track.
+- Cold Safari starts retain the original bounded 110 ms readiness guard. This is distinct from the later multi-second Safari delay: it prevents a rejected `play()` from entering the slow source-reset recovery loop.
+- `performance-policy.js` continues to govern SPA and cover preparation. It no longer alters the established audio N+1 controller.

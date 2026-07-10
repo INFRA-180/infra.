@@ -39,3 +39,8 @@
 - Anonymous, 25%-sampled performance events carry only duration, page kind, performance mode, PWA state, connection class, and runtime version. Failures that can affect resilience remain unsampled.
 - The service worker installs the offline player shell with `cache.addAll()` and warms QR/admin extras independently. A failed optional resource is reported to the page but cannot block activation of the new worker.
 - `tools/audit-performance.js` reports static shell/request-budget evidence for each release. Browser validation remains the authority for request counts, first sound, and SPA timing.
+
+## 2026-07-10 - Safari cold-start recovery
+
+- Safari/WebKit can cancel an initial R2 media request before metadata becomes available. The audio core now explicitly loads a newly assigned source, waits up to 1.5 seconds for initial readiness on iOS, and preserves an in-flight source during recovery before attempting a reset.
+- iOS has one additional bounded recovery attempt. The behavior is instrumented as `ios_recovery_wait`; desktop timing and the single next-track prefetch limit remain unchanged.

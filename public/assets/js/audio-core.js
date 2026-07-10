@@ -18,6 +18,8 @@
     const audioState = ctx.audioState || {};
     const PREFETCH_NEXT_ENABLED = Boolean(ctx.PREFETCH_NEXT_ENABLED);
     const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3;
+    const IOS_INITIAL_READINESS_TIMEOUT_MS = 1500;
+    const IOS_RECOVERY_READINESS_TIMEOUT_MS = 1800;
 
     const savePlaybackQueueContext = method(ctx, "savePlaybackQueueContext");
     const getCurrentLogicalAudioSrc = method(ctx, "getCurrentLogicalAudioSrc", function () { return ""; });
@@ -286,7 +288,7 @@
       const src = toAbsoluteUrlOrEmpty(srcLike || "") || getCurrentLogicalAudioSrc() || getCurrentPlayableAudioSrc(audio);
       const failures = registerTrackFailure(src);
       const track = getTrackByIndex(index);
-      const maxRetries = 1;
+      const maxRetries = isIosDevice() ? 2 : 1;
       if (failures > maxRetries) {
         failAudioRecovery({
           request_token: requestToken,
@@ -305,7 +307,7 @@
         reason: "playback_failure",
         strategy: "reset_source"
       });
-      setTimeout(function () {
+      function retryAfterSourceReset() {
         if (Number.isInteger(requestToken) && requestToken !== audioState.startRequestToken) return;
         if (audioState.currentIndex !== index) return;
         if (!audio.paused) return;
@@ -319,7 +321,37 @@
           });
           setTrackStatus(track, "Chargement du fichier audio, réessaie dans quelques secondes.", { retry: true });
         });
-      }, 360);
+      }
+
+      const resetDelayMs = isIosDevice() ? 900 : 360;
+      setTimeout(function () {
+        if (Number.isInteger(requestToken) && requestToken !== audioState.startRequestToken) return;
+        if (audioState.currentIndex !== index || !audio.paused) return;
+        const sourceIsStillLoading = !audio.error && audio.networkState === HTMLMediaElement.NETWORK_LOADING && audio.readyState < 2;
+        if (!isIosDevice() || !sourceIsStillLoading) {
+          retryAfterSourceReset();
+          return;
+        }
+
+        trackAudioRuntimeEvent("ios_recovery_wait", Object.assign(
+          buildAudioMonitorPayload(track, index, src),
+          {
+            request_token: requestToken,
+            ready_state: audio.readyState,
+            network_state: audio.networkState,
+            timeout_ms: IOS_RECOVERY_READINESS_TIMEOUT_MS
+          }
+        ));
+        waitForAudioReadiness(audio, requestToken, IOS_RECOVERY_READINESS_TIMEOUT_MS).then(function (ready) {
+          if (Number.isInteger(requestToken) && requestToken !== audioState.startRequestToken) return;
+          if (audioState.currentIndex !== index || !audio.paused) return;
+          if (ready) {
+            audio.play().catch(function () { retryAfterSourceReset(); });
+            return;
+          }
+          retryAfterSourceReset();
+        });
+      }, resetDelayMs);
     }
 
     function startTrack(index, options) {
@@ -434,6 +466,7 @@
           audioState.mediaSessionAudioPlaying = false;
           if (!sameTrack) {
             audio.src = nextSrc;
+            loadMediaElementForPlayback(audio);
           }
           logAudioAuditEvent("source_assigned", target, index, nextSrc, {
             request_token: requestToken,
@@ -548,7 +581,7 @@
           attemptPlay({ sync: true });
           return;
         }
-        const readinessTimeout = isIosDevice() ? 110 : 220;
+        const readinessTimeout = isIosDevice() ? IOS_INITIAL_READINESS_TIMEOUT_MS : 220;
         logAudioAuditEvent("ready_wait_start", target, index, nextSrc || target.src, {
           request_token: requestToken,
           timeout_ms: readinessTimeout,

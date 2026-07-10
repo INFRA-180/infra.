@@ -48,6 +48,7 @@
     "global_playlist_build_start",
     "heartbeat",
     "initial_random_tap",
+    "ios_recovery_wait",
     "source_resolved",
     "source_assigned",
     "startTrack_enter",

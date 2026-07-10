@@ -98,6 +98,9 @@ function verifyRuntimeWiring(version) {
   assert(telemetry.includes('"perf_audio_start"') && telemetry.includes('"perf_cover_render"'), "performance telemetry events are missing");
   assert(mediaSession.includes("function createMediaSessionRuntime(context)"), "Media Session runtime factory is missing");
   assert(audioCore.includes("const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3"), "previous-track restart threshold is missing");
+  assert(audioCore.includes("IOS_INITIAL_READINESS_TIMEOUT_MS = 1500"), "iOS cold-start readiness guard is missing");
+  assert(audioCore.includes("sourceIsStillLoading"), "iOS loading recovery guard is missing");
+  assert(audioCore.includes("loadMediaElementForPlayback(audio);"), "source assignment must explicitly load the media element");
   assert(audioCore.includes('trackAudioRuntimeEvent("track_restart_previous"'), "previous-track restart telemetry is missing");
   assert(!scripts.includes("function registerServiceWorker() {\n    if (serviceWorkerRegistered)"), "legacy Service Worker lifecycle remains in scripts.js");
   assert(!scripts.includes("function initSpaNavigation() {\n    if (!spaState.enabled)"), "legacy SPA controller remains in scripts.js");

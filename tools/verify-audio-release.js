@@ -105,6 +105,7 @@ function verifyRuntimeWiring(version) {
   assert(audioPrefetch.includes("status: 200") && audioPrefetch.includes("cachedResponse"), "partial warmup responses must be normalized before Cache.put");
   assert(audioRadio.includes('if (reason === "playing") return true;'), "N+1 warmup must start on real playback");
   assert(serviceWorker.includes("cachedRangeMatch"), "service worker must preserve partial audio range metadata");
+  assert(serviceWorker.includes("A valid startup segment must survive a network handoff"), "service worker must retain the startup segment after Range handoff");
   assert(audioCore.includes("const isDirectStart = opts.waitForReadiness !== true"), "normal playback must use the direct start path");
   assert(audioCore.includes('if (!hasPreparedTarget && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED)'), "incomplete N+1 must be cancelled without blocking playback");
   assert(audioCore.includes("const shouldFastSourceSwitch = isDirectStart"), "normal source switches must not pause before playback");

@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260711-audio295";
+const VERSION = "infra-shell-20260711-audio296";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
@@ -13,36 +13,36 @@ const SHELL_ASSETS = [
   "./sphragis/",
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
-  "./assets/css/styles.css?v=audiofix295-20260711",
-  "./assets/js/performance-policy.js?v=audiofix295-20260711",
-  "./assets/js/covers.js?v=audiofix295-20260711",
-  "./assets/js/favorites.js?v=audiofix295-20260711",
-  "./assets/js/favorites-ui.js?v=audiofix295-20260711",
-  "./assets/js/transport-ui.js?v=audiofix295-20260711",
-  "./assets/js/now-playing.js?v=audiofix295-20260711",
-  "./assets/js/album-player-ui.js?v=audiofix295-20260711",
-  "./assets/js/spa-renderer.js?v=audiofix295-20260711",
-  "./assets/js/audio-radio.js?v=audiofix295-20260711",
-  "./assets/js/media-session.js?v=audiofix295-20260711",
-  "./assets/js/audio-prefetch.js?v=audiofix295-20260711",
-  "./assets/js/spa-router.js?v=audiofix295-20260711",
-  "./assets/js/catalog-fallback.js?v=audiofix295-20260711",
-  "./assets/js/catalog-loader.js?v=audiofix295-20260711",
-  "./assets/js/audio-telemetry.js?v=audiofix295-20260711",
-  "./assets/js/downloads.js?v=audiofix295-20260711",
-  "./assets/js/home-catalog.js?v=audiofix295-20260711",
-  "./assets/js/audio-core.js?v=audiofix295-20260711",
-  "./assets/js/pwa-install.js?v=audiofix295-20260711",
-  "./assets/js/spa-controller.js?v=audiofix295-20260711",
-  "./assets/js/site-runtime.js?v=audiofix295-20260711",
-  "./assets/js/pwa-runtime.js?v=audiofix295-20260711",
-  "./assets/js/scripts.js?v=audiofix295-20260711",
+  "./assets/css/styles.css?v=audiofix296-20260711",
+  "./assets/js/performance-policy.js?v=audiofix296-20260711",
+  "./assets/js/covers.js?v=audiofix296-20260711",
+  "./assets/js/favorites.js?v=audiofix296-20260711",
+  "./assets/js/favorites-ui.js?v=audiofix296-20260711",
+  "./assets/js/transport-ui.js?v=audiofix296-20260711",
+  "./assets/js/now-playing.js?v=audiofix296-20260711",
+  "./assets/js/album-player-ui.js?v=audiofix296-20260711",
+  "./assets/js/spa-renderer.js?v=audiofix296-20260711",
+  "./assets/js/audio-radio.js?v=audiofix296-20260711",
+  "./assets/js/media-session.js?v=audiofix296-20260711",
+  "./assets/js/audio-prefetch.js?v=audiofix296-20260711",
+  "./assets/js/spa-router.js?v=audiofix296-20260711",
+  "./assets/js/catalog-fallback.js?v=audiofix296-20260711",
+  "./assets/js/catalog-loader.js?v=audiofix296-20260711",
+  "./assets/js/audio-telemetry.js?v=audiofix296-20260711",
+  "./assets/js/downloads.js?v=audiofix296-20260711",
+  "./assets/js/home-catalog.js?v=audiofix296-20260711",
+  "./assets/js/audio-core.js?v=audiofix296-20260711",
+  "./assets/js/pwa-install.js?v=audiofix296-20260711",
+  "./assets/js/spa-controller.js?v=audiofix296-20260711",
+  "./assets/js/site-runtime.js?v=audiofix296-20260711",
+  "./assets/js/pwa-runtime.js?v=audiofix296-20260711",
+  "./assets/js/scripts.js?v=audiofix296-20260711",
   "./assets/js/sphragis.js?v=sphragis20260625",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix295-20260711",
-  "./data/track-durations.json?v=audiofix295-20260711",
-  "./data/tracks.json?v=audiofix295-20260711",
+  "./data/catalog.json?v=audiofix296-20260711",
+  "./data/track-durations.json?v=audiofix296-20260711",
+  "./data/tracks.json?v=audiofix296-20260711",
   "./assets/branding/infra-logo-white-photoroom-title.png",
   "./assets/pwa/favicon-logo-white-64.png",
   "./assets/pwa/icon-192-logo-white.png",
@@ -53,8 +53,8 @@ const SHELL_ASSETS = [
 ];
 
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/share-qr.js?v=audiofix295-20260711",
-  "./assets/js/scripts.admin.js?v=audiofix295-20260711",
+  "./assets/js/share-qr.js?v=audiofix296-20260711",
+  "./assets/js/scripts.admin.js?v=audiofix296-20260711",
   "./assets/vendor/qr-creator.min.js?v=1.0.0"
 ];
 
@@ -292,16 +292,34 @@ async function buildRangeResponseFromCachedAudio(cached, rangeHeader) {
   const contentLength = Number(cached.headers.get("Content-Length") || cached.headers.get("content-length") || 0);
   const cachedContentRange = String(cached.headers.get("Content-Range") || cached.headers.get("content-range") || "");
   const cachedRangeMatch = cachedContentRange.match(/^bytes\s+(\d+)-(\d+)\/(\d+)$/i);
-  const cachedStart = cachedRangeMatch ? Number(cachedRangeMatch[1]) : 0;
-  const cachedEnd = cachedRangeMatch ? Number(cachedRangeMatch[2]) : contentLength - 1;
-  const total = cachedRangeMatch ? Number(cachedRangeMatch[3]) : contentLength;
+  if (!cachedRangeMatch || !Number.isFinite(contentLength) || contentLength <= 0) {
+    throw new Error("invalid_cached_audio_range");
+  }
+  const cachedStart = Number(cachedRangeMatch[1]);
+  const cachedEnd = Number(cachedRangeMatch[2]);
+  const total = Number(cachedRangeMatch[3]);
+  if (
+    !Number.isFinite(cachedStart) ||
+    !Number.isFinite(cachedEnd) ||
+    !Number.isFinite(total) ||
+    cachedStart < 0 ||
+    cachedEnd < cachedStart ||
+    total <= cachedEnd ||
+    contentLength !== cachedEnd - cachedStart + 1
+  ) {
+    throw new Error("inconsistent_cached_audio_range");
+  }
   const range = parseRangeHeader(rangeHeader, total);
   if (!range) return null;
+  const explicitRange = String(rangeHeader || "").match(/^bytes=(\d+)-(\d+)$/);
+  if (explicitRange && Number(explicitRange[2]) > cachedEnd) return null;
   const servedStart = Math.max(range.start, cachedStart);
   const servedEnd = Math.min(range.end, cachedEnd);
   if (servedStart > servedEnd || range.start < cachedStart) return null;
   const buffer = await cached.arrayBuffer();
-  if (!buffer || buffer.byteLength !== contentLength) return null;
+  if (!buffer || buffer.byteLength !== contentLength) {
+    throw new Error("invalid_cached_audio_body");
+  }
 
   const sliced = buffer.slice(servedStart - cachedStart, servedEnd - cachedStart + 1);
   const headers = new Headers();
@@ -339,7 +357,7 @@ async function servePrefetchedAudioOrNetwork(request, url) {
       await deletePrefetchedAudio(cache, request, url);
       return fetch(request);
     }
-    await deletePrefetchedAudio(cache, request, url);
+    // A valid startup segment must survive a network handoff for later ranges.
     return fetch(request);
   }
 

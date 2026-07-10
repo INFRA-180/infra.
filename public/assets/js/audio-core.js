@@ -12,6 +12,9 @@
 
   function createAudioCore(context) {
     const ctx = context || {};
+    const performancePolicy = window.InfraPerformancePolicy && typeof window.InfraPerformancePolicy.getPolicy === "function"
+      ? window.InfraPerformancePolicy.getPolicy()
+      : null;
     const audioState = ctx.audioState || {};
     const PREFETCH_NEXT_ENABLED = Boolean(ctx.PREFETCH_NEXT_ENABLED);
     const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3;
@@ -448,6 +451,13 @@
 
       function handlePlayResolved(playMeta) {
         if (requestToken !== audioState.startRequestToken) return;
+        if (performancePolicy && typeof performancePolicy.emit === "function") {
+          performancePolicy.emit("perf_audio_start", {
+            trigger: opts.auto ? "auto" : isFromMediaSession ? "media_session" : isFromTransportControl ? "transport" : "user",
+            duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - audioState.audioClickPerfTs)),
+            ready_state: audio.readyState
+          });
+        }
         logAudioAuditEvent("play_resolved", target, index, nextSrc || target.src, {
           request_token: requestToken,
           retry: Boolean(playMeta && playMeta.retry),

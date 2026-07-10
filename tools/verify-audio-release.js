@@ -73,6 +73,7 @@ function verifyRuntimeWiring(version) {
   const pwaRuntime = read("public/assets/js/pwa-runtime.js");
   const siteRuntime = read("public/assets/js/site-runtime.js");
   const spaController = read("public/assets/js/spa-controller.js");
+  const performancePolicy = read("public/assets/js/performance-policy.js");
 
   assert(!albumUi.includes("track-controls"), "album UI must not inject transport controls");
   assert(!albumUi.includes("data-track-prev"), "album UI must not own previous-track control");
@@ -90,25 +91,35 @@ function verifyRuntimeWiring(version) {
   assert(pwaRuntime.includes("function createPwaRuntime(context)"), "PWA runtime factory is missing");
   assert(siteRuntime.includes("function createSiteRuntime(context)"), "site runtime factory is missing");
   assert(spaController.includes("function createSpaController(context)"), "SPA controller factory is missing");
+  assert(performancePolicy.includes("function createPerformancePolicy(options)"), "performance policy factory is missing");
+  assert(performancePolicy.includes('"save-data"'), "save-data mode is missing from performance policy");
+  assert(performancePolicy.includes("spaHome: 12") && performancePolicy.includes("spaHome: 4"), "SPA prefetch budgets are missing");
+  assert(performancePolicy.includes("METRIC_SAMPLE_RATE = 0.25"), "performance metric sampling is missing");
+  assert(telemetry.includes('"perf_audio_start"') && telemetry.includes('"perf_cover_render"'), "performance telemetry events are missing");
   assert(mediaSession.includes("function createMediaSessionRuntime(context)"), "Media Session runtime factory is missing");
   assert(audioCore.includes("const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3"), "previous-track restart threshold is missing");
   assert(audioCore.includes('trackAudioRuntimeEvent("track_restart_previous"'), "previous-track restart telemetry is missing");
   assert(!scripts.includes("function registerServiceWorker() {\n    if (serviceWorkerRegistered)"), "legacy Service Worker lifecycle remains in scripts.js");
   assert(!scripts.includes("function initSpaNavigation() {\n    if (!spaState.enabled)"), "legacy SPA controller remains in scripts.js");
+  assert(spaController.includes(".album-cover"), "SPA cover normalization must include home album covers");
 
   const pages = ["public/index.html"]
     .concat(fs.readdirSync(path.join(publicRoot, "music")).filter((file) => file.endsWith(".html")).map((file) => `public/music/${file}`))
     .concat(fs.readdirSync(path.join(publicRoot, "apps")).filter((file) => file.endsWith(".html")).map((file) => `public/apps/${file}`));
   for (const relative of pages) {
     const html = read(relative);
-    for (const file of ["pwa-runtime.js", "site-runtime.js", "spa-controller.js"]) {
+    for (const file of ["performance-policy.js", "pwa-runtime.js", "site-runtime.js", "spa-controller.js"]) {
       assert(countMatches(html, new RegExp(`${file.replace(".", "\\.")}`, "g")) === 1, `${relative}: ${file} must be loaded once`);
       assert(html.indexOf(file) < html.indexOf("scripts.js"), `${relative}: ${file} must load before scripts.js`);
     }
   }
-  for (const file of ["pwa-runtime.js", "site-runtime.js", "spa-controller.js"]) {
+  for (const file of ["performance-policy.js", "pwa-runtime.js", "site-runtime.js", "spa-controller.js"]) {
     assert(serviceWorker.includes(`./assets/js/${file}?v=${version}`), `service worker does not precache ${file}`);
   }
+  assert(serviceWorker.includes("const OPTIONAL_SHELL_ASSETS"), "service worker optional precache manifest is missing");
+  const requiredShell = serviceWorker.match(/const SHELL_ASSETS = \[([\s\S]*?)\];/);
+  assert(requiredShell && !requiredShell[1].includes("share-qr.js"), "optional QR assets must not block shell installation");
+  assert(serviceWorker.includes("warmOptionalShellAssets"), "service worker optional warmup is missing");
 }
 
 try {

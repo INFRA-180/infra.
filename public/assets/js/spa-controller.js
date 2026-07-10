@@ -14,6 +14,9 @@
     const audioState = ctx.audioState || {};
     const runtime = ctx.runtime || { baseUrl: new URL("./", window.location.href) };
     const spaRouterApi = ctx.spaRouterApi || null;
+    const performancePolicy = window.InfraPerformancePolicy && typeof window.InfraPerformancePolicy.getPolicy === "function"
+      ? window.InfraPerformancePolicy.getPolicy()
+      : null;
     const spaNavigate = method(ctx, "spaNavigate");
     const snapshotCurrentSpaPage = method(ctx, "snapshotCurrentSpaPage");
     const primeLinkedAlbumCoverForPwa = method(ctx, "primeLinkedAlbumCoverForPwa", function () { return ""; });
@@ -120,7 +123,7 @@
 
     function normalizeCoverElementsForBase(docLike, baseUrl) {
       if (!docLike || typeof docLike.querySelectorAll !== "function") return;
-      Array.from(docLike.querySelectorAll(".album-layout .cover, .cover")).forEach(function (cover) {
+      Array.from(docLike.querySelectorAll(".album-layout .cover, .cover, .album-cover")).forEach(function (cover) {
         const src = cover.getAttribute("src"); if (src) cover.setAttribute("src", normalizeUrlAgainstBase(src, baseUrl));
         const srcset = cover.getAttribute("srcset"); if (srcset) cover.setAttribute("srcset", absolutizeSrcsetForBase(srcset, baseUrl));
       });
@@ -133,14 +136,27 @@
     }
 
     function prefetchSpaPage(href, options) {
-      if (!spaState.enabled || (!(options && options.force) && isAggressivePrefetchPaused())) return;
+      if (!spaState.enabled) return;
+      const opts = options || {};
+      const pageKind = document.body.classList.contains("home-screen") ? "home" : "page";
+      const playbackFragile = isAggressivePrefetchPaused();
+      const decision = performancePolicy && typeof performancePolicy.decide === "function"
+        ? performancePolicy.decide("spa", {
+          explicit: Boolean(opts.explicit),
+          pageKind,
+          playbackFragile,
+          appPage: document.body.classList.contains("app-screen")
+        })
+        : { allowed: Boolean(opts.explicit) || !playbackFragile };
+      if (!decision.allowed) return;
+      if (spaState.pageCacheApi && typeof spaState.pageCacheApi.has === "function" && spaState.pageCacheApi.has(href)) return;
       if (spaState.pageCacheApi && typeof spaState.pageCacheApi.prefetch === "function") {
-        spaState.pageCacheApi.prefetch(href, options || {});
+        spaState.pageCacheApi.prefetch(href, { cacheMode: opts.cacheMode || "default" });
       }
     }
 
     function scheduleSpaPagePrefetch() {
-      if (!spaState.enabled) return;
+      if (!spaState.enabled || document.body.classList.contains("app-screen")) return;
       const seen = new Set(); const queue = []; const current = new URL(window.location.href);
       function enqueue(value) {
         let url; try { url = new URL(String(value || ""), window.location.href); } catch (_err) { return; }
@@ -153,7 +169,10 @@
       if (!isHome) queue.unshift(new URL("index.html", runtime.baseUrl).href);
       const run = function () {
         const playing = Boolean(audioState.audio && !audioState.audio.paused && getCurrentPlayableAudioSrc(audioState.audio));
-        let limit = isHome ? 21 : 8; if (isIosDevice()) limit = Math.min(limit, isHome ? 8 : 5); if (playing) limit = Math.min(limit, isIosDevice() ? 5 : 7); if (isAggressivePrefetchPaused()) limit = Math.min(limit, 2);
+        let limit = performancePolicy && typeof performancePolicy.getBudget === "function"
+          ? performancePolicy.getBudget("spa", isHome ? "home" : "page")
+          : (isHome ? 12 : 4);
+        if (playing || isAggressivePrefetchPaused()) limit = 0;
         queue.slice(0, limit).forEach(function (href, index) { window.setTimeout(function () { prefetchSpaPage(href); }, index * 90); });
       };
       const extend = function () { if (!isHome) return run(); loadTracksData().then(function (data) { (data.albums || []).forEach(function (album) { enqueue(new URL(album.page || `music/${album.slug}.html`, runtime.baseUrl).href); }); }).finally(run); };
@@ -184,7 +203,7 @@
         const link = linkFrom(event); if (!link || link.hasAttribute("download") || link.hasAttribute("data-no-spa") || (link.target && link.target !== "_self")) return;
         let url; try { url = new URL(link.href, window.location.href); } catch (_err) { return; }
         if (!isSpaNavigableUrl(url)) return;
-        primeLinkedAlbumCoverForPwa(link, url.href); prefetchSpaPage(url.href, { force: true, cacheMode: "default" });
+        primeLinkedAlbumCoverForPwa(link, url.href); prefetchSpaPage(url.href, { explicit: true, cacheMode: "default" });
       }
       ["pointerdown", "touchstart", "focusin"].forEach(function (name) { document.addEventListener(name, prefetchIntent, name === "focusin" ? true : { capture: true, passive: true }); });
       document.addEventListener("click", function (event) {

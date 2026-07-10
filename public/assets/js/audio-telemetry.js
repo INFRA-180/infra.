@@ -79,6 +79,15 @@
     "play_resolved",
     "play_rejected",
     "playing",
+    "perf_boot",
+    "perf_interactive",
+    "perf_long_task",
+    "perf_audio_start",
+    "perf_cover_render",
+    "perf_module_load_error",
+    "perf_prefetch_decision",
+    "perf_spa_navigation_start",
+    "perf_spa_navigation_done",
     "seek",
     "spa_swap_done",
     "spa_swap_start",
@@ -90,6 +99,7 @@
     "nav:album_start",
     "stalled",
     "sw_controllerchange",
+    "sw_optional_cache_error",
     "sw_reload_executed",
     "sw_reload_pending",
     "suspend",
@@ -572,6 +582,19 @@
     function initLifecycle() {
       if (lifecycleInitialized) return;
       lifecycleInitialized = true;
+
+      const performancePolicy = window.InfraPerformancePolicy && typeof window.InfraPerformancePolicy.getPolicy === "function"
+        ? window.InfraPerformancePolicy.getPolicy()
+        : null;
+      if (performancePolicy && typeof performancePolicy.consumeEvents === "function") {
+        performancePolicy.consumeEvents().forEach(function (event) {
+          if (event && event.type) trackRuntimeEvent(event.type, event.data || {});
+        });
+      }
+      document.addEventListener("infra:performance", function (event) {
+        const detail = event && event.detail ? event.detail : null;
+        if (detail && detail.type) trackRuntimeEvent(detail.type, detail.data || {});
+      });
 
       loadQueue().then(function () {
         if (queue.length) scheduleFlush(5000);

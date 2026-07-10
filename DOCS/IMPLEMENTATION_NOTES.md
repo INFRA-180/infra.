@@ -30,3 +30,12 @@
 3. Open and close now-playing during playback, background the PWA, then return to the foreground and confirm the player and artwork remain coherent.
 4. Install a newer release while playback is active: no reload may occur until playback and the overlay are inactive; confirm the deferred reload then installs the new cache.
 5. Review telemetry after the session for `sw_controllerchange`, deferred reload events, media-session actions, and playback recovery events.
+
+## 2026-07-10 - audiofix285 performance policy
+
+- `performance-policy.js` selects `full`, `constrained`, or `save-data` using the available Network Information signals and conservative PWA/mobile fallbacks. It is the common budget authority for SPA, cover, and next-track preparation.
+- Automatic SPA preparation uses the mode budget and never bypasses an existing memory-cache entry. Cover preparation is limited to two concurrent jobs in full mode and one in constrained mode; automatic preparation is disabled under `save-data`.
+- The next-track cache remains capped at one track and is only started after stable playback. A user track change keeps the existing abort-and-replace lifecycle.
+- Anonymous, 25%-sampled performance events carry only duration, page kind, performance mode, PWA state, connection class, and runtime version. Failures that can affect resilience remain unsampled.
+- The service worker installs the offline player shell with `cache.addAll()` and warms QR/admin extras independently. A failed optional resource is reported to the page but cannot block activation of the new worker.
+- `tools/audit-performance.js` reports static shell/request-budget evidence for each release. Browser validation remains the authority for request counts, first sound, and SPA timing.

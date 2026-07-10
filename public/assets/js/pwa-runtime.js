@@ -142,6 +142,14 @@
           track("sw_controllerchange", buildReloadTelemetry());
           if (markReloadPending()) scheduleDeferredServiceWorkerReload();
         });
+        navigator.serviceWorker.addEventListener("message", function (event) {
+          const data = event && event.data ? event.data : null;
+          if (!data || data.type !== "INFRA_SW_OPTIONAL_CACHE_ERROR") return;
+          track("sw_optional_cache_error", {
+            asset: String(data.asset || ""),
+            reason: String(data.reason || "cache_add_failed")
+          });
+        });
         controllerChangeBound = true;
       }
 

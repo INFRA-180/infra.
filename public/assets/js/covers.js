@@ -194,6 +194,9 @@
 
   function createRuntime(context) {
     const ctx = context || {};
+    const performancePolicy = globalObject.InfraPerformancePolicy && typeof globalObject.InfraPerformancePolicy.getPolicy === "function"
+      ? globalObject.InfraPerformancePolicy.getPolicy()
+      : null;
     const audioState = ctx.audioState || {};
     const spaState = ctx.spaState || {};
     const COVERS_CACHE_NAME = String(ctx.COVERS_CACHE_NAME || constants.CACHE_NAME);
@@ -816,6 +819,14 @@
             duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
             reason: reason || "session"
           }, getResourceTimingHint(entry.url, startedAt)));
+          if (performancePolicy && typeof performancePolicy.emit === "function") {
+            performancePolicy.emit("perf_cover_render", {
+              source: "session_prepare",
+              cache_hint: result && result.cacheHint ? result.cacheHint : "unknown",
+              decoded: Boolean(decoded),
+              duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
+            });
+          }
           return Boolean(decoded);
         });
       }).catch(function (err) {
@@ -861,6 +872,17 @@
       if (audioState.albumCoverPreparePromise) return audioState.albumCoverPreparePromise;
       if (typeof caches === "undefined" || !caches.open) return Promise.resolve();
 
+      const audio = audioState.audio;
+      const explicit = reason === "album_gate";
+      const decision = performancePolicy && typeof performancePolicy.decide === "function"
+        ? performancePolicy.decide("covers", {
+          explicit,
+          pageKind: document.body.classList.contains("home-screen") ? "home" : "album",
+          playbackFragile: Boolean(audio && !audio.paused && audio.readyState < 3)
+        })
+        : { allowed: true, budget: COVER_SESSION_PREPARE_CONCURRENCY };
+      if (!decision.allowed) return Promise.resolve();
+
       audioState.albumCoverCacheWarmupScheduled = true;
       const startedAt = getAudioTelemetryNow();
       audioState.albumCoverPreparePromise = loadTracksData().then(function (tracksData) {
@@ -876,7 +898,10 @@
         return caches.open(COVERS_CACHE_NAME).then(function (cache) {
           let cursor = 0;
           let decodedCount = 0;
-          const workerCount = Math.min(COVER_SESSION_PREPARE_CONCURRENCY, covers.length);
+          const workerCount = Math.min(
+            Math.max(1, Number(decision.budget) || COVER_SESSION_PREPARE_CONCURRENCY),
+            covers.length
+          );
           const workers = Array.from({ length: workerCount }, function () {
             return Promise.resolve().then(function runNext() {
               if (shouldPauseCoverPrepareForPwaNavigation()) {
@@ -1003,6 +1028,14 @@
 
     function scheduleAlbumCoverCacheWarmup(reason) {
       if (audioState.albumCoverCacheWarmupScheduled || audioState.albumCoverCacheWarmupDone) return;
+      const audio = audioState.audio;
+      const decision = performancePolicy && typeof performancePolicy.decide === "function"
+        ? performancePolicy.decide("covers", {
+          pageKind: document.body.classList.contains("home-screen") ? "home" : "album",
+          playbackFragile: Boolean(audio && !audio.paused && audio.readyState < 3)
+        })
+        : { allowed: true };
+      if (!decision.allowed) return;
       audioState.albumCoverCacheWarmupScheduled = true;
       const run = function () {
         warmAlbumCoverCache(reason || "idle");

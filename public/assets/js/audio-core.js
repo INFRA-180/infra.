@@ -248,15 +248,14 @@
         }
 
         let settled = false;
-        const requestedTimeout = Number(timeoutMs);
-        const timeout = Number.isFinite(requestedTimeout) && requestedTimeout > 0
-          ? setTimeout(function () { done(false); }, Math.max(80, requestedTimeout))
-          : null;
+        const timeout = setTimeout(function () {
+          done(false);
+        }, Math.max(80, Number(timeoutMs) || 180));
 
         function done(ready) {
           if (settled) return;
           settled = true;
-          if (timeout) clearTimeout(timeout);
+          clearTimeout(timeout);
           audio.removeEventListener("loadedmetadata", onReady);
           audio.removeEventListener("canplay", onReady);
           audio.removeEventListener("canplaythrough", onReady);
@@ -403,9 +402,7 @@
         }
       ));
       audioState.trackStartInFlight = true;
-      // A transport action must not add a deliberate pause or fade. It still
-      // clears an incomplete N+1 through isFastSkip above before switching.
-      const shouldFastSourceSwitch = isAutoAdvance || isFromMediaSession || isFromTransportControl;
+      const shouldFastSourceSwitch = isFastSkip;
       const shouldFadeSwitch = !shouldFastSourceSwitch && !sameTrack && !audio.paused && Boolean(getCurrentPlayableAudioSrc(audio));
 
       if (sameTrack && !opts.resume) {
@@ -438,14 +435,7 @@
           audioState.activeLogicalSrc = nextSrc;
           audioState.mediaSessionAudioPlaying = false;
           if (!sameTrack) {
-            const shouldPrimeColdIosSource = isIosDevice() && !getCurrentPlayableAudioSrc(audio);
             audio.src = nextSrc;
-            if (shouldPrimeColdIosSource) {
-              // preload="none" avoids background audio traffic. A user-initiated
-              // cold iOS start still needs one metadata load before it can play.
-              audio.preload = "metadata";
-              audio.load();
-            }
           }
           logAudioAuditEvent("source_assigned", target, index, nextSrc, {
             request_token: requestToken,
@@ -520,15 +510,9 @@
             reason: "AbortError",
             strategy: "wait_retry"
           });
-          const recoveryReadinessTimeout = isIosDevice() ? null : 700;
-          waitForAudioReadiness(audio, requestToken, recoveryReadinessTimeout).then(function (ready) {
+          waitForAudioReadiness(audio, requestToken, isIosDevice() ? 900 : 700).then(function () {
             if (requestToken !== audioState.startRequestToken) return;
-            if (ready) {
-              attemptPlay({ retry: true, sync: isFastSkip });
-              return;
-            }
-            audioState.trackStartInFlight = false;
-            recoverFromTrackFailure(index, target.src, requestToken);
+            attemptPlay({ retry: true, sync: isFastSkip });
           });
           return;
         }
@@ -583,22 +567,7 @@
             network_state: audio.networkState,
             click_perf_ms: audioState.audioClickPerfTs
           });
-          if (ready || !isIosDevice()) {
-            attemptPlay({ sync: false });
-            return;
-          }
-
-          // A cold iOS source may not accept play() until metadata is available.
-          // Wait for that browser event instead of triggering the reset recovery.
-          waitForAudioReadiness(audio, requestToken, null).then(function (eventReady) {
-            if (requestToken !== audioState.startRequestToken) return;
-            if (eventReady) {
-              attemptPlay({ sync: false });
-              return;
-            }
-            audioState.trackStartInFlight = false;
-            recoverFromTrackFailure(index, target.src, requestToken);
-          });
+          attemptPlay({ sync: false });
         });
       }
 

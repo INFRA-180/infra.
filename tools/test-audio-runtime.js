@@ -22,7 +22,28 @@ const sandbox = {
   performance: { now: () => 0 },
   location: { href: "https://example.test/", origin: "https://example.test" },
   navigator: { userAgent: "", platform: "", maxTouchPoints: 0 },
-  document: { body: { classList: { contains: () => true } } },
+  document: {
+    _elementsById: new Map(),
+    body: {
+      classList: { contains: () => true },
+      appendChild(node) {
+        node.parentNode = this;
+        if (node.id) sandbox.document._elementsById.set(node.id, node);
+        return node;
+      }
+    },
+    createElement(tagName) {
+      if (String(tagName).toLowerCase() === "audio") return createAudio();
+      return {
+        tagName: String(tagName).toUpperCase(),
+        setAttribute() {},
+        removeAttribute() {}
+      };
+    },
+    getElementById(id) {
+      return this._elementsById.get(id) || null;
+    }
+  },
   matchMedia: () => ({ matches: false }),
   setTimeout,
   clearTimeout,
@@ -56,6 +77,8 @@ function createAudio() {
     play() { this.playCalls += 1; this.paused = false; return Promise.resolve(); },
     pause() { this.pauseCalls += 1; this.paused = true; },
     load() { this.loadCalls += 1; },
+    setAttribute() {},
+    removeAttribute(name) { if (name === "src") { source = ""; this.currentSrc = ""; } },
     addEventListener(type, handler) { listeners.set(type, handler); },
     removeEventListener(type, handler) { if (listeners.get(type) === handler) listeners.delete(type); },
     dispatch(type) { const handler = listeners.get(type); if (handler) handler({ type }); }
@@ -63,10 +86,9 @@ function createAudio() {
 }
 
 load("public/assets/js/audio-prefetch.js");
-const warmupRequest = sandbox.InfraAudioPrefetch.createRequest("https://media.test/warm.m4a", {
-  warmupBytes: 512 * 1024
-});
-assert.strictEqual(warmupRequest.headers.get("Range"), "bytes=0-524287", "audio warmup must request only the startup segment");
+const fullPrefetchRequest = sandbox.InfraAudioPrefetch.createRequest("https://media.test/warm.m4a");
+assert.strictEqual(fullPrefetchRequest.headers.get("Range"), null, "audio prefetch must request the complete N+1 track");
+assert.strictEqual(sandbox.InfraAudioPrefetch.constants.CACHE_NAME, "infra-next-track-full-v3", "audio prefetch must use the complete-track cache");
 
 load("public/assets/js/audio-core.js");
 load("public/assets/js/audio-radio.js");
@@ -105,10 +127,10 @@ const core = sandbox.InfraAudioCore.createAudioCore({
 });
 
 core.startTrack(1, { fromTransportControl: true, seamless: true });
-assert.strictEqual(audio.playCalls, 1, "transport next must call play immediately even when N+1 is incomplete");
+assert.strictEqual(audio.playCalls, 0, "transport next must not claim an immediate fast path when N+1 is incomplete");
 assert.strictEqual(prefetchCancels, 1, "an incomplete N+1 must be cancelled");
 assert.strictEqual(audioState.activeMediaRequest.index, 1, "the active media request must follow the target track");
-assert.strictEqual(audio.pauseCalls, 0, "transport next must not pause the old source before starting the new one");
+assert.strictEqual(audio.pauseCalls, 1, "incomplete transport next must use the guarded fallback source switch");
 
 const preparedAudio = createAudio();
 const preparedState = {
@@ -255,7 +277,7 @@ radioDurations.ensureRadioPlaylistLoaded().then((radioList) => {
   assert.strictEqual(overlayDuration.textContent, "-3:21", "fullscreen player must show catalog duration before audio metadata");
   assert.strictEqual(overlayProgress.disabled, true, "catalog duration must not enable seeking before media metadata");
 
-  console.log(JSON.stringify({ ok: true, checks: 17 }, null, 2));
+  console.log(JSON.stringify({ ok: true, checks: 19 }, null, 2));
 }).catch((error) => {
   console.error(error);
   process.exitCode = 1;

@@ -107,3 +107,11 @@
 - In-app Next/Previous returns to the immediate source-switch path. If the N+1 warmup is incomplete, it is cancelled before playback, but it no longer decides whether transport playback can be fast.
 - The global PWA audio element now uses `preload="metadata"` instead of `none`, and home random preparation is scheduled immediately instead of waiting for idle time.
 - Mini-player and now-playing queue fallbacks avoid `--:--` on the current track; the UI shows `0:00` or the catalogue duration while browser metadata is still unavailable.
+
+## 2026-07-11 - audiofix301 complete-cache PWA N+1 restoration
+
+- The PWA N+1 path returns to the earlier `audiofix281` contract: the next track is cached as a complete `200 OK` audio response, not as a partial 512 KB startup segment and not as a hidden media element.
+- R2 audio requests are again eligible for Service Worker replay from the complete N+1 cache. Safari/PWA Range requests can therefore be answered locally with valid `206 Partial Content` responses when the next track is prepared.
+- Transport Next is fast only when the target is the completed N+1 track. If it is not prepared, the pending prefetch is cancelled and playback uses the bounded fallback path instead of changing UI state as if the target were already warm.
+- Home initialization still avoids destructive idle audio cleanup, starts loading `tracks.json` before first Play, and keeps Albums, Clips, and Applications before SEO direct links during rehydration.
+- The fullscreen cover keeps the clipped dark-backed render to hide sub-pixel WebKit edge artifacts.

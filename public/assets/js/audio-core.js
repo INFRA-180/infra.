@@ -339,7 +339,7 @@
       const isFromTransportControl = Boolean(opts.fromTransportControl);
       const preparedNextIndex = getAutoPrefetchedNextIndex();
       const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index;
-      const isFastSkip = isAutoAdvance || isFromMediaSession || isFromTransportControl;
+      const isFastSkip = isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
       const shouldCancelPendingPrefetch = Boolean(
         PREFETCH_NEXT_ENABLED &&
@@ -442,9 +442,7 @@
         try {
           audioState.activeLogicalSrc = nextSrc;
           audioState.mediaSessionAudioPlaying = false;
-          if (!sameTrack) {
-            audio.src = nextSrc;
-          }
+          if (!sameTrack) audio.src = nextSrc;
           logAudioAuditEvent("source_assigned", target, index, nextSrc, {
             request_token: requestToken,
             same_track: sameTrack,
@@ -554,7 +552,29 @@
 
       function beginPlayback() {
         if (requestToken !== audioState.startRequestToken) return;
-        attemptPlay({ sync: true });
+        if (isFastSkip) {
+          attemptPlay({ sync: true });
+          return;
+        }
+        const readinessTimeout = isIosDevice() ? 110 : 220;
+        logAudioAuditEvent("ready_wait_start", target, index, nextSrc || target.src, {
+          request_token: requestToken,
+          timeout_ms: readinessTimeout,
+          ready_state: audio.readyState,
+          network_state: audio.networkState,
+          click_perf_ms: audioState.audioClickPerfTs
+        });
+        waitForAudioReadiness(audio, requestToken, readinessTimeout).then(function (ready) {
+          if (requestToken !== audioState.startRequestToken) return;
+          logAudioAuditEvent("ready_wait_end", target, index, nextSrc || target.src, {
+            request_token: requestToken,
+            ready: Boolean(ready),
+            ready_state: audio.readyState,
+            network_state: audio.networkState,
+            click_perf_ms: audioState.audioClickPerfTs
+          });
+          attemptPlay({ sync: false });
+        });
       }
 
       if (sameTrack) {

@@ -3251,19 +3251,22 @@ body.now-playing-open {
   background: #050609;
   overflow: hidden;
   isolation: isolate;
+  line-height: 0;
 }
 
 .now-playing-cover {
   width: 100%;
   aspect-ratio: 1 / 1;
   display: block;
-  object-fit: contain;
+  object-fit: cover;
   border-radius: inherit;
   border: 0;
   box-shadow: none;
-  background: transparent;
+  background: #050609;
   backface-visibility: hidden;
-  transform: translateZ(0);
+  clip-path: inset(0.5px);
+  transform: translateZ(0) scale(1.002);
+  transform-origin: center;
   -webkit-user-drag: none;
   user-select: none;
 }
@@ -4221,8 +4224,8 @@ body.now-playing-open {
     max-width: var(--now-playing-content-width);
     max-height: var(--now-playing-cover-size);
     aspect-ratio: auto;
-    object-fit: contain;
-    background: transparent;
+    object-fit: cover;
+    background: #050609;
   }
 
   .now-playing-title {
@@ -4423,7 +4426,7 @@ body.now-playing-open {
     margin: 0;
     background: #050609;
     border-radius: clamp(22px, 2vw, 34px);
-    line-height: 1;
+    line-height: 0;
     transform: translateY(clamp(18px, 2vh, 26px));
   }
 
@@ -4433,7 +4436,8 @@ body.now-playing-open {
     max-width: none;
     max-height: none;
     aspect-ratio: 1 / 1;
-    object-fit: contain;
+    object-fit: cover;
+    background: #050609;
   }
 
   .now-playing-meta,

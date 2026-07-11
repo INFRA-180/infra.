@@ -222,26 +222,27 @@
       if (!document.body.classList.contains("home-screen")) return;
       const container = document.querySelector(".one-page-layout"); if (!container) return;
       const albums = container.querySelector('[data-module-id="albums"]'); const clips = container.querySelector('[data-module-id="clips"]'); const apps = container.querySelector('[data-module-id="apps"]');
-      if (!albums || !apps) return; container.appendChild(albums); if (clips) container.appendChild(clips); container.appendChild(apps);
+      const directLinks = container.querySelector(".seo-direct-links");
+      if (!albums || !apps) return; container.insertBefore(albums, directLinks || null); if (clips) container.insertBefore(clips, directLinks || null); container.insertBefore(apps, directLinks || null);
     }
     function enforceHomeAppsCollapsed(adminMode) { if (!adminMode && document.body.classList.contains("home-screen")) { const menu = document.querySelector(".apps-menu"); if (menu) menu.open = false; } }
     function resumeLiveHomeRoute() {
       if (!document.body.classList.contains("home-screen")) return;
       const adminMode = isAdminModeEnabled(); document.body.classList.toggle("ios-device", isIosDevice()); closeNowPlayingOverlay(); initThemePreset(); if (!adminMode) applyThemePreset("blanc", false);
-      cleanupIdleAudioContext({ preserveMode: true }); ensureGlobalAudio(); ensurePlayablePlaylistContext(); syncFavoriteButtons(); syncFavoritesRoute(); syncTransportUi(); enforceHomeModuleOrder(); enforceHomeAppsCollapsed(adminMode); resetHomePlaybackModeIfIdle();
+      ensureGlobalAudio(); ensurePlayablePlaylistContext(); syncFavoriteButtons(); syncFavoritesRoute(); syncTransportUi(); enforceHomeModuleOrder(); enforceHomeAppsCollapsed(adminMode);
       if (audioState.homeMode !== "radio") setHomePlayMode("album", { force: true }); else syncAudioUi();
       scheduleFavoritesPreload("home_restore"); scheduleSpaPagePrefetch(); scheduleAlbumCoverCacheWarmup("home_restore"); snapshotCurrentSpaPage(spaState.currentUrl || window.location.href); initPwaInstallPrompt(adminMode);
     }
     async function initPage() {
       const adminMode = isAdminModeEnabled(); document.body.classList.toggle("ios-device", isIosDevice()); closeNowPlayingOverlay(); initThemePreset(); if (!adminMode) applyThemePreset("blanc", false);
       const isHome = document.body.classList.contains("home-screen"); const needsAudio = shouldInitAudioFeatures();
-      const durations = needsAudio ? loadTrackDurationData() : Promise.resolve(); const tracks = needsAudio ? loadTracksData() : Promise.resolve();
+      const durations = needsAudio ? loadTrackDurationData() : Promise.resolve(); const tracks = (isHome || needsAudio) ? loadTracksData() : Promise.resolve();
       if (isHome || needsAudio) { ensureGlobalAudio(); initAudioSessionTelemetry(); ensurePlayablePlaylistContext(); }
-      if (!document.body.classList.contains("album-screen")) cleanupIdleAudioContext({ preserveMode: true });
+      if (!isHome && !document.body.classList.contains("album-screen")) cleanupIdleAudioContext({ preserveMode: true });
       if (isHome) {
         initHomeFavoritesButton(); initFavoritesRoute(); scheduleFavoritesPreload("home_init");
         loadFavoritesWithReset().catch(function () { audioState.favoritesDbSupported = false; syncFavoriteButtons(); }).finally(syncFavoritesRoute);
-        loadCatalogData().catch(function () {}); await hydrateHomeCatalog(); prepareAlbumCoversForSession("home_start"); if (!adminMode) enforceHomeModuleOrder(); enforceHomeAppsCollapsed(adminMode); resetHomePlaybackModeIfIdle();
+        loadCatalogData().catch(function () {}); await hydrateHomeCatalog(); prepareAlbumCoversForSession("home_start"); if (!adminMode) enforceHomeModuleOrder(); enforceHomeAppsCollapsed(adminMode);
         if (audioState.homeMode !== "radio") setHomePlayMode("album", { force: true }); else syncAudioUi(); syncFavoritesRoute();
         scheduleInitialGlobalRandomPreparation("home_idle");
       }

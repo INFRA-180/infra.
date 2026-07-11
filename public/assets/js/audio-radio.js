@@ -18,9 +18,6 @@
     const prefetchApi = ctx.prefetchApi || null;
     const PREFETCH_NEXT_CACHE_NAME = ctx.PREFETCH_NEXT_CACHE_NAME || "infra-next-track";
     const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_MAX_BYTES)) ? Number(ctx.PREFETCH_NEXT_MAX_BYTES) : 12 * 1024 * 1024;
-    const PREFETCH_NEXT_WARMUP_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_WARMUP_BYTES))
-      ? Number(ctx.PREFETCH_NEXT_WARMUP_BYTES)
-      : Number(prefetchApi && prefetchApi.constants && prefetchApi.constants.WARMUP_BYTES) || 512 * 1024;
     const PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS)) ? Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS) : 24;
     const SYSTEM_INTERRUPTION_GUARD_MS = 2 * 60 * 1000;
     const SYSTEM_INTERRUPTION_NEAR_END_SECONDS = 2.5;
@@ -572,6 +569,15 @@
     syncAudioUi();
     ensureGlobalAudio();
     const preparedPlaylist = consumePreparedInitialGlobalRandomPlaylist();
+    if (!preparedPlaylist && audioState.tracksData && Array.isArray(audioState.tracksData.albums)) {
+      const syncPlaylist = buildGlobalRandomPlaylistWithTelemetry(audioState.tracksData, "tap_sync");
+      if (setGlobalCatalogPlaylist(syncPlaylist)) {
+        startTrack(0, { seamless: true, initialRandom: true });
+        audioState.globalRandomStartInFlight = false;
+        syncAudioUi();
+        return;
+      }
+    }
     const buildOnTap = function () {
       return loadTracksData().then(function (tracksData) {
         return buildGlobalRandomPlaylistWithTelemetry(tracksData, "tap");
@@ -1191,7 +1197,7 @@
     const audio = audioState.audio;
     if (audio && !audio.paused && getCurrentPlayableAudioSrc(audio)) return false;
 
-    if (audio) {
+    if (audio && getCurrentPlayableAudioSrc(audio)) {
       try {
         audio.pause();
       } catch (_err) {
@@ -2243,7 +2249,6 @@
   }
 
 
-
   function resetNextTrackPrefetchState() {
     audioState.nextPrefetchSrc = "";
     audioState.nextPrefetchIndex = -1;
@@ -2391,23 +2396,17 @@
       }
     ));
 
-    const supportsWarmupRequest = prefetchApi && typeof prefetchApi.createRequest === "function";
-    const baseRequest = supportsWarmupRequest
-      ? prefetchApi.createRequest(src, { warmupBytes: PREFETCH_NEXT_WARMUP_BYTES })
-      : getPrefetchCacheRequest(src);
+    const baseRequest = getPrefetchCacheRequest(src);
     let fetchRequest = baseRequest;
-    let fetchOptions = supportsWarmupRequest
-      ? undefined
-      : { headers: { Range: `bytes=0-${PREFETCH_NEXT_WARMUP_BYTES - 1}` } };
     if (abortController) {
       try {
         fetchRequest = new Request(baseRequest, { signal: abortController.signal });
       } catch (_err) {
-        fetchOptions = Object.assign({}, fetchOptions, { signal: abortController.signal });
+        fetchRequest = baseRequest;
       }
     }
 
-    fetch(fetchRequest, fetchOptions).then(function (response) {
+    fetch(fetchRequest).then(function (response) {
       if (token !== audioState.nextPrefetchToken) return null;
       if (!response || !response.ok) {
         throw new Error(`prefetch_http_${response ? response.status : "none"}`);
@@ -2416,11 +2415,7 @@
         ? prefetchApi.getContentLength(response)
         : Number(response.headers.get("Content-Length") || response.headers.get("content-length") || 0);
       if (!Number.isFinite(bytes) || bytes <= 0) throw new Error("prefetch_missing_content_length");
-      const contentRange = response.headers.get("Content-Range") || response.headers.get("content-range") || "";
-      if (response.status !== 206 || !/^bytes\s+0-/i.test(contentRange)) {
-        throw new Error("prefetch_range_unsupported");
-      }
-      if (bytes > Math.min(PREFETCH_NEXT_MAX_BYTES, PREFETCH_NEXT_WARMUP_BYTES)) {
+      if (bytes > PREFETCH_NEXT_MAX_BYTES) {
         if (response.body && typeof response.body.cancel === "function") {
           response.body.cancel().catch(function () {});
         }
@@ -2448,6 +2443,7 @@
         {
           next_index: index,
           from_index: audioState.nextPrefetchFromIndex,
+          strategy: "full_cache",
           bytes,
           ms: Date.now() - startedAt
         }
@@ -2462,6 +2458,7 @@
         {
           next_index: index,
           from_index: audioState.nextPrefetchFromIndex,
+          strategy: "full_cache",
           reason: err && err.message ? err.message : "prefetch_failed",
           ms: Date.now() - startedAt
         }

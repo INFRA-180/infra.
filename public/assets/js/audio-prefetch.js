@@ -7,9 +7,8 @@
 
   const constants = Object.freeze({
     ENABLED: true,
-    CACHE_NAME: "infra-next-track-v2",
+    CACHE_NAME: "infra-next-track-full-v3",
     MAX_BYTES: 15 * 1024 * 1024,
-    WARMUP_BYTES: 512 * 1024,
     THRESHOLD_SECONDS: 30
   });
 
@@ -22,19 +21,13 @@
     );
   }
 
-  function createRequest(src, options) {
-    const opts = options || {};
-    const headers = new Headers(opts.headers || {});
-    if (Number.isFinite(opts.warmupBytes) && opts.warmupBytes > 0) {
-      headers.set("Range", `bytes=0-${Math.floor(opts.warmupBytes) - 1}`);
-    }
+  function createRequest(src) {
     try {
       return new Request(src, {
         method: "GET",
         mode: "cors",
         credentials: "omit",
-        cache: "default",
-        headers
+        cache: "default"
       });
     } catch (_err) {
       return src;
@@ -66,17 +59,11 @@
 
   function putSingle(src, response) {
     const request = createRequest(src);
-    const cachedHeaders = new Headers(response.headers);
-    const cachedResponse = new Response(response.clone().body, {
-      status: 200,
-      statusText: "OK",
-      headers: cachedHeaders
-    });
     return clearCache().then(function () {
       return openCache();
     }).then(function (cache) {
       if (!cache) return false;
-      return cache.put(request, cachedResponse).then(function () {
+      return cache.put(request, response.clone()).then(function () {
         return true;
       });
     });

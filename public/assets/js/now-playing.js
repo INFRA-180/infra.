@@ -485,14 +485,14 @@
       const title = normalizeTrackTitle(track && track.name ? track.name : "") || `Titre ${index + 1}`;
       const album = normalizeAlbumTitle(track && track.album ? track.album : "");
       const meta = getTrackMetaByAssetPath(track && track.src ? track.src : "");
-      const duration = String((track && track.duration) || getCachedTrackDuration(track && track.src ? track.src : "") || (meta && meta.duration) || "").trim() || "--:--";
+      const isCurrent = index === currentIndex;
+      const duration = String((track && track.duration) || getCachedTrackDuration(track && track.src ? track.src : "") || (meta && meta.duration) || "").trim() || (isCurrent ? "0:00" : "");
       const artwork = normalizeArtworkUrl(
         (track && track.artwork) ||
         (meta && meta.artwork) ||
         getCurrentTrackArtwork(track) ||
         getMediaSessionFallbackArtwork()
       );
-      const isCurrent = index === currentIndex;
       const item = document.createElement("button");
       item.type = "button";
       item.className = "now-playing-up-next-item";

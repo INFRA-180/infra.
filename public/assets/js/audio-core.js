@@ -339,12 +339,19 @@
       const isFromTransportControl = Boolean(opts.fromTransportControl);
       const preparedNextIndex = getAutoPrefetchedNextIndex();
       const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index;
-      const isFastSkip = isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget;
+      const isFastSkip = isAutoAdvance || isFromMediaSession || isFromTransportControl;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
+      const shouldCancelPendingPrefetch = Boolean(
+        PREFETCH_NEXT_ENABLED &&
+        (
+          (!isFastSkip && !isPreparedInitialRandom) ||
+          (isFromTransportControl && !hasPreparedTransportTarget)
+        )
+      );
 
-      if (!isFastSkip && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
-        clearNextTrackPrefetch("manual_start");
-        resetPreparedInitialGlobalRandomPlayback();
+      if (shouldCancelPendingPrefetch) {
+        clearNextTrackPrefetch(isFromTransportControl ? "transport_start" : "manual_start");
+        if (!isFromTransportControl) resetPreparedInitialGlobalRandomPlayback();
       }
 
       audioState.currentIndex = index;
@@ -430,8 +437,6 @@
       // Keep controls/snippets in sync while play() promise resolves.
       syncAudioUi();
 
-      setTrackStatus(rowTrack, "Chargement du fichier audio...");
-
       function assignDirectSource() {
         if (!nextSrc) return false;
         try {
@@ -476,6 +481,7 @@
         });
         clearTrackFailure(target.src);
         clearTrackStatus(rowTrack);
+        audioState.trackStartInFlight = false;
         if (!sameTrack && !(isFastSkip || shouldSeamless)) {
           fadeInAudio(audio, 100);
         } else if (sameTrack && !shouldSeamless) {
@@ -548,29 +554,7 @@
 
       function beginPlayback() {
         if (requestToken !== audioState.startRequestToken) return;
-        if (isFastSkip) {
-          attemptPlay({ sync: true });
-          return;
-        }
-        const readinessTimeout = isIosDevice() ? 110 : 220;
-        logAudioAuditEvent("ready_wait_start", target, index, nextSrc || target.src, {
-          request_token: requestToken,
-          timeout_ms: readinessTimeout,
-          ready_state: audio.readyState,
-          network_state: audio.networkState,
-          click_perf_ms: audioState.audioClickPerfTs
-        });
-        waitForAudioReadiness(audio, requestToken, readinessTimeout).then(function (ready) {
-          if (requestToken !== audioState.startRequestToken) return;
-          logAudioAuditEvent("ready_wait_end", target, index, nextSrc || target.src, {
-            request_token: requestToken,
-            ready: Boolean(ready),
-            ready_state: audio.readyState,
-            network_state: audio.networkState,
-            click_perf_ms: audioState.audioClickPerfTs
-          });
-          attemptPlay({ sync: false });
-        });
+        attemptPlay({ sync: true });
       }
 
       if (sameTrack) {

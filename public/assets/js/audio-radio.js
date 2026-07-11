@@ -681,11 +681,7 @@
     const run = function () {
       prepareInitialGlobalRandomPlayback(reason || "home_idle");
     };
-    if (typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(run, { timeout: 1500 });
-      return;
-    }
-    window.setTimeout(run, 250);
+    window.setTimeout(run, 0);
   }
 
 
@@ -1797,7 +1793,7 @@
     if (audioState.audio) {
       audioState.audio.crossOrigin = "";
       audioState.audio.removeAttribute("crossorigin");
-      audioState.audio.preload = "none";
+      audioState.audio.preload = "metadata";
       root.appendChild(audioState.audio);
       bindMediaSessionActions();
       ensureGlobalTransportUi();
@@ -1811,7 +1807,7 @@
     if (!audio) {
       audio = document.createElement("audio");
       audio.id = "infraGlobalAudio";
-      audio.preload = "none";
+      audio.preload = "metadata";
       audio.playsInline = true;
       audio.crossOrigin = "";
       audio.removeAttribute("crossorigin");
@@ -1820,7 +1816,7 @@
     } else {
       audio.crossOrigin = "";
       audio.removeAttribute("crossorigin");
-      audio.preload = "none";
+      audio.preload = "metadata";
       root.appendChild(audio);
     }
 

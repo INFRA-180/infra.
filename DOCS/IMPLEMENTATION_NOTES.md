@@ -100,3 +100,10 @@
 - R2 audio requests now bypass the Service Worker entirely, so Safari/PWA owns the real byte-range negotiation. The previous partial-cache Range reconstruction remains in code for test coverage but is no longer on the live audio path.
 - Service Worker activation deletes both legacy and current N+1 partial warmup caches to force clients out of stale segmented audio entries.
 - The private Cloudflare Worker source now clamps telemetry export offset windows to avoid unbounded KV scans; catalogue and R2 bindings are unchanged.
+
+## 2026-07-11 - audiofix299 immediate PWA playback path
+
+- PWA playback no longer waits for `loadedmetadata` or `canplay` before calling `audio.play()` on normal starts, cold global random starts, or transport changes. The readiness wait remains only as an `AbortError` recovery path.
+- In-app Next/Previous returns to the immediate source-switch path. If the N+1 warmup is incomplete, it is cancelled before playback, but it no longer decides whether transport playback can be fast.
+- The global PWA audio element now uses `preload="metadata"` instead of `none`, and home random preparation is scheduled immediately instead of waiting for idle time.
+- Mini-player and now-playing queue fallbacks avoid `--:--` on the current track; the UI shows `0:00` or the catalogue duration while browser metadata is still unavailable.

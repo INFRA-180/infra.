@@ -487,7 +487,7 @@
         "    <button class=\"global-transport-mini-progress\" type=\"button\" data-transport-mini-progress aria-label=\"Avancer dans le morceau\">",
         "      <span class=\"global-transport-mini-fill\" data-transport-mini-fill></span>",
         "    </button>",
-        "    <span class=\"global-transport-mini-time\" data-transport-mini-duration>--:--</span>",
+        "    <span class=\"global-transport-mini-time\" data-transport-mini-duration>0:00</span>",
         "  </div>",
         "</div>",
         "<div class=\"global-transport-controls\">",
@@ -1460,7 +1460,7 @@
     transport.nowMini.hidden = !hasSource;
     if (!hasSource) {
       if (transport.miniCurrent) transport.miniCurrent.textContent = "0:00";
-      if (transport.miniDuration) transport.miniDuration.textContent = "--:--";
+      if (transport.miniDuration) transport.miniDuration.textContent = "0:00";
       if (transport.miniFill) transport.miniFill.style.width = "0%";
       if (transport.miniProgress) transport.miniProgress.disabled = true;
       syncNowPlayingOverlayProgress();
@@ -1474,7 +1474,7 @@
         : ""
     );
     const currentTime = hasDuration ? formatTrackDuration(audio.currentTime) : "0:00";
-    const duration = hasDuration ? formatTrackDuration(audio.duration) : (catalogDuration || "--:--");
+    const duration = hasDuration ? formatTrackDuration(audio.duration) : (catalogDuration || "0:00");
     const percent = hasDuration ? Math.max(0, Math.min(100, (audio.currentTime / audio.duration) * 100)) : 0;
 
     if (transport.miniCurrent) transport.miniCurrent.textContent = currentTime;

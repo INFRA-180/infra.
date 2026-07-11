@@ -105,11 +105,10 @@ const core = sandbox.InfraAudioCore.createAudioCore({
 });
 
 core.startTrack(1, { fromTransportControl: true, seamless: true });
-assert.strictEqual(audio.playCalls, 0, "unprepared transport next must wait for media readiness");
+assert.strictEqual(audio.playCalls, 1, "transport next must call play immediately even when N+1 is incomplete");
 assert.strictEqual(prefetchCancels, 1, "an incomplete N+1 must be cancelled");
 assert.strictEqual(audioState.activeMediaRequest.index, 1, "the active media request must follow the target track");
-audio.readyState = 2;
-audio.dispatch("canplay");
+assert.strictEqual(audio.pauseCalls, 0, "transport next must not pause the old source before starting the new one");
 
 const preparedAudio = createAudio();
 const preparedState = {

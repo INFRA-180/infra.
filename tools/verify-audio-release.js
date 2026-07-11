@@ -109,9 +109,12 @@ function verifyRuntimeWiring(version) {
   assert(serviceWorker.includes("Let Safari/PWA talk directly to R2"), "R2 audio must bypass service-worker Range reconstruction");
   assert(serviceWorker.includes("key === NEXT_TRACK_CACHE"), "partial warmup cache must be purged during service-worker activation");
   assert(audioCore.includes("const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index"), "transport fast path must require a completed N+1 target");
-  assert(audioCore.includes("const isFastSkip = isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget"), "normal playback must not use the direct fast path");
-  assert(audioCore.includes('if (!isFastSkip && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED)'), "incomplete N+1 must be cancelled before guarded playback");
-  assert(audioCore.includes("const shouldFastSourceSwitch = isFastSkip"), "normal source switches must use readiness safeguards");
+  assert(audioCore.includes("const isFastSkip = isAutoAdvance || isFromMediaSession || isFromTransportControl"), "transport playback must use the immediate path");
+  assert(audioCore.includes("isFromTransportControl && !hasPreparedTransportTarget"), "incomplete transport N+1 must be cancelled before immediate playback");
+  assert(audioCore.includes("attemptPlay({ sync: true });"), "normal playback must call play immediately after source assignment");
+  assert(!audioCore.includes('logAudioAuditEvent("ready_wait_start"'), "normal playback must not wait for readiness before play()");
+  assert(audioRadio.includes('audio.preload = "metadata"') && audioRadio.includes('audioState.audio.preload = "metadata"'), "global PWA audio must request metadata preload");
+  assert(audioRadio.includes("window.setTimeout(run, 0);"), "initial random preparation must not be deferred to idle");
   assert(!audioCore.includes("const isDirectStart = opts.waitForReadiness !== true"), "unconditional direct start path must not return");
   assert(!audioCore.includes("IOS_INITIAL_READINESS_TIMEOUT_MS"), "slow iOS readiness wait must not block normal playback");
   assert(!audioCore.includes("audio.src = nextSrc;\n            loadMediaElementForPlayback(audio);"), "normal source assignment must not force media reload");

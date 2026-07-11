@@ -532,6 +532,16 @@
     syncAudioUi();
     ensureGlobalAudio();
     const preparedPlaylist = consumePreparedInitialGlobalRandomPlaylist();
+    if (!preparedPlaylist && audioState.tracksData && Array.isArray(audioState.tracksData.albums)) {
+      const playlist = buildGlobalRandomPlaylistWithTelemetry(audioState.tracksData, "tap_memory");
+      if (setGlobalCatalogPlaylist(playlist)) {
+        resetPreparedInitialGlobalRandomPlayback();
+        startTrack(0, { seamless: true, initialRandom: true });
+        audioState.globalRandomStartInFlight = false;
+        syncAudioUi();
+        return;
+      }
+    }
     const buildOnTap = function () {
       return loadTracksData().then(function (tracksData) {
         return buildGlobalRandomPlaylistWithTelemetry(tracksData, "tap");
@@ -614,7 +624,11 @@
         audioState.initialRandomFirstSrc = normalizeAudioSourceUrl(playlist[0] && playlist[0].src ? playlist[0].src : "");
         audioState.initialRandomReady = true;
 
-        if (audioState.initialRandomFirstSrc && isCloudflareAudioUrl(audioState.initialRandomFirstSrc)) {
+        if (
+          reason !== "home_boot" &&
+          audioState.initialRandomFirstSrc &&
+          isCloudflareAudioUrl(audioState.initialRandomFirstSrc)
+        ) {
           startNextTrackPrefetch(0, playlist[0], audioState.initialRandomFirstSrc, reason || "initial_idle");
         }
         syncAudioUi();
@@ -639,13 +653,9 @@
   function scheduleInitialGlobalRandomPreparation(reason) {
     if (!PREFETCH_NEXT_ENABLED) return;
     const run = function () {
-      prepareInitialGlobalRandomPlayback(reason || "home_idle");
+      prepareInitialGlobalRandomPlayback("home_boot");
     };
-    if (typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(run, { timeout: 1500 });
-      return;
-    }
-    window.setTimeout(run, 250);
+    window.setTimeout(run, 0);
   }
 
 

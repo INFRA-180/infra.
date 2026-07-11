@@ -6,11 +6,13 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
+let storedRequest = null;
 let storedResponse = null;
 const cache = {
   keys: () => Promise.resolve([]),
   delete: () => Promise.resolve(true),
-  put: (_request, response) => {
+  put: (request, response) => {
+    storedRequest = request;
     storedResponse = response;
     return Promise.resolve();
   }
@@ -35,22 +37,30 @@ vm.runInContext(
 
 (async function () {
   const bytes = new Uint8Array(1024 * 1024);
-  const full = new Response(bytes, {
-    status: 200,
+  const startupRequest = sandbox.InfraAudioPrefetch.createRequest("https://media.test/next.m4a");
+  assert.strictEqual(startupRequest.headers.get("Range"), "bytes=0-2097151", "audio prefetch must request a startup segment");
+  assert.strictEqual(sandbox.InfraAudioPrefetch.constants.CACHE_NAME, "infra-next-track-segments-v4", "audio prefetch must use the startup segment cache");
+
+  const partial = new Response(bytes, {
+    status: 206,
     headers: {
       "Content-Type": "audio/mp4",
-      "Content-Length": String(bytes.byteLength)
+      "Content-Length": String(bytes.byteLength),
+      "Content-Range": `bytes 0-${bytes.byteLength - 1}/${bytes.byteLength * 4}`
     }
   });
 
-  const stored = await sandbox.InfraAudioPrefetch.putSingle("https://media.test/next.m4a", full);
+  const stored = await sandbox.InfraAudioPrefetch.putSingle("https://media.test/next.m4a", partial);
   assert.strictEqual(stored, true);
-  assert(storedResponse, "the complete N+1 track must be written to Cache Storage");
-  assert.strictEqual(storedResponse.status, 200, "the complete cache entry must remain a normal 200 response");
-  assert.strictEqual(storedResponse.headers.get("Content-Range"), null, "complete N+1 cache entries must not carry partial range metadata");
+  assert(storedRequest, "the startup segment must be written with an URL-only cache key");
+  assert.strictEqual(storedRequest.headers.get("Range"), null, "cache keys must not include the startup Range header");
+  assert(storedResponse, "the startup segment must be written to Cache Storage");
+  assert.strictEqual(storedResponse.status, 200, "Cache Storage entries must normalize 206 startup segments to 200");
+  assert.strictEqual(storedResponse.headers.get("X-Infra-Audio-Partial"), "1", "startup segment metadata must be preserved");
+  assert.strictEqual(storedResponse.headers.get("X-Infra-Total-Length"), String(bytes.byteLength * 4));
   assert.strictEqual((await storedResponse.arrayBuffer()).byteLength, 1024 * 1024);
 
-  console.log(JSON.stringify({ ok: true, checks: 5 }, null, 2));
+  console.log(JSON.stringify({ ok: true, checks: 9 }, null, 2));
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

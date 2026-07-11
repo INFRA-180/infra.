@@ -115,3 +115,11 @@
 - Transport Next is fast only when the target is the completed N+1 track. If it is not prepared, the pending prefetch is cancelled and playback uses the bounded fallback path instead of changing UI state as if the target were already warm.
 - Home initialization still avoids destructive idle audio cleanup, starts loading `tracks.json` before first Play, and keeps Albums, Clips, and Applications before SEO direct links during rehydration.
 - The fullscreen cover keeps the clipped dark-backed render to hide sub-pixel WebKit edge artifacts.
+
+## 2026-07-11 - audiofix302 segmented radio queue prefetch
+
+- The PWA audio cache now favors startup readiness over complete-track readiness: the prefetch request downloads the first 2 MB of each candidate track with a `Range` request and stores it as a normalized Cache Storage `200 OK` entry with explicit partial metadata.
+- Radio playback prepares a short queue instead of a single N+1. Up to four upcoming radio entries are considered, with two concurrent startup-segment downloads, so rapid Next commands can consume prepared starts faster than the old complete-file cache could refill.
+- Transport Next is considered prepared when the target startup segment is cached, not only when the whole M4A has downloaded. Once Safari requests beyond the cached startup window, the Service Worker falls back to R2 without deleting the valid segment.
+- Service Worker activation deletes the previous complete-track cache (`infra-next-track-full-v3`) and uses `infra-next-track-segments-v4` as the live audio prefetch cache.
+- The code-only tests now assert Range prefetching, Cache API normalization, partial Range replay, network fallback outside the prepared segment, and the new multi-candidate radio prefetch contract.

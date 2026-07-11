@@ -86,9 +86,10 @@ function createAudio() {
 }
 
 load("public/assets/js/audio-prefetch.js");
-const fullPrefetchRequest = sandbox.InfraAudioPrefetch.createRequest("https://media.test/warm.m4a");
-assert.strictEqual(fullPrefetchRequest.headers.get("Range"), null, "audio prefetch must request the complete N+1 track");
-assert.strictEqual(sandbox.InfraAudioPrefetch.constants.CACHE_NAME, "infra-next-track-full-v3", "audio prefetch must use the complete-track cache");
+const startupPrefetchRequest = sandbox.InfraAudioPrefetch.createRequest("https://media.test/warm.m4a");
+assert.strictEqual(startupPrefetchRequest.headers.get("Range"), "bytes=0-2097151", "audio prefetch must request a startup segment");
+assert.strictEqual(sandbox.InfraAudioPrefetch.constants.CACHE_NAME, "infra-next-track-segments-v4", "audio prefetch must use the startup segment cache");
+assert.strictEqual(sandbox.InfraAudioPrefetch.constants.QUEUE_DEPTH, 4, "radio prefetch must prepare more than one next track");
 
 load("public/assets/js/audio-core.js");
 load("public/assets/js/audio-radio.js");
@@ -145,7 +146,8 @@ const preparedState = {
   recentPlayedLimit: 12,
   startRequestToken: 0,
   activeLogicalSrc: "https://media.test/a.m4a",
-  trackFailureCounts: new Map()
+  trackFailureCounts: new Map(),
+  nextPrefetchReadySrcs: new Set(["https://media.test/b.m4a"])
 };
 const preparedCore = sandbox.InfraAudioCore.createAudioCore({
   audioState: preparedState,

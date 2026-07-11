@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix301-20260711";
+window.INFRA_BUILD_TAG = "audiofix302-20260711";
 
 try {
     document.documentElement.dataset.build = window.INFRA_BUILD_TAG, document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG),
@@ -185,7 +185,7 @@ function openAppDownloadGatekeeper(appName, url) {
             isAndroidDevice: isAndroidDevice,
             isStandaloneDisplayMode: isStandaloneDisplayMode
         }) : {};
-    }(), HEART_ICON_OUTLINE = '<svg class="heart-icon heart-icon-outline" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M19.5 12.572 12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.566Z"/></svg>', AUDIO_BASE = "https://pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev", prefetchApi = window.InfraAudioPrefetch || null, prefetchConstants = prefetchApi && prefetchApi.constants ? prefetchApi.constants : {}, PREFETCH_NEXT_ENABLED = !Object.prototype.hasOwnProperty.call(prefetchConstants, "ENABLED") || Boolean(prefetchConstants.ENABLED), PREFETCH_NEXT_CACHE_NAME = prefetchConstants.CACHE_NAME || "infra-next-track", coverApi = window.InfraCovers || null, coverConstants = coverApi && coverApi.constants ? coverApi.constants : {}, COVERS_CACHE_NAME = coverConstants.CACHE_NAME || "infra-covers", COVER_SESSION_PREPARE_ENABLED = !Object.prototype.hasOwnProperty.call(coverConstants, "SESSION_PREPARE_ENABLED") || Boolean(coverConstants.SESSION_PREPARE_ENABLED), COVER_SESSION_PREPARE_CONCURRENCY = Number.isFinite(Number(coverConstants.SESSION_PREPARE_CONCURRENCY)) ? Math.max(1, Number(coverConstants.SESSION_PREPARE_CONCURRENCY)) : 3, COVER_SESSION_NAVIGATION_GATE_ENABLED = !Object.prototype.hasOwnProperty.call(coverConstants, "SESSION_NAVIGATION_GATE_ENABLED") || Boolean(coverConstants.SESSION_NAVIGATION_GATE_ENABLED), ALBUM_COVER_IMAGE_CACHE_LIMIT = isStandaloneDisplayMode() ? 12 : 24, PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(prefetchConstants.MAX_BYTES)) ? Number(prefetchConstants.MAX_BYTES) : 15728640, PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(prefetchConstants.THRESHOLD_SECONDS)) ? Number(prefetchConstants.THRESHOLD_SECONDS) : 30, WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev", audioTelemetryModule = window.InfraAudioTelemetry || null;
+    }(), HEART_ICON_OUTLINE = '<svg class="heart-icon heart-icon-outline" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M19.5 12.572 12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.566Z"/></svg>', AUDIO_BASE = "https://pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev", prefetchApi = window.InfraAudioPrefetch || null, prefetchConstants = prefetchApi && prefetchApi.constants ? prefetchApi.constants : {}, PREFETCH_NEXT_ENABLED = !Object.prototype.hasOwnProperty.call(prefetchConstants, "ENABLED") || Boolean(prefetchConstants.ENABLED), PREFETCH_NEXT_CACHE_NAME = prefetchConstants.CACHE_NAME || "infra-next-track", coverApi = window.InfraCovers || null, coverConstants = coverApi && coverApi.constants ? coverApi.constants : {}, COVERS_CACHE_NAME = coverConstants.CACHE_NAME || "infra-covers", COVER_SESSION_PREPARE_ENABLED = !Object.prototype.hasOwnProperty.call(coverConstants, "SESSION_PREPARE_ENABLED") || Boolean(coverConstants.SESSION_PREPARE_ENABLED), COVER_SESSION_PREPARE_CONCURRENCY = Number.isFinite(Number(coverConstants.SESSION_PREPARE_CONCURRENCY)) ? Math.max(1, Number(coverConstants.SESSION_PREPARE_CONCURRENCY)) : 3, COVER_SESSION_NAVIGATION_GATE_ENABLED = !Object.prototype.hasOwnProperty.call(coverConstants, "SESSION_NAVIGATION_GATE_ENABLED") || Boolean(coverConstants.SESSION_NAVIGATION_GATE_ENABLED), ALBUM_COVER_IMAGE_CACHE_LIMIT = isStandaloneDisplayMode() ? 12 : 24, PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(prefetchConstants.MAX_BYTES)) ? Number(prefetchConstants.MAX_BYTES) : 15728640, PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(prefetchConstants.THRESHOLD_SECONDS)) ? Number(prefetchConstants.THRESHOLD_SECONDS) : 30, PREFETCH_NEXT_QUEUE_DEPTH = Number.isFinite(Number(prefetchConstants.QUEUE_DEPTH)) ? Math.max(1, Number(prefetchConstants.QUEUE_DEPTH)) : 4, PREFETCH_NEXT_CONCURRENCY = Number.isFinite(Number(prefetchConstants.CONCURRENCY)) ? Math.max(1, Number(prefetchConstants.CONCURRENCY)) : 2, WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev", audioTelemetryModule = window.InfraAudioTelemetry || null;
     function getAudioTelemetryNow() {
         return audioTelemetryModule && "function" == typeof audioTelemetryModule.now ? audioTelemetryModule.now() : "undefined" != typeof performance && "function" == typeof performance.now ? performance.now() : Date.now();
     }
@@ -205,7 +205,7 @@ function openAppDownloadGatekeeper(appName, url) {
         return {
             scriptUrl: scriptUrl || new URL("assets/js/scripts.js", baseUrl.href),
             baseUrl: baseUrl,
-            query: scriptUrl && scriptUrl.search || "?v=audiofix301-20260711"
+            query: scriptUrl && scriptUrl.search || "?v=audiofix302-20260711"
         };
     }(), mediaSessionRuntimeApi = function() {
         const factory = mediaSessionApi && "function" == typeof mediaSessionApi.createMediaSessionRuntime ? mediaSessionApi.createMediaSessionRuntime : null;
@@ -282,7 +282,7 @@ function openAppDownloadGatekeeper(appName, url) {
                 return WORKER_URL;
             },
             getRuntimeVersion: function() {
-                return "audiofix301-20260711";
+                return "audiofix302-20260711";
             },
             getAudioState: function() {
                 return audioState;
@@ -315,7 +315,7 @@ function openAppDownloadGatekeeper(appName, url) {
         return factory({
             audioState: audioState,
             runtime: runtime,
-            runtimeVersion: "audiofix301-20260711",
+            runtimeVersion: "audiofix302-20260711",
             now: getAudioTelemetryNow,
             getCurrentPlayableAudioSrc: getCurrentPlayableAudioSrc,
             trackAudioRuntimeEvent: trackAudioRuntimeEvent,
@@ -422,7 +422,9 @@ function openAppDownloadGatekeeper(appName, url) {
             prefetchApi: prefetchApi,
             PREFETCH_NEXT_CACHE_NAME: PREFETCH_NEXT_CACHE_NAME,
             PREFETCH_NEXT_MAX_BYTES: PREFETCH_NEXT_MAX_BYTES,
-            PREFETCH_NEXT_THRESHOLD_SECONDS: PREFETCH_NEXT_THRESHOLD_SECONDS
+            PREFETCH_NEXT_THRESHOLD_SECONDS: PREFETCH_NEXT_THRESHOLD_SECONDS,
+            PREFETCH_NEXT_QUEUE_DEPTH: PREFETCH_NEXT_QUEUE_DEPTH,
+            PREFETCH_NEXT_CONCURRENCY: PREFETCH_NEXT_CONCURRENCY
         }) : {};
     }();
     function callAudioRadio(name, args) {
@@ -965,7 +967,7 @@ function openAppDownloadGatekeeper(appName, url) {
             WORKER_URL: WORKER_URL,
             LIVE_CATALOG_CACHE_NAME: "infra-live-catalog-v1",
             LIVE_CATALOG_TIMEOUT_MS: 3500,
-            LOCAL_CATALOG_VERSION: "audiofix301-20260711",
+            LOCAL_CATALOG_VERSION: "audiofix302-20260711",
             normalizeAlbumTitle: normalizeAlbumTitle,
             normalizeTrackTitle: normalizeTrackTitle,
             toRuntimeAbsoluteUrl: toRuntimeAbsoluteUrl,

@@ -66,6 +66,25 @@ vm.runInContext(
   assert(later, "the cached complete track must satisfy later ranges too");
   assert.strictEqual(later.headers.get("Content-Range"), "bytes 512-1023/1024");
 
+  const segment = new Response(new Uint8Array(512), {
+    status: 200,
+    headers: {
+      "Content-Type": "audio/mp4",
+      "Content-Length": "512",
+      "X-Infra-Audio-Partial": "1",
+      "X-Infra-Range-Start": "0",
+      "X-Infra-Range-End": "511",
+      "X-Infra-Total-Length": "2048"
+    }
+  });
+  const segmentStartup = await sandbox.buildRangeResponseFromCachedAudio(segment.clone(), "bytes=0-");
+  assert(segmentStartup, "the cached startup segment must satisfy an initial open range");
+  assert.strictEqual(segmentStartup.status, 206);
+  assert.strictEqual(segmentStartup.headers.get("Content-Range"), "bytes 0-511/2048");
+  assert.strictEqual((await segmentStartup.arrayBuffer()).byteLength, 512);
+  const segmentMiss = await sandbox.buildRangeResponseFromCachedAudio(segment.clone(), "bytes=1024-");
+  assert.strictEqual(segmentMiss, null, "a seek outside the startup segment must fall back to the network");
+
   let fetchCalls = 0;
   let deleteCalls = 0;
   let expectedNetworkRange = "";
@@ -129,7 +148,7 @@ vm.runInContext(
   assert.strictEqual(fetchCalls, 1, "corrupt cache fallback must issue one network request");
   assert.strictEqual(deleteCalls, 2, "a corrupt entry must be deleted by Request and URL keys");
 
-  console.log(JSON.stringify({ ok: true, checks: 19 }, null, 2));
+  console.log(JSON.stringify({ ok: true, checks: 25 }, null, 2));
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

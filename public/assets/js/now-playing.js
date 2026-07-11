@@ -485,14 +485,14 @@
       const title = normalizeTrackTitle(track && track.name ? track.name : "") || `Titre ${index + 1}`;
       const album = normalizeAlbumTitle(track && track.album ? track.album : "");
       const meta = getTrackMetaByAssetPath(track && track.src ? track.src : "");
-      const isCurrent = index === currentIndex;
-      const duration = String((track && track.duration) || getCachedTrackDuration(track && track.src ? track.src : "") || (meta && meta.duration) || "").trim() || (isCurrent ? "0:00" : "");
+      const duration = String((track && track.duration) || getCachedTrackDuration(track && track.src ? track.src : "") || (meta && meta.duration) || "").trim() || "--:--";
       const artwork = normalizeArtworkUrl(
         (track && track.artwork) ||
         (meta && meta.artwork) ||
         getCurrentTrackArtwork(track) ||
         getMediaSessionFallbackArtwork()
       );
+      const isCurrent = index === currentIndex;
       const item = document.createElement("button");
       item.type = "button";
       item.className = "now-playing-up-next-item";
@@ -563,54 +563,26 @@
     transport.overlayQueueList.appendChild(fragment);
   }
 
-  function parseNowPlayingDurationSeconds(displayValue) {
-    const parts = String(displayValue || "").trim().split(":");
-    if (parts.length !== 2) return 0;
-    const minutes = Number.parseInt(parts[0], 10);
-    const seconds = Number.parseInt(parts[1], 10);
-    if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) return 0;
-    return Math.max(0, (minutes * 60) + seconds);
-  }
-
-  function getNowPlayingCatalogDurationSeconds(track) {
-    const source = track || {};
-    const meta = getTrackMetaByAssetPath(source && source.src ? source.src : "") || {};
-    const seconds = Number(source.seconds || meta.seconds);
-    if (Number.isFinite(seconds) && seconds > 0) return seconds;
-    const displayValue = String(
-      source.duration ||
-      getCachedTrackDuration(source && source.src ? source.src : "") ||
-      meta.duration ||
-      ""
-    ).trim();
-    return parseNowPlayingDurationSeconds(displayValue);
-  }
-
   function syncNowPlayingOverlayProgress() {
     if (!NOW_PLAYING_OVERLAY_ENABLED) return;
     const transport = audioState.transport;
     if (!transport || !transport.overlay) return;
 
     const audio = audioState.audio;
-    const track = getCurrentPlaylistTrack();
     const hasSource = Boolean(audio && getCurrentPlayableAudioSrc(audio));
-    const audioDuration = audio && Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
-    const catalogDuration = audioDuration ? 0 : getNowPlayingCatalogDurationSeconds(track);
-    const duration = audioDuration || catalogDuration;
-    const hasDuration = duration > 0;
-    const currentTime = audioDuration && Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-    const currentValue = hasDuration ? formatTrackDuration(currentTime) : "0:00";
+    const hasDuration = Boolean(audio && Number.isFinite(audio.duration) && audio.duration > 0);
+    const currentValue = hasDuration ? formatTrackDuration(audio.currentTime) : "0:00";
     const remainingValue = hasDuration
-      ? `-${formatTrackDuration(Math.max(0, duration - currentTime))}`
+      ? `-${formatTrackDuration(Math.max(0, audio.duration - audio.currentTime))}`
       : "-0:00";
-    const percent = audioDuration ? Math.max(0, Math.min(100, (currentTime / audioDuration) * 100)) : 0;
+    const percent = hasDuration ? Math.max(0, Math.min(100, (audio.currentTime / audio.duration) * 100)) : 0;
 
     if (!audioState.nowPlayingSeeking) {
       if (transport.overlayCurrent) transport.overlayCurrent.textContent = currentValue;
       if (transport.overlayDuration) transport.overlayDuration.textContent = remainingValue;
       if (transport.overlayFill) transport.overlayFill.style.width = `${percent}%`;
     }
-    if (transport.overlayProgress) transport.overlayProgress.disabled = !(hasSource && audioDuration);
+    if (transport.overlayProgress) transport.overlayProgress.disabled = !(hasSource && hasDuration);
   }
 
     return {

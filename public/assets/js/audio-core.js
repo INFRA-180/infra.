@@ -12,12 +12,8 @@
 
   function createAudioCore(context) {
     const ctx = context || {};
-    const performancePolicy = window.InfraPerformancePolicy && typeof window.InfraPerformancePolicy.getPolicy === "function"
-      ? window.InfraPerformancePolicy.getPolicy()
-      : null;
     const audioState = ctx.audioState || {};
     const PREFETCH_NEXT_ENABLED = Boolean(ctx.PREFETCH_NEXT_ENABLED);
-    const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3;
 
     const savePlaybackQueueContext = method(ctx, "savePlaybackQueueContext");
     const getCurrentLogicalAudioSrc = method(ctx, "getCurrentLogicalAudioSrc", function () { return ""; });
@@ -341,17 +337,10 @@
       const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index;
       const isFastSkip = isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
-      const shouldCancelPendingPrefetch = Boolean(
-        PREFETCH_NEXT_ENABLED &&
-        (
-          (!isFastSkip && !isPreparedInitialRandom) ||
-          (isFromTransportControl && !hasPreparedTransportTarget)
-        )
-      );
 
-      if (shouldCancelPendingPrefetch) {
-        clearNextTrackPrefetch(isFromTransportControl ? "transport_start" : "manual_start");
-        if (!isFromTransportControl) resetPreparedInitialGlobalRandomPlayback();
+      if (!isFastSkip && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
+        clearNextTrackPrefetch("manual_start");
+        resetPreparedInitialGlobalRandomPlayback();
       }
 
       audioState.currentIndex = index;
@@ -369,11 +358,6 @@
       clearOtherTrackStatuses(rowTrack);
       clearTrackStatus(rowTrack);
       const requestToken = ++audioState.startRequestToken;
-      audioState.activeMediaRequest = {
-        token: requestToken,
-        index,
-        src: nextSrc || target.src
-      };
       audioState.lastTrackChangeTs = Date.now();
       audioState.audioClickPerfTs = getAudioTelemetryNow();
       audioState.playRequestTs = audioState.lastTrackChangeTs;
@@ -437,12 +421,16 @@
       // Keep controls/snippets in sync while play() promise resolves.
       syncAudioUi();
 
+      setTrackStatus(rowTrack, "Chargement du fichier audio...");
+
       function assignDirectSource() {
         if (!nextSrc) return false;
         try {
           audioState.activeLogicalSrc = nextSrc;
           audioState.mediaSessionAudioPlaying = false;
-          if (!sameTrack) audio.src = nextSrc;
+          if (!sameTrack) {
+            audio.src = nextSrc;
+          }
           logAudioAuditEvent("source_assigned", target, index, nextSrc, {
             request_token: requestToken,
             same_track: sameTrack,
@@ -459,13 +447,6 @@
 
       function handlePlayResolved(playMeta) {
         if (requestToken !== audioState.startRequestToken) return;
-        if (performancePolicy && typeof performancePolicy.emit === "function") {
-          performancePolicy.emit("perf_audio_start", {
-            trigger: opts.auto ? "auto" : isFromMediaSession ? "media_session" : isFromTransportControl ? "transport" : "user",
-            duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - audioState.audioClickPerfTs)),
-            ready_state: audio.readyState
-          });
-        }
         logAudioAuditEvent("play_resolved", target, index, nextSrc || target.src, {
           request_token: requestToken,
           retry: Boolean(playMeta && playMeta.retry),
@@ -477,9 +458,9 @@
           network_state: audio.networkState,
           click_perf_ms: audioState.audioClickPerfTs
         });
+        audioState.trackStartInFlight = false;
         clearTrackFailure(target.src);
         clearTrackStatus(rowTrack);
-        audioState.trackStartInFlight = false;
         if (!sameTrack && !(isFastSkip || shouldSeamless)) {
           fadeInAudio(audio, 100);
         } else if (sameTrack && !shouldSeamless) {
@@ -775,37 +756,6 @@
       const useSeamless = Object.prototype.hasOwnProperty.call(opts, "seamless")
         ? Boolean(opts.seamless)
         : true;
-      const audio = audioState.audio;
-      const currentTime = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-
-      if (audio && currentTime > PREVIOUS_RESTART_THRESHOLD_SECONDS) {
-        const currentTrack = getTrackByIndex(audioState.currentIndex);
-        try {
-          audio.currentTime = 0;
-        } catch (_err) {
-          // Fall through to track navigation when the media element cannot seek.
-        }
-
-        if (audio.currentTime === 0) {
-          updateProgressUi();
-          saveResumeState();
-          syncMediaSessionMetadata({ forcePosition: true });
-          trackAudioRuntimeEvent("track_restart_previous", Object.assign(
-            buildAudioMonitorPayload(
-              currentTrack,
-              audioState.currentIndex,
-              audioState.activeLogicalSrc || audio.currentSrc || audio.src
-            ),
-            {
-              trigger: opts.fromMediaSession ? "media_session" : "transport",
-              from_transport_control: Boolean(opts.fromTransportControl),
-              surface: opts.surface || "",
-              previous_position_ms: Math.round(currentTime * 1000)
-            }
-          ));
-          return;
-        }
-      }
       console.info(
         "[INFRA] nav previous",
         `homeMode=${audioState.homeMode}`,

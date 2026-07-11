@@ -1,11 +1,8 @@
-const VERSION = "infra-shell-20260711-audio302";
+const VERSION = "infra-shell-20260701-audio279";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
-const NEXT_TRACK_CACHE = "infra-next-track-segments-v4";
-const LEGACY_NEXT_TRACK_CACHE = "infra-next-track";
-const PARTIAL_NEXT_TRACK_CACHE = "infra-next-track-v2";
-const COMPLETE_NEXT_TRACK_CACHE = "infra-next-track-full-v3";
+const NEXT_TRACK_CACHE = "infra-next-track";
 const MAX_COVER_CACHE_ENTRIES = 80;
 const R2_AUDIO_HOST = "pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev";
 
@@ -15,36 +12,35 @@ const SHELL_ASSETS = [
   "./sphragis/",
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
-  "./assets/css/styles.css?v=audiofix302-20260711",
-  "./assets/js/performance-policy.js?v=audiofix302-20260711",
-  "./assets/js/covers.js?v=audiofix302-20260711",
-  "./assets/js/favorites.js?v=audiofix302-20260711",
-  "./assets/js/favorites-ui.js?v=audiofix302-20260711",
-  "./assets/js/transport-ui.js?v=audiofix302-20260711",
-  "./assets/js/now-playing.js?v=audiofix302-20260711",
-  "./assets/js/album-player-ui.js?v=audiofix302-20260711",
-  "./assets/js/spa-renderer.js?v=audiofix302-20260711",
-  "./assets/js/audio-radio.js?v=audiofix302-20260711",
-  "./assets/js/media-session.js?v=audiofix302-20260711",
-  "./assets/js/audio-prefetch.js?v=audiofix302-20260711",
-  "./assets/js/spa-router.js?v=audiofix302-20260711",
-  "./assets/js/catalog-fallback.js?v=audiofix302-20260711",
-  "./assets/js/catalog-loader.js?v=audiofix302-20260711",
-  "./assets/js/audio-telemetry.js?v=audiofix302-20260711",
-  "./assets/js/downloads.js?v=audiofix302-20260711",
-  "./assets/js/home-catalog.js?v=audiofix302-20260711",
-  "./assets/js/audio-core.js?v=audiofix302-20260711",
-  "./assets/js/pwa-install.js?v=audiofix302-20260711",
-  "./assets/js/spa-controller.js?v=audiofix302-20260711",
-  "./assets/js/site-runtime.js?v=audiofix302-20260711",
-  "./assets/js/pwa-runtime.js?v=audiofix302-20260711",
-  "./assets/js/scripts.js?v=audiofix302-20260711",
+  "./assets/css/styles.css?v=audiofix280-20260703",
+  "./assets/js/covers.js?v=audiofix280-20260703",
+  "./assets/js/favorites.js?v=audiofix280-20260703",
+  "./assets/js/favorites-ui.js?v=audiofix280-20260703",
+  "./assets/js/transport-ui.js?v=audiofix280-20260703",
+  "./assets/js/now-playing.js?v=audiofix280-20260703",
+  "./assets/js/album-player-ui.js?v=audiofix280-20260703",
+  "./assets/js/spa-renderer.js?v=audiofix280-20260703",
+  "./assets/js/audio-radio.js?v=audiofix280-20260703",
+  "./assets/js/media-session.js?v=audiofix280-20260703",
+  "./assets/js/audio-prefetch.js?v=audiofix280-20260703",
+  "./assets/js/spa-router.js?v=audiofix280-20260703",
+  "./assets/js/catalog-fallback.js?v=audiofix280-20260703",
+  "./assets/js/catalog-loader.js?v=audiofix280-20260703",
+  "./assets/js/audio-telemetry.js?v=audiofix280-20260703",
+  "./assets/js/downloads.js?v=audiofix280-20260703",
+  "./assets/js/home-catalog.js?v=audiofix280-20260703",
+  "./assets/js/audio-core.js?v=audiofix280-20260703",
+  "./assets/js/pwa-install.js?v=audiofix280-20260703",
+  "./assets/js/share-qr.js?v=audiofix280-20260703",
+  "./assets/js/scripts.js?v=audiofix280-20260703",
+  "./assets/js/scripts.admin.js?v=audiofix280-20260703",
+  "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./assets/js/sphragis.js?v=sphragis20260625",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix302-20260711",
-  "./data/track-durations.json?v=audiofix302-20260711",
-  "./data/tracks.json?v=audiofix302-20260711",
+  "./data/catalog.json",
+  "./data/track-durations.json?v=audiofix255-20260627",
+  "./data/tracks.json?v=audiofix255-20260627",
   "./assets/branding/infra-logo-white-photoroom-title.png",
   "./assets/pwa/favicon-logo-white-64.png",
   "./assets/pwa/icon-192-logo-white.png",
@@ -54,33 +50,11 @@ const SHELL_ASSETS = [
   "./assets/pwa/apple-touch-icon-180-logo-white.png"
 ];
 
-const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/share-qr.js?v=audiofix302-20260711",
-  "./assets/js/scripts.admin.js?v=audiofix302-20260711",
-  "./assets/vendor/qr-creator.min.js?v=1.0.0"
-];
-
-async function notifyClients(message) {
-  const clients = await self.clients.matchAll({ type: "window" });
-  clients.forEach((client) => client.postMessage(message));
-}
-
-async function warmOptionalShellAssets(cache) {
-  await Promise.allSettled(OPTIONAL_SHELL_ASSETS.map(async (asset) => {
-    try {
-      await cache.add(asset);
-    } catch (error) {
-      notifyClients({ type: "INFRA_SW_OPTIONAL_CACHE_ERROR", asset, reason: error && error.name ? error.name : "cache_add_failed" }).catch(() => undefined);
-    }
-  }));
-}
-
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
       .then((cache) => cache.addAll(SHELL_ASSETS))
-      .then((cache) => warmOptionalShellAssets(cache))
       .then(() => self.skipWaiting())
   );
 });
@@ -91,12 +65,7 @@ self.addEventListener("activate", (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((key) => (
-            key === LEGACY_NEXT_TRACK_CACHE ||
-            key === PARTIAL_NEXT_TRACK_CACHE ||
-            key === COMPLETE_NEXT_TRACK_CACHE ||
-            (isVersionedSiteCache(key) && key !== SHELL_CACHE && key !== RUNTIME_CACHE)
-          ))
+          .filter((key) => isVersionedSiteCache(key) && key !== SHELL_CACHE && key !== RUNTIME_CACHE)
           .map((key) => caches.delete(key))
       );
       await self.clients.claim();
@@ -293,31 +262,17 @@ async function deletePrefetchedAudio(cache, request, url) {
 }
 
 async function buildRangeResponseFromCachedAudio(cached, rangeHeader) {
-  const storedLength = Number(cached.headers.get("Content-Length") || cached.headers.get("content-length") || 0);
-  const partial = cached.headers.get("X-Infra-Audio-Partial") === "1";
-  const cachedStart = partial ? Number(cached.headers.get("X-Infra-Range-Start") || 0) : 0;
-  const cachedEnd = partial
-    ? Number(cached.headers.get("X-Infra-Range-End") || (cachedStart + storedLength - 1))
-    : storedLength - 1;
-  const total = partial
-    ? Number(cached.headers.get("X-Infra-Total-Length") || 0)
-    : storedLength;
+  const total = Number(cached.headers.get("Content-Length") || cached.headers.get("content-length") || 0);
   const range = parseRangeHeader(rangeHeader, total);
   if (!range) return null;
-  if (!Number.isFinite(storedLength) || storedLength <= 0) return null;
-  if (!Number.isFinite(cachedStart) || !Number.isFinite(cachedEnd) || cachedEnd < cachedStart) return null;
-  if (range.start < cachedStart || range.start > cachedEnd) return null;
-  const responseEnd = Math.min(range.end, cachedEnd);
   const buffer = await cached.arrayBuffer();
-  if (!buffer || buffer.byteLength !== storedLength || storedLength !== (cachedEnd - cachedStart + 1)) {
-    throw new Error("cached_audio_corrupt");
-  }
+  if (!buffer || buffer.byteLength !== total) return null;
 
-  const sliced = buffer.slice(range.start - cachedStart, responseEnd - cachedStart + 1);
+  const sliced = buffer.slice(range.start, range.end + 1);
   const headers = new Headers();
   headers.set("Content-Type", cached.headers.get("Content-Type") || cached.headers.get("content-type") || "audio/mp4");
   headers.set("Accept-Ranges", "bytes");
-  headers.set("Content-Range", `bytes ${range.start}-${responseEnd}/${total}`);
+  headers.set("Content-Range", `bytes ${range.start}-${range.end}/${total}`);
   headers.set("Content-Length", String(sliced.byteLength));
   headers.set("Access-Control-Allow-Origin", cached.headers.get("Access-Control-Allow-Origin") || "*");
   headers.set("Access-Control-Expose-Headers", "Accept-Ranges,Content-Range,Content-Length,Content-Type,ETag");
@@ -349,10 +304,9 @@ async function servePrefetchedAudioOrNetwork(request, url) {
       await deletePrefetchedAudio(cache, request, url);
       return fetch(request);
     }
+    await deletePrefetchedAudio(cache, request, url);
     return fetch(request);
   }
-
-  if (cached.headers.get("X-Infra-Audio-Partial") === "1") return fetch(request);
 
   try {
     const headers = new Headers(cached.headers);
@@ -388,7 +342,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isHtmlRequest(request)) {
-    event.respondWith(networkFirst(request, RUNTIME_CACHE));
+    event.respondWith(networkFirst(request, SHELL_CACHE, "./index.html"));
     return;
   }
 

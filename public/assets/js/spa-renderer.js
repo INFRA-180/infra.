@@ -12,9 +12,6 @@
 
   function createSpaRenderer(context) {
     const ctx = context || {};
-    const performancePolicy = window.InfraPerformancePolicy && typeof window.InfraPerformancePolicy.getPolicy === "function"
-      ? window.InfraPerformancePolicy.getPolicy()
-      : null;
     const spaState = ctx.spaState || {};
     const audioState = ctx.audioState || {};
     const spaRouterApi = ctx.spaRouterApi || null;
@@ -987,12 +984,6 @@
     trackAudioRuntimeEvent("spa_swap_done", Object.assign({}, telemetry || {}, swapResult || {}, {
       duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
     }));
-    if (performancePolicy && typeof performancePolicy.markNavigationDone === "function") {
-      performancePolicy.markNavigationDone({
-        page_kind: isAlbumPage ? "album" : isHomePage ? "home" : "app",
-        duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
-      });
-    }
     if (isAlbumPage && isMobilePwaCoverNavigation()) {
       releasePwaCoverHold("album_first_paint");
     } else if (isHomePage && isMobilePwaCoverNavigation()) {
@@ -1046,11 +1037,6 @@
     const navToken = spaState.navToken + 1;
     spaState.navToken = navToken;
     spaState.navigationActive = true;
-    if (performancePolicy && typeof performancePolicy.markNavigationStart === "function") {
-      performancePolicy.markNavigationStart({
-        page_kind: /(?:^|\/)music\//.test(url.pathname) ? "album" : url.pathname === "/" || /index\.html$/.test(url.pathname) ? "home" : "app"
-      });
-    }
     trackAudioRuntimeEvent("nav:album_start", {
       track: "album_open",
       album: getAlbumNameFromUrlLike(url.href),
@@ -1145,7 +1131,7 @@
         });
         logAudioRuntimeAlbumSwitch(audioSwitchContext, true);
         snapshotCurrentSpaPage(url.href);
-        prefetchSpaPage(url.href, { cacheMode: "default" });
+        prefetchSpaPage(url.href, { force: true, cacheMode: "default" });
         finishSpaNavigation();
         return;
       }
@@ -1203,17 +1189,6 @@
           return;
         }
         await initPage();
-        if (spaState.navToken !== navToken) {
-          releasePwaCoverHold("stale_cached_init");
-          finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "stale_cached_init" });
-          trackAudioRuntimeEvent("nav:album_abort", {
-            track: "album_open",
-            album: getAlbumNameFromUrlLike(url.href),
-            reason: "stale_cached_init",
-            to_url: url.href
-          });
-          return;
-        }
         trackAudioRuntimeEvent("spa_render_done", {
           album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
           from_album: audioSwitchContext.fromAlbum || "",
@@ -1241,7 +1216,7 @@
         snapshotCurrentSpaPage(url.href);
 
         // Refresh the cached document in background.
-        prefetchSpaPage(url.href, { cacheMode: "default" });
+        prefetchSpaPage(url.href, { force: true, cacheMode: "default" });
         finishSpaNavigation();
         return;
       }
@@ -1353,17 +1328,6 @@
       return;
     }
     await initPage();
-    if (spaState.navToken !== navToken) {
-      releasePwaCoverHold("stale_init");
-      finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "stale_init" });
-      trackAudioRuntimeEvent("nav:album_abort", {
-        track: "album_open",
-        album: getAlbumNameFromUrlLike(url.href),
-        reason: "stale_init",
-        to_url: url.href
-      });
-      return;
-    }
     trackAudioRuntimeEvent("spa_render_done", {
       album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
       from_album: audioSwitchContext.fromAlbum || "",

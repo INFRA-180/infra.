@@ -14,6 +14,10 @@
     const ctx = context || {};
     const audioState = ctx.audioState || {};
     const runtime = ctx.runtime || { baseUrl: window.location.href };
+    const PLAYER_ICON_PLAY = ctx.PLAYER_ICON_PLAY || "";
+    const PLAYER_ICON_STOP = ctx.PLAYER_ICON_STOP || "";
+    const PLAYER_ICON_PREVIOUS = ctx.PLAYER_ICON_PREVIOUS || "";
+    const PLAYER_ICON_NEXT = ctx.PLAYER_ICON_NEXT || "";
     const TRACK_CLICK_COOLDOWN_MS = Number.isFinite(Number(ctx.TRACK_CLICK_COOLDOWN_MS)) ? Number(ctx.TRACK_CLICK_COOLDOWN_MS) : 180;
     const getAudioAssetPathKey = method(ctx, "getAudioAssetPathKey", function () { return ""; });
     const fetchLiveCatalogDocument = method(ctx, "fetchLiveCatalogDocument", function () { return Promise.reject(new Error("missing live catalog loader")); });
@@ -27,6 +31,7 @@
     const savePlaybackQueueContext = method(ctx, "savePlaybackQueueContext");
     const syncMediaSessionMetadata = method(ctx, "syncMediaSessionMetadata");
     const ensureGlobalAudio = method(ctx, "ensureGlobalAudio", function () { return null; });
+    const ensureAlbumHeaderActions = method(ctx, "ensureAlbumHeaderActions", function () { return null; });
     const ensureAlbumFavoriteSelectionToolbar = method(ctx, "ensureAlbumFavoriteSelectionToolbar");
     const toAbsoluteUrl = method(ctx, "toAbsoluteUrl", function (value) { return String(value || ""); });
     const getCurrentAlbumTitle = method(ctx, "getCurrentAlbumTitle", function () { return ""; });
@@ -43,6 +48,10 @@
     const startTrack = method(ctx, "startTrack");
     const cleanupForeignAlbumAudioWhenIdle = method(ctx, "cleanupForeignAlbumAudioWhenIdle");
     const syncPlaylistContext = method(ctx, "syncPlaylistContext");
+    const playPrevious = method(ctx, "playPrevious");
+    const playNext = method(ctx, "playNext");
+    const toggleAlbumShuffleMode = method(ctx, "toggleAlbumShuffleMode");
+    const bindGlobalKeyboardShortcuts = method(ctx, "bindGlobalKeyboardShortcuts");
     const syncRadioQueueToPlaylist = method(ctx, "syncRadioQueueToPlaylist");
     const buildPreservedTrack = method(ctx, "buildPreservedTrack", function () { return null; });
     const injectCurrentTrackIntoRadioQueue = method(ctx, "injectCurrentTrackIntoRadioQueue", function () { return -1; });
@@ -157,23 +166,16 @@
     }
   }
 
-  function syncCurrentTrackDurationFromAudio(audio, srcOverride) {
+  function syncCurrentTrackDurationFromAudio(audio) {
     const currentAudio = audio || audioState.audio;
     if (!currentAudio || !Number.isFinite(currentAudio.duration) || currentAudio.duration <= 0) return;
-    const src = String(srcOverride || getCurrentLogicalAudioSrc() || "");
+    const src = getCurrentLogicalAudioSrc();
     if (!src) return;
     const displayValue = formatTrackDuration(currentAudio.duration);
     if (!displayValue || displayValue === "--:--") return;
     rememberTrackDuration(src, displayValue);
 
     const ui = audioState.ui;
-    const playlistTrack = Array.isArray(audioState.playlist)
-      ? audioState.playlist.find((item) => item && srcMatches(item.src, src))
-      : null;
-    if (playlistTrack) {
-      playlistTrack.duration = displayValue;
-      playlistTrack.seconds = currentAudio.duration;
-    }
     if (!ui || !Array.isArray(ui.tracks)) return;
     const track = ui.tracks.find((item) => item && item.durationEl && srcMatches(item.src, src));
     if (track && track.durationEl) {
@@ -221,6 +223,23 @@
         track.fill.style.width = "0%";
       }
     });
+
+    const toggleActive = uiIndex >= 0 && (isPlaying || audioState.trackStartInFlight);
+    if (ui.toggleBtn) {
+      ui.toggleBtn.innerHTML = toggleActive ? PLAYER_ICON_STOP : PLAYER_ICON_PLAY;
+      ui.toggleBtn.classList.toggle("is-on", toggleActive);
+      ui.toggleBtn.setAttribute("aria-label", toggleActive ? "Pause" : "Lire l'album");
+    }
+
+    if (ui.shuffleBtn) {
+      const shuffleActive = Boolean(audioState.shuffleOn && audioState.homeMode !== "radio");
+      ui.shuffleBtn.textContent = shuffleActive ? "Mix on" : "Mix off";
+      ui.shuffleBtn.classList.toggle("is-on", shuffleActive);
+      ui.shuffleBtn.classList.toggle("is-muted-active", Boolean(audioState.shuffleOn && audioState.homeMode === "radio"));
+      ui.shuffleBtn.disabled = false;
+      ui.shuffleBtn.setAttribute("aria-pressed", shuffleActive ? "true" : "false");
+      ui.shuffleBtn.setAttribute("aria-label", shuffleActive ? "Desactiver la lecture aleatoire" : "Activer la lecture aleatoire");
+    }
 
     updateProgressUi();
   }
@@ -278,8 +297,19 @@
       return;
     }
 
-    // The global transport owns prev/play/next/shuffle. Album pages only select tracks.
-    ensureAlbumFavoriteSelectionToolbar(section);
+    const controls = document.createElement("div");
+    controls.className = "track-controls";
+    controls.innerHTML = [
+      `<button class="track-ctrl" type="button" data-track-prev aria-label="Piste precedente">${PLAYER_ICON_PREVIOUS}</button>`,
+      `<button class="track-ctrl" type="button" data-track-toggle aria-label="Lecture pause">${PLAYER_ICON_PLAY}</button>`,
+      `<button class="track-ctrl" type="button" data-track-next aria-label="Piste suivante">${PLAYER_ICON_NEXT}</button>`,
+      "<button class=\"track-ctrl\" type=\"button\" data-track-shuffle aria-label=\"Lecture aleatoire\">Mix off</button>"
+    ].join("");
+
+    const actions = ensureAlbumHeaderActions(section);
+    if (actions) actions.insertBefore(controls, actions.firstChild);
+    else section.insertBefore(controls, section.firstChild);
+    ensureAlbumFavoriteSelectionToolbar(section, controls);
 
     const pageHref = toAbsoluteUrl(window.location.pathname);
     const albumTitle = getCurrentAlbumTitle();
@@ -288,6 +318,11 @@
 
     const ui = {
       section,
+      controls,
+      prevBtn: controls.querySelector("[data-track-prev]"),
+      toggleBtn: controls.querySelector("[data-track-toggle]"),
+      nextBtn: controls.querySelector("[data-track-next]"),
+      shuffleBtn: controls.querySelector("[data-track-shuffle]"),
       albumTitle,
       albumArtwork,
       tracks: [],
@@ -598,6 +633,30 @@
         }, 220);
       }
     });
+
+    if (ui.prevBtn) ui.prevBtn.addEventListener("click", function () {
+      audioState.ui = ui;
+      ensurePlaylistFromUi(ui);
+      playPrevious();
+    });
+
+    if (ui.nextBtn) ui.nextBtn.addEventListener("click", function () {
+      audioState.ui = ui;
+      ensurePlaylistFromUi(ui);
+      playNext();
+    });
+
+    if (ui.toggleBtn) ui.toggleBtn.addEventListener("click", function () {
+      audioState.ui = ui;
+      ensurePlaylistFromUi(ui);
+      togglePlayPause();
+    });
+
+    if (ui.shuffleBtn) ui.shuffleBtn.addEventListener("click", function () {
+      toggleAlbumShuffleMode();
+    });
+
+    bindGlobalKeyboardShortcuts();
 
     // If the current global track belongs to this page, bind the playlist for next/prev.
     const currentSrc = getCurrentLogicalAudioSrc();

@@ -26,12 +26,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Verify public boundary
         run: node tools/verify-public-boundary.js
-      - name: Verify audio runtime
-        run: |
-          node tools/test-audio-runtime.js
-          node tools/test-audio-prefetch-cache.js
-          node tools/test-audio-prefetch-sw.js
-          node tools/verify-audio-release.js
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload public site

@@ -2,536 +2,535 @@
   "use strict";
 
   const fallbackCatalog = {
-    "apps": [
-      {
-        "id": "vizu",
-        "title": "VIZU",
-        "editKey": "app_vizu",
-        "page": "apps/vizu.html",
-        "thumb": "assets/apps/vizu-icon-balanced-detoure-500.png",
-        "thumbAlt": "Icone VIZU",
-        "width": 500,
-        "height": 500,
-        "download": {
-          "type": "app_download",
-          "label": "Download VIZU",
-          "appName": "VIZU",
-          "url": "https://drive.google.com/uc?export=download&id=16ZsO2eOD498AgWNoeejQFW4ztNwTTDwI"
-        }
-      },
-      {
-        "id": "reverb",
-        "title": "REVERB TIME CALCULATOR",
-        "editKey": "app_reverb",
-        "page": "apps/reverb-time-calculator.html",
-        "thumb": "assets/apps/reverb-icon.png?v=20260213b",
-        "thumbAlt": "Icone REVERB TIME CALCULATOR",
-        "width": 500,
-        "height": 500,
-        "download": {
-          "type": "app_download",
-          "label": "Download REVERB TIME CALCULATOR",
-          "appName": "REVERB TIME CALCULATOR",
-          "url": "https://drive.google.com/uc?export=download&id=18EGtIO_-bwDri6yX_VKl_XFBbYC8Qm2I"
-        }
-      },
-      {
-        "id": "infra-extract",
-        "title": "INFRA_EXTRACT",
-        "editKey": "app_extract",
-        "page": "apps/infra-extract.html",
-        "thumb": "assets/apps/infra-extract-icon.png?v=20260213",
-        "thumbAlt": "Icone INFRA_EXTRACT",
-        "width": 500,
-        "height": 500,
-        "download": {
-          "type": "app_download",
-          "label": "Download INFRA_EXTRACT",
-          "appName": "INFRA_EXTRACT",
-          "url": "https://drive.google.com/uc?export=download&id=1qm_BELRHQeovtx9ad0cqJul_BbuCFeoD"
-        }
+  "apps": [
+    {
+      "id": "vizu",
+      "title": "VIZU",
+      "editKey": "app_vizu",
+      "page": "apps/vizu.html",
+      "thumb": "assets/apps/vizu-icon-balanced-detoure-500.png",
+      "thumbAlt": "Icone VIZU",
+      "width": 500,
+      "height": 500,
+      "download": {
+        "type": "app_download",
+        "label": "Download VIZU",
+        "appName": "VIZU",
+        "url": "https://drive.google.com/uc?export=download&id=16ZsO2eOD498AgWNoeejQFW4ztNwTTDwI"
       }
-    ],
-    "albums": [
-      {
-        "id": "v-23pi56",
-        "title": "V-23π56",
-        "editKey": "album_v_23pi56",
-        "page": "music/v-23pi56-infra.html",
-        "thumb": "assets/music/v-23pi56-cover.jpg",
-        "thumbAlt": "Cover INFRA. - V-23π56",
-        "thumbSrcset": "assets/music/responsive/v-23pi56-cover-480.webp 480w, assets/music/responsive/v-23pi56-cover-900.webp 900w, assets/music/v-23pi56-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "he-4-0026",
-        "title": "He 4.0026",
-        "editKey": "album_he_4_0026",
-        "page": "music/he-4-0026-infra.html",
-        "thumb": "assets/music/he-4-0026-cover.jpg",
-        "thumbAlt": "Cover INFRA. - He 4.0026",
-        "thumbSrcset": "assets/music/responsive/he-4-0026-cover-480.webp 480w, assets/music/responsive/he-4-0026-cover-900.webp 900w, assets/music/he-4-0026-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "h-1-008",
-        "title": "H 1.008",
-        "editKey": "album_h_1_008",
-        "page": "music/h-1-008-infra.html",
-        "thumb": "assets/music/h-1-008-cover.jpg",
-        "thumbAlt": "Cover H 1.008 - INFRA.",
-        "thumbSrcset": "assets/music/responsive/h-1-008-cover-480.webp 480w, assets/music/responsive/h-1-008-cover-900.webp 900w, assets/music/h-1-008-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download H 1.008",
-          "url": "https://drive.google.com/uc?export=download&id=1tf1FBj3LsaNtq-dgftM-PjXdbon4y-V7"
-        }
-      },
-      {
-        "id": "kali",
-        "title": "KALI",
-        "editKey": "album_kali",
-        "page": "music/kali-infra.html",
-        "thumb": "assets/music/kali-cover.jpg",
-        "thumbAlt": "Cover KALI - INFRA.",
-        "thumbSrcset": "assets/music/responsive/kali-cover-480.webp 480w, assets/music/responsive/kali-cover-900.webp 900w, assets/music/kali-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download KALI",
-          "url": "https://drive.google.com/uc?export=download&id=1q9WXnRi1Inp0AeU7a6FMW4Dxj4tAKwZa"
-        }
-      },
-      {
-        "id": "asase-yaa",
-        "title": "ASASE YAA",
-        "editKey": "album_asase_yaa",
-        "page": "music/asase-yaa-infra.html",
-        "thumb": "assets/music/asase-yaa-cover.jpg",
-        "thumbAlt": "Cover ASASE YAA - INFRA.",
-        "thumbSrcset": "assets/music/responsive/asase-yaa-cover-480.webp 480w, assets/music/responsive/asase-yaa-cover-900.webp 900w, assets/music/asase-yaa-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download ASASE YAA",
-          "url": "https://drive.google.com/uc?export=download&id=124ttLRZkovE9l5roAps7WGU678BLIgmR"
-        }
-      },
-      {
-        "id": "anunnaki",
-        "title": "𒀭𒉣𒆠",
-        "editKey": "album_anunnaki",
-        "page": "music/anunnaki-infra.html",
-        "thumb": "assets/music/anunnaki-cover.jpg",
-        "thumbAlt": "Cover 𒀭𒉣𒆠 - INFRA.",
-        "thumbSrcset": "assets/music/responsive/anunnaki-cover-480.webp 480w, assets/music/responsive/anunnaki-cover-900.webp 900w, assets/music/anunnaki-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download 𒀭𒉣𒆠",
-          "url": "https://drive.google.com/uc?export=download&id=165BIWQnMCEJA7nP8W_mtbYYRyhKgHUai"
-        }
-      },
-      {
-        "id": "anunnaki-instru",
-        "title": "𒁀𒆷𒂵 𒈜",
-        "editKey": "album_anunnaki_instru",
-        "page": "music/anunnaki-instru-infra.html",
-        "thumb": "assets/music/anunnaki-instru-6a799ef0-cover.jpg",
-        "thumbAlt": "Cover INFRA. - 𒁀𒆷𒂵 𒈜",
-        "thumbSrcset": "assets/music/responsive/anunnaki-instru-6a799ef0-cover-480.webp 480w, assets/music/responsive/anunnaki-instru-6a799ef0-cover-900.webp 900w, assets/music/anunnaki-instru-6a799ef0-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "impression",
-        "title": "IMPRESSION",
-        "editKey": "album_impression",
-        "page": "music/impression-infra.html",
-        "thumb": "assets/music/impression-cover.jpg",
-        "thumbAlt": "Cover IMPRESSION - INFRA.",
-        "thumbSrcset": "assets/music/responsive/impression-cover-480.webp 480w, assets/music/responsive/impression-cover-900.webp 900w, assets/music/impression-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download Impression",
-          "url": "https://drive.google.com/uc?export=download&id=1QHQz22R0d8e3WoR3MlEFA9_-R_7T16_w"
-        }
-      },
-      {
-        "id": "nahda",
-        "title": "نهضة",
-        "editKey": "album_nahda",
-        "page": "music/nahda-infra.html",
-        "thumb": "assets/music/nahda-cover.jpg",
-        "thumbAlt": "Cover نهضة - INFRA.",
-        "thumbSrcset": "assets/music/responsive/nahda-cover-480.webp 480w, assets/music/responsive/nahda-cover-900.webp 900w, assets/music/nahda-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download نهضة",
-          "url": "https://drive.google.com/uc?export=download&id=14TL52jrxRAH3OCQsJs8eyld8-cWUkBAv"
-        }
-      },
-      {
-        "id": "etoiles",
-        "title": "ETOILES",
-        "editKey": "album_etoiles",
-        "page": "music/etoiles-infra.html",
-        "thumb": "assets/music/etoiles-cover.jpg",
-        "thumbAlt": "Cover ETOILES - INFRA.",
-        "thumbSrcset": "assets/music/responsive/etoiles-cover-480.webp 480w, assets/music/responsive/etoiles-cover-900.webp 900w, assets/music/etoiles-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download ETOILES",
-          "url": "https://drive.google.com/uc?export=download&id=1YQw0zOsOMEYw6pszJc6BuBDsxPNFYeVK"
-        }
-      },
-      {
-        "id": "salam",
-        "title": "سَلام",
-        "editKey": "album_salam",
-        "page": "music/salam-infra.html",
-        "thumb": "assets/music/salam-cover.jpg",
-        "thumbAlt": "Cover INFRA. - سَلام",
-        "thumbSrcset": "assets/music/responsive/salam-cover-480.webp 480w, assets/music/responsive/salam-cover-900.webp 900w, assets/music/salam-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download سَلام",
-          "url": "https://drive.google.com/uc?export=download&id=1NjMyfAx6jKInnLJN4bnGIGyS4BRXQG3H"
-        }
-      },
-      {
-        "id": "fond-diffus",
-        "title": "FOND DIFFUS",
-        "editKey": "album_fond_diffus",
-        "page": "music/fond-diffus-infra.html",
-        "thumb": "assets/music/fond-diffus-e28f5aa2-cover.jpg",
-        "thumbAlt": "Cover INFRA. - FOND DIFFUS",
-        "thumbSrcset": "assets/music/responsive/fond-diffus-e28f5aa2-cover-480.webp 480w, assets/music/responsive/fond-diffus-e28f5aa2-cover-900.webp 900w, assets/music/fond-diffus-e28f5aa2-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download Fond Diffus",
-          "url": "https://drive.google.com/uc?export=download&id=16b9lJD5gCC-M49FxEM56sbEO2DGKEinV"
-        }
-      },
-      {
-        "id": "ballades",
-        "title": "BALLADES",
-        "editKey": "album_ballades",
-        "page": "music/ballades-infra.html",
-        "thumb": "assets/music/ballades-cover.jpg",
-        "thumbAlt": "Cover BALLADES - INFRA.",
-        "thumbSrcset": "assets/music/responsive/ballades-cover-480.webp 480w, assets/music/responsive/ballades-cover-900.webp 900w, assets/music/ballades-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download Ballades",
-          "url": "https://drive.google.com/uc?export=download&id=1eXlFHETITEWvj6artl-JJUxELwuZ8Egu"
-        }
-      },
-      {
-        "id": "trou-noir",
-        "title": "TROU NOIR",
-        "editKey": "album_trou_noir",
-        "page": "music/trou-noir-infra.html",
-        "thumb": "assets/music/trou-noir-cover.jpg",
-        "thumbAlt": "Cover INFRA. - TROU NOIR",
-        "thumbSrcset": "assets/music/responsive/trou-noir-cover-480.webp 480w, assets/music/responsive/trou-noir-cover-900.webp 900w, assets/music/trou-noir-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download Trou Noir",
-          "url": "https://drive.google.com/uc?export=download&id=1agshYrhNFZaj00fw-fDaxtvGLUjdjhmO"
-        }
-      },
-      {
-        "id": "voyager",
-        "title": "VOYAGER",
-        "editKey": "album_voyager",
-        "page": "music/voyager-infra.html",
-        "thumb": "assets/music/voyager-cover.jpg",
-        "thumbAlt": "Cover INFRA. - VOYAGER",
-        "thumbSrcset": "assets/music/responsive/voyager-cover-480.webp 480w, assets/music/responsive/voyager-cover-900.webp 900w, assets/music/voyager-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download Voyager",
-          "url": "https://drive.google.com/uc?export=download&id=1X69enZ8oS-cvicQsZw309jEESUfSvk4T"
-        }
-      },
-      {
-        "id": "sanguin",
-        "title": "SANGUIN",
-        "editKey": "album_sanguin",
-        "page": "music/sanguin-infra.html",
-        "thumb": "assets/music/sanguin-cover.jpg",
-        "thumbAlt": "Cover INFRA. - SANGUIN",
-        "thumbSrcset": "assets/music/responsive/sanguin-cover-480.webp 480w, assets/music/responsive/sanguin-cover-900.webp 900w, assets/music/sanguin-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "naviguer",
-        "title": "NAVIGUER",
-        "editKey": "album_naviguer",
-        "page": "music/naviguer-infra.html",
-        "thumb": "assets/music/naviguer-cover.jpg",
-        "thumbAlt": "Cover INFRA. - NAVIGUER",
-        "thumbSrcset": "assets/music/responsive/naviguer-cover-480.webp 480w, assets/music/responsive/naviguer-cover-900.webp 900w, assets/music/naviguer-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download Naviguer",
-          "url": "https://drive.google.com/uc?export=download&id=1FlxhF_vEDBJpwRnA2LvPYIGKxVup53dS"
-        }
-      },
-      {
-        "id": "pbb",
-        "title": "PBB",
-        "editKey": "album_pbb",
-        "page": "music/pbb-infra.html",
-        "thumb": "assets/music/pbb-cover.jpg",
-        "thumbAlt": "Cover INFRA. - PBB",
-        "thumbSrcset": "assets/music/responsive/pbb-cover-480.webp 480w, assets/music/responsive/pbb-cover-900.webp 900w, assets/music/pbb-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "rue-de-paris",
-        "title": "RUE DE PARIS",
-        "editKey": "album_rue_de_paris",
-        "page": "music/rue-de-paris-infra.html",
-        "thumb": "assets/music/rue-de-paris-cover.jpg",
-        "thumbAlt": "Cover INFRA. - RUE DE PARIS",
-        "thumbSrcset": "assets/music/responsive/rue-de-paris-cover-480.webp 480w, assets/music/responsive/rue-de-paris-cover-900.webp 900w, assets/music/rue-de-paris-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "black-stallion",
-        "title": "BLACK STALLION",
-        "editKey": "album_black_stallion",
-        "page": "music/black-stallion-infra.html",
-        "thumb": "assets/music/black-stallion-cover.jpg",
-        "thumbAlt": "Cover INFRA. - BLACK STALLION",
-        "thumbSrcset": "assets/music/responsive/black-stallion-cover-480.webp 480w, assets/music/responsive/black-stallion-cover-900.webp 900w, assets/music/black-stallion-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "osiris",
-        "title": "OSIRIS",
-        "editKey": "album_osiris",
-        "page": "music/osiris-infra.html",
-        "thumb": "assets/music/osiris-cover.jpg",
-        "thumbAlt": "Cover INFRA. - OSIRIS",
-        "thumbSrcset": "assets/music/responsive/osiris-cover-480.webp 480w, assets/music/responsive/osiris-cover-900.webp 900w, assets/music/osiris-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "cyberpunk",
-        "title": "CYBERPUNK",
-        "editKey": "album_cyberpunk",
-        "page": "music/cyberpunk-infra.html",
-        "thumb": "assets/music/cyberpunk-cover.jpg",
-        "thumbAlt": "Cover INFRA. - CYBERPUNK",
-        "thumbSrcset": "assets/music/responsive/cyberpunk-cover-480.webp 480w, assets/music/responsive/cyberpunk-cover-900.webp 900w, assets/music/cyberpunk-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "aspasie",
-        "title": "ASPASIE",
-        "editKey": "album_aspasie",
-        "page": "music/aspasie-infra.html",
-        "thumb": "assets/music/aspasie-cover.jpg",
-        "thumbAlt": "Cover INFRA. - ASPASIE",
-        "thumbSrcset": "assets/music/responsive/aspasie-cover-480.webp 480w, assets/music/responsive/aspasie-cover-900.webp 900w, assets/music/aspasie-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download Aspasie",
-          "url": "https://drive.google.com/uc?export=download&id=1yDr4qC5CsJSSOGsl3JV1k93-Wn8fHWIH"
-        }
-      },
-      {
-        "id": "cerises",
-        "title": "CERISES",
-        "editKey": "album_cerises",
-        "page": "music/cerises-infra.html",
-        "thumb": "assets/music/cerises-cover.jpg",
-        "thumbAlt": "Cover INFRA. - CERISES",
-        "thumbSrcset": "assets/music/responsive/cerises-cover-480.webp 480w, assets/music/responsive/cerises-cover-900.webp 900w, assets/music/cerises-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "ldc13",
-        "title": "LDC13",
-        "editKey": "album_ldc13",
-        "page": "music/ldc13-infra.html",
-        "thumb": "assets/music/ldc13-cover.jpg",
-        "thumbAlt": "Cover INFRA. - LDC13",
-        "thumbSrcset": "assets/music/responsive/ldc13-cover-480.webp 480w, assets/music/responsive/ldc13-cover-900.webp 900w, assets/music/ldc13-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "moremi-ajasoro",
-        "title": "MOREMI AJASORO",
-        "editKey": "album_moremi_ajasoro",
-        "page": "music/moremi-ajasoro-infra.html",
-        "thumb": "assets/music/moremi-ajasoro-cover.jpg",
-        "thumbAlt": "Cover INFRA. - MOREMI AJASORO",
-        "thumbSrcset": "assets/music/responsive/moremi-ajasoro-cover-480.webp 480w, assets/music/responsive/moremi-ajasoro-cover-900.webp 900w, assets/music/moremi-ajasoro-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
-      },
-      {
-        "id": "gaia",
-        "title": "GAIA",
-        "editKey": "album_gaia",
-        "page": "music/gaia-infra.html",
-        "thumb": "assets/music/gaia-cover.jpg",
-        "thumbAlt": "Cover GAIA - INFRA.",
-        "thumbSrcset": "assets/music/responsive/gaia-cover-480.webp 480w, assets/music/responsive/gaia-cover-900.webp 900w, assets/music/gaia-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download Gaia",
-          "url": "https://drive.google.com/uc?export=download&id=18EGtIO_-bwDri6yX_VKl_XFBbYC8Qm2I"
-        }
-      },
-      {
-        "id": "mami-wata",
-        "title": "MAMI WATA",
-        "editKey": "album_mami_wata",
-        "page": "music/mami-wata-infra.html",
-        "thumb": "assets/music/mami-wata-cover.jpg",
-        "thumbAlt": "Cover INFRA. - MAMI WATA",
-        "thumbSrcset": "assets/music/responsive/mami-wata-cover-480.webp 480w, assets/music/responsive/mami-wata-cover-900.webp 900w, assets/music/mami-wata-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download Mami Wata",
-          "url": "https://drive.google.com/uc?export=download&id=18vMDtTb_h0dcpvEsUZZ4Q27kfoz6AJEh"
-        }
-      },
-      {
-        "id": "adc-13",
-        "title": "ADC13",
-        "editKey": "album_adc_13",
-        "page": "music/adc-13-infra.html",
-        "thumb": "assets/music/adc-13-cover.jpg",
-        "thumbAlt": "Cover INFRA. - ADC 13",
-        "thumbSrcset": "assets/music/responsive/adc-13-cover-480.webp 480w, assets/music/responsive/adc-13-cover-900.webp 900w, assets/music/adc-13-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download ADC 13",
-          "url": "https://drive.google.com/uc?export=download&id=1j9AZDjm090tLcgrqRJ5skPEkKywhDu_e"
-        }
-      },
-      {
-        "id": "abricot",
-        "title": "ABRICOTS",
-        "editKey": "album_abricot",
-        "page": "music/abricot-infra.html",
-        "thumb": "assets/music/abricot-cover.jpg",
-        "thumbAlt": "Cover INFRA. - ABRICOT",
-        "thumbSrcset": "assets/music/responsive/abricot-cover-480.webp 480w, assets/music/responsive/abricot-cover-900.webp 900w, assets/music/abricot-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800,
-        "download": {
-          "type": "download",
-          "label": "Download Abricot",
-          "url": "https://drive.google.com/uc?export=download&id=1jnaysfOtLXW-xtkvSemsoOuf6ImYYdq1"
-        }
-      },
-      {
-        "id": "peches",
-        "title": "PECHES",
-        "editKey": "album_peches",
-        "page": "music/peches-infra.html",
-        "thumb": "assets/music/peches-cover.jpg",
-        "thumbAlt": "Cover INFRA. - PECHES",
-        "thumbSrcset": "assets/music/responsive/peches-cover-480.webp 480w, assets/music/responsive/peches-cover-900.webp 900w, assets/music/peches-cover.jpg 1600w",
-        "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
-        "width": 800,
-        "height": 800
+    },
+    {
+      "id": "reverb",
+      "title": "REVERB TIME CALCULATOR",
+      "editKey": "app_reverb",
+      "page": "apps/reverb-time-calculator.html",
+      "thumb": "assets/apps/reverb-icon.png?v=20260213b",
+      "thumbAlt": "Icone REVERB TIME CALCULATOR",
+      "width": 500,
+      "height": 500,
+      "download": {
+        "type": "app_download",
+        "label": "Download REVERB TIME CALCULATOR",
+        "appName": "REVERB TIME CALCULATOR",
+        "url": "https://drive.google.com/uc?export=download&id=18EGtIO_-bwDri6yX_VKl_XFBbYC8Qm2I"
       }
-    ],
-    "clips": [
-      {
-        "id": "clip-1",
-        "title": "FREEZE CORLEONE - CHEN LADEN (INFRA. MIX)",
-        "editKey": "clip_1",
-        "youtubeUrl": "https://www.youtube.com/watch?v=_JeILYHPjWE"
-      },
-      {
-        "id": "clip-2",
-        "title": "FREEZE CORLEONE - VOLDEMORT (INFRA. MIX)",
-        "editKey": "clip_2",
-        "youtubeUrl": "https://www.youtube.com/watch?v=fLcdQLtVt90"
+    },
+    {
+      "id": "infra-extract",
+      "title": "INFRA_EXTRACT",
+      "editKey": "app_extract",
+      "page": "apps/infra-extract.html",
+      "thumb": "assets/apps/infra-extract-icon.png?v=20260213",
+      "thumbAlt": "Icone INFRA_EXTRACT",
+      "width": 500,
+      "height": 500,
+      "download": {
+        "type": "app_download",
+        "label": "Download INFRA_EXTRACT",
+        "appName": "INFRA_EXTRACT",
+        "url": "https://drive.google.com/uc?export=download&id=1qm_BELRHQeovtx9ad0cqJul_BbuCFeoD"
       }
-    ]
-  };
-
+    }
+  ],
+  "albums": [
+    {
+      "id": "v-23pi56",
+      "title": "V-23π56",
+      "editKey": "album_v_23pi56",
+      "page": "music/v-23pi56-infra.html",
+      "thumb": "assets/music/v-23pi56-cover.jpg",
+      "thumbAlt": "Cover INFRA. - V-23π56",
+      "thumbSrcset": "assets/music/responsive/v-23pi56-cover-480.webp 480w, assets/music/responsive/v-23pi56-cover-900.webp 900w, assets/music/v-23pi56-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "he-4-0026",
+      "title": "He 4.0026",
+      "editKey": "album_he_4_0026",
+      "page": "music/he-4-0026-infra.html",
+      "thumb": "assets/music/he-4-0026-cover.jpg",
+      "thumbAlt": "Cover INFRA. - He 4.0026",
+      "thumbSrcset": "assets/music/responsive/he-4-0026-cover-480.webp 480w, assets/music/responsive/he-4-0026-cover-900.webp 900w, assets/music/he-4-0026-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "h-1-008",
+      "title": "H 1.008",
+      "editKey": "album_h_1_008",
+      "page": "music/h-1-008-infra.html",
+      "thumb": "assets/music/h-1-008-cover.jpg",
+      "thumbAlt": "Cover H 1.008 - INFRA.",
+      "thumbSrcset": "assets/music/responsive/h-1-008-cover-480.webp 480w, assets/music/responsive/h-1-008-cover-900.webp 900w, assets/music/h-1-008-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download H 1.008",
+        "url": "https://drive.google.com/uc?export=download&id=1tf1FBj3LsaNtq-dgftM-PjXdbon4y-V7"
+      }
+    },
+    {
+      "id": "kali",
+      "title": "KALI",
+      "editKey": "album_kali",
+      "page": "music/kali-infra.html",
+      "thumb": "assets/music/kali-cover.jpg",
+      "thumbAlt": "Cover KALI - INFRA.",
+      "thumbSrcset": "assets/music/responsive/kali-cover-480.webp 480w, assets/music/responsive/kali-cover-900.webp 900w, assets/music/kali-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download KALI",
+        "url": "https://drive.google.com/uc?export=download&id=1q9WXnRi1Inp0AeU7a6FMW4Dxj4tAKwZa"
+      }
+    },
+    {
+      "id": "asase-yaa",
+      "title": "ASASE YAA",
+      "editKey": "album_asase_yaa",
+      "page": "music/asase-yaa-infra.html",
+      "thumb": "assets/music/asase-yaa-cover.jpg",
+      "thumbAlt": "Cover ASASE YAA - INFRA.",
+      "thumbSrcset": "assets/music/responsive/asase-yaa-cover-480.webp 480w, assets/music/responsive/asase-yaa-cover-900.webp 900w, assets/music/asase-yaa-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download ASASE YAA",
+        "url": "https://drive.google.com/uc?export=download&id=124ttLRZkovE9l5roAps7WGU678BLIgmR"
+      }
+    },
+    {
+      "id": "anunnaki",
+      "title": "𒀭𒉣𒆠",
+      "editKey": "album_anunnaki",
+      "page": "music/anunnaki-infra.html",
+      "thumb": "assets/music/anunnaki-cover.jpg",
+      "thumbAlt": "Cover 𒀭𒉣𒆠 - INFRA.",
+      "thumbSrcset": "assets/music/responsive/anunnaki-cover-480.webp 480w, assets/music/responsive/anunnaki-cover-900.webp 900w, assets/music/anunnaki-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download 𒀭𒉣𒆠",
+        "url": "https://drive.google.com/uc?export=download&id=165BIWQnMCEJA7nP8W_mtbYYRyhKgHUai"
+      }
+    },
+    {
+      "id": "anunnaki-instru",
+      "title": "𒁀𒆷𒂵 𒈜",
+      "editKey": "album_anunnaki_instru",
+      "page": "music/anunnaki-instru-infra.html",
+      "thumb": "assets/music/anunnaki-instru-6a799ef0-cover.jpg",
+      "thumbAlt": "Cover INFRA. - 𒁀𒆷𒂵 𒈜",
+      "thumbSrcset": "assets/music/responsive/anunnaki-instru-6a799ef0-cover-480.webp 480w, assets/music/responsive/anunnaki-instru-6a799ef0-cover-900.webp 900w, assets/music/anunnaki-instru-6a799ef0-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "impression",
+      "title": "IMPRESSION",
+      "editKey": "album_impression",
+      "page": "music/impression-infra.html",
+      "thumb": "assets/music/impression-cover.jpg",
+      "thumbAlt": "Cover IMPRESSION - INFRA.",
+      "thumbSrcset": "assets/music/responsive/impression-cover-480.webp 480w, assets/music/responsive/impression-cover-900.webp 900w, assets/music/impression-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download Impression",
+        "url": "https://drive.google.com/uc?export=download&id=1QHQz22R0d8e3WoR3MlEFA9_-R_7T16_w"
+      }
+    },
+    {
+      "id": "nahda",
+      "title": "نهضة",
+      "editKey": "album_nahda",
+      "page": "music/nahda-infra.html",
+      "thumb": "assets/music/nahda-cover.jpg",
+      "thumbAlt": "Cover نهضة - INFRA.",
+      "thumbSrcset": "assets/music/responsive/nahda-cover-480.webp 480w, assets/music/responsive/nahda-cover-900.webp 900w, assets/music/nahda-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download نهضة",
+        "url": "https://drive.google.com/uc?export=download&id=14TL52jrxRAH3OCQsJs8eyld8-cWUkBAv"
+      }
+    },
+    {
+      "id": "etoiles",
+      "title": "ETOILES",
+      "editKey": "album_etoiles",
+      "page": "music/etoiles-infra.html",
+      "thumb": "assets/music/etoiles-cover.jpg",
+      "thumbAlt": "Cover ETOILES - INFRA.",
+      "thumbSrcset": "assets/music/responsive/etoiles-cover-480.webp 480w, assets/music/responsive/etoiles-cover-900.webp 900w, assets/music/etoiles-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download ETOILES",
+        "url": "https://drive.google.com/uc?export=download&id=1YQw0zOsOMEYw6pszJc6BuBDsxPNFYeVK"
+      }
+    },
+    {
+      "id": "salam",
+      "title": "سَلام",
+      "editKey": "album_salam",
+      "page": "music/salam-infra.html",
+      "thumb": "assets/music/salam-cover.jpg",
+      "thumbAlt": "Cover INFRA. - سَلام",
+      "thumbSrcset": "assets/music/responsive/salam-cover-480.webp 480w, assets/music/responsive/salam-cover-900.webp 900w, assets/music/salam-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download سَلام",
+        "url": "https://drive.google.com/uc?export=download&id=1NjMyfAx6jKInnLJN4bnGIGyS4BRXQG3H"
+      }
+    },
+    {
+      "id": "fond-diffus",
+      "title": "FOND DIFFUS",
+      "editKey": "album_fond_diffus",
+      "page": "music/fond-diffus-infra.html",
+      "thumb": "assets/music/fond-diffus-e28f5aa2-cover.jpg",
+      "thumbAlt": "Cover INFRA. - FOND DIFFUS",
+      "thumbSrcset": "assets/music/responsive/fond-diffus-e28f5aa2-cover-480.webp 480w, assets/music/responsive/fond-diffus-e28f5aa2-cover-900.webp 900w, assets/music/fond-diffus-e28f5aa2-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download Fond Diffus",
+        "url": "https://drive.google.com/uc?export=download&id=16b9lJD5gCC-M49FxEM56sbEO2DGKEinV"
+      }
+    },
+    {
+      "id": "ballades",
+      "title": "BALLADES",
+      "editKey": "album_ballades",
+      "page": "music/ballades-infra.html",
+      "thumb": "assets/music/ballades-cover.jpg",
+      "thumbAlt": "Cover BALLADES - INFRA.",
+      "thumbSrcset": "assets/music/responsive/ballades-cover-480.webp 480w, assets/music/responsive/ballades-cover-900.webp 900w, assets/music/ballades-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download Ballades",
+        "url": "https://drive.google.com/uc?export=download&id=1eXlFHETITEWvj6artl-JJUxELwuZ8Egu"
+      }
+    },
+    {
+      "id": "trou-noir",
+      "title": "TROU NOIR",
+      "editKey": "album_trou_noir",
+      "page": "music/trou-noir-infra.html",
+      "thumb": "assets/music/trou-noir-cover.jpg",
+      "thumbAlt": "Cover INFRA. - TROU NOIR",
+      "thumbSrcset": "assets/music/responsive/trou-noir-cover-480.webp 480w, assets/music/responsive/trou-noir-cover-900.webp 900w, assets/music/trou-noir-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download Trou Noir",
+        "url": "https://drive.google.com/uc?export=download&id=1agshYrhNFZaj00fw-fDaxtvGLUjdjhmO"
+      }
+    },
+    {
+      "id": "voyager",
+      "title": "VOYAGER",
+      "editKey": "album_voyager",
+      "page": "music/voyager-infra.html",
+      "thumb": "assets/music/voyager-cover.jpg",
+      "thumbAlt": "Cover INFRA. - VOYAGER",
+      "thumbSrcset": "assets/music/responsive/voyager-cover-480.webp 480w, assets/music/responsive/voyager-cover-900.webp 900w, assets/music/voyager-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download Voyager",
+        "url": "https://drive.google.com/uc?export=download&id=1X69enZ8oS-cvicQsZw309jEESUfSvk4T"
+      }
+    },
+    {
+      "id": "sanguin",
+      "title": "SANGUIN",
+      "editKey": "album_sanguin",
+      "page": "music/sanguin-infra.html",
+      "thumb": "assets/music/sanguin-cover.jpg",
+      "thumbAlt": "Cover INFRA. - SANGUIN",
+      "thumbSrcset": "assets/music/responsive/sanguin-cover-480.webp 480w, assets/music/responsive/sanguin-cover-900.webp 900w, assets/music/sanguin-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "naviguer",
+      "title": "NAVIGUER",
+      "editKey": "album_naviguer",
+      "page": "music/naviguer-infra.html",
+      "thumb": "assets/music/naviguer-cover.jpg",
+      "thumbAlt": "Cover INFRA. - NAVIGUER",
+      "thumbSrcset": "assets/music/responsive/naviguer-cover-480.webp 480w, assets/music/responsive/naviguer-cover-900.webp 900w, assets/music/naviguer-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download Naviguer",
+        "url": "https://drive.google.com/uc?export=download&id=1FlxhF_vEDBJpwRnA2LvPYIGKxVup53dS"
+      }
+    },
+    {
+      "id": "pbb",
+      "title": "PBB",
+      "editKey": "album_pbb",
+      "page": "music/pbb-infra.html",
+      "thumb": "assets/music/pbb-cover.jpg",
+      "thumbAlt": "Cover INFRA. - PBB",
+      "thumbSrcset": "assets/music/responsive/pbb-cover-480.webp 480w, assets/music/responsive/pbb-cover-900.webp 900w, assets/music/pbb-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "rue-de-paris",
+      "title": "RUE DE PARIS",
+      "editKey": "album_rue_de_paris",
+      "page": "music/rue-de-paris-infra.html",
+      "thumb": "assets/music/rue-de-paris-cover.jpg",
+      "thumbAlt": "Cover INFRA. - RUE DE PARIS",
+      "thumbSrcset": "assets/music/responsive/rue-de-paris-cover-480.webp 480w, assets/music/responsive/rue-de-paris-cover-900.webp 900w, assets/music/rue-de-paris-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "black-stallion",
+      "title": "BLACK STALLION",
+      "editKey": "album_black_stallion",
+      "page": "music/black-stallion-infra.html",
+      "thumb": "assets/music/black-stallion-cover.jpg",
+      "thumbAlt": "Cover INFRA. - BLACK STALLION",
+      "thumbSrcset": "assets/music/responsive/black-stallion-cover-480.webp 480w, assets/music/responsive/black-stallion-cover-900.webp 900w, assets/music/black-stallion-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "osiris",
+      "title": "OSIRIS",
+      "editKey": "album_osiris",
+      "page": "music/osiris-infra.html",
+      "thumb": "assets/music/osiris-cover.jpg",
+      "thumbAlt": "Cover INFRA. - OSIRIS",
+      "thumbSrcset": "assets/music/responsive/osiris-cover-480.webp 480w, assets/music/responsive/osiris-cover-900.webp 900w, assets/music/osiris-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "cyberpunk",
+      "title": "CYBERPUNK",
+      "editKey": "album_cyberpunk",
+      "page": "music/cyberpunk-infra.html",
+      "thumb": "assets/music/cyberpunk-cover.jpg",
+      "thumbAlt": "Cover INFRA. - CYBERPUNK",
+      "thumbSrcset": "assets/music/responsive/cyberpunk-cover-480.webp 480w, assets/music/responsive/cyberpunk-cover-900.webp 900w, assets/music/cyberpunk-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "aspasie",
+      "title": "ASPASIE",
+      "editKey": "album_aspasie",
+      "page": "music/aspasie-infra.html",
+      "thumb": "assets/music/aspasie-cover.jpg",
+      "thumbAlt": "Cover INFRA. - ASPASIE",
+      "thumbSrcset": "assets/music/responsive/aspasie-cover-480.webp 480w, assets/music/responsive/aspasie-cover-900.webp 900w, assets/music/aspasie-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download Aspasie",
+        "url": "https://drive.google.com/uc?export=download&id=1yDr4qC5CsJSSOGsl3JV1k93-Wn8fHWIH"
+      }
+    },
+    {
+      "id": "cerises",
+      "title": "CERISES",
+      "editKey": "album_cerises",
+      "page": "music/cerises-infra.html",
+      "thumb": "assets/music/cerises-cover.jpg",
+      "thumbAlt": "Cover INFRA. - CERISES",
+      "thumbSrcset": "assets/music/responsive/cerises-cover-480.webp 480w, assets/music/responsive/cerises-cover-900.webp 900w, assets/music/cerises-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "ldc13",
+      "title": "LDC13",
+      "editKey": "album_ldc13",
+      "page": "music/ldc13-infra.html",
+      "thumb": "assets/music/ldc13-cover.jpg",
+      "thumbAlt": "Cover INFRA. - LDC13",
+      "thumbSrcset": "assets/music/responsive/ldc13-cover-480.webp 480w, assets/music/responsive/ldc13-cover-900.webp 900w, assets/music/ldc13-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "moremi-ajasoro",
+      "title": "MOREMI AJASORO",
+      "editKey": "album_moremi_ajasoro",
+      "page": "music/moremi-ajasoro-infra.html",
+      "thumb": "assets/music/moremi-ajasoro-cover.jpg",
+      "thumbAlt": "Cover INFRA. - MOREMI AJASORO",
+      "thumbSrcset": "assets/music/responsive/moremi-ajasoro-cover-480.webp 480w, assets/music/responsive/moremi-ajasoro-cover-900.webp 900w, assets/music/moremi-ajasoro-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    },
+    {
+      "id": "gaia",
+      "title": "GAIA",
+      "editKey": "album_gaia",
+      "page": "music/gaia-infra.html",
+      "thumb": "assets/music/gaia-cover.jpg",
+      "thumbAlt": "Cover GAIA - INFRA.",
+      "thumbSrcset": "assets/music/responsive/gaia-cover-480.webp 480w, assets/music/responsive/gaia-cover-900.webp 900w, assets/music/gaia-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download Gaia",
+        "url": "https://drive.google.com/uc?export=download&id=18EGtIO_-bwDri6yX_VKl_XFBbYC8Qm2I"
+      }
+    },
+    {
+      "id": "mami-wata",
+      "title": "MAMI WATA",
+      "editKey": "album_mami_wata",
+      "page": "music/mami-wata-infra.html",
+      "thumb": "assets/music/mami-wata-cover.jpg",
+      "thumbAlt": "Cover INFRA. - MAMI WATA",
+      "thumbSrcset": "assets/music/responsive/mami-wata-cover-480.webp 480w, assets/music/responsive/mami-wata-cover-900.webp 900w, assets/music/mami-wata-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download Mami Wata",
+        "url": "https://drive.google.com/uc?export=download&id=18vMDtTb_h0dcpvEsUZZ4Q27kfoz6AJEh"
+      }
+    },
+    {
+      "id": "adc-13",
+      "title": "ADC13",
+      "editKey": "album_adc_13",
+      "page": "music/adc-13-infra.html",
+      "thumb": "assets/music/adc-13-cover.jpg",
+      "thumbAlt": "Cover INFRA. - ADC 13",
+      "thumbSrcset": "assets/music/responsive/adc-13-cover-480.webp 480w, assets/music/responsive/adc-13-cover-900.webp 900w, assets/music/adc-13-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download ADC 13",
+        "url": "https://drive.google.com/uc?export=download&id=1j9AZDjm090tLcgrqRJ5skPEkKywhDu_e"
+      }
+    },
+    {
+      "id": "abricot",
+      "title": "ABRICOTS",
+      "editKey": "album_abricot",
+      "page": "music/abricot-infra.html",
+      "thumb": "assets/music/abricot-cover.jpg",
+      "thumbAlt": "Cover INFRA. - ABRICOT",
+      "thumbSrcset": "assets/music/responsive/abricot-cover-480.webp 480w, assets/music/responsive/abricot-cover-900.webp 900w, assets/music/abricot-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download Abricot",
+        "url": "https://drive.google.com/uc?export=download&id=1jnaysfOtLXW-xtkvSemsoOuf6ImYYdq1"
+      }
+    },
+    {
+      "id": "peches",
+      "title": "PECHES",
+      "editKey": "album_peches",
+      "page": "music/peches-infra.html",
+      "thumb": "assets/music/peches-cover.jpg",
+      "thumbAlt": "Cover INFRA. - PECHES",
+      "thumbSrcset": "assets/music/responsive/peches-cover-480.webp 480w, assets/music/responsive/peches-cover-900.webp 900w, assets/music/peches-cover.jpg 1600w",
+      "thumbSizes": "(max-width: 980px) calc(50vw - 28px), 250px",
+      "width": 800,
+      "height": 800
+    }
+  ],
+  "clips": [
+    {
+      "id": "clip-1",
+      "title": "FREEZE CORLEONE - CHEN LADEN (INFRA. MIX)",
+      "editKey": "clip_1",
+      "youtubeUrl": "https://www.youtube.com/watch?v=_JeILYHPjWE"
+    },
+    {
+      "id": "clip-2",
+      "title": "FREEZE CORLEONE - VOLDEMORT (INFRA. MIX)",
+      "editKey": "clip_2",
+      "youtubeUrl": "https://www.youtube.com/watch?v=fLcdQLtVt90"
+    }
+  ]
+};
 
   const globalObject = typeof window !== "undefined"
     ? window

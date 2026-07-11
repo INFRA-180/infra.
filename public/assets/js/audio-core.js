@@ -338,11 +338,11 @@
       const isFromMediaSession = Boolean(opts.fromMediaSession);
       const isFromTransportControl = Boolean(opts.fromTransportControl);
       const preparedNextIndex = getAutoPrefetchedNextIndex();
-      const hasPreparedTarget = preparedNextIndex === index;
-      const isDirectStart = opts.waitForReadiness !== true;
+      const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index;
+      const isFastSkip = isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
 
-      if (!hasPreparedTarget && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
+      if (!isFastSkip && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
         clearNextTrackPrefetch("manual_start");
         resetPreparedInitialGlobalRandomPlayback();
       }
@@ -405,7 +405,7 @@
         }
       ));
       audioState.trackStartInFlight = true;
-      const shouldFastSourceSwitch = isDirectStart;
+      const shouldFastSourceSwitch = isFastSkip;
       const shouldFadeSwitch = !shouldFastSourceSwitch && !sameTrack && !audio.paused && Boolean(getCurrentPlayableAudioSrc(audio));
 
       if (sameTrack && !opts.resume) {
@@ -476,7 +476,7 @@
         });
         clearTrackFailure(target.src);
         clearTrackStatus(rowTrack);
-        if (!sameTrack && !(isDirectStart || shouldSeamless)) {
+        if (!sameTrack && !(isFastSkip || shouldSeamless)) {
           fadeInAudio(audio, 100);
         } else if (sameTrack && !shouldSeamless) {
           fadeInAudio(audio, 120);
@@ -514,7 +514,7 @@
           });
           waitForAudioReadiness(audio, requestToken, isIosDevice() ? 900 : 700).then(function () {
             if (requestToken !== audioState.startRequestToken) return;
-            attemptPlay({ retry: true, sync: isDirectStart });
+            attemptPlay({ retry: true, sync: isFastSkip });
           });
           return;
         }
@@ -548,7 +548,7 @@
 
       function beginPlayback() {
         if (requestToken !== audioState.startRequestToken) return;
-        if (isDirectStart) {
+        if (isFastSkip) {
           attemptPlay({ sync: true });
           return;
         }

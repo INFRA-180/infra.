@@ -85,3 +85,18 @@
 - Cached partial metadata and body length are now validated before reconstruction. Corrupt entries are deleted, while valid unsupported or out-of-window ranges use the original network request unchanged.
 - `test-audio-prefetch-sw.js` now exercises the complete cache-to-network-to-cache sequence and rejects truncated finite overlap responses.
 - No `preload`, radio queue, Media Session, or source-switch behavior changed in this release; those cross-cutting changes require a separate state-model patch and dedicated tests.
+
+## 2026-07-11 - audiofix297 PWA startup and fullscreen correction
+
+- Home PWA initial random preparation now runs on the home screen even when no album track rows are present. The previous gate only ran it when audio rows or a resume session existed, so the first home Play could still build the catalogue and warmup on tap.
+- Radio playlist entries, preserved queue entries, and restored queue entries keep catalogue `duration` and `seconds` fields. This keeps fullscreen and queue duration labels available before browser audio metadata arrives.
+- The fullscreen now-playing progress display uses catalogue duration as a read-only fallback while `audio.duration` is unavailable. Seeking remains disabled until media metadata is available.
+- The fullscreen cover wrapper now paints a dark backing layer under transparent or fractional WebKit image edges, without adding a visible border.
+- This release does not change R2 hosts, the Cloudflare Worker endpoint, or telemetry transport semantics.
+
+## 2026-07-11 - audiofix298 PWA playback contract restoration
+
+- Normal PWA track starts now use the guarded readiness path again. The direct source-switch path is limited to auto-advance, Media Session actions, and transport Next only when the target is the completed N+1 prefetch.
+- R2 audio requests now bypass the Service Worker entirely, so Safari/PWA owns the real byte-range negotiation. The previous partial-cache Range reconstruction remains in code for test coverage but is no longer on the live audio path.
+- Service Worker activation deletes both legacy and current N+1 partial warmup caches to force clients out of stale segmented audio entries.
+- The private Cloudflare Worker source now clamps telemetry export offset windows to avoid unbounded KV scans; catalogue and R2 bindings are unchanged.

@@ -57,7 +57,8 @@ function createAudio() {
     pause() { this.pauseCalls += 1; this.paused = true; },
     load() { this.loadCalls += 1; },
     addEventListener(type, handler) { listeners.set(type, handler); },
-    removeEventListener(type, handler) { if (listeners.get(type) === handler) listeners.delete(type); }
+    removeEventListener(type, handler) { if (listeners.get(type) === handler) listeners.delete(type); },
+    dispatch(type) { const handler = listeners.get(type); if (handler) handler({ type }); }
   };
 }
 
@@ -70,6 +71,7 @@ assert.strictEqual(warmupRequest.headers.get("Range"), "bytes=0-524287", "audio 
 load("public/assets/js/audio-core.js");
 load("public/assets/js/audio-radio.js");
 load("public/assets/js/media-session.js");
+load("public/assets/js/now-playing.js");
 
 const audio = createAudio();
 const audioState = {
@@ -103,10 +105,42 @@ const core = sandbox.InfraAudioCore.createAudioCore({
 });
 
 core.startTrack(1, { fromTransportControl: true, seamless: true });
-assert.strictEqual(audio.playCalls, 1, "transport next must call play synchronously");
-assert.strictEqual(audio.pauseCalls, 0, "transport next must not pause the old source");
+assert.strictEqual(audio.playCalls, 0, "unprepared transport next must wait for media readiness");
 assert.strictEqual(prefetchCancels, 1, "an incomplete N+1 must be cancelled");
 assert.strictEqual(audioState.activeMediaRequest.index, 1, "the active media request must follow the target track");
+audio.readyState = 2;
+audio.dispatch("canplay");
+
+const preparedAudio = createAudio();
+const preparedState = {
+  audio: preparedAudio,
+  playlist: [
+    { src: "https://media.test/a.m4a", name: "A" },
+    { src: "https://media.test/b.m4a", name: "B" }
+  ],
+  currentIndex: 0,
+  homeMode: "album",
+  recentPlayed: [],
+  recentPlayedLimit: 12,
+  startRequestToken: 0,
+  activeLogicalSrc: "https://media.test/a.m4a",
+  trackFailureCounts: new Map()
+};
+const preparedCore = sandbox.InfraAudioCore.createAudioCore({
+  audioState: preparedState,
+  PREFETCH_NEXT_ENABLED: true,
+  normalizeAudioSourceUrl: (value) => String(value || ""),
+  getCurrentLogicalAudioSrc: () => preparedState.activeLogicalSrc,
+  getCurrentPlayableAudioSrc: (item) => item.currentSrc || item.src || "",
+  srcMatches: (left, right) => String(left || "") === String(right || ""),
+  getAutoPrefetchedNextIndex: () => 1,
+  getAudioTelemetryNow: () => 0,
+  getAudioAssetPath: (value) => String(value || ""),
+  getTrackByIndex: (index) => preparedState.playlist[index] || null
+});
+preparedCore.startTrack(1, { fromTransportControl: true, seamless: true });
+assert.strictEqual(preparedAudio.playCalls, 1, "prepared transport next may use the synchronous fast path");
+assert.strictEqual(preparedAudio.pauseCalls, 0, "prepared transport next must not pause the old source");
 
 const coldAudio = createAudio();
 let radioStarts = 0;
@@ -168,4 +202,62 @@ mediaRuntime.scheduleWaitingRecovery({ requestToken: 5, index: 2, src: recoveryA
 queuedTimers.shift()();
 assert.strictEqual(recoveryAudio.loadCalls, 1, "a confirmed same-track mid-play stall may recover once");
 
-console.log(JSON.stringify({ ok: true, checks: 11 }, null, 2));
+const radioDurationState = { radioPlaylist: [], radioLoadingPromise: null };
+const radioDurations = sandbox.InfraAudioRadio.createAudioRadio({
+  audioState: radioDurationState,
+  runtime: { baseUrl: { href: "https://example.test/" } },
+  loadTracksData: () => Promise.resolve({
+    albums: [{
+      title: "Album",
+      page: "music/album.html",
+      cover: "cover.webp",
+      tracks: [{ src: "assets/music/streams/a/01.m4a", title: "One", duration: "3:21", seconds: 201 }]
+    }]
+  }),
+  toRuntimeAbsoluteUrl: (value) => `https://example.test/${value}`,
+  resolveManagedAudioSrc: (value) => `https://media.test/${value}`,
+  normalizeAlbumTitle: (value) => String(value || "").toUpperCase(),
+  normalizeTrackTitle: (value) => String(value || "").toUpperCase(),
+  formatTrackDuration: (seconds) => {
+    const total = Math.round(Number(seconds) || 0);
+    return total ? `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}` : "";
+  }
+});
+radioDurations.ensureRadioPlaylistLoaded().then((radioList) => {
+  assert.strictEqual(radioList[0].duration, "3:21", "radio tracks must keep catalog duration");
+  assert.strictEqual(radioList[0].seconds, 201, "radio tracks must keep catalog seconds");
+
+  const overlayCurrent = { textContent: "" };
+  const overlayDuration = { textContent: "" };
+  const overlayFill = { style: { width: "" } };
+  const overlayProgress = { disabled: false };
+  const nowPlayingState = {
+    audio: { duration: NaN, currentTime: 0, src: "https://media.test/a.m4a", currentSrc: "https://media.test/a.m4a" },
+    transport: {
+      overlay: {},
+      overlayCurrent,
+      overlayDuration,
+      overlayFill,
+      overlayProgress
+    },
+    nowPlayingSeeking: false
+  };
+  const nowPlaying = sandbox.InfraNowPlaying.createNowPlaying({
+    audioState: nowPlayingState,
+    getCurrentPlayableAudioSrc: (item) => item && (item.currentSrc || item.src) || "",
+    getCurrentPlaylistTrack: () => ({ src: "https://media.test/a.m4a", duration: "3:21", seconds: 201 }),
+    formatTrackDuration: (seconds) => {
+      const total = Math.round(Number(seconds) || 0);
+      return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+    }
+  });
+  nowPlaying.syncNowPlayingOverlayProgress();
+  assert.strictEqual(overlayCurrent.textContent, "0:00", "catalog fallback keeps current time at zero before metadata");
+  assert.strictEqual(overlayDuration.textContent, "-3:21", "fullscreen player must show catalog duration before audio metadata");
+  assert.strictEqual(overlayProgress.disabled, true, "catalog duration must not enable seeking before media metadata");
+
+  console.log(JSON.stringify({ ok: true, checks: 17 }, null, 2));
+}).catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

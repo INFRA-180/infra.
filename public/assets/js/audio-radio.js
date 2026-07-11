@@ -389,6 +389,8 @@
           const src = resolveManagedAudioSrc(track.src, runtime.baseUrl.href);
           if (!src || seen.has(src)) return;
           seen.add(src);
+          const seconds = Number(track.seconds);
+          const duration = String(track.duration || "").trim() || formatTrackDuration(seconds);
           playlist.push(track);
           playlist[playlist.length - 1] = {
             src,
@@ -396,7 +398,9 @@
             album: title,
             page,
             artist: "INFRA.",
-            artwork
+            artwork,
+            duration,
+            seconds
           };
         });
       });
@@ -1312,7 +1316,9 @@
         album: normalizeAlbumTitle(source.album || track.album || getCurrentAlbumTitle()),
         page: getCurrentTrackAlbumPage(source),
         artist: source.artist || track.artist || "INFRA.",
-        artwork: getCurrentTrackArtwork(source)
+        artwork: getCurrentTrackArtwork(source),
+        duration: String(source.duration || track.duration || "").trim(),
+        seconds: Number(source.seconds || track.seconds)
       });
     });
 
@@ -1330,7 +1336,9 @@
       album: normalizeAlbumTitle(track && track.album ? track.album : ""),
       page: track && track.page ? toAbsoluteUrl(track.page) : "",
       artist: track && track.artist ? String(track.artist).trim() : "INFRA.",
-      artwork: getCurrentTrackArtwork(track || null)
+      artwork: getCurrentTrackArtwork(track || null),
+      duration: String(track && track.duration ? track.duration : "").trim(),
+      seconds: Number(track && track.seconds)
     };
   }
 

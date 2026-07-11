@@ -3248,8 +3248,9 @@ body.now-playing-open {
   width: var(--now-playing-content-width);
   margin: 0 auto;
   border-radius: 24px;
-  background: transparent;
+  background: #050609;
   overflow: hidden;
+  isolation: isolate;
 }
 
 .now-playing-cover {
@@ -3261,6 +3262,8 @@ body.now-playing-open {
   border: 0;
   box-shadow: none;
   background: transparent;
+  backface-visibility: hidden;
+  transform: translateZ(0);
   -webkit-user-drag: none;
   user-select: none;
 }
@@ -4206,7 +4209,7 @@ body.now-playing-open {
     height: fit-content;
     max-width: var(--now-playing-content-width);
     max-height: var(--now-playing-cover-size);
-    background: transparent;
+    background: #050609;
     overflow: hidden;
     border-radius: 32px;
     line-height: 0;
@@ -4418,6 +4421,7 @@ body.now-playing-open {
     align-self: start;
     justify-self: start;
     margin: 0;
+    background: #050609;
     border-radius: clamp(22px, 2vw, 34px);
     line-height: 1;
     transform: translateY(clamp(18px, 2vh, 26px));

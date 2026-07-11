@@ -243,9 +243,10 @@
         loadFavoritesWithReset().catch(function () { audioState.favoritesDbSupported = false; syncFavoriteButtons(); }).finally(syncFavoritesRoute);
         loadCatalogData().catch(function () {}); await hydrateHomeCatalog(); prepareAlbumCoversForSession("home_start"); if (!adminMode) enforceHomeModuleOrder(); enforceHomeAppsCollapsed(adminMode); resetHomePlaybackModeIfIdle();
         if (audioState.homeMode !== "radio") setHomePlayMode("album", { force: true }); else syncAudioUi(); syncFavoritesRoute();
+        scheduleInitialGlobalRandomPreparation("home_idle");
       }
       optimizeAlbumCoverImage(); enhanceAlbumDownloadButtons();
-      if (needsAudio) { await Promise.all([durations, tracks]); hydrateCurrentAlbumTrackRows(audioState.tracksData); loadFavoritesWithReset().catch(function () { audioState.favoritesDbSupported = false; syncFavoriteButtons(); }); initMinimalPlayers(); syncTransportUi(); if (isHome) scheduleInitialGlobalRandomPreparation("home_idle"); }
+      if (needsAudio) { await Promise.all([durations, tracks]); hydrateCurrentAlbumTrackRows(audioState.tracksData); loadFavoritesWithReset().catch(function () { audioState.favoritesDbSupported = false; syncFavoriteButtons(); }); initMinimalPlayers(); syncTransportUi(); }
       if (adminMode) await initAdminFeatures(); else teardownAdminFeatures();
       scheduleSpaPagePrefetch(); scheduleAlbumCoverCacheWarmup(isHome ? "home_idle" : "page_idle"); snapshotCurrentSpaPage(spaState.currentUrl || window.location.href); initPwaInstallPrompt(adminMode);
     }

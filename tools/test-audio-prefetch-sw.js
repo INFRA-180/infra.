@@ -6,6 +6,8 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
+let fetchHandler = null;
+
 const sandbox = {
   URL,
   Request,
@@ -18,7 +20,9 @@ const sandbox = {
     delete: () => Promise.resolve(true)
   },
   self: {
-    addEventListener: () => {},
+    addEventListener: (type, handler) => {
+      if (type === "fetch") fetchHandler = handler;
+    },
     skipWaiting: () => Promise.resolve(),
     clients: {
       claim: () => Promise.resolve(),
@@ -35,6 +39,14 @@ vm.runInContext(
 );
 
 (async function () {
+  assert(fetchHandler, "service worker fetch handler must be registered");
+  let respondWithCalled = false;
+  fetchHandler({
+    request: new Request("https://pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev/test.m4a"),
+    respondWith: () => { respondWithCalled = true; }
+  });
+  assert.strictEqual(respondWithCalled, false, "R2 audio requests must pass through to Safari without service-worker Range reconstruction");
+
   const bytes = new Uint8Array(512 * 1024);
   const cached = new Response(bytes, {
     status: 206,
@@ -119,7 +131,7 @@ vm.runInContext(
   assert.strictEqual(fetchCalls, 2, "corrupt cache fallback must issue one network request");
   assert.strictEqual(deleteCalls, 2, "a corrupt entry must be deleted by Request and URL keys");
 
-  console.log(JSON.stringify({ ok: true, checks: 17 }, null, 2));
+  console.log(JSON.stringify({ ok: true, checks: 18 }, null, 2));
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

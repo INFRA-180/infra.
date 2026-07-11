@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix296-20260711";
+window.INFRA_BUILD_TAG = "audiofix298-20260711";
 
 try {
     document.documentElement.dataset.build = window.INFRA_BUILD_TAG, document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG),
@@ -205,7 +205,7 @@ function openAppDownloadGatekeeper(appName, url) {
         return {
             scriptUrl: scriptUrl || new URL("assets/js/scripts.js", baseUrl.href),
             baseUrl: baseUrl,
-            query: scriptUrl && scriptUrl.search || "?v=audiofix296-20260711"
+            query: scriptUrl && scriptUrl.search || "?v=audiofix298-20260711"
         };
     }(), mediaSessionRuntimeApi = function() {
         const factory = mediaSessionApi && "function" == typeof mediaSessionApi.createMediaSessionRuntime ? mediaSessionApi.createMediaSessionRuntime : null;
@@ -282,7 +282,7 @@ function openAppDownloadGatekeeper(appName, url) {
                 return WORKER_URL;
             },
             getRuntimeVersion: function() {
-                return "audiofix296-20260711";
+                return "audiofix298-20260711";
             },
             getAudioState: function() {
                 return audioState;
@@ -315,7 +315,7 @@ function openAppDownloadGatekeeper(appName, url) {
         return factory({
             audioState: audioState,
             runtime: runtime,
-            runtimeVersion: "audiofix296-20260711",
+            runtimeVersion: "audiofix298-20260711",
             now: getAudioTelemetryNow,
             getCurrentPlayableAudioSrc: getCurrentPlayableAudioSrc,
             trackAudioRuntimeEvent: trackAudioRuntimeEvent,
@@ -965,7 +965,7 @@ function openAppDownloadGatekeeper(appName, url) {
             WORKER_URL: WORKER_URL,
             LIVE_CATALOG_CACHE_NAME: "infra-live-catalog-v1",
             LIVE_CATALOG_TIMEOUT_MS: 3500,
-            LOCAL_CATALOG_VERSION: "audiofix296-20260711",
+            LOCAL_CATALOG_VERSION: "audiofix298-20260711",
             normalizeAlbumTitle: normalizeAlbumTitle,
             normalizeTrackTitle: normalizeTrackTitle,
             toRuntimeAbsoluteUrl: toRuntimeAbsoluteUrl,
@@ -1632,7 +1632,9 @@ function openAppDownloadGatekeeper(appName, url) {
             album: normalizeAlbumTitle(track && track.album ? track.album : getCurrentAlbumTitle()),
             page: getCurrentTrackAlbumPage(track || null),
             artist: track && track.artist ? track.artist : "INFRA.",
-            artwork: getCurrentTrackArtwork(track || null)
+            artwork: getCurrentTrackArtwork(track || null),
+            duration: String(track && track.duration ? track.duration : "").trim(),
+            seconds: Number(track && track.seconds)
         } : null;
     }
     function savePlaybackQueueContext() {

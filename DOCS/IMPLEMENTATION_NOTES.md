@@ -12,3 +12,8 @@
 - The PWA shell and catalog use release `audiofix303-20260713` / `infra-shell-20260713-audio303`, so an installed PWA receives this runtime rather than a previously cached July 3 shell.
 - Core playback transition telemetry is flushed after a short batch delay (600 ms), rather than waiting for the 40-event / 60-second background threshold. This makes a short manual PWA test observable without increasing normal event volume materially.
 - The historical readiness guard and Service Worker Range behavior remain unchanged in this release.
+
+## 2026-07-13 — Radio active-state visibility
+
+- The mini-player Radio button now keeps the accent color when its `is-on` state is active. The previous mode-specific CSS override made the active state visually indistinguishable from normal playback.
+- This is a UI-only correction: the Radio queue, readiness guard, and N+1 prefetch behavior are unchanged.

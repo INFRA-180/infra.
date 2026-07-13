@@ -699,7 +699,7 @@ body.home-screen {
 .global-transport-btn[data-transport-shuffle].is-on {
   background: transparent;
   border: 0;
-  color: var(--ink);
+  color: var(--accent);
   box-shadow: none;
   opacity: 1;
 }

@@ -17,3 +17,8 @@
 
 - The mini-player Radio button now keeps the accent color when its `is-on` state is active. The previous mode-specific CSS override made the active state visually indistinguishable from normal playback.
 - This is a UI-only correction: the Radio queue, readiness guard, and N+1 prefetch behavior are unchanged.
+
+## 2026-07-13 — Telemetry export ordering
+
+- The Worker now writes telemetry batches with a reverse-time key. KV lists keys in ascending lexical order, so the prior capped export could only reach old batches even when newer batches existed.
+- The Worker export now selects the newest batch keys directly; legacy batches remain readable as a fallback until the new batch format has data.

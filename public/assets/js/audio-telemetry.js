@@ -7,6 +7,7 @@
     "audio_play",
     "audio_session_state",
     "cache_hit",
+    "cold_start_radio",
     "click_track",
     "cover_error",
     "cover_prepare_done",
@@ -95,6 +96,19 @@
     "suspend",
     "visibilitychange",
     "waiting"
+  ]);
+  const PRIORITY_FLUSH_EVENTS = new Set([
+    "cold_start_radio",
+    "transport_nexttrack",
+    "source_assigned",
+    "ready_wait_end",
+    "play_resolved",
+    "play_rejected",
+    "playing",
+    "waiting",
+    "stalled",
+    "prefetch_done",
+    "prefetch_error"
   ]);
   const MAX_REQUESTS = 24;
   const DB_NAME = "infra_audio_telemetry_v1";
@@ -503,6 +517,9 @@
       });
 
       enqueue(body);
+      if (PRIORITY_FLUSH_EVENTS.has(eventType)) {
+        scheduleFlush(600);
+      }
     }
 
     function buildMonitorPayload(track, index, src) {

@@ -1722,7 +1722,13 @@
       document.body.classList.contains("home-screen") &&
       !audioState.globalRandomStartInFlight
     ) {
-      startGlobalRandomPlayback();
+      setHomePlayMode("radio", { force: true });
+      trackAudioRuntimeEvent("cold_start_radio", {
+        surface: "home",
+        trigger: "transport",
+        home_mode: "radio"
+      });
+      startRadioPlaybackFromIdle();
       return;
     }
     togglePlayPause();

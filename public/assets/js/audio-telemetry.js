@@ -59,6 +59,8 @@
     "media_session_play",
     "media_session_previoustrack",
     "transport_nexttrack",
+    "transport_navigation_deferred",
+    "transport_navigation_replayed",
     "transport_previoustrack",
     "play_request",
     "play_complete",
@@ -100,6 +102,8 @@
   const PRIORITY_FLUSH_EVENTS = new Set([
     "cold_start_radio",
     "transport_nexttrack",
+    "transport_navigation_deferred",
+    "transport_navigation_replayed",
     "source_assigned",
     "ready_wait_end",
     "play_resolved",

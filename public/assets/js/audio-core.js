@@ -495,10 +495,45 @@
           beginAudioRecovery({
             request_token: requestToken,
             reason: "AbortError",
-            strategy: "wait_retry"
+            strategy: "reset_source_wait_retry"
           });
-          waitForAudioReadiness(audio, requestToken, isIosDevice() ? 900 : 700).then(function () {
+          const resetForRetry = resetAudioElementForSource(audio, nextSrc || target.src);
+          logAudioAuditEvent("source_assigned", target, index, nextSrc || target.src, {
+            request_token: requestToken,
+            same_track: sameTrack,
+            recovery: true,
+            reset_for_abort: true,
+            reset_ok: Boolean(resetForRetry),
+            ready_state: audio.readyState,
+            network_state: audio.networkState,
+            click_perf_ms: audioState.audioClickPerfTs
+          });
+          if (!resetForRetry) {
+            audioState.trackStartInFlight = false;
+            recoverFromTrackFailure(index, target.src, requestToken);
+            return;
+          }
+          const retryReadinessTimeout = isIosDevice() ? 1800 : 1000;
+          logAudioAuditEvent("ready_wait_start", target, index, nextSrc || target.src, {
+            request_token: requestToken,
+            retry: true,
+            reason: "AbortError",
+            timeout_ms: retryReadinessTimeout,
+            ready_state: audio.readyState,
+            network_state: audio.networkState,
+            click_perf_ms: audioState.audioClickPerfTs
+          });
+          waitForAudioReadiness(audio, requestToken, retryReadinessTimeout).then(function (ready) {
             if (requestToken !== audioState.startRequestToken) return;
+            logAudioAuditEvent("ready_wait_end", target, index, nextSrc || target.src, {
+              request_token: requestToken,
+              retry: true,
+              reason: "AbortError",
+              ready: Boolean(ready),
+              ready_state: audio.readyState,
+              network_state: audio.networkState,
+              click_perf_ms: audioState.audioClickPerfTs
+            });
             attemptPlay({ retry: true, sync: isFastSkip });
           });
           return;

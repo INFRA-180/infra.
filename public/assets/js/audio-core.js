@@ -372,6 +372,76 @@
       });
     }
 
+    function waitForAbortPlaybackSettle(audio, requestToken, timeoutMs) {
+      return new Promise(function (resolve) {
+        if (!audio) {
+          resolve({ state: "missing_audio" });
+          return;
+        }
+
+        if (!audio.paused && audio.readyState >= 2) {
+          resolve({ state: "playing", readyState: audio.readyState, networkState: audio.networkState });
+          return;
+        }
+
+        let settled = false;
+        const timeout = setTimeout(function () {
+          if (!audio.paused && audio.readyState >= 2) {
+            done("playing");
+            return;
+          }
+          if (audio.readyState >= 2) {
+            done("canplay");
+            return;
+          }
+          done("timeout");
+        }, Math.max(800, Number(timeoutMs) || 6500));
+
+        function done(state) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          audio.removeEventListener("playing", onPlaying);
+          audio.removeEventListener("timeupdate", onTimeUpdate);
+          audio.removeEventListener("canplay", onCanPlay);
+          audio.removeEventListener("canplaythrough", onCanPlay);
+          audio.removeEventListener("error", onError);
+          resolve({
+            state,
+            readyState: audio.readyState,
+            networkState: audio.networkState,
+            paused: Boolean(audio.paused)
+          });
+        }
+
+        function onPlaying() {
+          done("playing");
+        }
+
+        function onTimeUpdate() {
+          if (!audio.paused && audio.readyState >= 2) done("playing");
+        }
+
+        function onCanPlay() {
+          if (!audio.paused) {
+            done("playing");
+            return;
+          }
+          done("canplay");
+        }
+
+        function onError() {
+          done("error");
+        }
+
+        audio.addEventListener("playing", onPlaying);
+        audio.addEventListener("timeupdate", onTimeUpdate);
+        audio.addEventListener("canplay", onCanPlay);
+        audio.addEventListener("canplaythrough", onCanPlay);
+        audio.addEventListener("error", onError);
+      });
+    }
+
     function recoverFromTrackFailure(index, srcLike, requestToken) {
       if (Number.isInteger(requestToken) && requestToken !== audioState.startRequestToken) return;
       if (!Number.isInteger(index) || index < 0) return;
@@ -549,6 +619,7 @@
           request_token: requestToken,
           retry: Boolean(playMeta && playMeta.retry),
           sync: Boolean(playMeta && playMeta.sync),
+          settled_after_abort: Boolean(playMeta && playMeta.settled),
           from_media_session: isFromMediaSession,
           from_transport_control: isFromTransportControl,
           surface: opts.surface || "",
@@ -590,6 +661,47 @@
           network_state: audio.networkState,
           click_perf_ms: audioState.audioClickPerfTs
         });
+        if (playErr && playErr.name === "AbortError" && !isRetry && isIosDevice()) {
+          const abortSettleTimeout = 6500;
+          beginAudioRecovery({
+            request_token: requestToken,
+            reason: "AbortError",
+            strategy: "abort_wait_same_source"
+          });
+          logAudioAuditEvent("abort_settle_start", target, index, nextSrc || target.src, {
+            request_token: requestToken,
+            timeout_ms: abortSettleTimeout,
+            strategy: "abort_wait_same_source",
+            ready_state: audio.readyState,
+            network_state: audio.networkState,
+            click_perf_ms: audioState.audioClickPerfTs
+          });
+          waitForAbortPlaybackSettle(audio, requestToken, abortSettleTimeout).then(function (result) {
+            if (requestToken !== audioState.startRequestToken) return;
+            const state = result && result.state ? result.state : "unknown";
+            logAudioAuditEvent("abort_settle_end", target, index, nextSrc || target.src, {
+              request_token: requestToken,
+              state,
+              timeout_ms: abortSettleTimeout,
+              ready_state: result && Number.isFinite(result.readyState) ? result.readyState : audio.readyState,
+              network_state: result && Number.isFinite(result.networkState) ? result.networkState : audio.networkState,
+              paused: result ? Boolean(result.paused) : Boolean(audio.paused),
+              click_perf_ms: audioState.audioClickPerfTs
+            });
+            if (state === "playing") {
+              handlePlayResolved({ sync: isFastSkip, settled: true });
+              return;
+            }
+            if (state === "canplay") {
+              attemptPlay({ retry: true, sync: isFastSkip, abortSettle: true });
+              return;
+            }
+            audioState.trackStartInFlight = false;
+            schedulePendingTransportNavigation("abort_settle_failed");
+            recoverFromTrackFailure(index, target.src, requestToken);
+          });
+          return;
+        }
         if (playErr && playErr.name === "AbortError" && !isRetry) {
           beginAudioRecovery({
             request_token: requestToken,
@@ -613,17 +725,7 @@
             recoverFromTrackFailure(index, target.src, requestToken);
             return;
           }
-          const retryReadinessTimeout = isIosDevice() ? 1800 : 1000;
-          logAudioAuditEvent("ready_wait_start", target, index, nextSrc || target.src, {
-            request_token: requestToken,
-            retry: true,
-            reason: "AbortError",
-            timeout_ms: retryReadinessTimeout,
-            ready_state: audio.readyState,
-            network_state: audio.networkState,
-            click_perf_ms: audioState.audioClickPerfTs
-          });
-          waitForAudioReadiness(audio, requestToken, retryReadinessTimeout).then(function (ready) {
+          waitForAudioReadiness(audio, requestToken, 1000).then(function (ready) {
             if (requestToken !== audioState.startRequestToken) return;
             logAudioAuditEvent("ready_wait_end", target, index, nextSrc || target.src, {
               request_token: requestToken,
@@ -654,6 +756,7 @@
           request_token: requestToken,
           retry: Boolean(meta.retry),
           sync: Boolean(meta.sync),
+          abort_settle_retry: Boolean(meta.abortSettle),
           from_media_session: isFromMediaSession,
           from_transport_control: isFromTransportControl,
           surface: opts.surface || "",

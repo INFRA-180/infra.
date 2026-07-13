@@ -42,3 +42,8 @@
 
 - The Service Worker controller-change reload now runs quickly when no audio is playing, instead of waiting for a long idle window that could let a user test on the previous runtime.
 - User interaction no longer postpones a pending runtime reload for several seconds unless audio playback, track startup, or the now-playing overlay is active.
+
+## 2026-07-14 — iOS AbortError passive settle
+
+- The first iOS `AbortError` no longer resets, pauses, or reloads the audio source immediately. The player now waits on the same source for `playing`, `canplay`, or `error` before retrying.
+- Telemetry records `abort_settle_start` and `abort_settle_end`; `playing` resolves the start without a retry, `canplay` triggers one same-source retry, and reset is kept as the last fallback after error/timeout.

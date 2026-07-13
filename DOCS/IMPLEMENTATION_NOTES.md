@@ -47,3 +47,8 @@
 
 - The first iOS `AbortError` no longer resets, pauses, or reloads the audio source immediately. The player now waits on the same source for `playing`, `canplay`, or `error` before retrying.
 - Telemetry records `abort_settle_start` and `abort_settle_end`; `playing` resolves the start without a retry, `canplay` triggers one same-source retry, and reset is kept as the last fallback after error/timeout.
+
+## 2026-07-14 — Prefetched audio Range bypass
+
+- The Service Worker no longer reconstructs audio `Range` responses from a fully cached N+1 prefetch by reading the whole file into memory.
+- When Safari asks for a Range on a prefetched audio file, the prefetch entry is removed and the request falls through to R2, with `served_from_prefetch` telemetry marked `bypass`.

@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix306-20260714";
+window.INFRA_BUILD_TAG = "audiofix307-20260714";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -373,7 +373,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix306-20260714";
+  const LOCAL_CATALOG_VERSION = "audiofix307-20260714";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -394,7 +394,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix306-20260714";
+  const runtimeVersion = "audiofix307-20260714";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -1307,8 +1307,8 @@ function openAppDownloadGatekeeper(appName, url) {
   let serviceWorkerReloadExecutedAt = 0;
   let lastUserInteractionAt = getAudioTelemetryNow();
   let documentVisibleSinceAt = document.visibilityState === "visible" ? getAudioTelemetryNow() : 0;
-  const SERVICE_WORKER_RELOAD_MIN_IDLE_MS = 8000;
-  const SERVICE_WORKER_RELOAD_MIN_VISIBLE_MS = 2000;
+  const SERVICE_WORKER_RELOAD_MIN_IDLE_MS = 700;
+  const SERVICE_WORKER_RELOAD_MIN_VISIBLE_MS = 300;
   const SERVICE_WORKER_UPDATE_CHECK_MIN_MS = 60000;
 
   function purgeAdminUi() {
@@ -3129,7 +3129,11 @@ function openAppDownloadGatekeeper(appName, url) {
   function noteUserInteractionForServiceWorkerReload() {
     lastUserInteractionAt = getAudioTelemetryNow();
     if (serviceWorkerControllerReloadPending) {
-      scheduleDeferredServiceWorkerReload(SERVICE_WORKER_RELOAD_MIN_IDLE_MS + 180);
+      const state = getServiceWorkerReloadState();
+      const delay = state.audioPlaying || state.trackStarting || state.overlayOpen
+        ? SERVICE_WORKER_RELOAD_MIN_IDLE_MS + 180
+        : 220;
+      scheduleDeferredServiceWorkerReload(delay);
     }
   }
 

@@ -22,3 +22,8 @@
 
 - The Worker now writes telemetry batches with a reverse-time key. KV lists keys in ascending lexical order, so the prior capped export could only reach old batches even when newer batches existed.
 - The Worker export now selects the newest batch keys directly; legacy batches remain readable as a fallback until the new batch format has data.
+
+## 2026-07-13 — Pages publication boundary
+
+- The public-boundary verifier now allows the project implementation notes file to stay tracked under `DOCS/`, matching the repository workflow requirement to document non-trivial site changes.
+- The public payload guard remains unchanged: `public/` still blocks private folders, local worker sources, debug/test paths, large media archives, database files, monitor keys, Cloudflare tokens, and worker configuration.

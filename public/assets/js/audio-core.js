@@ -662,16 +662,16 @@
           click_perf_ms: audioState.audioClickPerfTs
         });
         if (playErr && playErr.name === "AbortError" && !isRetry && isIosDevice()) {
-          const abortSettleTimeout = 6500;
+          const abortSettleTimeout = isFastSkip ? 1050 : 1250;
           beginAudioRecovery({
             request_token: requestToken,
             reason: "AbortError",
-            strategy: "abort_wait_same_source"
+            strategy: "abort_short_wait_reset_retry"
           });
           logAudioAuditEvent("abort_settle_start", target, index, nextSrc || target.src, {
             request_token: requestToken,
             timeout_ms: abortSettleTimeout,
-            strategy: "abort_wait_same_source",
+            strategy: "abort_short_wait_reset_retry",
             ready_state: audio.readyState,
             network_state: audio.networkState,
             click_perf_ms: audioState.audioClickPerfTs
@@ -696,9 +696,38 @@
               attemptPlay({ retry: true, sync: isFastSkip, abortSettle: true });
               return;
             }
-            audioState.trackStartInFlight = false;
-            schedulePendingTransportNavigation("abort_settle_failed");
-            recoverFromTrackFailure(index, target.src, requestToken);
+            const resetForRetry = resetAudioElementForSource(audio, nextSrc || target.src);
+            logAudioAuditEvent("source_assigned", target, index, nextSrc || target.src, {
+              request_token: requestToken,
+              same_track: sameTrack,
+              recovery: true,
+              reset_for_abort: true,
+              abort_settle_state: state,
+              reset_ok: Boolean(resetForRetry),
+              ready_state: audio.readyState,
+              network_state: audio.networkState,
+              click_perf_ms: audioState.audioClickPerfTs
+            });
+            if (!resetForRetry) {
+              audioState.trackStartInFlight = false;
+              schedulePendingTransportNavigation("abort_reset_failed");
+              recoverFromTrackFailure(index, target.src, requestToken);
+              return;
+            }
+            waitForAudioReadiness(audio, requestToken, 900).then(function (ready) {
+              if (requestToken !== audioState.startRequestToken) return;
+              logAudioAuditEvent("ready_wait_end", target, index, nextSrc || target.src, {
+                request_token: requestToken,
+                retry: true,
+                reason: "AbortError",
+                abort_settle_state: state,
+                ready: Boolean(ready),
+                ready_state: audio.readyState,
+                network_state: audio.networkState,
+                click_perf_ms: audioState.audioClickPerfTs
+              });
+              attemptPlay({ retry: true, sync: isFastSkip, abortSettle: true });
+            });
           });
           return;
         }

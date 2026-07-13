@@ -52,3 +52,8 @@
 
 - The Service Worker no longer reconstructs audio `Range` responses from a fully cached N+1 prefetch by reading the whole file into memory.
 - When Safari asks for a Range on a prefetched audio file, the prefetch entry is removed and the request falls through to R2, with `served_from_prefetch` telemetry marked `bypass`.
+
+## 2026-07-14 — iOS AbortError short settle retry
+
+- Safari iOS `AbortError` recovery now waits only a short settle window before resetting the same source and retrying playback.
+- `served_from_prefetch` telemetry now preserves `status: 0` and reports `bypass`, so Service Worker Range bypasses are visible in reports.

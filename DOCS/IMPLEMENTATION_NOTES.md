@@ -1,5 +1,15 @@
 # Implementation Notes
 
+## 2026-07-15 — audiofix324 iOS status-bar artwork continuity
+
+- Restored `viewport-fit=cover` on all 36 PWA HTML documents while retaining `apple-mobile-web-app-capable=yes`, `black-translucent` and manifest `display: standalone` (no fullscreen workaround).
+- The fullscreen overlay remains inside `#infraSpaPersist`: the audited ancestor chain has no `transform`, `filter`, `perspective` or `contain`, and the SPA renderer requires that persistent root.
+- `.now-playing-overlay` stays viewport-fixed at `inset: 0`; `.now-playing-backdrop` is now absolute at `inset: 0`. The painted layers carry no top safe-area offset.
+- The artwork-derived dark color now backs `html.now-playing-open`, `body.now-playing-open`, the overlay and `theme-color`; closing clears the temporary surface color and restores the previous page background/theme.
+- Top safe-area compensation remains on the panel, close control and interactive queue content. The lower player layout, audio, Service Worker Range routing and N+1 prefetch logic are unchanged.
+- Validation: JS/SW syntax, public boundary, catalog (31 albums / 280 tracks / 41 shell assets), all 36 heads, diff check, and Chromium mobile 390×844 open/close smoke passed with no UI/runtime error during the cycle. A later localhost-only R2 CORS error came from the unchanged N+1 prefetch. Real iOS 18.7 PWA validation remains required.
+- Runtime/SW cache-busting uses the collision-free pair `audiofix324-20260715` / `infra-shell-20260715-audio324`.
+
 ## 2026-07-14 — rollback audiofix324 to e637b42
 
 - Production telemetry for audiofix324 after rapid-track tests showed 5 playback attempts with a median play_call to playing delay of 3512.5 ms and a maximum of 5854 ms.

@@ -385,6 +385,10 @@
         }
 
         let settled = false;
+        const requestedTimeout = Number(timeoutMs);
+        const settleTimeout = Number.isFinite(requestedTimeout) && requestedTimeout > 0
+          ? Math.max(80, requestedTimeout)
+          : 6500;
         const timeout = setTimeout(function () {
           if (!audio.paused && audio.readyState >= 2) {
             done("playing");
@@ -395,7 +399,7 @@
             return;
           }
           done("timeout");
-        }, Math.max(800, Number(timeoutMs) || 6500));
+        }, settleTimeout);
 
         function done(state) {
           if (settled) return;

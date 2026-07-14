@@ -592,19 +592,27 @@ body.home-screen {
     min-width: 0;
     min-height: 0;
     border-radius: 10px;
+    overflow: hidden;
+    line-height: 0;
+    font-size: 0;
+    background: transparent;
+    transform: translateZ(0);
   }
 
   .global-transport.is-expanded .global-transport-cover-frame:not([hidden]) .global-transport-cover:not([hidden]) {
     display: block;
-    width: auto;
-    height: auto;
+    width: 100%;
+    height: 100%;
     max-width: 100%;
     max-height: 100%;
     aspect-ratio: 1 / 1;
-    border-radius: inherit;
-    object-fit: contain;
+    border-radius: 0;
+    object-fit: cover;
     object-position: center;
     pointer-events: none;
+    transform: translateZ(0) scale(1.002);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
 
   .global-transport.is-expanded .global-transport-now {
@@ -3334,17 +3342,23 @@ body.now-playing-open {
   border-radius: 24px;
   background: transparent;
   overflow: hidden;
+  line-height: 0;
+  font-size: 0;
+  transform: translateZ(0);
 }
 
 .now-playing-cover {
   width: 100%;
   aspect-ratio: 1 / 1;
   display: block;
-  object-fit: contain;
-  border-radius: inherit;
+  object-fit: cover;
+  border-radius: 0;
   border: 0;
   box-shadow: none;
   background: transparent;
+  transform: translateZ(0) scale(1.002);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   -webkit-user-drag: none;
   user-select: none;
 }
@@ -4302,8 +4316,12 @@ body.now-playing-open {
     max-width: var(--now-playing-content-width);
     max-height: var(--now-playing-cover-size);
     aspect-ratio: auto;
-    object-fit: contain;
+    border-radius: 0;
+    object-fit: cover;
     background: transparent;
+    transform: translateZ(0) scale(1.002);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
 
   .now-playing-title {
@@ -4503,8 +4521,10 @@ body.now-playing-open {
     justify-self: start;
     margin: 0;
     border-radius: clamp(22px, 2vw, 34px);
-    line-height: 1;
-    transform: translateY(clamp(18px, 2vh, 26px));
+    line-height: 0;
+    font-size: 0;
+    background: transparent;
+    transform: translateY(clamp(18px, 2vh, 26px)) translateZ(0);
   }
 
   .now-playing-cover {
@@ -4513,7 +4533,11 @@ body.now-playing-open {
     max-width: none;
     max-height: none;
     aspect-ratio: 1 / 1;
-    object-fit: contain;
+    border-radius: 0;
+    object-fit: cover;
+    transform: translateZ(0) scale(1.002);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
 
   .now-playing-meta,

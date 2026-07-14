@@ -13,7 +13,8 @@ const fail = (message) => {
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const sw = read("public/sw.js");
-const release = "audiofix320-20260714";
+const styles = read("public/assets/css/styles.css");
+const release = "audiofix321-20260714";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -45,8 +46,14 @@ if (!scripts.includes('"startup_cls"')) fail("startup layout-shift telemetry is 
 if (/PREFETCH_NEXT_ENABLED[\s\S]{0,180}!isIosDevice\(\)/.test(scripts)) {
   fail("next-track prefetch must remain enabled on iOS");
 }
-if (!radio.includes('reason === "playing" || reason === "queue_continue"')) {
-  fail("Radio must keep filling its prefetch queue while playback is active");
+if (!radio.includes('reason === "canplay" || reason === "playing" || reason === "queue_continue"')) {
+  fail("Radio must begin filling its prefetch queue as soon as the active track can play");
+}
+const canplayHandlerStart = radio.indexOf('audio.addEventListener("canplay"');
+const canplayHandlerEnd = radio.indexOf('audio.addEventListener("canplaythrough"', canplayHandlerStart);
+const canplayHandler = radio.slice(canplayHandlerStart, canplayHandlerEnd);
+if (canplayHandlerStart < 0 || canplayHandlerEnd < 0 || !canplayHandler.includes('maybePrefetchNextTrack("canplay")')) {
+  fail("canplay must trigger next-track prefetch before playing");
 }
 if (!radio.includes("peekNextIndicesForPrefetch(depth)")) {
   fail("Radio must prepare more than a single N+1 track");
@@ -56,6 +63,9 @@ if (!scripts.includes("PREFETCH_NEXT_QUEUE_DEPTH") || !scripts.includes("PREFETC
 }
 if (!radio.includes("response_ms") || !radio.includes("ready_count")) {
   fail("prefetch network timing telemetry is incomplete");
+}
+if (!styles.includes("bottom: calc(8px + env(safe-area-inset-bottom));")) {
+  fail("mobile transport must keep only an 8px visual gap above the iOS Home safe area");
 }
 if (!read("public/assets/js/audio-core.js").includes("isAutoAdvance || isFromMediaSession || isFromTransportControl")) {
   fail("transport navigation must use the immediate source-switch path");
@@ -122,6 +132,6 @@ for (const relativePath of publicFiles) {
     fail(`${relativePath} still references an obsolete audio runtime`);
   }
 }
-if (!sw.includes("infra-shell-20260714-audio320")) fail("Service Worker cache version is not audio320");
+if (!sw.includes("infra-shell-20260714-audio321")) fail("Service Worker cache version is not audio321");
 
 if (!process.exitCode) console.log("Audio stability checks passed.");

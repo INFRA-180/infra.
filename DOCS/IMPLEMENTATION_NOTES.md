@@ -1,5 +1,12 @@
 # Implementation Notes
 
+## 2026-07-14 — audiofix321 canplay prefetch and compact mobile transport inset
+
+- Normal N+1 preparation now starts from the active track's `canplay` event instead of waiting for `playing`; the existing ready/in-flight/attempted guards keep the later `playing` call idempotent.
+- The 4 MiB startup segment, queue depth/concurrency, Service Worker Range matching and `206 Partial Content` reconstruction are unchanged.
+- Below 980 px, the global transport now sits at `8px + env(safe-area-inset-bottom)` instead of `20px + env(safe-area-inset-bottom)`. The measured `--mobile-player-space` automatically follows the computed bottom position and is reduced by the same 12 px.
+- Now Playing safe areas, header, audio core, Media Session, favorites and Worker/R2 are unchanged.
+
 ## 2026-07-14 — audiofix320 PWA bottom safe-area continuity
 
 - iPhone PWA validation confirmed that the status-bar side is now full-bleed. The remaining black strip was the lower safe area behind the Home indicator, not the status bar.

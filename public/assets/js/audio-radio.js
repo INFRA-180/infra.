@@ -2105,6 +2105,7 @@
       ));
       clearWaitingRecovery();
       clearTrackStatus(getTrackByIndex(audioState.currentIndex));
+      maybePrefetchNextTrack("canplay");
     });
     audio.addEventListener("canplaythrough", function () {
       clearWaitingRecovery();
@@ -2381,7 +2382,7 @@
   function shouldPrefetchNextTrackNow(reason) {
     const audio = audioState.audio;
     if (!audio || audio.paused || !getCurrentPlayableAudioSrc(audio)) return false;
-    if (reason === "playing" || reason === "queue_continue") return true;
+    if (reason === "canplay" || reason === "playing" || reason === "queue_continue") return true;
     const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
     const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
     const bufferedEnd = getCurrentBufferedEndForPrefetch(audio);

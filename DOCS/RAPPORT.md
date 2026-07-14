@@ -1,8 +1,18 @@
-# RAPPORT — audiofix320 PWA safe-area continuity
+# RAPPORT — audiofix321 préfetch canplay et mini-player
 
 Date : 2026-07-14
-Runtime : `audiofix320-20260714`
-Service Worker : `infra-shell-20260714-audio320`
+Runtime : `audiofix321-20260714`
+Service Worker : `infra-shell-20260714-audio321`
+
+## Correctifs audiofix321
+
+- Le préfetch N+1 normal est maintenant demandé sur l'événement `canplay` de la piste courante. Le déclenchement `playing` reste en repli; les gardes `ready`, `in-flight` et `attempted` empêchent un double téléchargement.
+- Le segment reste strictement à 4 MiB. Le cache `infra-next-track-segments-v6`, la profondeur 4, la concurrence 2, le match Service Worker et la reconstruction `206 Partial Content` sont inchangés.
+- Sous 980 px, le mini-player public utilise `bottom: calc(8px + env(safe-area-inset-bottom))`. Sur un iPhone à inset 34 px, la réserve sous le mini-player passe donc de 54 px à 42 px.
+- `--mobile-player-space` reste mesuré depuis `rect.height + computed.bottom + 12`; il suit automatiquement la nouvelle position et diminue de 12 px. Les paddings consommateurs restent cohérents sans constante dupliquée.
+- Les safe areas du Now Playing, de l'overlay et du header ne changent pas.
+
+Validation visuelle et audio sur iPhone PWA : INFRA.
 
 ## Confirmation publique
 

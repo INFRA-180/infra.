@@ -1,5 +1,12 @@
 # Implementation Notes
 
+## 2026-07-14 — PWA runtime adoption and playback-correlation telemetry
+
+- Production inspection found a browser page still loading `audiofix315` while the origin already served `audiofix316`. The Service Worker previously activated updates but deliberately suppressed every client reload, so an active installed PWA could remain on its old JavaScript runtime.
+- Release `audiofix317` reloads only after a Service Worker `controllerchange` and a second safety check confirms that the page is visible, idle, has no active audio, no startup in flight, and no now-playing overlay. A fresh interaction cancels the short grace window; pause, end, overlay close, or a later idle state retries the update. Playback is never reloaded.
+- Service Worker activation now retains only the current shell and runtime caches. A successful new install has already precached the complete shell before activation, so obsolete shell versions cannot continue accumulating or be selected by the new controller.
+- Telemetry adds `sw_runtime_state` (controller/active/waiting worker URLs) and associates `loadstart` with the playback request token. This makes stale-runtime adoption and the interval between source assignment, media loadstart, canplay, and playing measurable in the next iOS PWA test.
+
 ## 2026-07-12 — PWA cold-start catalogue preparation
 
 - The home PWA prepares the global playlist immediately after application startup, without downloading a complete audio file.

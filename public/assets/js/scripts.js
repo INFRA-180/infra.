@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix316-20260714";
+window.INFRA_BUILD_TAG = "audiofix317-20260714";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -383,7 +383,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix316-20260714";
+  const LOCAL_CATALOG_VERSION = "audiofix317-20260714";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -404,7 +404,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix316-20260714";
+  const runtimeVersion = "audiofix317-20260714";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -3113,30 +3113,39 @@ function openAppDownloadGatekeeper(appName, url) {
   function attemptDeferredServiceWorkerReload() {
     clearDeferredServiceWorkerReloadTimer();
     if (!serviceWorkerControllerReloadPending || serviceWorkerControllerReloading) return;
-    serviceWorkerControllerReloadPending = false;
-    trackAudioRuntimeEvent("sw_reload_suppressed", buildServiceWorkerReloadTelemetry({
-      update_mode: "next_launch"
-    }));
+    if (!isServiceWorkerReloadSafe()) return;
+
+    // Give a last user interaction a chance to cancel this idle reload. The
+    // callback validates safety again before it can replace the active page.
+    serviceWorkerControllerReloadTimer = window.setTimeout(function () {
+      serviceWorkerControllerReloadTimer = 0;
+      if (!serviceWorkerControllerReloadPending || serviceWorkerControllerReloading) return;
+      if (!isServiceWorkerReloadSafe()) return;
+
+      serviceWorkerControllerReloadPending = false;
+      serviceWorkerControllerReloading = true;
+      serviceWorkerReloadExecutedAt = getAudioTelemetryNow();
+      trackAudioRuntimeEvent("sw_reload_executed", buildServiceWorkerReloadTelemetry({
+        update_mode: "safe_idle_reload",
+        automatic_reload: true
+      }));
+      flushAudioTelemetryQueue({ beacon: true });
+      window.location.reload();
+    }, 180);
   }
 
   function scheduleDeferredServiceWorkerReload(delayMs) {
     if (!serviceWorkerControllerReloadPending || serviceWorkerControllerReloading) return;
     clearDeferredServiceWorkerReloadTimer();
+    const requestedDelay = Math.max(0, Number(delayMs) || 0);
+    const safetyDelay = Math.max(0, getDeferredServiceWorkerReloadDelayMs());
     serviceWorkerControllerReloadTimer = window.setTimeout(
       attemptDeferredServiceWorkerReload,
-      Math.max(0, Number(delayMs) || 180)
+      Math.max(180, requestedDelay, safetyDelay)
     );
   }
 
   function markServiceWorkerReloadPendingForRuntime() {
-    try {
-      const reloadKey = "infra_sw_controller_reload_runtime_v2";
-      const previousRuntime = String(sessionStorage.getItem(reloadKey) || "").trim();
-      if (previousRuntime === runtimeVersion) return false;
-      sessionStorage.setItem(reloadKey, runtimeVersion);
-    } catch (_err) {
-      // Ignore storage errors; the in-memory pending flag still protects the session.
-    }
     serviceWorkerControllerReloadPending = true;
     trackAudioRuntimeEvent("sw_reload_pending", buildServiceWorkerReloadTelemetry());
     return true;
@@ -3189,11 +3198,15 @@ function openAppDownloadGatekeeper(appName, url) {
       navigator.serviceWorker.addEventListener("controllerchange", function () {
         if (serviceWorkerControllerReloading) return;
         serviceWorkerControllerChangeAt = getAudioTelemetryNow();
-        serviceWorkerControllerReloadPending = false;
+        const reloadScheduled = markServiceWorkerReloadPendingForRuntime();
         trackAudioRuntimeEvent("sw_controllerchange", buildServiceWorkerReloadTelemetry({
-          update_mode: "next_launch",
-          automatic_reload: false
+          update_mode: reloadScheduled ? "safe_idle_reload" : "already_reloaded",
+          automatic_reload: reloadScheduled,
+          controller_url: navigator.serviceWorker.controller
+            ? String(navigator.serviceWorker.controller.scriptURL || "")
+            : ""
         }));
+        if (reloadScheduled) scheduleDeferredServiceWorkerReload(getDeferredServiceWorkerReloadDelayMs());
       });
       serviceWorkerControllerChangeBound = true;
     }
@@ -3203,6 +3216,15 @@ function openAppDownloadGatekeeper(appName, url) {
       .register(swUrl, { scope: runtime.baseUrl.pathname, updateViaCache: "none" })
       .then(function (registration) {
         serviceWorkerRegistrationRef = registration;
+        trackAudioRuntimeEvent("sw_runtime_state", {
+          controller_url: navigator.serviceWorker.controller
+            ? String(navigator.serviceWorker.controller.scriptURL || "")
+            : "",
+          active_url: registration.active ? String(registration.active.scriptURL || "") : "",
+          waiting_url: registration.waiting ? String(registration.waiting.scriptURL || "") : "",
+          installing_url: registration.installing ? String(registration.installing.scriptURL || "") : "",
+          update_via_cache: "none"
+        });
         if (registration.waiting) {
           trackAudioRuntimeEvent("sw_update_waiting", {
             update_mode: "activate_no_reload"

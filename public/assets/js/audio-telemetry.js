@@ -111,6 +111,7 @@
     "sw_reload_executed",
     "sw_reload_pending",
     "sw_reload_suppressed",
+    "sw_runtime_state",
     "sw_update_ready",
     "sw_update_waiting",
     "suspend",

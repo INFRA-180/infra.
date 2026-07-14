@@ -1937,6 +1937,8 @@
         buildAudioMonitorPayload(track, audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
         {
           note: "loadstart navigateur, pas mesure réseau exacte",
+          request_token: audioState.playRequestToken,
+          startup_waiting: Boolean(audioState.trackStartInFlight || audioState.playbackConfirmedToken !== audioState.playRequestToken),
           buffered_end: getAudioBufferedEnd(),
           ready_state: audio.readyState,
           network_state: audio.networkState

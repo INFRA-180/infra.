@@ -13,7 +13,7 @@ const fail = (message) => {
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const sw = read("public/sw.js");
-const release = "audiofix316-20260714";
+const release = "audiofix317-20260714";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -34,8 +34,13 @@ const waitingRecovery = functionBody(scripts, "scheduleWaitingRecovery", "isIOSS
 if (/\.load\s*\(/.test(waitingRecovery)) fail("waiting recovery must not call audio.load()");
 if (!waitingRecovery.includes('"startup_waiting_passive"')) fail("startup waiting telemetry is missing");
 
-if (scripts.includes("window.location.reload(")) fail("runtime must not force an application reload");
-if (!scripts.includes('"sw_reload_suppressed"')) fail("suppressed Service Worker reload telemetry is missing");
+if (!scripts.includes("window.location.reload()")) fail("safe Service Worker reload is missing");
+if (!scripts.includes("function isServiceWorkerReloadSafe")) fail("safe Service Worker reload guard is missing");
+if (!scripts.includes('"sw_reload_executed"')) fail("executed Service Worker reload telemetry is missing");
+const deferredReload = functionBody(scripts, "scheduleDeferredServiceWorkerReload", "markServiceWorkerReloadPendingForRuntime");
+if (!deferredReload.includes("getDeferredServiceWorkerReloadDelayMs")) {
+  fail("safe Service Worker reload must wait for the idle safety window");
+}
 if (!scripts.includes('"startup_cls"')) fail("startup layout-shift telemetry is missing");
 if (/PREFETCH_NEXT_ENABLED[\s\S]{0,180}!isIosDevice\(\)/.test(scripts)) {
   fail("next-track prefetch must remain enabled on iOS");
@@ -65,7 +70,7 @@ if (coldToggleStart < 0 || coldToggle.includes('setHomePlayMode("radio"')) {
   fail("cold-start transport must not asynchronously rebuild the prepared Radio queue");
 }
 const telemetry = read("public/assets/js/audio-telemetry.js");
-for (const eventName of ["startup_cls", "startup_waiting_passive", "sw_reload_suppressed"]) {
+for (const eventName of ["startup_cls", "startup_waiting_passive", "sw_reload_executed", "sw_runtime_state"]) {
   if (!telemetry.includes(`"${eventName}"`)) fail(`${eventName} is not exported by fine telemetry`);
 }
 
@@ -111,6 +116,6 @@ for (const relativePath of publicFiles) {
     fail(`${relativePath} still references an obsolete audio runtime`);
   }
 }
-if (!sw.includes("infra-shell-20260714-audio316")) fail("Service Worker cache version is not audio316");
+if (!sw.includes("infra-shell-20260714-audio317")) fail("Service Worker cache version is not audio317");
 
 if (!process.exitCode) console.log("Audio stability checks passed.");

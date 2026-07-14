@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-07-14 — complete public rollback to July 3
+
+- Restored the entire tracked `public/` tree exactly from commit `760092e`, the last repository commit dated July 3, 2026.
+- The restored release is `audiofix280-20260703` with Service Worker `infra-shell-20260701-audio279`.
+- The rollback includes CSS, player UI, audio runtime/modules, Service Worker, catalog/durations, home, 31 album pages, 3 app pages and the public Sphragis interface.
+- No later fix was retained inside `public/`; the rollback is a new reversible commit and does not rewrite repository history.
+- Validation: exact tree equality with `760092e`, JavaScript/SW syntax, public-boundary check, catalog check (31 albums, 280 tracks/durations), shell assets, and Chromium mobile Play/Next/Now Playing with zero console errors.
+
 ## 2026-07-14 — audiofix322 safe-area ownership and retained transport prefetch
 
 - Mobile pages now use a bottom dock at `bottom: 0`; the Home Indicator inset is internal padding, and page scroll reserves consume the measured dock height without adding the inset a second time.

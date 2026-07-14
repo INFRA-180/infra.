@@ -91,3 +91,12 @@
 - The cold transport gesture activates Radio synchronously and keeps that prepared queue; it no longer launches an asynchronous mode change capable of replacing the target while `play()` is pending.
 - User next/previous commands are no longer serialized behind an unstable playback request; the newest tap switches source immediately and obsolete promise results remain ignored by their request token.
 - Executable cache and Service Worker Range tests live in `tools/test-audio-prefetch-cache.js` and `tools/test-audio-prefetch-sw.js`.
+
+## 2026-07-14 — Multi-track startup queue and reliable PWA activation
+
+- The last user session was still running `audiofix314`, despite `audiofix315` being published: telemetry recorded `sw_update_ready`, proving the new Service Worker remained waiting and the tested JavaScript was stale. New workers now call `skipWaiting()` after their shell cache is complete; an already-waiting worker is also released without forcing a reload during playback.
+- `audiofix316` restores the proven modular prefetch shape: the first four Radio entries are prepared as 1 MiB startup segments, with two concurrent requests and six retained cache entries. Preparation begins before the cold Play gesture and continues in the background after each completed segment.
+- Prefetch telemetry now separates response-header latency (`response_ms`) from response-body/cache latency (`body_ms`) and reports HTTP status, in-flight count, and ready count. This distinguishes R2 latency from media-element buffering.
+- Direct production probes measured roughly 1.3–4.0 seconds for uncached R2 starts. The private R2-binding Worker canary was deployed and verified but is not used as the public audio base because warmed measurements did not beat the direct endpoint consistently.
+- `GAIA/NATA` was independently confirmed as an R2 `ServiceUnavailable` object. The same catalog key was rebuilt from the local AIFF source and replaced; Range requests now return `206` again without a catalog/API change.
+- Release: `audiofix316-20260714`, Service Worker `infra-shell-20260714-audio316`, segment cache `infra-next-track-segments-v6`.

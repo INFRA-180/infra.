@@ -13,7 +13,7 @@ const fail = (message) => {
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const sw = read("public/sw.js");
-const release = "audiofix315-20260714";
+const release = "audiofix316-20260714";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -40,8 +40,17 @@ if (!scripts.includes('"startup_cls"')) fail("startup layout-shift telemetry is 
 if (/PREFETCH_NEXT_ENABLED[\s\S]{0,180}!isIosDevice\(\)/.test(scripts)) {
   fail("next-track prefetch must remain enabled on iOS");
 }
-if (!radio.includes('reason === "playing" && audioState.homeMode === "radio"')) {
-  fail("Radio must prefetch N+1 as soon as playback starts");
+if (!radio.includes('reason === "playing" || reason === "queue_continue"')) {
+  fail("Radio must keep filling its prefetch queue while playback is active");
+}
+if (!radio.includes("peekNextIndicesForPrefetch(depth)")) {
+  fail("Radio must prepare more than a single N+1 track");
+}
+if (!scripts.includes("PREFETCH_NEXT_QUEUE_DEPTH") || !scripts.includes("PREFETCH_NEXT_CONCURRENCY")) {
+  fail("multi-track prefetch depth/concurrency is not wired into the runtime");
+}
+if (!radio.includes("response_ms") || !radio.includes("ready_count")) {
+  fail("prefetch network timing telemetry is incomplete");
 }
 if (!read("public/assets/js/audio-core.js").includes("isAutoAdvance || isFromMediaSession || isFromTransportControl")) {
   fail("transport navigation must use the immediate source-switch path");
@@ -84,7 +93,10 @@ if (read("public/assets/js/audio-core.js").includes("queueIosTransportNavigation
   fail("user transport navigation must never be deferred");
 }
 const installBlock = sw.slice(sw.indexOf('self.addEventListener("install"'), sw.indexOf('self.addEventListener("activate"'));
-if (installBlock.includes("skipWaiting")) fail("Service Worker install must wait for the next launch");
+if (!installBlock.includes("skipWaiting")) fail("Service Worker updates must activate without remaining stuck in waiting");
+if (!scripts.includes('registration.waiting.postMessage({ type: "SKIP_WAITING" })')) {
+  fail("an already-waiting Service Worker must be released without reloading playback");
+}
 
 const publicFiles = ["public/index.html", "public/sw.js"]
   .concat(fs.readdirSync(path.join(root, "public/music"))
@@ -99,6 +111,6 @@ for (const relativePath of publicFiles) {
     fail(`${relativePath} still references an obsolete audio runtime`);
   }
 }
-if (!sw.includes("infra-shell-20260714-audio315")) fail("Service Worker cache version is not audio315");
+if (!sw.includes("infra-shell-20260714-audio316")) fail("Service Worker cache version is not audio316");
 
 if (!process.exitCode) console.log("Audio stability checks passed.");

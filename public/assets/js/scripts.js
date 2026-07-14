@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix315-20260714";
+window.INFRA_BUILD_TAG = "audiofix316-20260714";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -291,6 +291,10 @@ function openAppDownloadGatekeeper(appName, url) {
     nextPrefetchAttemptedSrc: "",
     nextPrefetchFailedSrc: "",
     nextPrefetchFailureReason: "",
+    nextPrefetchReadySrcs: new Set(),
+    nextPrefetchAttemptedSrcs: new Set(),
+    nextPrefetchInFlightSrcs: new Set(),
+    nextPrefetchControllers: new Map(),
     spaSwitchContext: null,
     favoriteEntries: [],
     favoritePaths: new Set(),
@@ -370,10 +374,16 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(prefetchConstants.THRESHOLD_SECONDS))
     ? Number(prefetchConstants.THRESHOLD_SECONDS)
     : 30;
+  const PREFETCH_NEXT_QUEUE_DEPTH = Number.isFinite(Number(prefetchConstants.QUEUE_DEPTH))
+    ? Math.max(1, Number(prefetchConstants.QUEUE_DEPTH))
+    : 4;
+  const PREFETCH_NEXT_CONCURRENCY = Number.isFinite(Number(prefetchConstants.CONCURRENCY))
+    ? Math.max(1, Number(prefetchConstants.CONCURRENCY))
+    : 2;
   const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix315-20260714";
+  const LOCAL_CATALOG_VERSION = "audiofix316-20260714";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -394,7 +404,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix315-20260714";
+  const runtimeVersion = "audiofix316-20260714";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -612,7 +622,9 @@ function openAppDownloadGatekeeper(appName, url) {
       prefetchApi,
       PREFETCH_NEXT_CACHE_NAME,
       PREFETCH_NEXT_MAX_BYTES,
-      PREFETCH_NEXT_THRESHOLD_SECONDS
+      PREFETCH_NEXT_THRESHOLD_SECONDS,
+      PREFETCH_NEXT_QUEUE_DEPTH,
+      PREFETCH_NEXT_CONCURRENCY
     });
   }
 
@@ -3193,8 +3205,9 @@ function openAppDownloadGatekeeper(appName, url) {
         serviceWorkerRegistrationRef = registration;
         if (registration.waiting) {
           trackAudioRuntimeEvent("sw_update_waiting", {
-            update_mode: "next_launch"
+            update_mode: "activate_no_reload"
           });
+          registration.waiting.postMessage({ type: "SKIP_WAITING" });
         }
         requestServiceWorkerUpdateCheck("registered");
 

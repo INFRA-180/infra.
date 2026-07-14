@@ -409,15 +409,15 @@
       const isFromMediaSession = Boolean(opts.fromMediaSession);
       const isFromTransportControl = Boolean(opts.fromTransportControl);
       const hasPreparedTarget = Boolean(
-        audioState.nextPrefetchDoneSrc &&
-        srcMatches(audioState.nextPrefetchDoneSrc, nextSrc || target.src)
+        (audioState.nextPrefetchReadySrcs instanceof Set && audioState.nextPrefetchReadySrcs.has(nextSrc)) ||
+        (audioState.nextPrefetchDoneSrc && srcMatches(audioState.nextPrefetchDoneSrc, nextSrc || target.src))
       );
       const isFastSkip = isAutoAdvance || isFromMediaSession || isFromTransportControl;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
 
       if (!hasPreparedTarget && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
-        clearNextTrackPrefetch("manual_start");
-        resetPreparedInitialGlobalRandomPlayback();
+        clearNextTrackPrefetch(isFromTransportControl ? "transport_start" : "manual_start");
+        if (!isFromTransportControl) resetPreparedInitialGlobalRandomPlayback();
       }
 
       audioState.currentIndex = index;

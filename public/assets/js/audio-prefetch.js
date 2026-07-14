@@ -7,11 +7,13 @@
 
   const constants = Object.freeze({
     ENABLED: true,
-    CACHE_NAME: "infra-next-track-segments-v5",
+    CACHE_NAME: "infra-next-track-segments-v6",
     MAX_BYTES: 15 * 1024 * 1024,
     THRESHOLD_SECONDS: 30,
     STARTUP_BYTES: 1024 * 1024,
-    MAX_ENTRIES: 4
+    QUEUE_DEPTH: 4,
+    CONCURRENCY: 2,
+    MAX_ENTRIES: 6
   });
 
   function isSupported() {

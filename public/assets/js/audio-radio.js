@@ -19,6 +19,8 @@
     const PREFETCH_NEXT_CACHE_NAME = ctx.PREFETCH_NEXT_CACHE_NAME || "infra-next-track";
     const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_MAX_BYTES)) ? Number(ctx.PREFETCH_NEXT_MAX_BYTES) : 12 * 1024 * 1024;
     const PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS)) ? Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS) : 24;
+    const PREFETCH_NEXT_QUEUE_DEPTH = Number.isFinite(Number(ctx.PREFETCH_NEXT_QUEUE_DEPTH)) ? Math.max(1, Number(ctx.PREFETCH_NEXT_QUEUE_DEPTH)) : 4;
+    const PREFETCH_NEXT_CONCURRENCY = Number.isFinite(Number(ctx.PREFETCH_NEXT_CONCURRENCY)) ? Math.max(1, Number(ctx.PREFETCH_NEXT_CONCURRENCY)) : 2;
     const SYSTEM_INTERRUPTION_GUARD_MS = 2 * 60 * 1000;
     const SYSTEM_INTERRUPTION_NEAR_END_SECONDS = 2.5;
     const loadTracksData = method(ctx, "loadTracksData", function () { return Promise.resolve({ albums: [] }); });
@@ -857,24 +859,29 @@
     const sourceList = Array.isArray(audioState.radioPlaylist) ? audioState.radioPlaylist : [];
     if (!sourceList.length || !PREFETCH_NEXT_ENABLED) return false;
 
+    ensureNextPrefetchCollections();
+
     if (!Array.isArray(audioState.radioQueue) || !audioState.radioQueue.length) {
       audioState.radioQueue = buildRadioQueue(sourceList, audioState.radioQueueBatchSize, "");
       audioState.radioQueueCursor = -1;
     }
-    const firstTrack = audioState.radioQueue[0];
-    const firstSrc = normalizeAudioSourceUrl(firstTrack && firstTrack.src ? firstTrack.src : "");
-    if (!firstTrack || !firstSrc || !isCloudflareAudioUrl(firstSrc)) return false;
-    if (
-      (audioState.nextPrefetchDoneSrc && srcMatches(audioState.nextPrefetchDoneSrc, firstSrc)) ||
-      (audioState.nextPrefetchInFlight && audioState.nextPrefetchSrc && srcMatches(audioState.nextPrefetchSrc, firstSrc))
-    ) {
-      return true;
+
+    syncRadioQueueToPlaylist({ preserveRecent: true });
+    let prepared = false;
+    const limit = Math.min(PREFETCH_NEXT_QUEUE_DEPTH, audioState.radioQueue.length);
+    for (let index = 0; index < limit; index += 1) {
+      const track = audioState.radioQueue[index];
+      const src = normalizeAudioSourceUrl(track && track.src ? track.src : "");
+      if (!track || !src || !isCloudflareAudioUrl(src)) continue;
+      if (getReadyPrefetchSrc(src) || audioState.nextPrefetchInFlightSrcs.has(src)) {
+        prepared = true;
+        continue;
+      }
+      if (countInFlightPrefetches() >= PREFETCH_NEXT_CONCURRENCY) break;
+      startNextTrackPrefetch(index, track, src, "cold_start_prepare");
+      prepared = true;
     }
-    if (audioState.nextPrefetchInFlight || audioState.nextPrefetchDoneSrc || audioState.nextPrefetchSrc) {
-      clearNextTrackPrefetch("cold_start_retarget");
-    }
-    startNextTrackPrefetch(0, firstTrack, firstSrc, "cold_start_prepare");
-    return true;
+    return prepared;
   }
 
 
@@ -2259,7 +2266,32 @@
 
 
 
+  function ensureNextPrefetchCollections() {
+    if (!(audioState.nextPrefetchReadySrcs instanceof Set)) audioState.nextPrefetchReadySrcs = new Set();
+    if (!(audioState.nextPrefetchAttemptedSrcs instanceof Set)) audioState.nextPrefetchAttemptedSrcs = new Set();
+    if (!(audioState.nextPrefetchInFlightSrcs instanceof Set)) audioState.nextPrefetchInFlightSrcs = new Set();
+    if (!(audioState.nextPrefetchControllers instanceof Map)) audioState.nextPrefetchControllers = new Map();
+  }
+
+
+  function getReadyPrefetchSrc(src) {
+    const normalized = normalizeAudioSourceUrl(src || "");
+    if (!normalized) return "";
+    ensureNextPrefetchCollections();
+    if (audioState.nextPrefetchReadySrcs.has(normalized)) return normalized;
+    if (audioState.nextPrefetchDoneSrc && srcMatches(audioState.nextPrefetchDoneSrc, normalized)) return normalized;
+    return "";
+  }
+
+
+  function countInFlightPrefetches() {
+    ensureNextPrefetchCollections();
+    return audioState.nextPrefetchInFlightSrcs.size;
+  }
+
+
   function resetNextTrackPrefetchState() {
+    ensureNextPrefetchCollections();
     audioState.nextPrefetchSrc = "";
     audioState.nextPrefetchIndex = -1;
     audioState.nextPrefetchFromIndex = -1;
@@ -2268,13 +2300,29 @@
     audioState.nextPrefetchAttemptedSrc = "";
     audioState.nextPrefetchFailedSrc = "";
     audioState.nextPrefetchFailureReason = "";
+    audioState.nextPrefetchReadySrcs.clear();
+    audioState.nextPrefetchAttemptedSrcs.clear();
+    audioState.nextPrefetchInFlightSrcs.clear();
+    audioState.nextPrefetchControllers.clear();
   }
 
 
 
   function clearNextTrackPrefetch(reason) {
+    ensureNextPrefetchCollections();
+    const preservePrepared = reason === "transport_start";
     audioState.nextPrefetchToken += 1;
     audioState.nextPrefetchInFlight = false;
+    audioState.nextPrefetchControllers.forEach(function (controller) {
+      if (!controller) return;
+      try {
+        controller.abort();
+      } catch (_err) {
+        // The generation token also invalidates every obsolete result.
+      }
+    });
+    audioState.nextPrefetchControllers.clear();
+    audioState.nextPrefetchInFlightSrcs.clear();
     if (audioState.nextPrefetchAbortController) {
       try {
         audioState.nextPrefetchAbortController.abort();
@@ -2282,6 +2330,12 @@
         // Ignore abort failures; the request token still invalidates the result.
       }
       audioState.nextPrefetchAbortController = null;
+    }
+    if (preservePrepared) {
+      audioState.nextPrefetchAttemptedSrcs.clear();
+      audioState.nextPrefetchFailedSrc = "";
+      audioState.nextPrefetchFailureReason = "";
+      return;
     }
     resetNextTrackPrefetchState();
     if (prefetchApi && typeof prefetchApi.clearCache === "function") {
@@ -2325,14 +2379,14 @@
   function shouldPrefetchNextTrackNow(reason) {
     const audio = audioState.audio;
     if (!audio || audio.paused || !getCurrentPlayableAudioSrc(audio)) return false;
+    if (reason === "playing" || reason === "queue_continue") return true;
     const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
     const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
     const bufferedEnd = getCurrentBufferedEndForPrefetch(audio);
     if (duration <= 0) return false;
-    if (reason === "playing" && audioState.homeMode === "radio") return true;
     if (bufferedEnd >= duration * 0.98) return true;
     if (duration - currentTime <= PREFETCH_NEXT_THRESHOLD_SECONDS) return true;
-    return reason === "playing" && duration <= PREFETCH_NEXT_THRESHOLD_SECONDS;
+    return false;
   }
 
 
@@ -2353,8 +2407,53 @@
   }
 
 
+  function peekNextIndicesForPrefetch(depth) {
+    const list = audioState.playlist;
+    if (!Array.isArray(list) || !list.length) return [];
+    const currentIndex = getCurrentPlaylistIndexSafe();
+    if (currentIndex < 0 || currentIndex >= list.length) return [];
+    const limit = Math.max(1, Math.floor(Number(depth) || 1));
+    const indices = [];
+    if (audioState.homeMode === "radio") {
+      if (!ensureRadioQueue(Math.max(audioState.radioQueueMinRemaining || 0, limit + 1))) return indices;
+      let cursor = Number.isInteger(audioState.radioQueueCursor) && audioState.radioQueueCursor >= 0
+        ? audioState.radioQueueCursor
+        : currentIndex;
+      const currentSrc = getCurrentLogicalAudioSrc();
+      if (currentSrc) {
+        const bySrc = audioState.radioQueue.findIndex(function (track) {
+          return track && srcMatches(track.src, currentSrc);
+        });
+        if (bySrc >= 0) cursor = bySrc;
+      }
+      for (let offset = 1; offset <= limit; offset += 1) {
+        const nextIndex = cursor + offset;
+        if (nextIndex >= 0 && nextIndex < audioState.radioQueue.length) indices.push(nextIndex);
+      }
+      syncRadioQueueToPlaylist({ preserveRecent: true });
+      return indices;
+    }
+    if (audioState.shuffleOn) {
+      const randomIndex = getRandomIndex(currentIndex);
+      return randomIndex >= 0 ? [randomIndex] : [];
+    }
+    for (let index = currentIndex + 1; index < list.length && indices.length < limit; index += 1) {
+      indices.push(index);
+    }
+    if (!indices.length) {
+      const extendedIndex = extendAlbumPlaylistToNextAlbum({
+        reason: "prefetch",
+        fromIndex: currentIndex
+      });
+      if (Number.isInteger(extendedIndex) && extendedIndex >= 0) indices.push(extendedIndex);
+    }
+    return indices;
+  }
+
+
 
   function rememberNextTrackPrefetch(index, src) {
+    ensureNextPrefetchCollections();
     audioState.nextPrefetchIndex = index;
     audioState.nextPrefetchFromIndex = getCurrentPlaylistIndexSafe();
     audioState.nextPrefetchSrc = src;
@@ -2365,6 +2464,14 @@
   function getAutoPrefetchedNextIndex() {
     if (!PREFETCH_NEXT_ENABLED) return -1;
     const currentIndex = getCurrentPlaylistIndexSafe();
+    ensureNextPrefetchCollections();
+    const list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
+    const immediateNextIndex = currentIndex + 1;
+    if (immediateNextIndex >= 0 && immediateNextIndex < list.length) {
+      const immediateTrack = list[immediateNextIndex];
+      const immediateSrc = normalizeAudioSourceUrl(immediateTrack && immediateTrack.src ? immediateTrack.src : "");
+      if (getReadyPrefetchSrc(immediateSrc)) return immediateNextIndex;
+    }
     if (
       audioState.nextPrefetchDoneSrc &&
       audioState.nextPrefetchFromIndex === currentIndex &&
@@ -2386,29 +2493,43 @@
       ? prefetchApi.isSupported()
       : ("caches" in window && typeof fetch === "function");
     if (!PREFETCH_NEXT_ENABLED || !prefetchSupported) return;
-    const token = ++audioState.nextPrefetchToken;
+    ensureNextPrefetchCollections();
+    const normalizedSrc = normalizeAudioSourceUrl(src || "");
+    if (!normalizedSrc) return;
+    if (audioState.nextPrefetchReadySrcs.has(normalizedSrc)) return;
+    if (audioState.nextPrefetchInFlightSrcs.has(normalizedSrc)) return;
+    if (countInFlightPrefetches() >= PREFETCH_NEXT_CONCURRENCY) return;
+    const token = audioState.nextPrefetchToken;
     const startedAt = Date.now();
     const fromIndexAtStart = getCurrentPlaylistIndexSafe();
+    let responseAt = 0;
+    let responseStatus = 0;
     const abortController = typeof AbortController === "function"
       ? new AbortController()
       : null;
     audioState.nextPrefetchAbortController = abortController;
+    if (abortController) audioState.nextPrefetchControllers.set(normalizedSrc, abortController);
+    audioState.nextPrefetchInFlightSrcs.add(normalizedSrc);
     audioState.nextPrefetchInFlight = true;
-    rememberNextTrackPrefetch(index, src);
-    audioState.nextPrefetchAttemptedSrc = src;
+    rememberNextTrackPrefetch(index, normalizedSrc);
+    audioState.nextPrefetchAttemptedSrc = normalizedSrc;
+    audioState.nextPrefetchAttemptedSrcs.add(normalizedSrc);
     audioState.nextPrefetchFailedSrc = "";
     audioState.nextPrefetchFailureReason = "";
     trackAudioRuntimeEvent("prefetch_start", Object.assign(
-      buildAudioMonitorPayload(track, index, src),
+      buildAudioMonitorPayload(track, index, normalizedSrc),
       {
         next_index: index,
-        from_index: audioState.nextPrefetchFromIndex,
+        from_index: fromIndexAtStart,
         reason: reason || "threshold",
-        strategy: "startup_segment"
+        strategy: "startup_segment",
+        queue_depth: PREFETCH_NEXT_QUEUE_DEPTH,
+        inflight_count: countInFlightPrefetches(),
+        ready_count: audioState.nextPrefetchReadySrcs.size
       }
     ));
 
-    const baseRequest = getPrefetchCacheRequest(src);
+    const baseRequest = getPrefetchCacheRequest(normalizedSrc);
     let fetchRequest = baseRequest;
     let fetchOptions;
     if (abortController) {
@@ -2420,6 +2541,8 @@
     }
 
     fetch(fetchRequest, fetchOptions).then(function (response) {
+      responseAt = Date.now();
+      responseStatus = response ? Number(response.status || 0) : 0;
       if (token !== audioState.nextPrefetchToken) return null;
       if (!response || !response.ok) {
         throw new Error(`prefetch_http_${response ? response.status : "none"}`);
@@ -2435,14 +2558,14 @@
         throw new Error("prefetch_too_large");
       }
       if (prefetchApi && typeof prefetchApi.putSingle === "function") {
-        return prefetchApi.putSingle(src, response).then(function () {
+        return prefetchApi.putSingle(normalizedSrc, response).then(function () {
           return bytes;
         });
       }
       return caches.open(PREFETCH_NEXT_CACHE_NAME).then(function (cache) {
         return cache.keys().then(function (keys) {
           return Promise.all(keys.map(function (key) { return cache.delete(key); })).then(function () {
-            return cache.put(getPrefetchCacheRequest(src), response.clone()).then(function () {
+            return cache.put(getPrefetchCacheRequest(normalizedSrc), response.clone()).then(function () {
               return bytes;
             });
           });
@@ -2450,42 +2573,50 @@
       });
     }).then(function (bytes) {
       if (token !== audioState.nextPrefetchToken || !bytes) return;
-      audioState.nextPrefetchDoneSrc = src;
+      audioState.nextPrefetchReadySrcs.add(normalizedSrc);
+      audioState.nextPrefetchDoneSrc = normalizedSrc;
       trackAudioRuntimeEvent("prefetch_done", Object.assign(
-        buildAudioMonitorPayload(track, index, src),
+        buildAudioMonitorPayload(track, index, normalizedSrc),
         {
           next_index: index,
-          from_index: audioState.nextPrefetchFromIndex,
+          from_index: fromIndexAtStart,
           bytes,
           ms: Date.now() - startedAt,
+          response_ms: responseAt ? responseAt - startedAt : null,
+          body_ms: responseAt ? Date.now() - responseAt : null,
+          status: responseStatus,
+          ready_count: audioState.nextPrefetchReadySrcs.size,
           strategy: "startup_segment"
         }
       ));
     }).catch(function (err) {
       if (token !== audioState.nextPrefetchToken) return;
-      audioState.nextPrefetchDoneSrc = "";
-      audioState.nextPrefetchFailedSrc = src;
+      audioState.nextPrefetchFailedSrc = normalizedSrc;
       audioState.nextPrefetchFailureReason = err && err.message ? err.message : "prefetch_failed";
       trackAudioRuntimeEvent("prefetch_error", Object.assign(
-        buildAudioMonitorPayload(track, index, src),
+        buildAudioMonitorPayload(track, index, normalizedSrc),
         {
           next_index: index,
-          from_index: audioState.nextPrefetchFromIndex,
+          from_index: fromIndexAtStart,
           reason: err && err.message ? err.message : "prefetch_failed",
           ms: Date.now() - startedAt,
+          response_ms: responseAt ? responseAt - startedAt : null,
+          status: responseStatus,
           strategy: "startup_segment"
         }
       ));
     }).finally(function () {
       if (token === audioState.nextPrefetchToken) {
-        audioState.nextPrefetchInFlight = false;
+        audioState.nextPrefetchInFlightSrcs.delete(normalizedSrc);
+        audioState.nextPrefetchControllers.delete(normalizedSrc);
+        audioState.nextPrefetchInFlight = audioState.nextPrefetchInFlightSrcs.size > 0;
         if (audioState.nextPrefetchAbortController === abortController) {
           audioState.nextPrefetchAbortController = null;
         }
-        if (audioState.homeMode === "radio" && getCurrentPlaylistIndexSafe() !== fromIndexAtStart) {
-          window.setTimeout(function () {
-            maybePrefetchNextTrack("playing");
-          }, 0);
+        if (reason === "cold_start_prepare") {
+          window.setTimeout(prepareRadioColdStart, 0);
+        } else if (audioState.nextPrefetchInFlightSrcs.size < PREFETCH_NEXT_CONCURRENCY) {
+          window.setTimeout(function () { maybePrefetchNextTrack("queue_continue"); }, 0);
         }
       }
     });
@@ -2495,54 +2626,23 @@
 
   function maybePrefetchNextTrack(reason) {
     if (!PREFETCH_NEXT_ENABLED) return;
-    if (audioState.nextPrefetchInFlight) return;
     if (!shouldPrefetchNextTrackNow(reason)) return;
-    const currentIndex = getCurrentPlaylistIndexSafe();
-    let nextIndex = -1;
-    if (
-      audioState.nextPrefetchFromIndex === currentIndex &&
-      Number.isInteger(audioState.nextPrefetchIndex) &&
-      audioState.nextPrefetchIndex >= 0 &&
-      audioState.nextPrefetchIndex < audioState.playlist.length
-    ) {
-      const selectedTrack = audioState.playlist[audioState.nextPrefetchIndex];
-      const selectedSrc = normalizeAudioSourceUrl(selectedTrack && selectedTrack.src ? selectedTrack.src : "");
-      if (selectedSrc && srcMatches(selectedSrc, audioState.nextPrefetchSrc)) {
-        nextIndex = audioState.nextPrefetchIndex;
-      }
+    ensureNextPrefetchCollections();
+    const depth = audioState.homeMode === "radio" ? PREFETCH_NEXT_QUEUE_DEPTH : 1;
+    const indices = peekNextIndicesForPrefetch(depth);
+    for (let i = 0; i < indices.length; i += 1) {
+      if (countInFlightPrefetches() >= PREFETCH_NEXT_CONCURRENCY) return;
+      const nextIndex = indices[i];
+      if (nextIndex < 0 || nextIndex >= audioState.playlist.length) continue;
+      const nextTrack = audioState.playlist[nextIndex];
+      const nextSrc = normalizeAudioSourceUrl(nextTrack && nextTrack.src ? nextTrack.src : "");
+      if (!nextSrc || !isCloudflareAudioUrl(nextSrc)) continue;
+      if (getReadyPrefetchSrc(nextSrc)) continue;
+      if (audioState.nextPrefetchInFlightSrcs.has(nextSrc)) continue;
+      if (audioState.nextPrefetchAttemptedSrcs.has(nextSrc)) continue;
+      if (!audioState.nextPrefetchSrc) rememberNextTrackPrefetch(nextIndex, nextSrc);
+      startNextTrackPrefetch(nextIndex, nextTrack, nextSrc, reason);
     }
-    if (nextIndex < 0) {
-      nextIndex = peekNextIndexForPrefetch();
-      if (nextIndex >= 0 && nextIndex < audioState.playlist.length) {
-        const selectedTrack = audioState.playlist[nextIndex];
-        const selectedSrc = normalizeAudioSourceUrl(selectedTrack && selectedTrack.src ? selectedTrack.src : "");
-        audioState.nextPrefetchDoneSrc = "";
-        audioState.nextPrefetchServedSrc = "";
-        audioState.nextPrefetchAttemptedSrc = "";
-        audioState.nextPrefetchFailedSrc = "";
-        audioState.nextPrefetchFailureReason = "";
-        rememberNextTrackPrefetch(nextIndex, selectedSrc);
-      }
-    }
-    if (nextIndex < 0 || nextIndex >= audioState.playlist.length) return;
-    const nextTrack = audioState.playlist[nextIndex];
-    const nextSrc = normalizeAudioSourceUrl(nextTrack && nextTrack.src ? nextTrack.src : "");
-    if (!nextSrc || !isCloudflareAudioUrl(nextSrc)) return;
-    if (
-      audioState.nextPrefetchDoneSrc &&
-      audioState.nextPrefetchFromIndex === currentIndex &&
-      srcMatches(audioState.nextPrefetchDoneSrc, nextSrc)
-    ) {
-      return;
-    }
-    if (
-      audioState.nextPrefetchAttemptedSrc &&
-      audioState.nextPrefetchFromIndex === currentIndex &&
-      srcMatches(audioState.nextPrefetchAttemptedSrc, nextSrc)
-    ) {
-      return;
-    }
-    startNextTrackPrefetch(nextIndex, nextTrack, nextSrc, reason);
   }
 
 

@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix322-20260714";
+window.INFRA_BUILD_TAG = "audiofix280-20260703";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -233,8 +233,6 @@ function openAppDownloadGatekeeper(appName, url) {
     externalResumeProbeTimers: [],
     externalResumeRecoveryInFlight: false,
     activeAudioRecovery: null,
-    coldStartInFlight: false,
-    playbackConfirmedToken: 0,
     resumeOnVisible: false,
     recentPlayed: [],
     recentPlayedLimit: 12,
@@ -291,10 +289,6 @@ function openAppDownloadGatekeeper(appName, url) {
     nextPrefetchAttemptedSrc: "",
     nextPrefetchFailedSrc: "",
     nextPrefetchFailureReason: "",
-    nextPrefetchReadySrcs: new Set(),
-    nextPrefetchAttemptedSrcs: new Set(),
-    nextPrefetchInFlightSrcs: new Set(),
-    nextPrefetchControllers: new Map(),
     spaSwitchContext: null,
     favoriteEntries: [],
     favoritePaths: new Set(),
@@ -374,16 +368,10 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(prefetchConstants.THRESHOLD_SECONDS))
     ? Number(prefetchConstants.THRESHOLD_SECONDS)
     : 30;
-  const PREFETCH_NEXT_QUEUE_DEPTH = Number.isFinite(Number(prefetchConstants.QUEUE_DEPTH))
-    ? Math.max(1, Number(prefetchConstants.QUEUE_DEPTH))
-    : 4;
-  const PREFETCH_NEXT_CONCURRENCY = Number.isFinite(Number(prefetchConstants.CONCURRENCY))
-    ? Math.max(1, Number(prefetchConstants.CONCURRENCY))
-    : 2;
   const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix322-20260714";
+  const LOCAL_CATALOG_VERSION = "audiofix255-20260627";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -404,7 +392,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix322-20260714";
+  const runtimeVersion = "audiofix280-20260703";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -622,9 +610,7 @@ function openAppDownloadGatekeeper(appName, url) {
       prefetchApi,
       PREFETCH_NEXT_CACHE_NAME,
       PREFETCH_NEXT_MAX_BYTES,
-      PREFETCH_NEXT_THRESHOLD_SECONDS,
-      PREFETCH_NEXT_QUEUE_DEPTH,
-      PREFETCH_NEXT_CONCURRENCY
+      PREFETCH_NEXT_THRESHOLD_SECONDS
     });
   }
 
@@ -633,7 +619,6 @@ function openAppDownloadGatekeeper(appName, url) {
       readHomePlayMode: function () {},
       persistHomePlayMode: function () {},
       findPlaylistIndexByCurrentSrc: function () {},
-      primeRadioPlaylistFromLoadedTracks: function () { return []; },
       ensureRadioPlaylistLoaded: function () {},
       getTrackSource: function () {},
       getRecentPlayedSrcSet: function () {},
@@ -654,7 +639,6 @@ function openAppDownloadGatekeeper(appName, url) {
       clearRadioQueue: function () {},
       syncRadioQueueToPlaylist: function () {},
       ensureRadioQueue: function () {},
-      prepareRadioColdStart: function () {},
       injectCurrentTrackIntoRadioQueue: function () {},
       ensureRadioPlaylistForNavigation: function () {},
       setHomePlayMode: function () {},
@@ -747,7 +731,6 @@ function openAppDownloadGatekeeper(appName, url) {
       ensurePlayablePlaylistContext,
       canStartInitialGlobalRandomPlayback,
       startGlobalRandomPlayback,
-      primeRadioPlaylistFromLoadedTracks,
       ensureRadioPlaylistLoaded,
       syncRadioQueueToPlaylist,
       updateProgressUi,
@@ -1322,8 +1305,8 @@ function openAppDownloadGatekeeper(appName, url) {
   let serviceWorkerReloadExecutedAt = 0;
   let lastUserInteractionAt = getAudioTelemetryNow();
   let documentVisibleSinceAt = document.visibilityState === "visible" ? getAudioTelemetryNow() : 0;
-  const SERVICE_WORKER_RELOAD_MIN_IDLE_MS = 700;
-  const SERVICE_WORKER_RELOAD_MIN_VISIBLE_MS = 300;
+  const SERVICE_WORKER_RELOAD_MIN_IDLE_MS = 8000;
+  const SERVICE_WORKER_RELOAD_MIN_VISIBLE_MS = 2000;
   const SERVICE_WORKER_UPDATE_CHECK_MIN_MS = 60000;
 
   function purgeAdminUi() {
@@ -1873,14 +1856,8 @@ function openAppDownloadGatekeeper(appName, url) {
   function findPlaylistIndexByCurrentSrc() {
     return callAudioRadio("findPlaylistIndexByCurrentSrc", arguments);
   }
-  function primeRadioPlaylistFromLoadedTracks() {
-    return callAudioRadio("primeRadioPlaylistFromLoadedTracks", arguments) || [];
-  }
   function ensureRadioPlaylistLoaded() {
     return callAudioRadio("ensureRadioPlaylistLoaded", arguments);
-  }
-  function prepareRadioColdStart() {
-    return callAudioRadio("prepareRadioColdStart", arguments);
   }
   function getTrackSource() {
     return callAudioRadio("getTrackSource", arguments);
@@ -2955,10 +2932,8 @@ function openAppDownloadGatekeeper(appName, url) {
     const body = document.body;
     root.style.setProperty("--pwa-status-bg", color);
     root.style.backgroundColor = color;
-    root.style.background = color;
     if (body) {
       body.style.setProperty("--pwa-status-bg", color);
-      body.style.background = color;
     }
     ensureMetaTag("theme-color", color);
     ensureMetaTag("apple-mobile-web-app-status-bar-style", "black-translucent");
@@ -2972,11 +2947,7 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function setThemeColor(color) {
     const safeColor = /^#[0-9a-f]{6}$/i.test(String(color || "").trim()) ? color : "#111111";
-    const meta = document.querySelector('meta[name="theme-color"]') || ensureMetaTag("theme-color", safeColor);
-    meta.content = safeColor;
-    document.documentElement.style.setProperty("--pwa-status-bg", safeColor);
-    document.documentElement.style.background = safeColor;
-    if (document.body) document.body.style.background = safeColor;
+    ensureMetaTag("theme-color", safeColor);
   }
 
   function initThemePreset() {
@@ -3048,7 +3019,6 @@ function openAppDownloadGatekeeper(appName, url) {
     const audio = audioState.audio;
     const audioPlaying = Boolean(audio && !audio.paused && getCurrentPlayableAudioSrc(audio));
     const trackStarting = Boolean(audioState.trackStartInFlight);
-    const coldStartInFlight = Boolean(audioState.coldStartInFlight);
     const overlayOpen = Boolean(audioState.nowPlayingOpen || audioState.nowPlayingClosing);
     const visible = document.visibilityState === "visible";
     const idleForMs = Math.max(0, Math.round(now - lastUserInteractionAt));
@@ -3056,7 +3026,6 @@ function openAppDownloadGatekeeper(appName, url) {
     return {
       audioPlaying,
       trackStarting,
-      coldStartInFlight,
       overlayOpen,
       visible,
       idleForMs,
@@ -3081,7 +3050,6 @@ function openAppDownloadGatekeeper(appName, url) {
       visible_for_ms: state.visibleForMs,
       audio_playing: state.audioPlaying,
       track_starting: state.trackStarting,
-      cold_start_in_flight: state.coldStartInFlight,
       overlay_open: state.overlayOpen
     }, extra || {});
   }
@@ -3094,7 +3062,6 @@ function openAppDownloadGatekeeper(appName, url) {
       state.visibleSafe &&
       !state.audioPlaying &&
       !state.trackStarting &&
-      !state.coldStartInFlight &&
       !state.overlayOpen
     );
   }
@@ -3102,7 +3069,7 @@ function openAppDownloadGatekeeper(appName, url) {
   function getDeferredServiceWorkerReloadDelayMs() {
     const state = getServiceWorkerReloadState();
     if (!state.visible) return 0;
-    if (state.audioPlaying || state.trackStarting || state.coldStartInFlight || state.overlayOpen) return 0;
+    if (state.audioPlaying || state.trackStarting || state.overlayOpen) return 0;
     return Math.max(
       180,
       SERVICE_WORKER_RELOAD_MIN_IDLE_MS - state.idleForMs + 180,
@@ -3119,39 +3086,39 @@ function openAppDownloadGatekeeper(appName, url) {
   function attemptDeferredServiceWorkerReload() {
     clearDeferredServiceWorkerReloadTimer();
     if (!serviceWorkerControllerReloadPending || serviceWorkerControllerReloading) return;
-    if (!isServiceWorkerReloadSafe()) return;
-
-    // Give a last user interaction a chance to cancel this idle reload. The
-    // callback validates safety again before it can replace the active page.
-    serviceWorkerControllerReloadTimer = window.setTimeout(function () {
-      serviceWorkerControllerReloadTimer = 0;
-      if (!serviceWorkerControllerReloadPending || serviceWorkerControllerReloading) return;
-      if (!isServiceWorkerReloadSafe()) return;
-
-      serviceWorkerControllerReloadPending = false;
-      serviceWorkerControllerReloading = true;
-      serviceWorkerReloadExecutedAt = getAudioTelemetryNow();
-      trackAudioRuntimeEvent("sw_reload_executed", buildServiceWorkerReloadTelemetry({
-        update_mode: "safe_idle_reload",
-        automatic_reload: true
-      }));
-      flushAudioTelemetryQueue({ beacon: true });
+    if (!isServiceWorkerReloadSafe()) {
+      const delay = getDeferredServiceWorkerReloadDelayMs();
+      if (delay > 0) scheduleDeferredServiceWorkerReload(delay);
+      return;
+    }
+    serviceWorkerControllerReloadPending = false;
+    serviceWorkerControllerReloading = true;
+    serviceWorkerReloadExecutedAt = getAudioTelemetryNow();
+    trackAudioRuntimeEvent("sw_reload_executed", buildServiceWorkerReloadTelemetry());
+    flushAudioTelemetryQueue({ beacon: true });
+    window.setTimeout(function () {
       window.location.reload();
-    }, 180);
+    }, 80);
   }
 
   function scheduleDeferredServiceWorkerReload(delayMs) {
     if (!serviceWorkerControllerReloadPending || serviceWorkerControllerReloading) return;
     clearDeferredServiceWorkerReloadTimer();
-    const requestedDelay = Math.max(0, Number(delayMs) || 0);
-    const safetyDelay = Math.max(0, getDeferredServiceWorkerReloadDelayMs());
     serviceWorkerControllerReloadTimer = window.setTimeout(
       attemptDeferredServiceWorkerReload,
-      Math.max(180, requestedDelay, safetyDelay)
+      Math.max(0, Number(delayMs) || 180)
     );
   }
 
   function markServiceWorkerReloadPendingForRuntime() {
+    try {
+      const reloadKey = "infra_sw_controller_reload_runtime_v2";
+      const previousRuntime = String(sessionStorage.getItem(reloadKey) || "").trim();
+      if (previousRuntime === runtimeVersion) return false;
+      sessionStorage.setItem(reloadKey, runtimeVersion);
+    } catch (_err) {
+      // Ignore storage errors; the in-memory pending flag still protects the session.
+    }
     serviceWorkerControllerReloadPending = true;
     trackAudioRuntimeEvent("sw_reload_pending", buildServiceWorkerReloadTelemetry());
     return true;
@@ -3160,11 +3127,7 @@ function openAppDownloadGatekeeper(appName, url) {
   function noteUserInteractionForServiceWorkerReload() {
     lastUserInteractionAt = getAudioTelemetryNow();
     if (serviceWorkerControllerReloadPending) {
-      const state = getServiceWorkerReloadState();
-      const delay = state.audioPlaying || state.trackStarting || state.overlayOpen
-        ? SERVICE_WORKER_RELOAD_MIN_IDLE_MS + 180
-        : 220;
-      scheduleDeferredServiceWorkerReload(delay);
+      scheduleDeferredServiceWorkerReload(SERVICE_WORKER_RELOAD_MIN_IDLE_MS + 180);
     }
   }
 
@@ -3204,15 +3167,9 @@ function openAppDownloadGatekeeper(appName, url) {
       navigator.serviceWorker.addEventListener("controllerchange", function () {
         if (serviceWorkerControllerReloading) return;
         serviceWorkerControllerChangeAt = getAudioTelemetryNow();
-        const reloadScheduled = markServiceWorkerReloadPendingForRuntime();
-        trackAudioRuntimeEvent("sw_controllerchange", buildServiceWorkerReloadTelemetry({
-          update_mode: reloadScheduled ? "safe_idle_reload" : "already_reloaded",
-          automatic_reload: reloadScheduled,
-          controller_url: navigator.serviceWorker.controller
-            ? String(navigator.serviceWorker.controller.scriptURL || "")
-            : ""
-        }));
-        if (reloadScheduled) scheduleDeferredServiceWorkerReload(getDeferredServiceWorkerReloadDelayMs());
+        trackAudioRuntimeEvent("sw_controllerchange", buildServiceWorkerReloadTelemetry());
+        if (!markServiceWorkerReloadPendingForRuntime()) return;
+        scheduleDeferredServiceWorkerReload();
       });
       serviceWorkerControllerChangeBound = true;
     }
@@ -3222,19 +3179,7 @@ function openAppDownloadGatekeeper(appName, url) {
       .register(swUrl, { scope: runtime.baseUrl.pathname, updateViaCache: "none" })
       .then(function (registration) {
         serviceWorkerRegistrationRef = registration;
-        trackAudioRuntimeEvent("sw_runtime_state", {
-          controller_url: navigator.serviceWorker.controller
-            ? String(navigator.serviceWorker.controller.scriptURL || "")
-            : "",
-          active_url: registration.active ? String(registration.active.scriptURL || "") : "",
-          waiting_url: registration.waiting ? String(registration.waiting.scriptURL || "") : "",
-          installing_url: registration.installing ? String(registration.installing.scriptURL || "") : "",
-          update_via_cache: "none"
-        });
         if (registration.waiting) {
-          trackAudioRuntimeEvent("sw_update_waiting", {
-            update_mode: "activate_no_reload"
-          });
           registration.waiting.postMessage({ type: "SKIP_WAITING" });
         }
         requestServiceWorkerUpdateCheck("registered");
@@ -3244,9 +3189,7 @@ function openAppDownloadGatekeeper(appName, url) {
           if (!worker) return;
           worker.addEventListener("statechange", function () {
             if (worker.state === "installed" && navigator.serviceWorker.controller && registration.waiting) {
-              trackAudioRuntimeEvent("sw_update_ready", {
-                update_mode: "next_launch"
-              });
+              registration.waiting.postMessage({ type: "SKIP_WAITING" });
             }
           });
         });
@@ -4739,37 +4682,42 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!audio) return;
     if (audio.paused) return;
     if (audioState.trackStartInFlight) return;
-    if (audioState.playbackConfirmedToken !== audioState.playRequestToken) return;
     if (audio.readyState >= 3) return;
-    trackAudioRuntimeEvent("stall_passive_wait", Object.assign(
-      buildAudioMonitorPayload(
-        getCurrentPlaylistTrack(),
-        audioState.currentIndex,
-        audioState.activeLogicalSrc || audio.currentSrc || audio.src
-      ),
-      getAudioRuntimeProbeState(),
-      {
-        request_token: audioState.playRequestToken,
-        recovery_action: "none"
+
+    const src = getCurrentLogicalAudioSrc();
+    if (!src) return;
+
+    const resumeAt = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+
+    try {
+      audio.load();
+    } catch (_err) {
+      // Ignore.
+    }
+
+    const resume = function () {
+      if (Number.isFinite(resumeAt) && resumeAt > 0) {
+        try {
+          audio.currentTime = resumeAt;
+        } catch (_err) {
+          // Ignore seek restore errors.
+        }
       }
-    ));
+      audio.play().catch(function () {
+        // Ignore autoplay errors.
+      });
+    };
+
+    audio.addEventListener("canplay", resume, { once: true });
   }
 
   function scheduleWaitingRecovery() {
     clearWaitingRecovery();
     audioState.prefetchPausedUntil = Date.now() + (isIosDevice() ? 2600 : 1600);
-    if (audioState.trackStartInFlight || audioState.playbackConfirmedToken !== audioState.playRequestToken) {
-      trackAudioRuntimeEvent("startup_waiting_passive", {
-        request_token: audioState.playRequestToken,
-        ready_state: audioState.audio ? audioState.audio.readyState : null,
-        network_state: audioState.audio ? audioState.audio.networkState : null
-      });
-      return;
-    }
     audioState.waitingRecoveryTimer = setTimeout(function () {
       audioState.waitingRecoveryTimer = null;
       recoverPlaybackFromStall();
-    }, 2500);
+    }, 700);
   }
 
   function isIOSStandaloneMediaSession() {
@@ -5217,8 +5165,7 @@ function openAppDownloadGatekeeper(appName, url) {
         {
           range: Boolean(data.range),
           range_header: data.range_header || "",
-          status: Object.prototype.hasOwnProperty.call(data, "status") ? data.status : 200,
-          bypass: Boolean(data.bypass)
+          status: data.status || 200
         }
       ));
     });
@@ -5707,15 +5654,15 @@ function openAppDownloadGatekeeper(appName, url) {
     const apps = container.querySelector('[data-module-id="apps"]');
     if (!albums || !apps) return;
 
-    // Avoid visible detach/reattach work when the static shell is already ordered.
-    const expected = clips ? [albums, clips, apps] : [albums, apps];
-    const current = Array.from(container.children).filter(function (node) {
-      return expected.includes(node);
-    });
-    if (current.length === expected.length && current.every(function (node, index) { return node === expected[index]; })) {
+    // Ensure public order stays stable: albums > clips > apps.
+    if (clips) {
+      container.appendChild(albums);
+      container.appendChild(clips);
+      container.appendChild(apps);
       return;
     }
-    expected.forEach(function (node) { container.appendChild(node); });
+    container.appendChild(albums);
+    container.appendChild(apps);
   }
 
   function enforceHomeAppsCollapsed(adminMode) {
@@ -5772,25 +5719,6 @@ function openAppDownloadGatekeeper(appName, url) {
     const tracksDataReady = audioFeaturesNeeded
       ? loadTracksData()
       : Promise.resolve();
-    const radioPrimeStartedAt = getAudioTelemetryNow();
-    if (isHomeScreen && audioFeaturesNeeded) {
-      tracksDataReady
-        .then(function () { return ensureRadioPlaylistLoaded(); })
-        .then(function (radioList) {
-          const coldStartPrepared = prepareRadioColdStart();
-          trackAudioRuntimeEvent("radio_queue_ready", {
-            tracks_count: Array.isArray(radioList) ? radioList.length : 0,
-            ms: Math.max(0, Math.round(getAudioTelemetryNow() - radioPrimeStartedAt)),
-            source: "startup_prime",
-            cold_start_prepared: Boolean(coldStartPrepared)
-          });
-        })
-        .catch(function () {
-          trackAudioRuntimeEvent("radio_queue_prepare_failed", {
-            source: "startup_prime"
-          });
-        });
-    }
     if (isHomeScreen || audioFeaturesNeeded) {
       ensureGlobalAudio();
       initAudioSessionTelemetry();
@@ -5814,20 +5742,8 @@ function openAppDownloadGatekeeper(appName, url) {
       loadCatalogData().catch(function () {
         // Keep fallback in place if remote catalog loading fails.
       });
-      const catalogHydrateStartedAt = getAudioTelemetryNow();
-      const albumsGridBeforeHydrate = document.querySelector('[data-catalog-grid="albums"]');
-      const firstAlbumNodeBeforeHydrate = albumsGridBeforeHydrate ? albumsGridBeforeHydrate.firstElementChild : null;
       await hydrateHomeCatalog();
-      const albumsGridAfterHydrate = document.querySelector('[data-catalog-grid="albums"]');
-      trackAudioRuntimeEvent("catalog_hydrated", {
-        ms: Math.max(0, Math.round(getAudioTelemetryNow() - catalogHydrateStartedAt)),
-        dom_preserved: Boolean(
-          firstAlbumNodeBeforeHydrate &&
-          albumsGridAfterHydrate &&
-          albumsGridAfterHydrate.firstElementChild === firstAlbumNodeBeforeHydrate
-        ),
-        source: catalogState.catalogBundleSource || "fallback"
-      });
+      prepareAlbumCoversForSession("home_start");
       if (!adminMode) enforceHomeModuleOrder();
       enforceHomeAppsCollapsed(adminMode);
 
@@ -5869,103 +5785,9 @@ function openAppDownloadGatekeeper(appName, url) {
     initPwaInstallPrompt(adminMode);
   }
 
-  function initStartupPerformanceTelemetry() {
-    const navigation = typeof performance !== "undefined" && typeof performance.getEntriesByType === "function"
-      ? performance.getEntriesByType("navigation")[0]
-      : null;
-    trackAudioRuntimeEvent("startup_navigation", {
-      navigation_type: navigation && navigation.type ? navigation.type : "unknown",
-      dom_content_loaded_ms: navigation && Number.isFinite(navigation.domContentLoadedEventEnd)
-        ? Math.round(navigation.domContentLoadedEventEnd)
-        : null,
-      response_end_ms: navigation && Number.isFinite(navigation.responseEnd)
-        ? Math.round(navigation.responseEnd)
-        : null
-    });
-
-    if (typeof PerformanceObserver !== "function") return;
-    const supported = Array.isArray(PerformanceObserver.supportedEntryTypes)
-      ? PerformanceObserver.supportedEntryTypes
-      : [];
-    if (supported.includes("paint")) {
-      try {
-        const paintObserver = new PerformanceObserver(function (list) {
-          list.getEntries().forEach(function (entry) {
-            trackAudioRuntimeEvent("startup_paint", {
-              paint_name: entry.name || "paint",
-              start_ms: Math.round(entry.startTime || 0)
-            });
-          });
-        });
-        paintObserver.observe({ type: "paint", buffered: true });
-      } catch (_err) {}
-    }
-    if (supported.includes("largest-contentful-paint")) {
-      try {
-        const lcpObserver = new PerformanceObserver(function (list) {
-          const entries = list.getEntries();
-          const entry = entries[entries.length - 1];
-          if (!entry) return;
-          trackAudioRuntimeEvent("startup_lcp", {
-            start_ms: Math.round(entry.startTime || 0),
-            size: Math.round(entry.size || 0)
-          });
-        });
-        lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
-      } catch (_err) {}
-    }
-    if (supported.includes("layout-shift")) {
-      try {
-        let cumulativeLayoutShift = 0;
-        let clsReported = false;
-        const reportCls = function (reason) {
-          if (clsReported) return;
-          clsReported = true;
-          trackAudioRuntimeEvent("startup_cls", {
-            value: Number(cumulativeLayoutShift.toFixed(4)),
-            reason: reason || "startup_window"
-          });
-        };
-        const clsObserver = new PerformanceObserver(function (list) {
-          list.getEntries().forEach(function (entry) {
-            if (!entry.hadRecentInput) cumulativeLayoutShift += Number(entry.value || 0);
-          });
-        });
-        clsObserver.observe({ type: "layout-shift", buffered: true });
-        window.setTimeout(function () {
-          reportCls("five_seconds");
-          clsObserver.disconnect();
-        }, 5000);
-        document.addEventListener("visibilitychange", function reportHiddenCls() {
-          if (document.visibilityState !== "hidden") return;
-          reportCls("page_hidden");
-          clsObserver.disconnect();
-          document.removeEventListener("visibilitychange", reportHiddenCls);
-        });
-      } catch (_err) {}
-    }
-  }
-
   document.addEventListener("DOMContentLoaded", function () {
-    const initStartedAt = getAudioTelemetryNow();
-    initStartupPerformanceTelemetry();
-    trackAudioRuntimeEvent("app_init_start", {
-      page_delta_ms: Math.max(0, Math.round(initStartedAt - pageOpenedAt))
-    });
     initSpaNavigation();
     registerServiceWorker();
-    void initPage()
-      .then(function () {
-        trackAudioRuntimeEvent("app_ready", {
-          init_ms: Math.max(0, Math.round(getAudioTelemetryNow() - initStartedAt)),
-          page_delta_ms: Math.max(0, Math.round(getAudioTelemetryNow() - pageOpenedAt))
-        });
-      })
-      .catch(function (err) {
-        trackAudioRuntimeEvent("app_init_failed", {
-          init_ms: Math.max(0, Math.round(getAudioTelemetryNow() - initStartedAt)),
-          reason: err && err.message ? err.message : "unknown"
-        });
-      });
+    void initPage();
   });
 })();

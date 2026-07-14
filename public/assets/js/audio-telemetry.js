@@ -3,15 +3,10 @@
 
   const FINE_EVENTS = new Set([
     "album_switch",
-    "app_init_failed",
-    "app_init_start",
-    "app_ready",
     "audio_pause",
     "audio_play",
     "audio_session_state",
     "cache_hit",
-    "catalog_hydrated",
-    "cold_start_radio",
     "click_track",
     "cover_error",
     "cover_prepare_done",
@@ -53,7 +48,6 @@
     "global_playlist_build_start",
     "heartbeat",
     "initial_random_tap",
-    "ios_abort_retry_deferred",
     "source_resolved",
     "source_assigned",
     "startTrack_enter",
@@ -64,8 +58,6 @@
     "media_session_play",
     "media_session_previoustrack",
     "transport_nexttrack",
-    "transport_navigation_deferred",
-    "transport_navigation_replayed",
     "transport_previoustrack",
     "play_request",
     "play_complete",
@@ -78,15 +70,11 @@
     "recovery_start",
     "recovery_resolved",
     "recovery_failed",
-    "radio_queue_prepare_failed",
-    "radio_queue_ready",
     "resume_probe",
     "served_from_prefetch",
     "silent_check",
     "ended",
     "auto_advance_attempt",
-    "abort_settle_end",
-    "abort_settle_start",
     "play_call",
     "play_resolved",
     "play_rejected",
@@ -101,39 +89,12 @@
     "nav:album_done",
     "nav:album_start",
     "stalled",
-    "stall_passive_wait",
-    "startup_cls",
-    "startup_lcp",
-    "startup_navigation",
-    "startup_paint",
-    "startup_waiting_passive",
     "sw_controllerchange",
     "sw_reload_executed",
     "sw_reload_pending",
-    "sw_reload_suppressed",
-    "sw_runtime_state",
-    "sw_update_ready",
-    "sw_update_waiting",
     "suspend",
     "visibilitychange",
     "waiting"
-  ]);
-  const PRIORITY_FLUSH_EVENTS = new Set([
-    "cold_start_radio",
-    "transport_nexttrack",
-    "transport_navigation_deferred",
-    "transport_navigation_replayed",
-    "abort_settle_end",
-    "abort_settle_start",
-    "source_assigned",
-    "ready_wait_end",
-    "play_resolved",
-    "play_rejected",
-    "playing",
-    "waiting",
-    "stalled",
-    "prefetch_done",
-    "prefetch_error"
   ]);
   const MAX_REQUESTS = 24;
   const DB_NAME = "infra_audio_telemetry_v1";
@@ -542,9 +503,6 @@
       });
 
       enqueue(body);
-      if (PRIORITY_FLUSH_EVENTS.has(eventType)) {
-        scheduleFlush(600);
-      }
     }
 
     function buildMonitorPayload(track, index, src) {

@@ -453,8 +453,6 @@
         }
         renderCatalogGrid(appsGrid, fallback.apps || [], "app");
         if (clipsGrid) renderClipsSection(fallback.clips || []);
-        loadPromise.catch(function () {});
-        return;
       }
 
       const catalog = await loadPromise;

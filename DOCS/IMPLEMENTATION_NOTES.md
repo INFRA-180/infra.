@@ -1,5 +1,12 @@
 # Implementation Notes
 
+## 2026-07-14 — audiofix324 radio prefetch start and zeroed mini-player time
+
+- Radio N+1 prefetch may now start on a confirmed "playing" event for an already-ready track with at least 250 ms of progress; short-track, near-end, in-flight and attempted guards remain unchanged.
+- The full-file cache, 15 MiB limit, single-entry policy and Service Worker Range handling are unchanged.
+- The mini-player now displays "0:00" instead of "--:--" while the active source duration is not available; catalog and Up Next unknown-duration placeholders remain unchanged.
+- Runtime/SW cache-busting was bumped to "audiofix324-20260714" / "infra-shell-20260714-audio324".
+
 ## 2026-07-14 — audiofix323 passive iOS startup recovery
 
 - Kept the July 3 full-file N+1 prefetch unchanged: one `infra-next-track` entry, one in-flight request and the existing 15 MiB cap.

@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260714-audio312";
+const VERSION = "infra-shell-20260714-audio313";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
@@ -12,35 +12,35 @@ const SHELL_ASSETS = [
   "./sphragis/",
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
-  "./assets/css/styles.css?v=audiofix312-20260714",
-  "./assets/js/covers.js?v=audiofix312-20260714",
-  "./assets/js/favorites.js?v=audiofix312-20260714",
-  "./assets/js/favorites-ui.js?v=audiofix312-20260714",
-  "./assets/js/transport-ui.js?v=audiofix312-20260714",
-  "./assets/js/now-playing.js?v=audiofix312-20260714",
-  "./assets/js/album-player-ui.js?v=audiofix312-20260714",
-  "./assets/js/spa-renderer.js?v=audiofix312-20260714",
-  "./assets/js/audio-radio.js?v=audiofix312-20260714",
-  "./assets/js/media-session.js?v=audiofix312-20260714",
-  "./assets/js/audio-prefetch.js?v=audiofix312-20260714",
-  "./assets/js/spa-router.js?v=audiofix312-20260714",
-  "./assets/js/catalog-fallback.js?v=audiofix312-20260714",
-  "./assets/js/catalog-loader.js?v=audiofix312-20260714",
-  "./assets/js/audio-telemetry.js?v=audiofix312-20260714",
-  "./assets/js/downloads.js?v=audiofix312-20260714",
-  "./assets/js/home-catalog.js?v=audiofix312-20260714",
-  "./assets/js/audio-core.js?v=audiofix312-20260714",
-  "./assets/js/pwa-install.js?v=audiofix312-20260714",
-  "./assets/js/share-qr.js?v=audiofix312-20260714",
-  "./assets/js/scripts.js?v=audiofix312-20260714",
-  "./assets/js/scripts.admin.js?v=audiofix312-20260714",
+  "./assets/css/styles.css?v=audiofix313-20260714",
+  "./assets/js/covers.js?v=audiofix313-20260714",
+  "./assets/js/favorites.js?v=audiofix313-20260714",
+  "./assets/js/favorites-ui.js?v=audiofix313-20260714",
+  "./assets/js/transport-ui.js?v=audiofix313-20260714",
+  "./assets/js/now-playing.js?v=audiofix313-20260714",
+  "./assets/js/album-player-ui.js?v=audiofix313-20260714",
+  "./assets/js/spa-renderer.js?v=audiofix313-20260714",
+  "./assets/js/audio-radio.js?v=audiofix313-20260714",
+  "./assets/js/media-session.js?v=audiofix313-20260714",
+  "./assets/js/audio-prefetch.js?v=audiofix313-20260714",
+  "./assets/js/spa-router.js?v=audiofix313-20260714",
+  "./assets/js/catalog-fallback.js?v=audiofix313-20260714",
+  "./assets/js/catalog-loader.js?v=audiofix313-20260714",
+  "./assets/js/audio-telemetry.js?v=audiofix313-20260714",
+  "./assets/js/downloads.js?v=audiofix313-20260714",
+  "./assets/js/home-catalog.js?v=audiofix313-20260714",
+  "./assets/js/audio-core.js?v=audiofix313-20260714",
+  "./assets/js/pwa-install.js?v=audiofix313-20260714",
+  "./assets/js/share-qr.js?v=audiofix313-20260714",
+  "./assets/js/scripts.js?v=audiofix313-20260714",
+  "./assets/js/scripts.admin.js?v=audiofix313-20260714",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./assets/js/sphragis.js?v=sphragis20260625",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
   "./data/catalog.json",
-  "./data/track-durations.json?v=audiofix312-20260714",
-  "./data/tracks.json?v=audiofix312-20260714",
+  "./data/track-durations.json?v=audiofix313-20260714",
+  "./data/tracks.json?v=audiofix313-20260714",
   "./assets/branding/infra-logo-white-photoroom-title.png",
   "./assets/pwa/favicon-logo-white-64.png",
   "./assets/pwa/icon-192-logo-white.png",
@@ -55,7 +55,6 @@ self.addEventListener("install", (event) => {
     caches
       .open(SHELL_CACHE)
       .then((cache) => cache.addAll(SHELL_ASSETS))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -63,11 +62,18 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async function () {
       const keys = await caches.keys();
+      const previousVersionedCaches = keys
+        .filter((key) => isVersionedSiteCache(key) && key !== SHELL_CACHE && key !== RUNTIME_CACHE)
+        .sort()
+        .reverse()
+        .slice(0, 2);
+      const cachesToKeep = new Set([SHELL_CACHE, RUNTIME_CACHE].concat(previousVersionedCaches));
       await Promise.all(
         keys
-          .filter((key) => isVersionedSiteCache(key) && key !== SHELL_CACHE && key !== RUNTIME_CACHE)
+          .filter((key) => isVersionedSiteCache(key) && !cachesToKeep.has(key))
           .map((key) => caches.delete(key))
       );
+      await caches.delete(NEXT_TRACK_CACHE);
       await self.clients.claim();
     })()
   );
@@ -180,6 +186,19 @@ async function staleWhileRevalidate(request, cacheName) {
   return cached || networkPromise;
 }
 
+async function shellFirstOrRuntime(request) {
+  const shell = await caches.open(SHELL_CACHE);
+  const cached = await shell.match(request);
+  if (!cached) return staleWhileRevalidate(request, RUNTIME_CACHE);
+
+  fetch(request)
+    .then((response) => {
+      if (response && response.ok) shell.put(request, response.clone()).catch(() => undefined);
+    })
+    .catch(() => undefined);
+  return cached;
+}
+
 async function cacheFirst(request, cacheName, options) {
   const opts = options || {};
   const cache = await caches.open(cacheName);
@@ -213,75 +232,12 @@ async function pruneCacheEntries(cache, maxEntries) {
   await Promise.all(keys.slice(0, excess).map((key) => cache.delete(key)));
 }
 
-function notifyPrefetchHit(url, details) {
-  const payload = Object.assign({
-    type: "INFRA_PREFETCH_HIT",
-    url
-  }, details || {});
-  self.clients.matchAll({ type: "window", includeUncontrolled: true })
-    .then((clients) => {
-      clients.forEach((client) => {
-        try {
-          client.postMessage(payload);
-        } catch (_err) {
-          // Ignore telemetry message failures.
-        }
-      });
-    })
-    .catch(() => undefined);
-}
-
-async function deletePrefetchedAudio(cache, request, url) {
-  try {
-    await cache.delete(request, { ignoreVary: true });
-    await cache.delete(url.href, { ignoreVary: true });
-  } catch (_err) {
-    // Ignore cache cleanup failures; network fallback remains authoritative.
-  }
-}
-
-async function servePrefetchedAudioOrNetwork(request, url) {
-  const cache = await caches.open(NEXT_TRACK_CACHE);
-  let cached = null;
-  try {
-    cached = await cache.match(request, { ignoreVary: true }) || await cache.match(url.href, { ignoreVary: true });
-  } catch (_err) {
-    return fetch(request);
-  }
-  if (!cached || !cached.ok) return fetch(request);
-
-  const rangeHeader = request.headers.get("Range") || request.headers.get("range") || "";
-  if (rangeHeader) {
-    await deletePrefetchedAudio(cache, request, url);
-    notifyPrefetchHit(url.href, { range: true, range_header: rangeHeader, status: 0, bypass: true });
-    return fetch(request);
-  }
-
-  try {
-    const headers = new Headers(cached.headers);
-    if (!headers.has("Accept-Ranges")) headers.set("Accept-Ranges", "bytes");
-    notifyPrefetchHit(url.href, { range: false, range_header: "", status: 200 });
-    return new Response(cached.body, {
-      status: cached.status,
-      statusText: cached.statusText,
-      headers
-    });
-  } catch (_err) {
-    await deletePrefetchedAudio(cache, request, url);
-    return fetch(request);
-  }
-}
-
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (!request) return;
   const url = new URL(request.url);
-  if (url.hostname === R2_AUDIO_HOST) {
-    if (request.method === "GET") {
-      event.respondWith(servePrefetchedAudioOrNetwork(request, url));
-    }
-    return;
-  }
+  // WebKit must send cross-origin media Range requests directly to R2.
+  if (url.hostname === R2_AUDIO_HOST) return;
   if (request.method !== "GET") return;
   if (!isSameOrigin(request.url)) return;
 
@@ -291,7 +247,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isHtmlRequest(request)) {
-    event.respondWith(networkFirst(request, SHELL_CACHE, "./index.html"));
+    event.respondWith(htmlCacheFirst(request, SHELL_CACHE, "./index.html"));
     return;
   }
 
@@ -309,7 +265,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isStaticAsset(request, url)) {
-    event.respondWith(staleWhileRevalidate(request, RUNTIME_CACHE));
+    event.respondWith(shellFirstOrRuntime(request));
     return;
   }
 });

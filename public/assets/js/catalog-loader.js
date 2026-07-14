@@ -388,19 +388,15 @@
       if (catalogState.catalogBundlePromise) return catalogState.catalogBundlePromise;
 
       catalogState.catalogBundlePromise = (async function () {
-        try {
-          const live = await fetchLiveCatalogLatest();
-          catalogState.catalogBundlePayload = live;
-          catalogState.catalogBundleSource = "live";
-          catalogState.catalogBundleReleaseId = live.releaseId || "";
-          return live;
-        } catch (_err) {
-          const local = await fetchLocalCatalogBundle();
-          catalogState.catalogBundlePayload = local;
-          catalogState.catalogBundleSource = "local";
-          catalogState.catalogBundleReleaseId = local.releaseId || "";
-          return local;
-        }
+        const local = await fetchLocalCatalogBundle();
+        catalogState.catalogBundlePayload = local;
+        catalogState.catalogBundleSource = "local";
+        catalogState.catalogBundleReleaseId = local.releaseId || "";
+
+        // Refresh the validated live bundle for a later launch without blocking
+        // or rebuilding the already-visible static home shell.
+        fetchLiveCatalogLatest().catch(function () {});
+        return local;
       })().finally(function () {
         catalogState.catalogBundlePromise = null;
       });

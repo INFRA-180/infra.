@@ -67,3 +67,11 @@
 
 - `waitForAbortPlaybackSettle` now respects the caller-provided short timeout, with only an 80 ms floor, so the iOS `AbortError` recovery window is no longer forced to about 800 ms.
 - Player cover surfaces now keep clipping on the wrapper and use a tiny image bleed with WebKit compositing hints to avoid right-edge aliasing artifacts without changing source artwork.
+
+## 2026-07-14 — Cold-start stability and next-launch Service Worker update
+
+- Telemetry tied repeated iOS `AbortError` failures to the 700 ms waiting-recovery timer: it called `audio.load()` while the original `play()` promise was still pending. Startup `waiting` and `stalled` events are now passive; only `playing` confirms a playback request.
+- Cross-origin R2 media requests bypass the Service Worker entirely, preserving Safari's native Range-request path. Next-track full-file prefetch is disabled on iOS to avoid competing with the active media request.
+- A newly installed Service Worker no longer takes control and reloads the active application during a Play gesture. The new runtime activates on the next application launch, while the shell is served cache-first and refreshed in the background.
+- Home catalog loading is local-first and preserves the first rendered DOM. Startup telemetry now records navigation, paint, largest-contentful-paint, cumulative layout shift, catalog hydration, initialization, and ready timing.
+- `tools/verify-audio-stability.js` protects these invariants and checks that all public album pages reference `audiofix313-20260714`.

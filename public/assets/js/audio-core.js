@@ -57,6 +57,7 @@
     const ensurePlayablePlaylistContext = method(ctx, "ensurePlayablePlaylistContext");
     const canStartInitialGlobalRandomPlayback = method(ctx, "canStartInitialGlobalRandomPlayback", function () { return false; });
     const startGlobalRandomPlayback = method(ctx, "startGlobalRandomPlayback");
+    const primeRadioPlaylistFromLoadedTracks = method(ctx, "primeRadioPlaylistFromLoadedTracks", function () { return []; });
     const ensureRadioPlaylistLoaded = method(ctx, "ensureRadioPlaylistLoaded", function () { return Promise.resolve([]); });
     const syncRadioQueueToPlaylist = method(ctx, "syncRadioQueueToPlaylist");
     const updateProgressUi = method(ctx, "updateProgressUi");
@@ -632,6 +633,8 @@
           click_perf_ms: audioState.audioClickPerfTs
         });
         audioState.trackStartInFlight = false;
+        audioState.coldStartInFlight = false;
+        audioState.playbackConfirmedToken = requestToken;
         clearTrackFailure(target.src);
         clearTrackStatus(rowTrack);
         if (!sameTrack && !(isFastSkip || shouldSeamless)) {
@@ -665,17 +668,32 @@
           network_state: audio.networkState,
           click_perf_ms: audioState.audioClickPerfTs
         });
+        if (playErr && playErr.name === "AbortError" && isRetry && isIosDevice()) {
+          audioState.trackStartInFlight = false;
+          audioState.coldStartInFlight = false;
+          clearWaitingRecovery();
+          clearFadeTimer();
+          failAudioRecovery({
+            request_token: requestToken,
+            reason: "abort_retry_rejected",
+            strategy: "passive_wait_single_retry"
+          });
+          setTrackStatus(rowTrack, "Chargement du fichier audio, réessaie dans quelques secondes.", { retry: true });
+          syncAudioUi();
+          schedulePendingTransportNavigation("abort_retry_rejected");
+          return;
+        }
         if (playErr && playErr.name === "AbortError" && !isRetry && isIosDevice()) {
-          const abortSettleTimeout = isFastSkip ? 220 : 260;
+          const abortSettleTimeout = isFastSkip ? 900 : 1600;
           beginAudioRecovery({
             request_token: requestToken,
             reason: "AbortError",
-            strategy: "abort_short_wait_reset_retry"
+            strategy: "passive_wait_single_retry"
           });
           logAudioAuditEvent("abort_settle_start", target, index, nextSrc || target.src, {
             request_token: requestToken,
             timeout_ms: abortSettleTimeout,
-            strategy: "abort_short_wait_reset_retry",
+            strategy: "passive_wait_single_retry",
             ready_state: audio.readyState,
             network_state: audio.networkState,
             click_perf_ms: audioState.audioClickPerfTs
@@ -696,42 +714,14 @@
               handlePlayResolved({ sync: isFastSkip, settled: true });
               return;
             }
-            if (state === "canplay") {
-              attemptPlay({ retry: true, sync: isFastSkip, abortSettle: true });
-              return;
-            }
-            const resetForRetry = resetAudioElementForSource(audio, nextSrc || target.src);
-            logAudioAuditEvent("source_assigned", target, index, nextSrc || target.src, {
+            logAudioAuditEvent("ios_abort_retry_deferred", target, index, nextSrc || target.src, {
               request_token: requestToken,
-              same_track: sameTrack,
-              recovery: true,
-              reset_for_abort: true,
               abort_settle_state: state,
-              reset_ok: Boolean(resetForRetry),
               ready_state: audio.readyState,
               network_state: audio.networkState,
               click_perf_ms: audioState.audioClickPerfTs
             });
-            if (!resetForRetry) {
-              audioState.trackStartInFlight = false;
-              schedulePendingTransportNavigation("abort_reset_failed");
-              recoverFromTrackFailure(index, target.src, requestToken);
-              return;
-            }
-            waitForAudioReadiness(audio, requestToken, 260).then(function (ready) {
-              if (requestToken !== audioState.startRequestToken) return;
-              logAudioAuditEvent("ready_wait_end", target, index, nextSrc || target.src, {
-                request_token: requestToken,
-                retry: true,
-                reason: "AbortError",
-                abort_settle_state: state,
-                ready: Boolean(ready),
-                ready_state: audio.readyState,
-                network_state: audio.networkState,
-                click_perf_ms: audioState.audioClickPerfTs
-              });
-              attemptPlay({ retry: true, sync: isFastSkip, abortSettle: true });
-            });
+            attemptPlay({ retry: true, sync: isFastSkip, abortSettle: true });
           });
           return;
         }
@@ -774,6 +764,7 @@
           return;
         }
         audioState.trackStartInFlight = false;
+        audioState.coldStartInFlight = false;
         clearWaitingRecovery();
         clearFadeTimer();
         setTrackStatus(rowTrack, "Chargement du fichier audio...");
@@ -805,7 +796,7 @@
 
       function beginPlayback() {
         if (requestToken !== audioState.startRequestToken) return;
-        if (isFastSkip) {
+        if (isFastSkip || opts.immediatePlay) {
           attemptPlay({ sync: true });
           return;
         }
@@ -1142,17 +1133,36 @@
     }
 
     function startRadioPlaybackFromIdle() {
-      ensureRadioPlaylistLoaded()
+      audioState.coldStartInFlight = true;
+
+      function startPreparedRadio(radioList) {
+        if (!Array.isArray(radioList) || !radioList.length) return false;
+        if (audioState.homeMode !== "radio") return false;
+        if (!ensureRadioQueue(audioState.radioQueueMinRemaining) || !audioState.radioQueue.length) return false;
+        audioState.radioQueueCursor = 0;
+        syncRadioQueueToPlaylist({ preserveRecent: true });
+        startTrack(0, { seamless: true, immediatePlay: true, coldStart: true });
+        return true;
+      }
+
+      primeRadioPlaylistFromLoadedTracks();
+      if (Array.isArray(audioState.radioPlaylist) && audioState.radioPlaylist.length) {
+        startPreparedRadio(audioState.radioPlaylist);
+        if (!audioState.trackStartInFlight) audioState.coldStartInFlight = false;
+        return Promise.resolve(audioState.radioPlaylist.slice());
+      }
+
+      return ensureRadioPlaylistLoaded()
         .then(function (radioList) {
-          if (!Array.isArray(radioList) || !radioList.length) return;
-          if (audioState.homeMode !== "radio") return;
-          if (!ensureRadioQueue(audioState.radioQueueMinRemaining) || !audioState.radioQueue.length) return;
-          audioState.radioQueueCursor = 0;
-          syncRadioQueueToPlaylist({ preserveRecent: true });
-          startTrack(0, { seamless: true });
+          startPreparedRadio(radioList);
+          return radioList;
         })
         .catch(function () {
           // Ignore radio loading failures.
+          return [];
+        })
+        .finally(function () {
+          if (!audioState.trackStartInFlight) audioState.coldStartInFlight = false;
         });
     }
 

@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix312-20260714";
+window.INFRA_BUILD_TAG = "audiofix313-20260714";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -233,6 +233,8 @@ function openAppDownloadGatekeeper(appName, url) {
     externalResumeProbeTimers: [],
     externalResumeRecoveryInFlight: false,
     activeAudioRecovery: null,
+    coldStartInFlight: false,
+    playbackConfirmedToken: 0,
     resumeOnVisible: false,
     recentPlayed: [],
     recentPlayedLimit: 12,
@@ -342,9 +344,12 @@ function openAppDownloadGatekeeper(appName, url) {
   const prefetchApi = window.InfraAudioPrefetch || null;
   const prefetchConstants = prefetchApi && prefetchApi.constants ? prefetchApi.constants : {};
   const PREFETCH_NEXT_ENABLED = Object.prototype.hasOwnProperty.call(prefetchConstants, "ENABLED")
-    ? Boolean(prefetchConstants.ENABLED)
-    : true;
+    ? Boolean(prefetchConstants.ENABLED) && !isIosDevice()
+    : !isIosDevice();
   // ROLLBACK: passer a false pour couper les prefetchs N+1 et play froid sans toucher au play sync.
+  if (!PREFETCH_NEXT_ENABLED && prefetchApi && typeof prefetchApi.clearCache === "function") {
+    prefetchApi.clearCache().catch(function () {});
+  }
   const PREFETCH_NEXT_CACHE_NAME = prefetchConstants.CACHE_NAME || "infra-next-track";
   const coverApi = window.InfraCovers || null;
   const coverConstants = coverApi && coverApi.constants
@@ -373,7 +378,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix312-20260714";
+  const LOCAL_CATALOG_VERSION = "audiofix313-20260714";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -394,7 +399,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix312-20260714";
+  const runtimeVersion = "audiofix313-20260714";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -621,6 +626,7 @@ function openAppDownloadGatekeeper(appName, url) {
       readHomePlayMode: function () {},
       persistHomePlayMode: function () {},
       findPlaylistIndexByCurrentSrc: function () {},
+      primeRadioPlaylistFromLoadedTracks: function () { return []; },
       ensureRadioPlaylistLoaded: function () {},
       getTrackSource: function () {},
       getRecentPlayedSrcSet: function () {},
@@ -733,6 +739,7 @@ function openAppDownloadGatekeeper(appName, url) {
       ensurePlayablePlaylistContext,
       canStartInitialGlobalRandomPlayback,
       startGlobalRandomPlayback,
+      primeRadioPlaylistFromLoadedTracks,
       ensureRadioPlaylistLoaded,
       syncRadioQueueToPlaylist,
       updateProgressUi,
@@ -1857,6 +1864,9 @@ function openAppDownloadGatekeeper(appName, url) {
   }
   function findPlaylistIndexByCurrentSrc() {
     return callAudioRadio("findPlaylistIndexByCurrentSrc", arguments);
+  }
+  function primeRadioPlaylistFromLoadedTracks() {
+    return callAudioRadio("primeRadioPlaylistFromLoadedTracks", arguments) || [];
   }
   function ensureRadioPlaylistLoaded() {
     return callAudioRadio("ensureRadioPlaylistLoaded", arguments);
@@ -3021,6 +3031,7 @@ function openAppDownloadGatekeeper(appName, url) {
     const audio = audioState.audio;
     const audioPlaying = Boolean(audio && !audio.paused && getCurrentPlayableAudioSrc(audio));
     const trackStarting = Boolean(audioState.trackStartInFlight);
+    const coldStartInFlight = Boolean(audioState.coldStartInFlight);
     const overlayOpen = Boolean(audioState.nowPlayingOpen || audioState.nowPlayingClosing);
     const visible = document.visibilityState === "visible";
     const idleForMs = Math.max(0, Math.round(now - lastUserInteractionAt));
@@ -3028,6 +3039,7 @@ function openAppDownloadGatekeeper(appName, url) {
     return {
       audioPlaying,
       trackStarting,
+      coldStartInFlight,
       overlayOpen,
       visible,
       idleForMs,
@@ -3052,6 +3064,7 @@ function openAppDownloadGatekeeper(appName, url) {
       visible_for_ms: state.visibleForMs,
       audio_playing: state.audioPlaying,
       track_starting: state.trackStarting,
+      cold_start_in_flight: state.coldStartInFlight,
       overlay_open: state.overlayOpen
     }, extra || {});
   }
@@ -3064,6 +3077,7 @@ function openAppDownloadGatekeeper(appName, url) {
       state.visibleSafe &&
       !state.audioPlaying &&
       !state.trackStarting &&
+      !state.coldStartInFlight &&
       !state.overlayOpen
     );
   }
@@ -3071,7 +3085,7 @@ function openAppDownloadGatekeeper(appName, url) {
   function getDeferredServiceWorkerReloadDelayMs() {
     const state = getServiceWorkerReloadState();
     if (!state.visible) return 0;
-    if (state.audioPlaying || state.trackStarting || state.overlayOpen) return 0;
+    if (state.audioPlaying || state.trackStarting || state.coldStartInFlight || state.overlayOpen) return 0;
     return Math.max(
       180,
       SERVICE_WORKER_RELOAD_MIN_IDLE_MS - state.idleForMs + 180,
@@ -3088,19 +3102,10 @@ function openAppDownloadGatekeeper(appName, url) {
   function attemptDeferredServiceWorkerReload() {
     clearDeferredServiceWorkerReloadTimer();
     if (!serviceWorkerControllerReloadPending || serviceWorkerControllerReloading) return;
-    if (!isServiceWorkerReloadSafe()) {
-      const delay = getDeferredServiceWorkerReloadDelayMs();
-      if (delay > 0) scheduleDeferredServiceWorkerReload(delay);
-      return;
-    }
     serviceWorkerControllerReloadPending = false;
-    serviceWorkerControllerReloading = true;
-    serviceWorkerReloadExecutedAt = getAudioTelemetryNow();
-    trackAudioRuntimeEvent("sw_reload_executed", buildServiceWorkerReloadTelemetry());
-    flushAudioTelemetryQueue({ beacon: true });
-    window.setTimeout(function () {
-      window.location.reload();
-    }, 80);
+    trackAudioRuntimeEvent("sw_reload_suppressed", buildServiceWorkerReloadTelemetry({
+      update_mode: "next_launch"
+    }));
   }
 
   function scheduleDeferredServiceWorkerReload(delayMs) {
@@ -3173,9 +3178,11 @@ function openAppDownloadGatekeeper(appName, url) {
       navigator.serviceWorker.addEventListener("controllerchange", function () {
         if (serviceWorkerControllerReloading) return;
         serviceWorkerControllerChangeAt = getAudioTelemetryNow();
-        trackAudioRuntimeEvent("sw_controllerchange", buildServiceWorkerReloadTelemetry());
-        if (!markServiceWorkerReloadPendingForRuntime()) return;
-        scheduleDeferredServiceWorkerReload();
+        serviceWorkerControllerReloadPending = false;
+        trackAudioRuntimeEvent("sw_controllerchange", buildServiceWorkerReloadTelemetry({
+          update_mode: "next_launch",
+          automatic_reload: false
+        }));
       });
       serviceWorkerControllerChangeBound = true;
     }
@@ -3186,7 +3193,9 @@ function openAppDownloadGatekeeper(appName, url) {
       .then(function (registration) {
         serviceWorkerRegistrationRef = registration;
         if (registration.waiting) {
-          registration.waiting.postMessage({ type: "SKIP_WAITING" });
+          trackAudioRuntimeEvent("sw_update_waiting", {
+            update_mode: "next_launch"
+          });
         }
         requestServiceWorkerUpdateCheck("registered");
 
@@ -3195,7 +3204,9 @@ function openAppDownloadGatekeeper(appName, url) {
           if (!worker) return;
           worker.addEventListener("statechange", function () {
             if (worker.state === "installed" && navigator.serviceWorker.controller && registration.waiting) {
-              registration.waiting.postMessage({ type: "SKIP_WAITING" });
+              trackAudioRuntimeEvent("sw_update_ready", {
+                update_mode: "next_launch"
+              });
             }
           });
         });
@@ -4688,42 +4699,37 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!audio) return;
     if (audio.paused) return;
     if (audioState.trackStartInFlight) return;
+    if (audioState.playbackConfirmedToken !== audioState.playRequestToken) return;
     if (audio.readyState >= 3) return;
-
-    const src = getCurrentLogicalAudioSrc();
-    if (!src) return;
-
-    const resumeAt = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-
-    try {
-      audio.load();
-    } catch (_err) {
-      // Ignore.
-    }
-
-    const resume = function () {
-      if (Number.isFinite(resumeAt) && resumeAt > 0) {
-        try {
-          audio.currentTime = resumeAt;
-        } catch (_err) {
-          // Ignore seek restore errors.
-        }
+    trackAudioRuntimeEvent("stall_passive_wait", Object.assign(
+      buildAudioMonitorPayload(
+        getCurrentPlaylistTrack(),
+        audioState.currentIndex,
+        audioState.activeLogicalSrc || audio.currentSrc || audio.src
+      ),
+      getAudioRuntimeProbeState(),
+      {
+        request_token: audioState.playRequestToken,
+        recovery_action: "none"
       }
-      audio.play().catch(function () {
-        // Ignore autoplay errors.
-      });
-    };
-
-    audio.addEventListener("canplay", resume, { once: true });
+    ));
   }
 
   function scheduleWaitingRecovery() {
     clearWaitingRecovery();
     audioState.prefetchPausedUntil = Date.now() + (isIosDevice() ? 2600 : 1600);
+    if (audioState.trackStartInFlight || audioState.playbackConfirmedToken !== audioState.playRequestToken) {
+      trackAudioRuntimeEvent("startup_waiting_passive", {
+        request_token: audioState.playRequestToken,
+        ready_state: audioState.audio ? audioState.audio.readyState : null,
+        network_state: audioState.audio ? audioState.audio.networkState : null
+      });
+      return;
+    }
     audioState.waitingRecoveryTimer = setTimeout(function () {
       audioState.waitingRecoveryTimer = null;
       recoverPlaybackFromStall();
-    }, 700);
+    }, 2500);
   }
 
   function isIOSStandaloneMediaSession() {
@@ -5661,15 +5667,15 @@ function openAppDownloadGatekeeper(appName, url) {
     const apps = container.querySelector('[data-module-id="apps"]');
     if (!albums || !apps) return;
 
-    // Ensure public order stays stable: albums > clips > apps.
-    if (clips) {
-      container.appendChild(albums);
-      container.appendChild(clips);
-      container.appendChild(apps);
+    // Avoid visible detach/reattach work when the static shell is already ordered.
+    const expected = clips ? [albums, clips, apps] : [albums, apps];
+    const current = Array.from(container.children).filter(function (node) {
+      return expected.includes(node);
+    });
+    if (current.length === expected.length && current.every(function (node, index) { return node === expected[index]; })) {
       return;
     }
-    container.appendChild(albums);
-    container.appendChild(apps);
+    expected.forEach(function (node) { container.appendChild(node); });
   }
 
   function enforceHomeAppsCollapsed(adminMode) {
@@ -5726,6 +5732,23 @@ function openAppDownloadGatekeeper(appName, url) {
     const tracksDataReady = audioFeaturesNeeded
       ? loadTracksData()
       : Promise.resolve();
+    const radioPrimeStartedAt = getAudioTelemetryNow();
+    if (isHomeScreen && audioFeaturesNeeded) {
+      tracksDataReady
+        .then(function () { return ensureRadioPlaylistLoaded(); })
+        .then(function (radioList) {
+          trackAudioRuntimeEvent("radio_queue_ready", {
+            tracks_count: Array.isArray(radioList) ? radioList.length : 0,
+            ms: Math.max(0, Math.round(getAudioTelemetryNow() - radioPrimeStartedAt)),
+            source: "startup_prime"
+          });
+        })
+        .catch(function () {
+          trackAudioRuntimeEvent("radio_queue_prepare_failed", {
+            source: "startup_prime"
+          });
+        });
+    }
     if (isHomeScreen || audioFeaturesNeeded) {
       ensureGlobalAudio();
       initAudioSessionTelemetry();
@@ -5749,8 +5772,20 @@ function openAppDownloadGatekeeper(appName, url) {
       loadCatalogData().catch(function () {
         // Keep fallback in place if remote catalog loading fails.
       });
+      const catalogHydrateStartedAt = getAudioTelemetryNow();
+      const albumsGridBeforeHydrate = document.querySelector('[data-catalog-grid="albums"]');
+      const firstAlbumNodeBeforeHydrate = albumsGridBeforeHydrate ? albumsGridBeforeHydrate.firstElementChild : null;
       await hydrateHomeCatalog();
-      prepareAlbumCoversForSession("home_start");
+      const albumsGridAfterHydrate = document.querySelector('[data-catalog-grid="albums"]');
+      trackAudioRuntimeEvent("catalog_hydrated", {
+        ms: Math.max(0, Math.round(getAudioTelemetryNow() - catalogHydrateStartedAt)),
+        dom_preserved: Boolean(
+          firstAlbumNodeBeforeHydrate &&
+          albumsGridAfterHydrate &&
+          albumsGridAfterHydrate.firstElementChild === firstAlbumNodeBeforeHydrate
+        ),
+        source: catalogState.catalogBundleSource || "fallback"
+      });
       if (!adminMode) enforceHomeModuleOrder();
       enforceHomeAppsCollapsed(adminMode);
 
@@ -5792,9 +5827,103 @@ function openAppDownloadGatekeeper(appName, url) {
     initPwaInstallPrompt(adminMode);
   }
 
+  function initStartupPerformanceTelemetry() {
+    const navigation = typeof performance !== "undefined" && typeof performance.getEntriesByType === "function"
+      ? performance.getEntriesByType("navigation")[0]
+      : null;
+    trackAudioRuntimeEvent("startup_navigation", {
+      navigation_type: navigation && navigation.type ? navigation.type : "unknown",
+      dom_content_loaded_ms: navigation && Number.isFinite(navigation.domContentLoadedEventEnd)
+        ? Math.round(navigation.domContentLoadedEventEnd)
+        : null,
+      response_end_ms: navigation && Number.isFinite(navigation.responseEnd)
+        ? Math.round(navigation.responseEnd)
+        : null
+    });
+
+    if (typeof PerformanceObserver !== "function") return;
+    const supported = Array.isArray(PerformanceObserver.supportedEntryTypes)
+      ? PerformanceObserver.supportedEntryTypes
+      : [];
+    if (supported.includes("paint")) {
+      try {
+        const paintObserver = new PerformanceObserver(function (list) {
+          list.getEntries().forEach(function (entry) {
+            trackAudioRuntimeEvent("startup_paint", {
+              paint_name: entry.name || "paint",
+              start_ms: Math.round(entry.startTime || 0)
+            });
+          });
+        });
+        paintObserver.observe({ type: "paint", buffered: true });
+      } catch (_err) {}
+    }
+    if (supported.includes("largest-contentful-paint")) {
+      try {
+        const lcpObserver = new PerformanceObserver(function (list) {
+          const entries = list.getEntries();
+          const entry = entries[entries.length - 1];
+          if (!entry) return;
+          trackAudioRuntimeEvent("startup_lcp", {
+            start_ms: Math.round(entry.startTime || 0),
+            size: Math.round(entry.size || 0)
+          });
+        });
+        lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
+      } catch (_err) {}
+    }
+    if (supported.includes("layout-shift")) {
+      try {
+        let cumulativeLayoutShift = 0;
+        let clsReported = false;
+        const reportCls = function (reason) {
+          if (clsReported) return;
+          clsReported = true;
+          trackAudioRuntimeEvent("startup_cls", {
+            value: Number(cumulativeLayoutShift.toFixed(4)),
+            reason: reason || "startup_window"
+          });
+        };
+        const clsObserver = new PerformanceObserver(function (list) {
+          list.getEntries().forEach(function (entry) {
+            if (!entry.hadRecentInput) cumulativeLayoutShift += Number(entry.value || 0);
+          });
+        });
+        clsObserver.observe({ type: "layout-shift", buffered: true });
+        window.setTimeout(function () {
+          reportCls("five_seconds");
+          clsObserver.disconnect();
+        }, 5000);
+        document.addEventListener("visibilitychange", function reportHiddenCls() {
+          if (document.visibilityState !== "hidden") return;
+          reportCls("page_hidden");
+          clsObserver.disconnect();
+          document.removeEventListener("visibilitychange", reportHiddenCls);
+        });
+      } catch (_err) {}
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
+    const initStartedAt = getAudioTelemetryNow();
+    initStartupPerformanceTelemetry();
+    trackAudioRuntimeEvent("app_init_start", {
+      page_delta_ms: Math.max(0, Math.round(initStartedAt - pageOpenedAt))
+    });
     initSpaNavigation();
     registerServiceWorker();
-    void initPage();
+    void initPage()
+      .then(function () {
+        trackAudioRuntimeEvent("app_ready", {
+          init_ms: Math.max(0, Math.round(getAudioTelemetryNow() - initStartedAt)),
+          page_delta_ms: Math.max(0, Math.round(getAudioTelemetryNow() - pageOpenedAt))
+        });
+      })
+      .catch(function (err) {
+        trackAudioRuntimeEvent("app_init_failed", {
+          init_ms: Math.max(0, Math.round(getAudioTelemetryNow() - initStartedAt)),
+          reason: err && err.message ? err.message : "unknown"
+        });
+      });
   });
 })();

@@ -1,5 +1,12 @@
 # Implementation Notes
 
+## 2026-07-14 — audiofix322 safe-area ownership and retained transport prefetch
+
+- Mobile pages now use a bottom dock at `bottom: 0`; the Home Indicator inset is internal padding, and page scroll reserves consume the measured dock height without adding the inset a second time.
+- Mobile Now Playing no longer extends below `100dvh`. Its existing top artwork/status-bar behavior remains unchanged, its bottom padding still protects the Home Indicator, and the flex layout anchors `À suivre` at the bottom.
+- A transport start keeps the current in-flight prefetch generation when it still contains the requested track or its immediate N+1. Existing ready/in-flight/attempted guards continue to prevent duplicate prefetch requests.
+- Segment size, prefetch concurrency/depth, Service Worker Range behavior, Media Session, Worker/R2 and audio architecture are unchanged.
+
 ## 2026-07-14 — audiofix321 canplay prefetch and compact mobile transport inset
 
 - Normal N+1 preparation now starts from the active track's `canplay` event instead of waiting for `playing`; the existing ready/in-flight/attempted guards keep the later `playing` call idempotent.

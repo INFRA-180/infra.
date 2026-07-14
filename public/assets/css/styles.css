@@ -2850,12 +2850,12 @@ audio {
 
   .global-transport {
     top: auto;
-    right: 10px;
-    left: 10px;
-    bottom: calc(8px + env(safe-area-inset-bottom));
+    right: 0;
+    left: 0;
+    bottom: 0;
     align-items: stretch;
-    border-radius: 16px;
-    padding: 9px 10px;
+    border-radius: 16px 16px 0 0;
+    padding: 9px 10px calc(9px + env(safe-area-inset-bottom));
     gap: 7px;
     z-index: 9999;
     box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
@@ -3101,19 +3101,19 @@ audio {
   .has-mobile-player .home-screen .container,
   .has-mobile-player .album-screen .page,
   .has-mobile-player .app-screen .page {
-    padding-bottom: calc(var(--mobile-player-space, 0px) + env(safe-area-inset-bottom)) !important;
+    padding-bottom: var(--mobile-player-space, 0px) !important;
   }
 
   .has-mobile-player .album-screen .page {
-    padding-bottom: calc(var(--mobile-player-space, 0px) + env(safe-area-inset-bottom) + 24px) !important;
+    padding-bottom: calc(var(--mobile-player-space, 0px) + 24px) !important;
   }
 
   .has-mobile-player .album-screen .tracks {
-    padding-bottom: calc(var(--mobile-player-space, 0px) + env(safe-area-inset-bottom) + 52px);
+    padding-bottom: calc(var(--mobile-player-space, 0px) + 52px);
   }
 
   .has-mobile-player .home-screen .albums-grid {
-    padding-bottom: calc(var(--mobile-player-space, 0px) + env(safe-area-inset-bottom) + 20px);
+    padding-bottom: calc(var(--mobile-player-space, 0px) + 20px);
   }
 
   .album-screen .track-player {
@@ -4170,8 +4170,6 @@ body.now-playing-open {
 @media (max-width: 640px) {
   .now-playing-overlay {
     display: block;
-    /* Continue the artwork-backed overlay through the iOS Home safe area. */
-    bottom: calc(-1 * env(safe-area-inset-bottom));
     padding: 0;
   }
 
@@ -4182,15 +4180,16 @@ body.now-playing-open {
   .now-playing-panel {
     --now-playing-content-width: min(92vw, 410px);
     width: 100%;
-    min-height: calc(100vh + env(safe-area-inset-bottom));
-    min-height: calc(100dvh + env(safe-area-inset-bottom));
-    max-height: calc(100vh + env(safe-area-inset-bottom));
-    max-height: calc(100dvh + env(safe-area-inset-bottom));
+    min-height: 100vh;
+    min-height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    display: flex;
+    flex-direction: column;
     border-radius: 0;
     border: 0;
     padding: calc(16px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));
     gap: 16px;
-    align-content: start;
   }
 
   .now-playing-cover-wrap {
@@ -4220,7 +4219,7 @@ body.now-playing-open {
 
   .now-playing-up-next {
     width: var(--now-playing-content-width);
-    margin-top: 18px;
+    margin-top: auto;
   }
 
   .now-playing-controls {

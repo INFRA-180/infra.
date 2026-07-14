@@ -12,9 +12,10 @@ const fail = (message) => {
 
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
+const core = read("public/assets/js/audio-core.js");
 const sw = read("public/sw.js");
 const styles = read("public/assets/css/styles.css");
-const release = "audiofix321-20260714";
+const release = "audiofix322-20260714";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -64,11 +65,20 @@ if (!scripts.includes("PREFETCH_NEXT_QUEUE_DEPTH") || !scripts.includes("PREFETC
 if (!radio.includes("response_ms") || !radio.includes("ready_count")) {
   fail("prefetch network timing telemetry is incomplete");
 }
-if (!styles.includes("bottom: calc(8px + env(safe-area-inset-bottom));")) {
-  fail("mobile transport must keep only an 8px visual gap above the iOS Home safe area");
+if (!styles.includes("padding: 9px 10px calc(9px + env(safe-area-inset-bottom));")) {
+  fail("mobile transport must protect the Home indicator inside the dock");
 }
-if (!read("public/assets/js/audio-core.js").includes("isAutoAdvance || isFromMediaSession || isFromTransportControl")) {
+if (/bottom:\s*calc\(-1\s*\*\s*env\(safe-area-inset-bottom\)\)/.test(styles) || /100dvh\s*\+\s*env\(safe-area-inset-bottom\)/.test(styles)) {
+  fail("Now Playing must not extend beyond the viewport by the bottom safe area");
+}
+if (!styles.includes("margin-top: auto;") || !styles.includes("padding-bottom: var(--mobile-player-space, 0px) !important;")) {
+  fail("mobile bottom layout must anchor Up Next and count the safe area only once");
+}
+if (!core.includes("isAutoAdvance || isFromMediaSession || isFromTransportControl")) {
   fail("transport navigation must use the immediate source-switch path");
+}
+if (!core.includes("hasRelevantTransportPrefetch") || !core.includes("nextPrefetchInFlightSrcs")) {
+  fail("transport navigation must preserve a still-relevant in-flight prefetch");
 }
 if (!radio.includes("function prepareRadioColdStart")) {
   fail("Radio must prepare its first startup segment before the cold Play tap");
@@ -95,7 +105,7 @@ if (!radio.slice(playingHandlerStart).includes("playbackConfirmedToken = audioSt
 if (!radio.includes("function primeRadioPlaylistFromLoadedTracks")) {
   fail("cold-start Radio must support synchronous queue preparation from loaded tracks");
 }
-if (!read("public/assets/js/audio-core.js").includes("primeRadioPlaylistFromLoadedTracks();")) {
+if (!core.includes("primeRadioPlaylistFromLoadedTracks();")) {
   fail("cold-start playback does not use synchronous Radio queue preparation");
 }
 
@@ -104,7 +114,7 @@ if (r2FetchGuard < 0 || !sw.slice(r2FetchGuard, r2FetchGuard + 220).includes("se
   fail("R2 audio requests must consult the startup-segment cache");
 }
 if (!sw.includes("buildRangeResponseFromCachedAudio")) fail("startup segment Range reconstruction is missing");
-if (read("public/assets/js/audio-core.js").includes("queueIosTransportNavigation")) {
+if (core.includes("queueIosTransportNavigation")) {
   fail("user transport navigation must never be deferred");
 }
 const installBlock = sw.slice(sw.indexOf('self.addEventListener("install"'), sw.indexOf('self.addEventListener("activate"'));
@@ -132,6 +142,6 @@ for (const relativePath of publicFiles) {
     fail(`${relativePath} still references an obsolete audio runtime`);
   }
 }
-if (!sw.includes("infra-shell-20260714-audio321")) fail("Service Worker cache version is not audio321");
+if (!sw.includes("infra-shell-20260714-audio322")) fail("Service Worker cache version is not audio322");
 
 if (!process.exitCode) console.log("Audio stability checks passed.");

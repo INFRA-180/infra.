@@ -408,14 +408,26 @@
       const isAutoAdvance = Boolean(opts.auto);
       const isFromMediaSession = Boolean(opts.fromMediaSession);
       const isFromTransportControl = Boolean(opts.fromTransportControl);
+      const followingTrack = audioState.playlist[index + 1];
+      const followingSrc = normalizeAudioSourceUrl(followingTrack && followingTrack.src ? followingTrack.src : "");
       const hasPreparedTarget = Boolean(
         (audioState.nextPrefetchReadySrcs instanceof Set && audioState.nextPrefetchReadySrcs.has(nextSrc)) ||
         (audioState.nextPrefetchDoneSrc && srcMatches(audioState.nextPrefetchDoneSrc, nextSrc || target.src))
       );
+      const hasRelevantTransportPrefetch = Boolean(
+        isFromTransportControl &&
+        audioState.nextPrefetchInFlightSrcs instanceof Set &&
+        [nextSrc, followingSrc].some(function (src) {
+          if (!src) return false;
+          return Array.from(audioState.nextPrefetchInFlightSrcs).some(function (inFlightSrc) {
+            return srcMatches(inFlightSrc, src);
+          });
+        })
+      );
       const isFastSkip = isAutoAdvance || isFromMediaSession || isFromTransportControl;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
 
-      if (!hasPreparedTarget && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
+      if (!hasPreparedTarget && !hasRelevantTransportPrefetch && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
         clearNextTrackPrefetch(isFromTransportControl ? "transport_start" : "manual_start");
         if (!isFromTransportControl) resetPreparedInitialGlobalRandomPlayback();
       }

@@ -10,7 +10,7 @@
     CACHE_NAME: "infra-next-track-segments-v6",
     MAX_BYTES: 15 * 1024 * 1024,
     THRESHOLD_SECONDS: 30,
-    STARTUP_BYTES: 1024 * 1024,
+    PREFETCH_SEGMENT_SIZE: 4 * 1024 * 1024,
     QUEUE_DEPTH: 4,
     CONCURRENCY: 2,
     MAX_ENTRIES: 6
@@ -30,7 +30,7 @@
     const headers = new Headers(opts.headers || {});
     const bytes = Number.isFinite(Number(opts.bytes)) && Number(opts.bytes) > 0
       ? Math.floor(Number(opts.bytes))
-      : constants.STARTUP_BYTES;
+      : constants.PREFETCH_SEGMENT_SIZE;
     if (opts.range !== false && bytes > 0 && !headers.has("Range")) {
       headers.set("Range", `bytes=0-${bytes - 1}`);
     }

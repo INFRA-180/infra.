@@ -36,7 +36,8 @@ vm.runInContext(
 (async function () {
   const api = sandbox.InfraAudioPrefetch;
   const request = api.createRequest("https://media.test/next.m4a");
-  assert.strictEqual(request.headers.get("Range"), "bytes=0-1048575");
+  assert.strictEqual(api.constants.PREFETCH_SEGMENT_SIZE, 4 * 1024 * 1024);
+  assert.strictEqual(request.headers.get("Range"), "bytes=0-4194303");
   assert.strictEqual(api.constants.CACHE_NAME, "infra-next-track-segments-v6");
   assert.strictEqual(api.constants.QUEUE_DEPTH, 4);
   assert.strictEqual(api.constants.CONCURRENCY, 2);

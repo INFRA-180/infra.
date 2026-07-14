@@ -2254,14 +2254,7 @@
     if (duration <= 0) return false;
     if (bufferedEnd >= duration * 0.98) return true;
     if (duration - currentTime <= PREFETCH_NEXT_THRESHOLD_SECONDS) return true;
-    return (
-      reason === "playing" &&
-      audioState.homeMode === "radio" &&
-      audioState.mediaSessionAudioPlaying === true &&
-      audio.readyState >= 3 &&
-      Number.isFinite(audio.currentTime) &&
-      audio.currentTime >= 0.25
-    );
+    return reason === "playing" && duration <= PREFETCH_NEXT_THRESHOLD_SECONDS;
   }
 
 

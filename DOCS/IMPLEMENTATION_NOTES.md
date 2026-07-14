@@ -1,5 +1,11 @@
 # Implementation Notes
 
+## 2026-07-14 — rollback audiofix324 to e637b42
+
+- Production telemetry for audiofix324 after rapid-track tests showed 6 playback attempts with a median play_call to playing delay of 3512.5 ms and a maximum of 5854 ms.
+- Four AbortError events occurred while the document was hidden; no prefetch_start or served_from_prefetch events were recorded in those sessions.
+- Restored the tracked public tree exactly from commit e637b42 (audiofix323), preserving the known-good passive startup recovery and previous prefetch behavior.
+
 ## 2026-07-14 — audiofix324 radio prefetch start and zeroed mini-player time
 
 - Radio N+1 prefetch may now start on a confirmed "playing" event for an already-ready track with at least 250 ms of progress; short-track, near-end, in-flight and attempted guards remain unchanged.

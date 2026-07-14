@@ -74,4 +74,11 @@
 - Cross-origin R2 media requests bypass the Service Worker entirely, preserving Safari's native Range-request path. Next-track full-file prefetch is disabled on iOS to avoid competing with the active media request.
 - A newly installed Service Worker no longer takes control and reloads the active application during a Play gesture. The new runtime activates on the next application launch, while the shell is served cache-first and refreshed in the background.
 - Home catalog loading is local-first and preserves the first rendered DOM. Startup telemetry now records navigation, paint, largest-contentful-paint, cumulative layout shift, catalog hydration, initialization, and ready timing.
-- `tools/verify-audio-stability.js` protects these invariants and checks that all public album pages reference `audiofix313-20260714`.
+- `tools/verify-audio-stability.js` protects these invariants and checks that all public album pages reference the current audio runtime.
+
+## 2026-07-14 — Restore immediate iOS Radio N+1 preparation
+
+- `audiofix313` disabled next-track prefetch on iOS and cleared its cache. Production telemetry then measured a 3335 ms median `play_resolved` delay, despite first-byte events arriving within 39–57 ms; the delay was Safari buffering each unprepared M4A after the transport tap.
+- N+1 prefetch is enabled again on iOS and starts as soon as a Radio track reaches `playing`, while R2 media Range requests continue to bypass the Service Worker.
+- Transport next/previous switches now use the immediate source-switch path even when the target prefetch has not completed, removing the extra readiness guard from the user gesture.
+- The release is `audiofix314-20260714` / `infra-shell-20260714-audio314`.

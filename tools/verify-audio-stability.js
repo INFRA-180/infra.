@@ -13,7 +13,7 @@ const fail = (message) => {
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const sw = read("public/sw.js");
-const release = "audiofix313-20260714";
+const release = "audiofix314-20260714";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -37,6 +37,22 @@ if (!waitingRecovery.includes('"startup_waiting_passive"')) fail("startup waitin
 if (scripts.includes("window.location.reload(")) fail("runtime must not force an application reload");
 if (!scripts.includes('"sw_reload_suppressed"')) fail("suppressed Service Worker reload telemetry is missing");
 if (!scripts.includes('"startup_cls"')) fail("startup layout-shift telemetry is missing");
+if (/PREFETCH_NEXT_ENABLED[\s\S]{0,180}!isIosDevice\(\)/.test(scripts)) {
+  fail("next-track prefetch must remain enabled on iOS");
+}
+if (!radio.includes('reason === "playing" && audioState.homeMode === "radio"')) {
+  fail("Radio must prefetch N+1 as soon as playback starts");
+}
+if (!read("public/assets/js/audio-core.js").includes("isAutoAdvance || isFromMediaSession || isFromTransportControl")) {
+  fail("transport navigation must use the immediate source-switch path");
+}
+if (!radio.includes("getCurrentPlaylistIndexSafe() !== fromIndexAtStart")) {
+  fail("Radio prefetch must chain after a skip overtakes an in-flight N+1 request");
+}
+const telemetry = read("public/assets/js/audio-telemetry.js");
+for (const eventName of ["startup_cls", "startup_waiting_passive", "sw_reload_suppressed"]) {
+  if (!telemetry.includes(`"${eventName}"`)) fail(`${eventName} is not exported by fine telemetry`);
+}
 
 const playHandlerStart = radio.indexOf('audio.addEventListener("play"');
 const playingHandlerStart = radio.indexOf('audio.addEventListener("playing"');
@@ -69,10 +85,10 @@ for (const relativePath of publicFiles) {
   if (!source.includes(release) && relativePath !== "public/sw.js") {
     fail(`${relativePath} does not reference ${release}`);
   }
-  if (/audiofix(?:304|311|312)-2026071[34]/.test(source)) {
+  if (/audiofix(?:304|311|312|313)-2026071[34]/.test(source)) {
     fail(`${relativePath} still references an obsolete audio runtime`);
   }
 }
-if (!sw.includes("infra-shell-20260714-audio313")) fail("Service Worker cache version is not audio313");
+if (!sw.includes("infra-shell-20260714-audio314")) fail("Service Worker cache version is not audio314");
 
 if (!process.exitCode) console.log("Audio stability checks passed.");

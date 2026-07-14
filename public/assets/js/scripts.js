@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix313-20260714";
+window.INFRA_BUILD_TAG = "audiofix314-20260714";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -344,12 +344,9 @@ function openAppDownloadGatekeeper(appName, url) {
   const prefetchApi = window.InfraAudioPrefetch || null;
   const prefetchConstants = prefetchApi && prefetchApi.constants ? prefetchApi.constants : {};
   const PREFETCH_NEXT_ENABLED = Object.prototype.hasOwnProperty.call(prefetchConstants, "ENABLED")
-    ? Boolean(prefetchConstants.ENABLED) && !isIosDevice()
-    : !isIosDevice();
+    ? Boolean(prefetchConstants.ENABLED)
+    : true;
   // ROLLBACK: passer a false pour couper les prefetchs N+1 et play froid sans toucher au play sync.
-  if (!PREFETCH_NEXT_ENABLED && prefetchApi && typeof prefetchApi.clearCache === "function") {
-    prefetchApi.clearCache().catch(function () {});
-  }
   const PREFETCH_NEXT_CACHE_NAME = prefetchConstants.CACHE_NAME || "infra-next-track";
   const coverApi = window.InfraCovers || null;
   const coverConstants = coverApi && coverApi.constants
@@ -378,7 +375,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix313-20260714";
+  const LOCAL_CATALOG_VERSION = "audiofix314-20260714";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -399,7 +396,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix313-20260714";
+  const runtimeVersion = "audiofix314-20260714";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||

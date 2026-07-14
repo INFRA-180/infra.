@@ -2298,6 +2298,7 @@
     const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
     const bufferedEnd = getCurrentBufferedEndForPrefetch(audio);
     if (duration <= 0) return false;
+    if (reason === "playing" && audioState.homeMode === "radio") return true;
     if (bufferedEnd >= duration * 0.98) return true;
     if (duration - currentTime <= PREFETCH_NEXT_THRESHOLD_SECONDS) return true;
     return reason === "playing" && duration <= PREFETCH_NEXT_THRESHOLD_SECONDS;
@@ -2356,6 +2357,7 @@
     if (!PREFETCH_NEXT_ENABLED || !prefetchSupported) return;
     const token = ++audioState.nextPrefetchToken;
     const startedAt = Date.now();
+    const fromIndexAtStart = getCurrentPlaylistIndexSafe();
     const abortController = typeof AbortController === "function"
       ? new AbortController()
       : null;
@@ -2445,6 +2447,11 @@
         audioState.nextPrefetchInFlight = false;
         if (audioState.nextPrefetchAbortController === abortController) {
           audioState.nextPrefetchAbortController = null;
+        }
+        if (audioState.homeMode === "radio" && getCurrentPlaylistIndexSafe() !== fromIndexAtStart) {
+          window.setTimeout(function () {
+            maybePrefetchNextTrack("playing");
+          }, 0);
         }
       }
     });

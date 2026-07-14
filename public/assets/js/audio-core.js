@@ -507,11 +507,14 @@
       const isFromMediaSession = Boolean(opts.fromMediaSession);
       const isFromTransportControl = Boolean(opts.fromTransportControl);
       const preparedNextIndex = getAutoPrefetchedNextIndex();
-      const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index;
-      const isFastSkip = isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget;
+      const hasPreparedTarget = preparedNextIndex === index;
+      const hasActivePrefetchTarget = Number.isInteger(audioState.nextPrefetchIndex) &&
+        audioState.nextPrefetchIndex === index &&
+        srcMatches(audioState.nextPrefetchSrc || "", nextSrc || target.src);
+      const isFastSkip = isAutoAdvance || isFromMediaSession || isFromTransportControl;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
 
-      if (!isFastSkip && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
+      if (!hasPreparedTarget && !hasActivePrefetchTarget && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
         clearNextTrackPrefetch("manual_start");
         resetPreparedInitialGlobalRandomPlayback();
       }

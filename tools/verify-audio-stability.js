@@ -13,7 +13,7 @@ const fail = (message) => {
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const sw = read("public/sw.js");
-const release = "audiofix319-20260714";
+const release = "audiofix320-20260714";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -99,6 +99,12 @@ if (read("public/assets/js/audio-core.js").includes("queueIosTransportNavigation
 }
 const installBlock = sw.slice(sw.indexOf('self.addEventListener("install"'), sw.indexOf('self.addEventListener("activate"'));
 if (!installBlock.includes("skipWaiting")) fail("Service Worker updates must activate without remaining stuck in waiting");
+if (!installBlock.includes("cache.addAll(CRITICAL_SHELL_ASSETS)")) {
+  fail("Service Worker critical shell assets must remain atomic");
+}
+if (!installBlock.includes("Promise.allSettled") || !installBlock.includes("OPTIONAL_SHELL_ASSETS")) {
+  fail("Service Worker optional shell assets must not block installation");
+}
 if (!scripts.includes('registration.waiting.postMessage({ type: "SKIP_WAITING" })')) {
   fail("an already-waiting Service Worker must be released without reloading playback");
 }
@@ -116,6 +122,6 @@ for (const relativePath of publicFiles) {
     fail(`${relativePath} still references an obsolete audio runtime`);
   }
 }
-if (!sw.includes("infra-shell-20260714-audio319")) fail("Service Worker cache version is not audio319");
+if (!sw.includes("infra-shell-20260714-audio320")) fail("Service Worker cache version is not audio320");
 
 if (!process.exitCode) console.log("Audio stability checks passed.");

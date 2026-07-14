@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260714-audio319";
+const VERSION = "infra-shell-20260714-audio320";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
@@ -12,35 +12,35 @@ const SHELL_ASSETS = [
   "./sphragis/",
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
-  "./assets/css/styles.css?v=audiofix319-20260714",
-  "./assets/js/covers.js?v=audiofix319-20260714",
-  "./assets/js/favorites.js?v=audiofix319-20260714",
-  "./assets/js/favorites-ui.js?v=audiofix319-20260714",
-  "./assets/js/transport-ui.js?v=audiofix319-20260714",
-  "./assets/js/now-playing.js?v=audiofix319-20260714",
-  "./assets/js/album-player-ui.js?v=audiofix319-20260714",
-  "./assets/js/spa-renderer.js?v=audiofix319-20260714",
-  "./assets/js/audio-radio.js?v=audiofix319-20260714",
-  "./assets/js/media-session.js?v=audiofix319-20260714",
-  "./assets/js/audio-prefetch.js?v=audiofix319-20260714",
-  "./assets/js/spa-router.js?v=audiofix319-20260714",
-  "./assets/js/catalog-fallback.js?v=audiofix319-20260714",
-  "./assets/js/catalog-loader.js?v=audiofix319-20260714",
-  "./assets/js/audio-telemetry.js?v=audiofix319-20260714",
-  "./assets/js/downloads.js?v=audiofix319-20260714",
-  "./assets/js/home-catalog.js?v=audiofix319-20260714",
-  "./assets/js/audio-core.js?v=audiofix319-20260714",
-  "./assets/js/pwa-install.js?v=audiofix319-20260714",
-  "./assets/js/share-qr.js?v=audiofix319-20260714",
-  "./assets/js/scripts.js?v=audiofix319-20260714",
-  "./assets/js/scripts.admin.js?v=audiofix319-20260714",
+  "./assets/css/styles.css?v=audiofix320-20260714",
+  "./assets/js/covers.js?v=audiofix320-20260714",
+  "./assets/js/favorites.js?v=audiofix320-20260714",
+  "./assets/js/favorites-ui.js?v=audiofix320-20260714",
+  "./assets/js/transport-ui.js?v=audiofix320-20260714",
+  "./assets/js/now-playing.js?v=audiofix320-20260714",
+  "./assets/js/album-player-ui.js?v=audiofix320-20260714",
+  "./assets/js/spa-renderer.js?v=audiofix320-20260714",
+  "./assets/js/audio-radio.js?v=audiofix320-20260714",
+  "./assets/js/media-session.js?v=audiofix320-20260714",
+  "./assets/js/audio-prefetch.js?v=audiofix320-20260714",
+  "./assets/js/spa-router.js?v=audiofix320-20260714",
+  "./assets/js/catalog-fallback.js?v=audiofix320-20260714",
+  "./assets/js/catalog-loader.js?v=audiofix320-20260714",
+  "./assets/js/audio-telemetry.js?v=audiofix320-20260714",
+  "./assets/js/downloads.js?v=audiofix320-20260714",
+  "./assets/js/home-catalog.js?v=audiofix320-20260714",
+  "./assets/js/audio-core.js?v=audiofix320-20260714",
+  "./assets/js/pwa-install.js?v=audiofix320-20260714",
+  "./assets/js/share-qr.js?v=audiofix320-20260714",
+  "./assets/js/scripts.js?v=audiofix320-20260714",
+  "./assets/js/scripts.admin.js?v=audiofix320-20260714",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./assets/js/sphragis.js?v=sphragis20260625",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
   "./data/catalog.json",
-  "./data/track-durations.json?v=audiofix319-20260714",
-  "./data/tracks.json?v=audiofix319-20260714",
+  "./data/track-durations.json?v=audiofix320-20260714",
+  "./data/tracks.json?v=audiofix320-20260714",
   "./assets/branding/infra-logo-white-photoroom-title.png",
   "./assets/pwa/favicon-logo-white-64.png",
   "./assets/pwa/icon-192-logo-white.png",
@@ -50,12 +50,24 @@ const SHELL_ASSETS = [
   "./assets/pwa/apple-touch-icon-180-logo-white.png"
 ];
 
+const OPTIONAL_SHELL_ASSETS = [
+  "./assets/js/scripts.admin.js?v=audiofix320-20260714",
+  "./assets/js/share-qr.js?v=audiofix320-20260714",
+  "./assets/vendor/qr-creator.min.js?v=1.0.0"
+];
+const OPTIONAL_SHELL_ASSET_SET = new Set(OPTIONAL_SHELL_ASSETS);
+const CRITICAL_SHELL_ASSETS = SHELL_ASSETS.filter((url) => !OPTIONAL_SHELL_ASSET_SET.has(url));
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches
-      .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
-      .then(() => self.skipWaiting())
+    (async function () {
+      const cache = await caches.open(SHELL_CACHE);
+      await cache.addAll(CRITICAL_SHELL_ASSETS);
+      await Promise.allSettled(
+        OPTIONAL_SHELL_ASSETS.map((url) => cache.add(url).catch(() => undefined))
+      );
+      await self.skipWaiting();
+    })()
   );
 });
 

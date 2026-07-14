@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-07-14 — audiofix323 passive iOS startup recovery
+
+- Kept the July 3 full-file N+1 prefetch unchanged: one `infra-next-track` entry, one in-flight request and the existing 15 MiB cap.
+- `waiting`/`stalled` recovery is now passive until the media element has emitted `playing` and progressed beyond 250 ms; this prevents the 700 ms recovery timer from calling `audio.load()` during an iOS startup and aborting the user Play request.
+- No CSS, player layout, Service Worker routing, Range reconstruction, Media Session, favorites, Worker/R2 or segment logic changed.
+- Runtime/SW cache-busting was bumped to `audiofix323-20260714` / `infra-shell-20260714-audio323`.
+
+
 ## 2026-07-14 — complete public rollback to July 3
 
 - Restored the entire tracked `public/` tree exactly from commit `760092e`, the last repository commit dated July 3, 2026.

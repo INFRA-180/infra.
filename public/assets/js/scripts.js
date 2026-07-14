@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix280-20260703";
+window.INFRA_BUILD_TAG = "audiofix323-20260714";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -392,7 +392,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix280-20260703";
+  const runtimeVersion = "audiofix323-20260714";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -4681,6 +4681,11 @@ function openAppDownloadGatekeeper(appName, url) {
     const audio = audioState.audio;
     if (!audio) return;
     if (audio.paused) return;
+    // Do not reset the media element while an iOS startup is still settling.
+    // Safari can emit waiting/stalled before the first real playback progress;
+    // calling load() in that window aborts the user-initiated play request.
+    if (!audioState.mediaSessionAudioPlaying) return;
+    if (Number(audio.currentTime || 0) < 0.25) return;
     if (audioState.trackStartInFlight) return;
     if (audio.readyState >= 3) return;
 
@@ -4713,6 +4718,12 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function scheduleWaitingRecovery() {
     clearWaitingRecovery();
+    const audio = audioState.audio;
+    if (!audio || audio.paused) return;
+    // Startup waiting/stalled is passive. Recovery is reserved for a track
+    // that has already emitted playing and made measurable progress.
+    if (!audioState.mediaSessionAudioPlaying) return;
+    if (Number(audio.currentTime || 0) < 0.25) return;
     audioState.prefetchPausedUntil = Date.now() + (isIosDevice() ? 2600 : 1600);
     audioState.waitingRecoveryTimer = setTimeout(function () {
       audioState.waitingRecoveryTimer = null;

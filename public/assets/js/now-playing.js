@@ -79,37 +79,25 @@
     return isDarkColor(base) ? base : "#14141c";
   }
 
-  function setNowPlayingSurfaceColor(color) {
+  function setNowPlayingSafeAreaColor(color) {
     const rawColor = String(color || "").trim();
     const safeColor = /^#[0-9a-f]{6}$/i.test(rawColor) && isDarkColor(rawColor)
       ? rawColor
       : "#14141c";
     const transport = audioState.transport;
-    const surfaces = [
-      document.documentElement,
-      document.body,
-      transport && transport.overlay
-    ];
-    surfaces.forEach(function (surface) {
-      if (surface && surface.style) {
-        surface.style.setProperty("--now-playing-surface-bg", safeColor);
-      }
-    });
+    const overlay = transport && transport.overlay;
+    if (overlay && overlay.style) {
+      overlay.style.setProperty("--now-playing-safe-area-bg", safeColor);
+    }
     setThemeColor(safeColor);
   }
 
-  function clearNowPlayingSurfaceColor() {
+  function clearNowPlayingSafeAreaColor() {
     const transport = audioState.transport;
-    const surfaces = [
-      document.documentElement,
-      document.body,
-      transport && transport.overlay
-    ];
-    surfaces.forEach(function (surface) {
-      if (surface && surface.style) {
-        surface.style.removeProperty("--now-playing-surface-bg");
-      }
-    });
+    const overlay = transport && transport.overlay;
+    if (overlay && overlay.style) {
+      overlay.style.removeProperty("--now-playing-safe-area-bg");
+    }
   }
 
   function extractImageThemeColor(src, token) {
@@ -132,14 +120,14 @@
         const green = Math.max(0, Math.min(255, data[1] || 0));
         const blue = Math.max(0, Math.min(255, data[2] || 0));
         const color = `#${[red, green, blue].map((part) => part.toString(16).padStart(2, "0")).join("")}`;
-        setNowPlayingSurfaceColor(isDarkColor(color) ? color : "#14141c");
+        setNowPlayingSafeAreaColor(isDarkColor(color) ? color : "#14141c");
       } catch (_err) {
-        setNowPlayingSurfaceColor(getFallbackNowPlayingThemeColor());
+        setNowPlayingSafeAreaColor(getFallbackNowPlayingThemeColor());
       }
     };
     image.onerror = function () {
       if (token === audioState.nowPlayingThemeToken && audioState.nowPlayingOpen) {
-        setNowPlayingSurfaceColor(getFallbackNowPlayingThemeColor());
+        setNowPlayingSafeAreaColor(getFallbackNowPlayingThemeColor());
       }
     };
     image.src = url;
@@ -153,14 +141,14 @@
       audioState.nowPlayingPreviousThemeColor = getCurrentThemeColor();
     }
     const token = ++audioState.nowPlayingThemeToken;
-    setNowPlayingSurfaceColor(getFallbackNowPlayingThemeColor());
+    setNowPlayingSafeAreaColor(getFallbackNowPlayingThemeColor());
     extractImageThemeColor(artworkUrl, token);
   }
 
   function restoreNowPlayingThemeColor() {
     audioState.nowPlayingThemeToken += 1;
     audioState.nowPlayingThemeArtwork = "";
-    clearNowPlayingSurfaceColor();
+    clearNowPlayingSafeAreaColor();
     if (audioState.nowPlayingPreviousThemeColor) {
       setThemeColor(audioState.nowPlayingPreviousThemeColor);
       audioState.nowPlayingPreviousThemeColor = "";

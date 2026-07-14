@@ -3204,7 +3204,7 @@ body.now-playing-open {
   overflow: hidden;
   height: 100%;
   overscroll-behavior: none;
-  background: var(--now-playing-surface-bg, #14141c) !important;
+  background: #050609 !important;
 }
 
 .now-playing-overlay {
@@ -3216,7 +3216,7 @@ body.now-playing-open {
   justify-content: center;
   align-items: center;
   padding: 0 18px max(18px, env(safe-area-inset-bottom));
-  background: var(--now-playing-surface-bg, #14141c);
+  background: rgba(6, 7, 10, 0.62);
   color: #fff;
   overflow: hidden;
   overscroll-behavior: contain;
@@ -3246,6 +3246,18 @@ body.now-playing-open {
   background:
     radial-gradient(90% 80% at 50% 0%, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0) 58%),
     linear-gradient(180deg, rgba(5, 6, 9, 0.18), rgba(5, 6, 9, 0.78));
+  pointer-events: none;
+}
+
+.now-playing-overlay::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: env(safe-area-inset-top);
+  z-index: 2;
+  background: var(--now-playing-safe-area-bg, #14141c);
   pointer-events: none;
 }
 
@@ -4149,7 +4161,7 @@ body.now-playing-open {
 
 @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
   .now-playing-overlay {
-    background: var(--now-playing-surface-bg, #14141c);
+    background: rgba(10, 10, 15, 0.95);
   }
 }
 

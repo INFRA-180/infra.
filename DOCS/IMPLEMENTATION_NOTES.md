@@ -57,3 +57,8 @@
 
 - Safari iOS `AbortError` recovery now waits only a short settle window before resetting the same source and retrying playback.
 - `served_from_prefetch` telemetry now preserves `status: 0` and reports `bypass`, so Service Worker Range bypasses are visible in reports.
+
+## 2026-07-14 — iOS AbortError aggressive retry window
+
+- The iOS `AbortError` settle window is reduced to a micro-delay before source reset and retry, because telemetry showed the previous 1.05–1.25s settle added visible latency without preventing repeated waits.
+- The readiness wait after reset is also shortened so retry playback starts quickly even when Safari has not yet promoted the media element to `canplay`.

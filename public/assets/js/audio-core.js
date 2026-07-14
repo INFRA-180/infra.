@@ -662,7 +662,7 @@
           click_perf_ms: audioState.audioClickPerfTs
         });
         if (playErr && playErr.name === "AbortError" && !isRetry && isIosDevice()) {
-          const abortSettleTimeout = isFastSkip ? 1050 : 1250;
+          const abortSettleTimeout = isFastSkip ? 220 : 260;
           beginAudioRecovery({
             request_token: requestToken,
             reason: "AbortError",
@@ -714,7 +714,7 @@
               recoverFromTrackFailure(index, target.src, requestToken);
               return;
             }
-            waitForAudioReadiness(audio, requestToken, 900).then(function (ready) {
+            waitForAudioReadiness(audio, requestToken, 260).then(function (ready) {
               if (requestToken !== audioState.startRequestToken) return;
               logAudioAuditEvent("ready_wait_end", target, index, nextSrc || target.src, {
                 request_token: requestToken,

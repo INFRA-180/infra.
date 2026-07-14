@@ -1,5 +1,12 @@
 # Implementation Notes
 
+## 2026-07-14 — audiofix318 PWA status-bar full-bleed
+
+- All 36 PWA HTML documents (home, 31 album pages, 3 app pages and Sphragis) now opt into `viewport-fit=cover`; the Google verification file remains byte-for-byte a verification artifact.
+- The three app pages now also declare `apple-mobile-web-app-status-bar-style=black-translucent`, matching the rest of the PWA documents.
+- While the now-playing overlay is open, `setThemeColor()` synchronizes the document theme-color meta tag, `--pwa-status-bg`, and the inline backgrounds of `html` and `body`. Closing restores the pre-overlay color through the existing saved-theme lifecycle.
+- `audiofix318-20260714` / `infra-shell-20260714-audio318` refreshes the shell cache only; Service Worker routing and audio behavior are unchanged.
+
 ## 2026-07-14 — PWA runtime adoption and playback-correlation telemetry
 
 - Production inspection found a browser page still loading `audiofix315` while the origin already served `audiofix316`. The Service Worker previously activated updates but deliberately suppressed every client reload, so an active installed PWA could remain on its old JavaScript runtime.

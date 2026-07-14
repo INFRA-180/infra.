@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix317-20260714";
+window.INFRA_BUILD_TAG = "audiofix318-20260714";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -383,7 +383,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix317-20260714";
+  const LOCAL_CATALOG_VERSION = "audiofix318-20260714";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -404,7 +404,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix317-20260714";
+  const runtimeVersion = "audiofix318-20260714";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -2955,8 +2955,10 @@ function openAppDownloadGatekeeper(appName, url) {
     const body = document.body;
     root.style.setProperty("--pwa-status-bg", color);
     root.style.backgroundColor = color;
+    root.style.background = color;
     if (body) {
       body.style.setProperty("--pwa-status-bg", color);
+      body.style.background = color;
     }
     ensureMetaTag("theme-color", color);
     ensureMetaTag("apple-mobile-web-app-status-bar-style", "black-translucent");
@@ -2970,7 +2972,11 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function setThemeColor(color) {
     const safeColor = /^#[0-9a-f]{6}$/i.test(String(color || "").trim()) ? color : "#111111";
-    ensureMetaTag("theme-color", safeColor);
+    const meta = document.querySelector('meta[name="theme-color"]') || ensureMetaTag("theme-color", safeColor);
+    meta.content = safeColor;
+    document.documentElement.style.setProperty("--pwa-status-bg", safeColor);
+    document.documentElement.style.background = safeColor;
+    if (document.body) document.body.style.background = safeColor;
   }
 
   function initThemePreset() {

@@ -13,7 +13,7 @@ const fail = (message) => {
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const sw = read("public/sw.js");
-const release = "audiofix317-20260714";
+const release = "audiofix318-20260714";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -116,6 +116,6 @@ for (const relativePath of publicFiles) {
     fail(`${relativePath} still references an obsolete audio runtime`);
   }
 }
-if (!sw.includes("infra-shell-20260714-audio317")) fail("Service Worker cache version is not audio317");
+if (!sw.includes("infra-shell-20260714-audio318")) fail("Service Worker cache version is not audio318");
 
 if (!process.exitCode) console.log("Audio stability checks passed.");

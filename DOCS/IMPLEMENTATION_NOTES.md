@@ -1,5 +1,14 @@
 # Implementation Notes
 
+## 2026-07-15 — audiofix325 iOS fullscreen safe-area split
+
+- A real iPhone test showed that audiofix324's artwork-derived color on `html` and `body` also painted the lower system area behind the Home Indicator as a separate band.
+- The extracted dark color is now stored only on `.now-playing-overlay` as `--now-playing-safe-area-bg` and painted by `.now-playing-overlay::after` at the top with `height: env(safe-area-inset-top)`. The existing full-screen `::before` gradients remain unchanged.
+- `html.now-playing-open` and `body.now-playing-open` use the player's static `#050609` fallback instead of any artwork color. The overlay's normal translucent surface and no-backdrop-filter fallback are restored, while the backdrop remains `position: absolute; inset: 0` behind the Home Indicator.
+- `viewport-fit=cover`, `black-translucent`, the top-safe control offsets, lower-player layout and `#infraSpaPersist` parentage are unchanged. Transport, audio, N+1 prefetch and the Service Worker are untouched.
+- Only `styles.css` and `now-playing.js` receive the targeted `audiofix325-20260715` asset query in the 35 player documents; the runtime and Service Worker stay on their existing audiofix324 identifiers.
+- Validation: JS/SW syntax, public and Sphragis boundaries, catalog (31 albums / 280 tracks / 41 shell assets), 36 PWA heads, diff check and Chromium mobile 390×844 open/close passed. The extracted color existed only on the overlay, a simulated 47 px top inset ended at 47 px, roots/theme were restored on close and playback continued. Final iOS PWA confirmation remains required.
+
 ## 2026-07-15 — audiofix324 iOS status-bar artwork continuity
 
 - Restored `viewport-fit=cover` on all 36 PWA HTML documents while retaining `apple-mobile-web-app-capable=yes`, `black-translucent` and manifest `display: standalone` (no fullscreen workaround).

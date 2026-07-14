@@ -3212,7 +3212,7 @@ body.now-playing-open {
   overflow: hidden;
   height: 100%;
   overscroll-behavior: none;
-  background: #050609;
+  background: var(--pwa-status-bg);
 }
 
 .now-playing-overlay {
@@ -4170,6 +4170,8 @@ body.now-playing-open {
 @media (max-width: 640px) {
   .now-playing-overlay {
     display: block;
+    /* Continue the artwork-backed overlay through the iOS Home safe area. */
+    bottom: calc(-1 * env(safe-area-inset-bottom));
     padding: 0;
   }
 
@@ -4180,10 +4182,10 @@ body.now-playing-open {
   .now-playing-panel {
     --now-playing-content-width: min(92vw, 410px);
     width: 100%;
-    min-height: 100vh;
-    min-height: 100dvh;
-    max-height: 100vh;
-    max-height: 100dvh;
+    min-height: calc(100vh + env(safe-area-inset-bottom));
+    min-height: calc(100dvh + env(safe-area-inset-bottom));
+    max-height: calc(100vh + env(safe-area-inset-bottom));
+    max-height: calc(100dvh + env(safe-area-inset-bottom));
     border-radius: 0;
     border: 0;
     padding: calc(16px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));

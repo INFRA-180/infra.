@@ -1,5 +1,18 @@
 # Implementation Notes
 
+## 2026-07-14 — audiofix320 PWA bottom safe-area continuity
+
+- iPhone PWA validation confirmed that the status-bar side is now full-bleed. The remaining black strip was the lower safe area behind the Home indicator, not the status bar.
+- The now-playing root fallback now uses `--pwa-status-bg` instead of hard-coded black. On mobile, the artwork-backed overlay itself extends through `env(safe-area-inset-bottom)`; the panel keeps that inset as bottom padding, so `À suivre` remains usable directly above the Home gesture area without a separate colour band.
+- The top safe area, transport, audio runtime, Service Worker routing, favorites and Media Session are unchanged.
+
+## 2026-07-14 — audiofix320 tolerant shell installation
+
+- Audited all 41 `SHELL_ASSETS` URLs against GitHub Pages: every asset returned HTTP 200; no missing file was found.
+- Kept 38 critical shell assets under atomic `cache.addAll`, while moving admin, share QR and the QR vendor to an optional `Promise.allSettled` phase.
+- Added regression coverage proving that an optional failure reaches `skipWaiting` and that a critical failure still rejects installation.
+- Cache matching, HTML cache-first behavior, audio, Media Session, Worker/R2 and favorites remain unchanged.
+
 ## 2026-07-14 — audiofix318 PWA status-bar full-bleed
 
 - All 36 PWA HTML documents (home, 31 album pages, 3 app pages and Sphragis) now opt into `viewport-fit=cover`; the Google verification file remains byte-for-byte a verification artifact.

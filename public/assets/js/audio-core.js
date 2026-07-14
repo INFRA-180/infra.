@@ -67,104 +67,6 @@
     const beginAudioRecovery = method(ctx, "beginAudioRecovery");
     const failAudioRecovery = method(ctx, "failAudioRecovery");
 
-    const IOS_NAVIGATION_DEFER_MS = 180;
-    const IOS_NAVIGATION_DEFER_MAX_MS = 1600;
-
-    function clearPendingTransportNavigationTimer() {
-      if (audioState.pendingTransportNavigationTimer) {
-        window.clearTimeout(audioState.pendingTransportNavigationTimer);
-        audioState.pendingTransportNavigationTimer = null;
-      }
-    }
-
-    function hasUnstablePlaybackStart() {
-      return Boolean(audioState.trackStartInFlight || audioState.activeAudioRecovery);
-    }
-
-    function cloneNavigationOptions(options) {
-      const source = options || {};
-      const cloned = {
-        fromMediaSession: Boolean(source.fromMediaSession),
-        fromTransportControl: Boolean(source.fromTransportControl),
-        surface: source.surface || ""
-      };
-      if (Object.prototype.hasOwnProperty.call(source, "seamless")) {
-        cloned.seamless = Boolean(source.seamless);
-      }
-      return cloned;
-    }
-
-    function schedulePendingTransportNavigation(reason) {
-      const pending = audioState.pendingTransportNavigation;
-      if (!pending) return;
-      clearPendingTransportNavigationTimer();
-      audioState.pendingTransportNavigationTimer = window.setTimeout(function () {
-        flushPendingTransportNavigation(reason || "timer");
-      }, IOS_NAVIGATION_DEFER_MS);
-    }
-
-    function flushPendingTransportNavigation(reason) {
-      const pending = audioState.pendingTransportNavigation;
-      if (!pending) return;
-      const ageMs = Date.now() - pending.queuedAt;
-      if (hasUnstablePlaybackStart() && ageMs < IOS_NAVIGATION_DEFER_MAX_MS) {
-        pending.attempts += 1;
-        schedulePendingTransportNavigation("still_unstable");
-        return;
-      }
-
-      clearPendingTransportNavigationTimer();
-      audioState.pendingTransportNavigation = null;
-      const currentTrack = getTrackByIndex(audioState.currentIndex);
-      trackAudioRuntimeEvent("transport_navigation_replayed", Object.assign(
-        buildAudioMonitorPayload(currentTrack, audioState.currentIndex, currentTrack && currentTrack.src ? currentTrack.src : ""),
-        {
-          direction: pending.direction,
-          age_ms: Math.max(0, Math.round(ageMs)),
-          attempts: pending.attempts,
-          reason: reason || "ready",
-          from_transport_control: pending.options.fromTransportControl,
-          from_media_session: pending.options.fromMediaSession,
-          surface: pending.options.surface || ""
-        }
-      ));
-      const replayOptions = Object.assign({}, pending.options, { replayed: true });
-      if (pending.direction < 0) {
-        playPrevious(replayOptions);
-      } else {
-        playNext(replayOptions);
-      }
-    }
-
-    function queueIosTransportNavigation(direction, options, targetIndex, targetTrack, prefetched) {
-      const opts = options || {};
-      if (!isIosDevice() || opts.auto || opts.replayed) return false;
-      if (!opts.fromTransportControl && !opts.fromMediaSession) return false;
-      if (!hasUnstablePlaybackStart()) return false;
-
-      const clonedOptions = cloneNavigationOptions(opts);
-      audioState.pendingTransportNavigation = {
-        direction,
-        options: clonedOptions,
-        queuedAt: Date.now(),
-        attempts: 0
-      };
-      trackAudioRuntimeEvent("transport_navigation_deferred", Object.assign(
-        buildAudioMonitorPayload(targetTrack, targetIndex, targetTrack && targetTrack.src ? targetTrack.src : ""),
-        {
-          direction,
-          target_index: targetIndex,
-          prefetched: Boolean(prefetched),
-          reason: audioState.activeAudioRecovery ? "recovery" : "track_start",
-          from_transport_control: clonedOptions.fromTransportControl,
-          from_media_session: clonedOptions.fromMediaSession,
-          surface: clonedOptions.surface || ""
-        }
-      ));
-      schedulePendingTransportNavigation("queued");
-      return true;
-    }
-
     function seekCurrentAudioToRatio(ratio) {
       const audio = audioState.audio;
       if (!audio) return;
@@ -506,15 +408,14 @@
       const isAutoAdvance = Boolean(opts.auto);
       const isFromMediaSession = Boolean(opts.fromMediaSession);
       const isFromTransportControl = Boolean(opts.fromTransportControl);
-      const preparedNextIndex = getAutoPrefetchedNextIndex();
-      const hasPreparedTarget = preparedNextIndex === index;
-      const hasActivePrefetchTarget = Number.isInteger(audioState.nextPrefetchIndex) &&
-        audioState.nextPrefetchIndex === index &&
-        srcMatches(audioState.nextPrefetchSrc || "", nextSrc || target.src);
+      const hasPreparedTarget = Boolean(
+        audioState.nextPrefetchDoneSrc &&
+        srcMatches(audioState.nextPrefetchDoneSrc, nextSrc || target.src)
+      );
       const isFastSkip = isAutoAdvance || isFromMediaSession || isFromTransportControl;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
 
-      if (!hasPreparedTarget && !hasActivePrefetchTarget && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
+      if (!hasPreparedTarget && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
         clearNextTrackPrefetch("manual_start");
         resetPreparedInitialGlobalRandomPlayback();
       }
@@ -652,7 +553,6 @@
         scheduleMediaSessionResync(requestToken);
         syncAudioUi();
         startAudioRaf();
-        schedulePendingTransportNavigation("play_resolved");
       }
 
       function handlePlayRejected(playErr, playMeta) {
@@ -683,7 +583,6 @@
           });
           setTrackStatus(rowTrack, "Chargement du fichier audio, réessaie dans quelques secondes.", { retry: true });
           syncAudioUi();
-          schedulePendingTransportNavigation("abort_retry_rejected");
           return;
         }
         if (playErr && playErr.name === "AbortError" && !isRetry && isIosDevice()) {
@@ -747,7 +646,6 @@
           });
           if (!resetForRetry) {
             audioState.trackStartInFlight = false;
-            schedulePendingTransportNavigation("abort_reset_failed");
             recoverFromTrackFailure(index, target.src, requestToken);
             return;
           }
@@ -772,7 +670,6 @@
         clearFadeTimer();
         setTrackStatus(rowTrack, "Chargement du fichier audio...");
         syncAudioUi();
-        schedulePendingTransportNavigation("play_rejected");
         recoverFromTrackFailure(index, target.src, requestToken);
       }
 
@@ -967,7 +864,6 @@
       const nextIndex = prefetchedNextIndex >= 0 ? prefetchedNextIndex : resolveIndex(1);
       if (nextIndex >= 0) {
         const nextTrack = audioState.playlist[nextIndex];
-        if (queueIosTransportNavigation(1, opts, nextIndex, nextTrack, prefetchedNextIndex >= 0)) return;
         if (opts.auto) {
           trackAudioRuntimeEvent("auto_advance_attempt", Object.assign(
             buildAudioMonitorPayload(nextTrack, nextIndex, nextTrack && nextTrack.src ? nextTrack.src : ""),
@@ -1044,7 +940,6 @@
       const prevIndex = resolveIndex(-1);
       if (prevIndex >= 0) {
         const prevTrack = audioState.playlist[prevIndex];
-        if (queueIosTransportNavigation(-1, opts, prevIndex, prevTrack, false)) return;
         if (opts.fromMediaSession) {
           trackAudioRuntimeEvent("media_session_previoustrack", Object.assign(
             buildAudioMonitorPayload(prevTrack, prevIndex, prevTrack && prevTrack.src ? prevTrack.src : ""),

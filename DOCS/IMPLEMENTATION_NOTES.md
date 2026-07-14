@@ -82,3 +82,12 @@
 - N+1 prefetch is enabled again on iOS and starts as soon as a Radio track reaches `playing`, while R2 media Range requests continue to bypass the Service Worker.
 - Transport next/previous switches now use the immediate source-switch path even when the target prefetch has not completed, removing the extra readiness guard from the user gesture.
 - The release is `audiofix314-20260714` / `infra-shell-20260714-audio314`.
+
+## 2026-07-14 — Safari startup-segment pipeline
+
+- Production `audiofix314` telemetry proved that full-file `fetch()` preloading did not feed Safari's media pipeline: a 6.3 MB N+1 download competed for 2.8 seconds, then the actual media element still waited 9.3 seconds. Rapid taps were also deferred internally for up to 1.63 seconds.
+- `audiofix315` requests only the first 1 MiB of upcoming M4A files, stores at most four startup segments, and reconstructs valid `206 Partial Content` responses only while the requested Range is covered. Later ranges fall through to R2 unchanged.
+- The first Radio queue entry is selected and warmed immediately after `tracks.json` is ready, before the cold Play gesture. Normal Radio N+1 warming still starts at `playing`.
+- The cold transport gesture activates Radio synchronously and keeps that prepared queue; it no longer launches an asynchronous mode change capable of replacing the target while `play()` is pending.
+- User next/previous commands are no longer serialized behind an unstable playback request; the newest tap switches source immediately and obsolete promise results remain ignored by their request token.
+- Executable cache and Service Worker Range tests live in `tools/test-audio-prefetch-cache.js` and `tools/test-audio-prefetch-sw.js`.

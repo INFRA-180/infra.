@@ -13,7 +13,7 @@ const fail = (message) => {
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const sw = read("public/sw.js");
-const release = "audiofix314-20260714";
+const release = "audiofix315-20260714";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -46,8 +46,14 @@ if (!radio.includes('reason === "playing" && audioState.homeMode === "radio"')) 
 if (!read("public/assets/js/audio-core.js").includes("isAutoAdvance || isFromMediaSession || isFromTransportControl")) {
   fail("transport navigation must use the immediate source-switch path");
 }
-if (!radio.includes("getCurrentPlaylistIndexSafe() !== fromIndexAtStart")) {
-  fail("Radio prefetch must chain after a skip overtakes an in-flight N+1 request");
+if (!radio.includes("function prepareRadioColdStart")) {
+  fail("Radio must prepare its first startup segment before the cold Play tap");
+}
+const coldToggleStart = radio.indexOf("function handleGlobalTransportToggle");
+const coldToggleEnd = radio.indexOf("function ensureGlobalAudio", coldToggleStart);
+const coldToggle = radio.slice(coldToggleStart, coldToggleEnd);
+if (coldToggleStart < 0 || coldToggle.includes('setHomePlayMode("radio"')) {
+  fail("cold-start transport must not asynchronously rebuild the prepared Radio queue");
 }
 const telemetry = read("public/assets/js/audio-telemetry.js");
 for (const eventName of ["startup_cls", "startup_waiting_passive", "sw_reload_suppressed"]) {
@@ -70,8 +76,12 @@ if (!read("public/assets/js/audio-core.js").includes("primeRadioPlaylistFromLoad
 }
 
 const r2FetchGuard = sw.indexOf("url.hostname === R2_AUDIO_HOST");
-if (r2FetchGuard < 0 || !sw.slice(r2FetchGuard, r2FetchGuard + 120).includes("return;")) {
-  fail("R2 audio requests must bypass Service Worker interception");
+if (r2FetchGuard < 0 || !sw.slice(r2FetchGuard, r2FetchGuard + 220).includes("servePrefetchedAudioOrNetwork")) {
+  fail("R2 audio requests must consult the startup-segment cache");
+}
+if (!sw.includes("buildRangeResponseFromCachedAudio")) fail("startup segment Range reconstruction is missing");
+if (read("public/assets/js/audio-core.js").includes("queueIosTransportNavigation")) {
+  fail("user transport navigation must never be deferred");
 }
 const installBlock = sw.slice(sw.indexOf('self.addEventListener("install"'), sw.indexOf('self.addEventListener("activate"'));
 if (installBlock.includes("skipWaiting")) fail("Service Worker install must wait for the next launch");
@@ -85,10 +95,10 @@ for (const relativePath of publicFiles) {
   if (!source.includes(release) && relativePath !== "public/sw.js") {
     fail(`${relativePath} does not reference ${release}`);
   }
-  if (/audiofix(?:304|311|312|313)-2026071[34]/.test(source)) {
+  if (/audiofix(?:304|311|312|313|314)-2026071[34]/.test(source)) {
     fail(`${relativePath} still references an obsolete audio runtime`);
   }
 }
-if (!sw.includes("infra-shell-20260714-audio314")) fail("Service Worker cache version is not audio314");
+if (!sw.includes("infra-shell-20260714-audio315")) fail("Service Worker cache version is not audio315");
 
 if (!process.exitCode) console.log("Audio stability checks passed.");

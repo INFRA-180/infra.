@@ -853,6 +853,32 @@
 
 
 
+  function prepareRadioColdStart() {
+    const sourceList = Array.isArray(audioState.radioPlaylist) ? audioState.radioPlaylist : [];
+    if (!sourceList.length || !PREFETCH_NEXT_ENABLED) return false;
+
+    if (!Array.isArray(audioState.radioQueue) || !audioState.radioQueue.length) {
+      audioState.radioQueue = buildRadioQueue(sourceList, audioState.radioQueueBatchSize, "");
+      audioState.radioQueueCursor = -1;
+    }
+    const firstTrack = audioState.radioQueue[0];
+    const firstSrc = normalizeAudioSourceUrl(firstTrack && firstTrack.src ? firstTrack.src : "");
+    if (!firstTrack || !firstSrc || !isCloudflareAudioUrl(firstSrc)) return false;
+    if (
+      (audioState.nextPrefetchDoneSrc && srcMatches(audioState.nextPrefetchDoneSrc, firstSrc)) ||
+      (audioState.nextPrefetchInFlight && audioState.nextPrefetchSrc && srcMatches(audioState.nextPrefetchSrc, firstSrc))
+    ) {
+      return true;
+    }
+    if (audioState.nextPrefetchInFlight || audioState.nextPrefetchDoneSrc || audioState.nextPrefetchSrc) {
+      clearNextTrackPrefetch("cold_start_retarget");
+    }
+    startNextTrackPrefetch(0, firstTrack, firstSrc, "cold_start_prepare");
+    return true;
+  }
+
+
+
   function injectCurrentTrackIntoRadioQueue(track) {
     const preservedTrack = buildPreservedTrack(track, track && track.src ? track.src : getCurrentLogicalAudioSrc());
     if (!preservedTrack) return -1;
@@ -1740,7 +1766,12 @@
       document.body.classList.contains("home-screen") &&
       !audioState.globalRandomStartInFlight
     ) {
-      setHomePlayMode("radio", { force: true });
+      // The cold-start queue is already prepared and prefetched at startup.
+      // Avoid the asynchronous mode setter here: its completion can rebuild
+      // the randomized queue while the first play() request is still pending.
+      audioState.homeMode = "radio";
+      audioState.playlistKind = "radio";
+      persistHomePlayMode("radio");
       audioState.coldStartInFlight = true;
       trackAudioRuntimeEvent("cold_start_radio", {
         surface: "home",
@@ -2372,7 +2403,8 @@
       {
         next_index: index,
         from_index: audioState.nextPrefetchFromIndex,
-        reason: reason || "threshold"
+        reason: reason || "threshold",
+        strategy: "startup_segment"
       }
     ));
 
@@ -2425,7 +2457,8 @@
           next_index: index,
           from_index: audioState.nextPrefetchFromIndex,
           bytes,
-          ms: Date.now() - startedAt
+          ms: Date.now() - startedAt,
+          strategy: "startup_segment"
         }
       ));
     }).catch(function (err) {
@@ -2439,7 +2472,8 @@
           next_index: index,
           from_index: audioState.nextPrefetchFromIndex,
           reason: err && err.message ? err.message : "prefetch_failed",
-          ms: Date.now() - startedAt
+          ms: Date.now() - startedAt,
+          strategy: "startup_segment"
         }
       ));
     }).finally(function () {
@@ -2559,6 +2593,7 @@
       clearRadioQueue,
       syncRadioQueueToPlaylist,
       ensureRadioQueue,
+      prepareRadioColdStart,
       injectCurrentTrackIntoRadioQueue,
       ensureRadioPlaylistForNavigation,
       setHomePlayMode,
@@ -2626,6 +2661,7 @@
       clearRadioQueue: function () {},
       syncRadioQueueToPlaylist: function () {},
       ensureRadioQueue: function () { return false; },
+      prepareRadioColdStart: function () { return false; },
       injectCurrentTrackIntoRadioQueue: function () { return -1; },
       ensureRadioPlaylistForNavigation: function () { return true; },
       setHomePlayMode: function () {},

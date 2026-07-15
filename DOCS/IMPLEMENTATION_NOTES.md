@@ -205,3 +205,10 @@
 - Direct production probes measured roughly 1.3–4.0 seconds for uncached R2 starts. The private R2-binding Worker canary was deployed and verified but is not used as the public audio base because warmed measurements did not beat the direct endpoint consistently.
 - `GAIA/NATA` was independently confirmed as an R2 `ServiceUnavailable` object. The same catalog key was rebuilt from the local AIFF source and replaced; Range requests now return `206` again without a catalog/API change.
 - Release: `audiofix316-20260714`, Service Worker `infra-shell-20260714-audio316`, segment cache `infra-next-track-segments-v6`.
+
+## 2026-07-15 — Restore the July 3 PWA viewport geometry
+
+- The main PWA shell no longer opts into `viewport-fit=cover`, restoring the July 3 viewport mapping that reached the physical bottom of the iPhone screen.
+- Live Web Inspector measurements on the installed PWA showed a `844px` screen but a `797px` viewport and matching `html`, `body`, overlay, and panel bottoms; the missing `47px` matched the top safe-area inset.
+- No mobile overlay or panel height, bottom anchor, or bottom filler changed. The removed status-bar overlay layer, safe top control spacing, and artwork-only top extension remain intact.
+- Release shell: `infra-shell-20260715-audio328`; the unchanged fullscreen stylesheet remains `audiofix327-20260715`.

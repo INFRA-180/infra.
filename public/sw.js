@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260715-audio327";
+const VERSION = "infra-shell-20260715-audio328";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";

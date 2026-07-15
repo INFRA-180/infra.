@@ -35,7 +35,7 @@ const SHELL_ASSETS = [
   "./assets/js/scripts.js?v=audiofix332-20260716",
   "./assets/js/scripts.admin.js?v=audiofix332-20260716",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
-  "./assets/js/sphragis.js?v=sphragis20260625",
+  "./assets/js/sphragis.js?v=sphragis20260716",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
   "./data/catalog.json",

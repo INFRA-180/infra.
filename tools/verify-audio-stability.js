@@ -27,6 +27,7 @@ const albumUi = read("public/assets/js/album-player-ui.js");
 const nowPlaying = read("public/assets/js/now-playing.js");
 const telemetry = read("public/assets/js/audio-telemetry.js");
 const sphragis = read("public/assets/js/sphragis.js");
+const sphragisPage = read("public/sphragis/index.html");
 const sw = read("public/sw.js");
 const styles = read("public/assets/css/styles.css");
 
@@ -138,6 +139,8 @@ expect(scripts.includes('https://infra180-api.pages.dev'), "runtime does not use
 expect(sphragis.includes('https://infra180-api.pages.dev'), "Sphragis does not use the neutral API hostname");
 expect(!scripts.includes('workers.dev'), "a Workers account hostname remains in the runtime");
 expect(!sphragis.includes('workers.dev'), "a Workers account hostname remains in Sphragis");
+expect(sw.includes('sphragis.js?v=sphragis20260716'), "Service Worker still caches the pre-migration Sphragis asset key");
+expect(sphragisPage.includes('sphragis.js?v=sphragis20260716'), "Sphragis page still loads the pre-migration asset key");
 expect(!telemetry.includes('"cover_prepare_item"'), "cover loading still floods remote audio telemetry");
 expect(sw.includes("htmlCacheFirst(request, SHELL_CACHE"), "PWA navigation is not shell cache-first");
 expect(catalogLoader.includes("readCachedLiveCatalogLatest()"), "validated live CacheStorage is not consulted at startup");

@@ -91,6 +91,7 @@ function segmentResponse(seed) {
   assert.strictEqual(stored.headers.get("X-Infra-Range-End"), "1023");
   assert.strictEqual(stored.headers.get("X-Infra-Total-Length"), "8192");
   assert.strictEqual(stored.headers.get("X-Infra-Body-Validated"), "1");
+  assert.strictEqual(stored.headers.get("X-Infra-First-Two-Bytes"), "0000");
   assert.strictEqual((await stored.clone().arrayBuffer()).byteLength, 1024);
 
   let cachedBodyReads = 0;
@@ -134,8 +135,30 @@ function segmentResponse(seed) {
   assert.strictEqual(corruptInfo.reason, "cache_corrupt");
   assert.strictEqual(corruptBodyReads, 0);
 
+  const legacyProbeUrl = "https://media.test/legacy-probe.m4a";
+  const legacyProbeResponse = new Response(new Uint8Array(1024), {
+    status: 200,
+    headers: {
+      "Content-Length": "1024",
+      "X-Infra-Audio-Partial": "1",
+      "X-Infra-Audio-Cache-Version": "7",
+      "X-Infra-Range-Start": "0",
+      "X-Infra-Range-End": "1023",
+      "X-Infra-Total-Length": "8192",
+      "X-Infra-Body-Validated": "1"
+    }
+  });
+  entries.set(legacyProbeUrl, {
+    request: new Request(legacyProbeUrl),
+    response: legacyProbeResponse
+  });
+  const legacyProbeInfo = await api.inspectCachedSegment(legacyProbeUrl);
+  assert.strictEqual(legacyProbeInfo.valid, true, "An additive v7 metadata change must not corrupt old entries");
+  assert.strictEqual(legacyProbeInfo.probeReady, false, "Old v7 entries must be refreshed before fast playback");
+
   const firstCached = await api.findFirstValidCachedSegment([
     "https://media.test/missing.m4a",
+    legacyProbeUrl,
     corruptUrl,
     "https://media.test/track-0.m4a"
   ]);
@@ -144,6 +167,7 @@ function segmentResponse(seed) {
   assert.strictEqual(fetchCalls, 0, "Cache inspection helpers must never trigger a network fetch");
 
   entries.delete(corruptUrl);
+  entries.delete(legacyProbeUrl);
 
   await Promise.all(Array.from({ length: 7 }, (_unused, index) => (
     api.putSingle(`https://media.test/track-${index + 1}.m4a`, segmentResponse(index + 1))
@@ -160,6 +184,42 @@ function segmentResponse(seed) {
 
   const puts = mutationLog.filter((entry) => entry.startsWith("put:"));
   assert.strictEqual(puts.length, 8, "Every valid segment is stored exactly once");
+
+  const deferredBodies = [];
+  let bodyReadsStarted = 0;
+  let bodyReadyCallbacks = 0;
+  function deferredSegmentResponse(seed) {
+    const response = segmentResponse(seed);
+    response.arrayBuffer = function () {
+      bodyReadsStarted += 1;
+      return new Promise((resolve) => {
+        deferredBodies.push(function () {
+          const bytes = new Uint8Array(1024);
+          bytes.fill(seed);
+          resolve(bytes.buffer);
+        });
+      });
+    };
+    return response;
+  }
+  const timingOptions = { onBodyReady() { bodyReadyCallbacks += 1; } };
+  const parallelA = api.putSingle("https://media.test/parallel-a.m4a", deferredSegmentResponse(8), timingOptions);
+  const parallelB = api.putSingle("https://media.test/parallel-b.m4a", deferredSegmentResponse(9), timingOptions);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.strictEqual(
+    bodyReadsStarted,
+    2,
+    "Two response bodies must validate in parallel instead of waiting in the cache mutation queue"
+  );
+  deferredBodies.forEach((resolve) => resolve());
+  await Promise.all([parallelA, parallelB]);
+  assert.strictEqual(bodyReadyCallbacks, 2, "Network timeouts may stop as soon as each body is fully validated");
+  assert.strictEqual(
+    mutationLog.filter((entry) => entry.startsWith("put:")).length,
+    10,
+    "Parallel body validation must still produce one serialized cache write per segment"
+  );
   console.log("Audio startup-segment v7 cache checks passed.");
 })().catch(function (error) {
   console.error(error);

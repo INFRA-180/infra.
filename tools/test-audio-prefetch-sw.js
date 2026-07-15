@@ -69,7 +69,9 @@ const sandbox = {
       "infra-shell-20260715-audio331-shell",
       "infra-shell-20260715-audio331-runtime",
       "infra-shell-20260716-audio332-shell",
-      "infra-shell-20260716-audio332-runtime"
+      "infra-shell-20260716-audio332-runtime",
+      "infra-shell-20260716-audio333-shell",
+      "infra-shell-20260716-audio333-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -114,6 +116,7 @@ function validCachedSegment(overrides) {
     "X-Infra-Range-End": "1023",
     "X-Infra-Total-Length": "8192",
     "X-Infra-Body-Validated": "1",
+    "X-Infra-First-Two-Bytes": "0000",
     "ETag": '"track-v1"',
     "Last-Modified": "Wed, 15 Jul 2026 12:00:00 GMT"
   }, opts.headers || {});
@@ -185,12 +188,14 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260715-audio330-runtime",
     "infra-shell-20260715-audio330-shell",
     "infra-shell-20260715-audio331-runtime",
-    "infra-shell-20260715-audio331-shell"
+    "infra-shell-20260715-audio331-shell",
+    "infra-shell-20260716-audio332-runtime",
+    "infra-shell-20260716-audio332-shell"
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v7"));
   assert(!deletedCaches.includes("infra-covers"));
-  assert(!deletedCaches.includes("infra-shell-20260716-audio332-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260716-audio332-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260716-audio333-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260716-audio333-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;
@@ -219,6 +224,23 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(clientMessages.length, 1);
   assert.strictEqual(clientMessages[0].clientId, "client-hit");
   assert.strictEqual(clientMessages[0].message.type, "INFRA_PREFETCH_HIT");
+
+  cachedAudioArrayBufferCalls = 0;
+  cachedAudio = validCachedSegment({ trackArrayBuffer: true });
+  response = await dispatchAudioFetch({ Range: "bytes=0-1" }, "client-probe");
+  assert.strictEqual(response.status, 206);
+  assert.strictEqual(response.headers.get("Content-Range"), "bytes 0-1/8192");
+  assert.strictEqual((await response.arrayBuffer()).byteLength, 2);
+  assert.strictEqual(
+    cachedAudioArrayBufferCalls,
+    0,
+    "The WebKit bytes=0-1 probe must use cached header bytes without reading the 4 MiB body"
+  );
+  assert.strictEqual(clientMessages[1].clientId, "client-probe");
+  assert.strictEqual(clientMessages[1].message.strategy, "startup_probe_v7");
+  assert.strictEqual(clientMessages[1].message.range_start, 0);
+  assert.strictEqual(clientMessages[1].message.range_end, 1);
+  assert.strictEqual(clientMessages[1].message.bytes, 2);
 
   cachedAudio = validCachedSegment();
   response = await dispatchAudioFetch({ Range: "bytes=512-1535" });

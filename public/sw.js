@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260716-audio332";
+const VERSION = "infra-shell-20260716-audio333";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
@@ -13,27 +13,27 @@ const SHELL_ASSETS = [
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
   "./assets/css/styles.css?v=audiofix332-20260716",
-  "./assets/js/covers.js?v=audiofix332-20260716",
-  "./assets/js/favorites.js?v=audiofix332-20260716",
-  "./assets/js/favorites-ui.js?v=audiofix332-20260716",
-  "./assets/js/transport-ui.js?v=audiofix332-20260716",
-  "./assets/js/now-playing.js?v=audiofix332-20260716",
-  "./assets/js/album-player-ui.js?v=audiofix332-20260716",
-  "./assets/js/spa-renderer.js?v=audiofix332-20260716",
-  "./assets/js/audio-radio.js?v=audiofix332-20260716",
-  "./assets/js/media-session.js?v=audiofix332-20260716",
-  "./assets/js/audio-prefetch.js?v=audiofix332-20260716",
-  "./assets/js/spa-router.js?v=audiofix332-20260716",
-  "./assets/js/catalog-fallback.js?v=audiofix332-20260716",
-  "./assets/js/catalog-loader.js?v=audiofix332-20260716",
-  "./assets/js/audio-telemetry.js?v=audiofix332-20260716",
-  "./assets/js/downloads.js?v=audiofix332-20260716",
-  "./assets/js/home-catalog.js?v=audiofix332-20260716",
-  "./assets/js/audio-core.js?v=audiofix332-20260716",
-  "./assets/js/pwa-install.js?v=audiofix332-20260716",
-  "./assets/js/share-qr.js?v=audiofix332-20260716",
-  "./assets/js/scripts.js?v=audiofix332-20260716",
-  "./assets/js/scripts.admin.js?v=audiofix332-20260716",
+  "./assets/js/covers.js?v=audiofix333-20260716",
+  "./assets/js/favorites.js?v=audiofix333-20260716",
+  "./assets/js/favorites-ui.js?v=audiofix333-20260716",
+  "./assets/js/transport-ui.js?v=audiofix333-20260716",
+  "./assets/js/now-playing.js?v=audiofix333-20260716",
+  "./assets/js/album-player-ui.js?v=audiofix333-20260716",
+  "./assets/js/spa-renderer.js?v=audiofix333-20260716",
+  "./assets/js/audio-radio.js?v=audiofix333-20260716",
+  "./assets/js/media-session.js?v=audiofix333-20260716",
+  "./assets/js/audio-prefetch.js?v=audiofix333-20260716",
+  "./assets/js/spa-router.js?v=audiofix333-20260716",
+  "./assets/js/catalog-fallback.js?v=audiofix333-20260716",
+  "./assets/js/catalog-loader.js?v=audiofix333-20260716",
+  "./assets/js/audio-telemetry.js?v=audiofix333-20260716",
+  "./assets/js/downloads.js?v=audiofix333-20260716",
+  "./assets/js/home-catalog.js?v=audiofix333-20260716",
+  "./assets/js/audio-core.js?v=audiofix333-20260716",
+  "./assets/js/pwa-install.js?v=audiofix333-20260716",
+  "./assets/js/share-qr.js?v=audiofix333-20260716",
+  "./assets/js/scripts.js?v=audiofix333-20260716",
+  "./assets/js/scripts.admin.js?v=audiofix333-20260716",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./assets/js/sphragis.js?v=sphragis20260716",
   "./assets/fonts/antique-olive-nord.woff2",
@@ -306,6 +306,7 @@ function getCachedAudioSegmentMetadata(cached) {
   const cachedStartValue = cached.headers.get("X-Infra-Range-Start");
   const cachedEndValue = cached.headers.get("X-Infra-Range-End");
   const totalValue = cached.headers.get("X-Infra-Total-Length");
+  const firstTwoBytes = String(cached.headers.get("X-Infra-First-Two-Bytes") || "").toLowerCase();
   const storedLength = Number(storedLengthValue);
   const partial = cached.headers.get("X-Infra-Audio-Partial") === "1";
   const version = cached.headers.get("X-Infra-Audio-Cache-Version");
@@ -330,13 +331,14 @@ function getCachedAudioSegmentMetadata(cached) {
     cachedStart < 0 ||
     cachedEnd < cachedStart ||
     total <= cachedEnd ||
-    storedLength !== cachedEnd - cachedStart + 1
+    storedLength !== cachedEnd - cachedStart + 1 ||
+    (firstTwoBytes && !/^[0-9a-f]{4}$/.test(firstTwoBytes))
   ) {
     const error = new Error("cached_audio_corrupt");
     error.code = "cached_audio_corrupt";
     throw error;
   }
-  return { storedLength, cachedStart, cachedEnd, total, bodyValidated };
+  return { storedLength, cachedStart, cachedEnd, total, bodyValidated, firstTwoBytes };
 }
 
 async function buildRangeResponseFromCachedAudio(cached, rangeHeader) {
@@ -357,6 +359,18 @@ async function buildRangeResponseFromCachedAudio(cached, rangeHeader) {
   const etag = cached.headers.get("ETag") || cached.headers.get("etag");
   if (etag) headers.set("ETag", etag);
   headers.set("Cache-Control", "public, max-age=31536000, immutable");
+
+  if (
+    range.start === 0 &&
+    responseEnd === 1 &&
+    metadata.firstTwoBytes
+  ) {
+    const probeBytes = new Uint8Array([
+      Number.parseInt(metadata.firstTwoBytes.slice(0, 2), 16),
+      Number.parseInt(metadata.firstTwoBytes.slice(2, 4), 16)
+    ]);
+    return new Response(probeBytes, { status: 206, statusText: "Partial Content", headers });
+  }
 
   if (
     range.start === metadata.cachedStart &&
@@ -400,11 +414,15 @@ async function servePrefetchedAudioOrNetwork(request, url, event) {
   try {
     const partial = await buildRangeResponseFromCachedAudio(cached.clone(), rangeHeader);
     if (partial) {
+      const servedRange = String(partial.headers.get("Content-Range") || "").match(/^bytes\s+(\d+)-(\d+)\//i);
       notifyPrefetchHit(event, url.href, {
         range: true,
         range_header: rangeHeader,
+        range_start: servedRange ? Number(servedRange[1]) : null,
+        range_end: servedRange ? Number(servedRange[2]) : null,
+        bytes: Number(partial.headers.get("Content-Length") || 0),
         status: 206,
-        strategy: "startup_segment_v7"
+        strategy: rangeHeader === "bytes=0-1" ? "startup_probe_v7" : "startup_segment_v7"
       });
       return partial;
     }

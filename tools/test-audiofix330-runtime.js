@@ -549,6 +549,26 @@ async function testPrefetchCacheRehydrationAndCorruptFallback() {
     [corruptHarness.playlist[1].src],
     "Only the corrupt segment must be normalized back into v7"
   );
+
+  const legacyProbeHarness = createPrefetchRehydrationHarness(function (src) {
+    const lacksProbeHeader = src === legacyProbeHarness.playlist[1].src;
+    return Promise.resolve({
+      src,
+      found: true,
+      valid: true,
+      probeReady: !lacksProbeHeader,
+      bytes: 1024,
+      reason: "cache_hit"
+    });
+  });
+  legacyProbeHarness.radio.maybePrefetchNextTrack("legacy_probe_test");
+  await flushAsyncWork();
+  assert.deepStrictEqual(
+    legacyProbeHarness.fetchUrls,
+    [legacyProbeHarness.playlist[1].src],
+    "An older v7 N+1 entry must be refreshed once to gain the WebKit probe fast path"
+  );
+  assert.deepStrictEqual(legacyProbeHarness.putSources, [legacyProbeHarness.playlist[1].src]);
 }
 
 function createDeferredCacheInspectionHarness() {
@@ -628,11 +648,20 @@ async function testPrefetchGatePriorityAndConcurrency() {
   const sandbox = createSandbox({
     fetch(request) {
       return new Promise((resolve, reject) => {
-        pendingFetches.push({
+        const pending = {
           url: request && request.url ? request.url : String(request || ""),
           resolve,
           reject
-        });
+        };
+        pendingFetches.push(pending);
+        const signal = request && request.signal;
+        if (signal && typeof signal.addEventListener === "function") {
+          signal.addEventListener("abort", function () {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          }, { once: true });
+        }
       });
     }
   });
@@ -732,15 +761,66 @@ async function testPrefetchGatePriorityAndConcurrency() {
     "The prefetch plan must retain the complete N+1 through N+5 window"
   );
 
+  const generationBeforeSkip = state.nextPrefetchGeneration;
+  state.currentIndex = 1;
+  state.activeLogicalSrc = playlist[1].src;
+  audio.src = playlist[1].src;
+  audio.currentSrc = playlist[1].src;
+  radio.maybePrefetchNextTrack("track_change");
+  assert(state.nextPrefetchGeneration > generationBeforeSkip, "A fast skip must rebase the rolling window");
+  assert.deepStrictEqual(
+    Array.from(state.nextPrefetchInFlightSrcs).sort(),
+    [playlist[2].src, playlist[3].src].sort(),
+    "A fast skip must preserve useful in-flight N+2 and N+3 requests"
+  );
+  assert.strictEqual(
+    state.nextPrefetchControllers.get(playlist[2].src).generation,
+    state.nextPrefetchGeneration,
+    "A preserved request must complete against the rebased generation"
+  );
+
+  pendingFetches[1].resolve(validSegmentResponse());
+  pendingFetches[2].resolve(validSegmentResponse());
+  await flushAsyncWork();
+  assert(state.nextPrefetchReadySrcs.has(playlist[2].src));
+  assert(state.nextPrefetchReadySrcs.has(playlist[3].src));
+
   radio.clearNextTrackPrefetch("runtime_test");
   assert.strictEqual(state.nextPrefetchInFlightSrcs.size, 0);
   assert(pruneCalls.length > 0, "A normal clear may perform bounded selective pruning");
   const lastPrune = pruneCalls[pruneCalls.length - 1];
   assert.deepStrictEqual(
     Array.from(lastPrune.keepSources),
-    [playlist[0].src],
+    [playlist[1].src],
     "A normal clear must preserve the current track instead of emptying CacheStorage"
   );
+
+  const restartOffset = pendingFetches.length;
+  radio.maybePrefetchNextTrack("buffer_stable");
+  const unpreparedFetch = pendingFetches[restartOffset];
+  assert(unpreparedFetch, "A new speculative request must start after the reset");
+  const unpreparedIndex = playlist.findIndex((track) => track.src === unpreparedFetch.url);
+  assert(unpreparedIndex > state.currentIndex);
+  unpreparedFetch.resolve(validSegmentResponse());
+  await flushAsyncWork();
+  const speculativeRecords = Array.from(state.nextPrefetchControllers.values());
+  assert(speculativeRecords.length > 0, "Useful speculation must be active before the unprepared skip");
+  state.nextPrefetchReadySrcs.delete(unpreparedFetch.url);
+  state.currentIndex = unpreparedIndex;
+  state.activeLogicalSrc = unpreparedFetch.url;
+  audio.src = unpreparedFetch.url;
+  audio.currentSrc = unpreparedFetch.url;
+  radio.maybePrefetchNextTrack("track_change");
+  assert.strictEqual(
+    state.nextPrefetchInFlightSrcs.size,
+    0,
+    "An unprepared current track must stop speculative downloads until playback stabilizes"
+  );
+  assert(
+    speculativeRecords.every((record) => record.controller.signal.aborted),
+    "Unprepared playback must receive mobile bandwidth priority over useful speculation"
+  );
+  await flushAsyncWork();
 }
 
 async function testPrefetchTimeoutRetriesOnce() {
@@ -922,7 +1002,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchTimeoutRetriesOnce();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix332 runtime checks passed.");
+  console.log("audiofix333 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

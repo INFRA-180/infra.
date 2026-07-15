@@ -95,6 +95,7 @@
     "buffered_end", "duration", "bytes", "segment_bytes", "transfer_size",
     "encoded_body_size", "decoded_body_size", "rank", "attempt", "ready_count",
     "inflight_count", "from_index", "next_index", "generation", "depth", "status",
+    "response_ms", "body_ms", "queue_ms", "cache_ms", "range_start", "range_end",
     "error_code", "timeout_ms", "recovery_ms", "advanced_ms", "buffer_ahead",
     "cancelled_count", "health_session_age_ms", "volume", "click_perf_ms",
     "guard_age_ms", "guard_current_time", "progressed_seconds", "playback_rate"

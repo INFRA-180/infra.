@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix332-20260716";
+window.INFRA_BUILD_TAG = "audiofix333-20260716";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -420,7 +420,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix332-20260716";
+  const runtimeVersion = "audiofix333-20260716";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -5208,6 +5208,9 @@ function openAppDownloadGatekeeper(appName, url) {
         {
           range: Boolean(data.range),
           range_header: data.range_header || "",
+          range_start: Number.isFinite(Number(data.range_start)) ? Number(data.range_start) : null,
+          range_end: Number.isFinite(Number(data.range_end)) ? Number(data.range_end) : null,
+          bytes: Number.isFinite(Number(data.bytes)) ? Number(data.bytes) : null,
           status: Number.isFinite(Number(data.status)) ? Number(data.status) : 200,
           strategy: data.strategy || "segment_v7",
           client_id: data.client_id || ""

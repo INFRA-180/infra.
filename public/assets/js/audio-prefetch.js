@@ -93,10 +93,11 @@
       return Promise.reject(new Error("prefetch_content_length_mismatch"));
     }
 
-    return response.clone().arrayBuffer().then(function (buffer) {
+    return response.arrayBuffer().then(function (buffer) {
       if (!buffer || buffer.byteLength !== range.length) {
         throw new Error("prefetch_body_length_mismatch");
       }
+      const bodyBytes = new Uint8Array(buffer);
       const headers = new Headers(response.headers || {});
       headers.delete("Content-Range");
       headers.set("Content-Length", String(buffer.byteLength));
@@ -107,6 +108,12 @@
       headers.set("X-Infra-Range-End", String(range.end));
       headers.set("X-Infra-Total-Length", String(range.total));
       headers.set("X-Infra-Body-Validated", "1");
+      if (bodyBytes.byteLength >= 2) {
+        headers.set(
+          "X-Infra-First-Two-Bytes",
+          `${bodyBytes[0].toString(16).padStart(2, "0")}${bodyBytes[1].toString(16).padStart(2, "0")}`
+        );
+      }
       headers.set("Cache-Control", "public, max-age=31536000, immutable");
       return new Response(buffer, {
         status: 200,
@@ -138,6 +145,7 @@
     const rangeStart = readStoredInteger(headers, "X-Infra-Range-Start");
     const rangeEnd = readStoredInteger(headers, "X-Infra-Range-End");
     const totalLength = readStoredInteger(headers, "X-Infra-Total-Length");
+    const firstTwoBytes = String(headers.get("X-Infra-First-Two-Bytes") || "").toLowerCase();
     if (
       headers.get("X-Infra-Audio-Partial") !== "1" ||
       headers.get("X-Infra-Audio-Cache-Version") !== "7" ||
@@ -149,7 +157,8 @@
       storedLength > constants.PREFETCH_SEGMENT_SIZE ||
       rangeEnd < rangeStart ||
       totalLength <= rangeEnd ||
-      storedLength !== rangeEnd - rangeStart + 1
+      storedLength !== rangeEnd - rangeStart + 1 ||
+      (firstTwoBytes && !/^[0-9a-f]{4}$/.test(firstTwoBytes))
     ) {
       return null;
     }
@@ -158,7 +167,8 @@
       rangeStart,
       rangeEnd,
       totalLength,
-      bodyValidated: headers.get("X-Infra-Body-Validated") === "1"
+      bodyValidated: headers.get("X-Infra-Body-Validated") === "1",
+      firstTwoBytes
     };
   }
 
@@ -209,7 +219,8 @@
           rangeStart: metadata.rangeStart,
           rangeEnd: metadata.rangeEnd,
           totalLength: metadata.totalLength,
-          bodyValidated: metadata.bodyValidated
+          bodyValidated: metadata.bodyValidated,
+          probeReady: Boolean(metadata.firstTwoBytes)
         };
       });
     }).catch(function () {
@@ -235,7 +246,9 @@
     function inspectAt(index) {
       if (index >= candidates.length) return Promise.resolve(null);
       return inspectCachedSegment(candidates[index]).then(function (result) {
-        return result && result.valid ? result : inspectAt(index + 1);
+        return result && result.valid && result.probeReady !== false
+          ? result
+          : inspectAt(index + 1);
       });
     }
 
@@ -287,22 +300,49 @@
   function putSingle(src, response, options) {
     const opts = options || {};
     const request = createStorageRequest(src);
-    return enqueueMutation(function () {
-      return openCache().then(function (cache) {
-        if (!cache) return false;
-        return normalizeAudioResponseForCache(response).then(function (cacheResponse) {
+    const bodyStartedAt = Date.now();
+    return normalizeAudioResponseForCache(response).then(function (cacheResponse) {
+      const bodyFinishedAt = Date.now();
+      if (typeof opts.onBodyReady === "function") {
+        try {
+          opts.onBodyReady({
+            body_ms: Math.max(0, bodyFinishedAt - bodyStartedAt)
+          });
+        } catch (_err) {
+          // Scheduling telemetry must never affect the cache write.
+        }
+      }
+      const queuedAt = Date.now();
+      let cacheStartedAt = queuedAt;
+      return enqueueMutation(function () {
+        cacheStartedAt = Date.now();
+        return openCache().then(function (cache) {
+          if (!cache) return false;
           // Refresh only this entry. Other useful startup segments remain available.
           return cache.delete(request, { ignoreVary: true })
             .catch(function () { return false; })
-            .then(function () { return cache.put(request, cacheResponse); });
-        }).then(function () {
-          return pruneCacheEntries(cache, {
-            maxEntries: opts.maxEntries || constants.MAX_ENTRIES,
-            keepSources: opts.keepSources || []
-          });
-        }).then(function () {
-          return true;
+            .then(function () { return cache.put(request, cacheResponse); })
+            .then(function () {
+              return pruneCacheEntries(cache, {
+                maxEntries: opts.maxEntries || constants.MAX_ENTRIES,
+                keepSources: opts.keepSources || []
+              });
+            })
+            .then(function () { return true; });
         });
+      }).then(function (stored) {
+        if (typeof opts.onTimings === "function") {
+          try {
+            opts.onTimings({
+              body_ms: Math.max(0, bodyFinishedAt - bodyStartedAt),
+              queue_ms: Math.max(0, cacheStartedAt - queuedAt),
+              cache_ms: Math.max(0, Date.now() - cacheStartedAt)
+            });
+          } catch (_err) {
+            // Telemetry must never affect the cache write.
+          }
+        }
+        return stored;
       });
     });
   }

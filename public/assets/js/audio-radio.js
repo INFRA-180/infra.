@@ -2297,6 +2297,7 @@
         if (
           !result ||
           !result.valid ||
+          result.probeReady === false ||
           !src ||
           !usefulSources.has(src) ||
           (currentSrc && srcMatches(src, currentSrc))
@@ -2392,11 +2393,21 @@
     audioState.nextPrefetchCacheHydrationKey = "";
     audioState.nextPrefetchCacheHydratedKey = "";
     audioState.nextPrefetchCacheHydrationPromise = null;
-    const useful = new Set(targets.map(function (target) { return target.src; }));
-    audioState.nextPrefetchControllers.forEach(function (_record, src) {
+    const usefulTargets = new Map(targets.map(function (target) { return [target.src, target]; }));
+    const useful = new Set(usefulTargets.keys());
+    audioState.nextPrefetchControllers.forEach(function (record, src) {
       if (!useful.has(src) || (currentSrc && srcMatches(src, currentSrc))) {
         abortPrefetchTarget(src, currentSrc && srcMatches(src, currentSrc) ? "became_current" : "window_rebased");
+        return;
       }
+      // A fast skip rebases the rolling window while N+2...N+5 may still be
+      // downloading. Keep those useful requests and bind their completion to
+      // the new authoritative generation instead of throwing their bytes away.
+      const reboundTarget = usefulTargets.get(src);
+      record.generation = audioState.nextPrefetchGeneration;
+      record.planKey = planKey;
+      record.index = reboundTarget ? reboundTarget.index : record.index;
+      record.rank = reboundTarget ? reboundTarget.rank : record.rank;
     });
     audioState.nextPrefetchRetryTimers.forEach(function (_timer, src) {
       if (!useful.has(src)) abortPrefetchTarget(src, "window_rebased");
@@ -2559,8 +2570,12 @@
       cancelReason: "",
       generation,
       planKey,
-      attempt
+      attempt,
+      index,
+      rank: target ? target.rank : null
     };
+    let responseMs = null;
+    let storeTimings = null;
     audioState.nextPrefetchAttemptCounts.set(normalizedSrc, attempt);
     audioState.nextPrefetchControllers.set(normalizedSrc, record);
     audioState.nextPrefetchInFlightSrcs.add(normalizedSrc);
@@ -2598,7 +2613,8 @@
     }
 
     fetch(fetchRequest, fetchOptions).then(function (response) {
-      const stillUseful = isPrefetchTargetUsefulForSnapshot(normalizedSrc, generation, planKey);
+      responseMs = Date.now() - startedAt;
+      const stillUseful = isPrefetchTargetUsefulForSnapshot(normalizedSrc, record.generation, record.planKey);
       if (!stillUseful) throw new Error("prefetch_obsolete");
       if (!response || response.status !== 206) {
         throw new Error(`prefetch_http_${response ? response.status : "none"}`);
@@ -2611,10 +2627,22 @@
       }
       return prefetchApi.putSingle(normalizedSrc, response, {
         keepSources: getPrefetchKeepSources(),
-        maxEntries: PREFETCH_NEXT_MAX_ENTRIES
+        maxEntries: PREFETCH_NEXT_MAX_ENTRIES,
+        onBodyReady: function (timings) {
+          storeTimings = Object.assign({}, storeTimings || {}, timings || {});
+          if (record.timeout) {
+            window.clearTimeout(record.timeout);
+            record.timeout = 0;
+          }
+        },
+        onTimings: function (timings) {
+          storeTimings = timings && typeof timings === "object"
+            ? Object.assign({}, storeTimings || {}, timings)
+            : storeTimings;
+        }
       }).then(function () { return bytes; });
     }).then(function (bytes) {
-      const stillUseful = isPrefetchTargetUsefulForSnapshot(normalizedSrc, generation, planKey);
+      const stillUseful = isPrefetchTargetUsefulForSnapshot(normalizedSrc, record.generation, record.planKey);
       if (!bytes || !stillUseful) return;
       audioState.nextPrefetchReadySrcs.add(normalizedSrc);
       audioState.nextPrefetchDoneSrc = normalizedSrc;
@@ -2623,12 +2651,16 @@
       trackAudioRuntimeEvent("prefetch_done", Object.assign(
         buildAudioMonitorPayload(track, index, normalizedSrc),
         {
-          next_index: index,
+          next_index: record.index,
           from_index: fromIndexAtStart,
           bytes,
           ms: Date.now() - startedAt,
-          generation,
-          rank: target ? target.rank : null,
+          response_ms: responseMs,
+          body_ms: storeTimings ? storeTimings.body_ms : null,
+          queue_ms: storeTimings ? storeTimings.queue_ms : null,
+          cache_ms: storeTimings ? storeTimings.cache_ms : null,
+          generation: record.generation,
+          rank: record.rank,
           attempt,
           ready_count: audioState.nextPrefetchReadySrcs.size
         }
@@ -2643,12 +2675,16 @@
       trackAudioRuntimeEvent(cancelled ? "prefetch_cancel" : "prefetch_error", Object.assign(
         buildAudioMonitorPayload(track, index, normalizedSrc),
         {
-          next_index: index,
+          next_index: record.index,
           from_index: fromIndexAtStart,
           reason: errorReason,
           ms: Date.now() - startedAt,
-          generation,
-          rank: target ? target.rank : null,
+          response_ms: responseMs,
+          body_ms: storeTimings ? storeTimings.body_ms : null,
+          queue_ms: storeTimings ? storeTimings.queue_ms : null,
+          cache_ms: storeTimings ? storeTimings.cache_ms : null,
+          generation: record.generation,
+          rank: record.rank,
           attempt
         }
       ));
@@ -2660,7 +2696,7 @@
       }
       audioState.nextPrefetchInFlight = audioState.nextPrefetchInFlightSrcs.size > 0;
       if (audioState.nextPrefetchAbortController === abortController) audioState.nextPrefetchAbortController = null;
-      const stillUseful = isPrefetchTargetUsefulForSnapshot(normalizedSrc, generation, planKey);
+      const stillUseful = isPrefetchTargetUsefulForSnapshot(normalizedSrc, record.generation, record.planKey);
       const retryable = !audioState.nextPrefetchReadySrcs.has(normalizedSrc) &&
         (!record.cancelReason || record.cancelReason === "timeout") &&
         stillUseful &&
@@ -2683,10 +2719,18 @@
   function maybePrefetchNextTrack(reason) {
     if (!PREFETCH_NEXT_ENABLED) return;
     ensureNextPrefetchCollections();
+    const currentSrcAtChange = normalizeAudioSourceUrl(getCurrentLogicalAudioSrc());
+    const currentWasPrepared = reason === "track_change" && Boolean(
+      (currentSrcAtChange && audioState.nextPrefetchReadySrcs.has(currentSrcAtChange)) ||
+      (currentSrcAtChange && audioState.nextPrefetchServedSrc && srcMatches(audioState.nextPrefetchServedSrc, currentSrcAtChange))
+    );
     const targets = reconcileNextTrackPrefetchPlan(reason || "update");
     if (!targets.length) return;
     if (reason === "track_change") {
-      suspendNextTrackPrefetch("track_change", true);
+      // Reconcile already cancels only the source that became current and the
+      // targets that left the window. Useful in-flight N+2...N+5 survive only
+      // a prepared fast skip; an unprepared current track gets network priority.
+      if (!currentWasPrepared) suspendNextTrackPrefetch("track_change_unprepared", true);
       return;
     }
     if (hydrateNextTrackPrefetchPlanFromCache(targets)) return;

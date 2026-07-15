@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260715-audio326";
+const VERSION = "infra-shell-20260715-audio327";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
@@ -12,7 +12,7 @@ const SHELL_ASSETS = [
   "./sphragis/",
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
-  "./assets/css/styles.css?v=audiofix326-20260715",
+  "./assets/css/styles.css?v=audiofix327-20260715",
   "./assets/js/covers.js?v=audiofix326-20260715",
   "./assets/js/favorites.js?v=audiofix326-20260715",
   "./assets/js/favorites-ui.js?v=audiofix326-20260715",

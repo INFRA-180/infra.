@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-07-15 — audiofix327 artwork-only status-bar extension
+
+- Retained the exact `audiofix325` mobile fullscreen geometry already present in `audiofix326`: the fixed overlay remains at `inset: 0`, and the panel keeps its existing `100vh` / `100dvh` height, bottom anchoring, safe-area padding and content flow.
+- Kept the `audiofix326` removal of `.now-playing-overlay::after`; no replacement layer is painted behind the Home Indicator.
+- Only the mobile `.now-playing-backdrop` artwork surface extends upward by `env(safe-area-inset-top)`. Its right, bottom and left edges remain at `0`, so the panel, content and lower fullscreen edge do not move.
+- Top-safe spacing remains on the panel and controls. No `100lvh`, lower fill, bottom offset or bottom pseudo-element is introduced.
+- The stylesheet asset is bumped to `audiofix327-20260715` and the shell cache to `infra-shell-20260715-audio327`; JavaScript remains on `audiofix326-20260715` because audio, transport, Media Session, prefetch and Service Worker routing behavior are unchanged.
+
 ## 2026-07-15 — audiofix326 iOS fullscreen status-bar layer removal
 
 - A real installed-PWA test on iPhone 13 Pro / iOS 18.7.1 proved that .now-playing-overlay::after paints directly behind the status-bar clock and icons, while a runtime theme-color change does not alter the Home Indicator area.

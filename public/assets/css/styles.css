@@ -4159,6 +4159,10 @@ body.now-playing-open {
     padding: 0;
   }
 
+  .now-playing-backdrop {
+    top: calc(0px - env(safe-area-inset-top));
+  }
+
   .now-playing-overlay[hidden] {
     display: none;
   }

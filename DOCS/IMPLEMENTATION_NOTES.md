@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-07-15 — audiofix329 iOS standalone full-screen viewport correction
+
+- Restored `viewport-fit=cover` on the main PWA shell so WebKit can paint the artwork behind the status bar and expose the top/bottom safe-area insets.
+- Real-device Web Inspector measurements showed an `844px` screen but a `797px` `100dvh`/fixed overlay in standalone. A standalone-only mobile override now lets `100vh` size the open roots, overlay and panel to the covered screen, following the workaround documented in WebKit bug 254868.
+- The overlay remains `position: fixed; inset: 0`; the existing body scroll lock, top-safe control padding, artwork-only top extension and removal of `.now-playing-overlay::after` are unchanged.
+- No `100lvh`, negative bottom anchor, bottom pseudo-element or separate fill under the Home Indicator is introduced.
+- Release assets: `audiofix329-20260715` stylesheet and `infra-shell-20260715-audio329`. Final visual confirmation remains the user's real-iPhone validation after publication.
+
 ## 2026-07-15 — audiofix327 artwork-only status-bar extension
 
 - Retained the exact `audiofix325` mobile fullscreen geometry already present in `audiofix326`: the fixed overlay remains at `inset: 0`, and the panel keeps its existing `100vh` / `100dvh` height, bottom anchoring, safe-area padding and content flow.

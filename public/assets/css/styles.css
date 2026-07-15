@@ -4248,6 +4248,20 @@ body.now-playing-open {
   }
 }
 
+/* audiofix329: iOS standalone reports 100dvh without the covered top inset. */
+@media (display-mode: standalone) and (max-width: 640px) {
+  html.now-playing-open,
+  body.now-playing-open,
+  .now-playing-overlay {
+    min-height: 100vh;
+  }
+
+  .now-playing-panel {
+    min-height: 100vh;
+    max-height: 100vh;
+  }
+}
+
 @media (min-width: 860px) {
   .now-playing-open .now-playing-overlay {
     overflow-x: hidden;

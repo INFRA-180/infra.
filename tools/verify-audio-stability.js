@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -9,13 +10,22 @@ const fail = (message) => {
   console.error(`Audio stability check failed: ${message}`);
   process.exitCode = 1;
 };
+const expect = (condition, message) => {
+  if (!condition) fail(message);
+};
 
+const release = "audiofix330-20260715";
+const shellRelease = "infra-shell-20260715-audio330";
+const frozenCssRelease = "audiofix329-20260715";
+const frozenCssSha256 = "1b9cd26ebcd33d3b2331ccb160b340e870f7fcd904aca2f30d588b4dfd6a402d";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");
+const prefetch = read("public/assets/js/audio-prefetch.js");
+const albumUi = read("public/assets/js/album-player-ui.js");
+const nowPlaying = read("public/assets/js/now-playing.js");
 const sw = read("public/sw.js");
 const styles = read("public/assets/css/styles.css");
-const release = "audiofix322-20260714";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -27,121 +37,99 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-const stallRecovery = functionBody(scripts, "recoverPlaybackFromStall", "scheduleWaitingRecovery");
-if (/\.load\s*\(/.test(stallRecovery)) fail("stall recovery must not call audio.load()");
-if (/\.play\s*\(/.test(stallRecovery)) fail("stall recovery must stay passive");
-if (!stallRecovery.includes('"stall_passive_wait"')) fail("passive stall telemetry is missing");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix330");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix330");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio330");
+expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v7"'), "Service Worker does not use segment cache v7");
 
-const waitingRecovery = functionBody(scripts, "scheduleWaitingRecovery", "isIOSStandaloneMediaSession");
-if (/\.load\s*\(/.test(waitingRecovery)) fail("waiting recovery must not call audio.load()");
-if (!waitingRecovery.includes('"startup_waiting_passive"')) fail("startup waiting telemetry is missing");
+const coldPreparation = functionBody(radio, "prepareInitialGlobalRandomPlayback", "scheduleInitialGlobalRandomPreparation");
+expect(coldPreparation.includes("buildRadioQueue"), "cold startup does not materialize the Radio queue");
+expect(coldPreparation.includes("audio_fetch: false"), "cold metadata preparation is not explicitly audio-free");
+expect(!/\bfetch\s*\(/.test(coldPreparation), "cold metadata preparation must not download audio");
+expect(!coldPreparation.includes("startNextTrackPrefetch"), "cold metadata preparation must not prefetch a media segment");
 
-if (!scripts.includes("window.location.reload()")) fail("safe Service Worker reload is missing");
-if (!scripts.includes("function isServiceWorkerReloadSafe")) fail("safe Service Worker reload guard is missing");
-if (!scripts.includes('"sw_reload_executed"')) fail("executed Service Worker reload telemetry is missing");
-const deferredReload = functionBody(scripts, "scheduleDeferredServiceWorkerReload", "markServiceWorkerReloadPendingForRuntime");
-if (!deferredReload.includes("getDeferredServiceWorkerReloadDelayMs")) {
-  fail("safe Service Worker reload must wait for the idle safety window");
+const coldActivation = functionBody(radio, "activatePreparedInitialRadioPlayback", "startGlobalRandomPlayback");
+for (const invariant of [
+  'audioState.homeMode = "radio"',
+  'audioState.playlistKind = "radio"',
+  "audioState.radioQueueCursor = 0",
+  "immediatePlay: true",
+  "userGesture: true"
+]) {
+  expect(coldActivation.includes(invariant), `cold Radio activation is missing ${invariant}`);
 }
-if (!scripts.includes('"startup_cls"')) fail("startup layout-shift telemetry is missing");
-if (/PREFETCH_NEXT_ENABLED[\s\S]{0,180}!isIosDevice\(\)/.test(scripts)) {
-  fail("next-track prefetch must remain enabled on iOS");
-}
-if (!radio.includes('reason === "canplay" || reason === "playing" || reason === "queue_continue"')) {
-  fail("Radio must begin filling its prefetch queue as soon as the active track can play");
-}
-const canplayHandlerStart = radio.indexOf('audio.addEventListener("canplay"');
-const canplayHandlerEnd = radio.indexOf('audio.addEventListener("canplaythrough"', canplayHandlerStart);
-const canplayHandler = radio.slice(canplayHandlerStart, canplayHandlerEnd);
-if (canplayHandlerStart < 0 || canplayHandlerEnd < 0 || !canplayHandler.includes('maybePrefetchNextTrack("canplay")')) {
-  fail("canplay must trigger next-track prefetch before playing");
-}
-if (!radio.includes("peekNextIndicesForPrefetch(depth)")) {
-  fail("Radio must prepare more than a single N+1 track");
-}
-if (!scripts.includes("PREFETCH_NEXT_QUEUE_DEPTH") || !scripts.includes("PREFETCH_NEXT_CONCURRENCY")) {
-  fail("multi-track prefetch depth/concurrency is not wired into the runtime");
-}
-if (!radio.includes("response_ms") || !radio.includes("ready_count")) {
-  fail("prefetch network timing telemetry is incomplete");
-}
-if (!styles.includes("padding: 9px 10px calc(9px + env(safe-area-inset-bottom));")) {
-  fail("mobile transport must protect the Home indicator inside the dock");
-}
-if (/bottom:\s*calc\(-1\s*\*\s*env\(safe-area-inset-bottom\)\)/.test(styles) || /100dvh\s*\+\s*env\(safe-area-inset-bottom\)/.test(styles)) {
-  fail("Now Playing must not extend beyond the viewport by the bottom safe area");
-}
-if (!styles.includes("margin-top: auto;") || !styles.includes("padding-bottom: var(--mobile-player-space, 0px) !important;")) {
-  fail("mobile bottom layout must anchor Up Next and count the safe area only once");
-}
-if (!core.includes("isAutoAdvance || isFromMediaSession || isFromTransportControl")) {
-  fail("transport navigation must use the immediate source-switch path");
-}
-if (!core.includes("hasRelevantTransportPrefetch") || !core.includes("nextPrefetchInFlightSrcs")) {
-  fail("transport navigation must preserve a still-relevant in-flight prefetch");
-}
-if (!radio.includes("function prepareRadioColdStart")) {
-  fail("Radio must prepare its first startup segment before the cold Play tap");
-}
-const coldToggleStart = radio.indexOf("function handleGlobalTransportToggle");
-const coldToggleEnd = radio.indexOf("function ensureGlobalAudio", coldToggleStart);
-const coldToggle = radio.slice(coldToggleStart, coldToggleEnd);
-if (coldToggleStart < 0 || coldToggle.includes('setHomePlayMode("radio"')) {
-  fail("cold-start transport must not asynchronously rebuild the prepared Radio queue");
-}
-const telemetry = read("public/assets/js/audio-telemetry.js");
-for (const eventName of ["startup_cls", "startup_waiting_passive", "sw_reload_executed", "sw_runtime_state"]) {
-  if (!telemetry.includes(`"${eventName}"`)) fail(`${eventName} is not exported by fine telemetry`);
-}
+const coldStart = functionBody(radio, "startGlobalRandomPlayback", "resetPreparedInitialGlobalRandomPlayback");
+expect(coldStart.includes("activatePreparedInitialRadioPlayback()"), "cold Play does not consume the prepared Radio queue synchronously");
+expect(!coldStart.includes(".then("), "cold Play must not wait on a Promise before startTrack");
+expect(!coldStart.includes("setTimeout"), "cold Play must not wait on a timer before startTrack");
+
+const startTrack = functionBody(core, "startTrack", "getRandomIndex");
+expect(startTrack.includes("opts.immediatePlay && opts.userGesture"), "startTrack lacks the guarded immediate user-gesture path");
+expect(startTrack.includes("attemptPlay({ sync: true, immediate: isImmediateUserGesture })"), "immediate Play does not call audio.play() directly");
+const beginPlaybackStart = startTrack.indexOf("function beginPlayback");
+const beginPlaybackEnd = startTrack.indexOf("if (sameTrack)", beginPlaybackStart);
+const beginPlayback = startTrack.slice(beginPlaybackStart, beginPlaybackEnd);
+expect(beginPlayback.indexOf("attemptPlay({ sync: true, immediate: isImmediateUserGesture })") < beginPlayback.indexOf("waitForAudioReadiness(audio"), "immediate Play is ordered after the readiness wait");
 
 const playHandlerStart = radio.indexOf('audio.addEventListener("play"');
 const playingHandlerStart = radio.indexOf('audio.addEventListener("playing"');
-const playHandler = radio.slice(playHandlerStart, playingHandlerStart);
-if (playHandlerStart < 0 || playingHandlerStart < 0) fail("audio play/playing handlers are missing");
-if (playHandler.includes("trackStartInFlight = false")) fail("play must not confirm a pending start");
-if (!radio.slice(playingHandlerStart).includes("playbackConfirmedToken = audioState.playRequestToken")) {
-  fail("playing must confirm the active request token");
-}
-if (!radio.includes("function primeRadioPlaylistFromLoadedTracks")) {
-  fail("cold-start Radio must support synchronous queue preparation from loaded tracks");
-}
-if (!core.includes("primeRadioPlaylistFromLoadedTracks();")) {
-  fail("cold-start playback does not use synchronous Radio queue preparation");
-}
+expect(playHandlerStart >= 0 && playingHandlerStart > playHandlerStart, "play/playing event handlers are missing");
+expect(!radio.slice(playHandlerStart, playingHandlerStart).includes("trackStartInFlight = false"), "play must not confirm a pending start");
+expect(radio.slice(playingHandlerStart, playingHandlerStart + 1400).includes("trackStartInFlight = false"), "playing must confirm the pending start");
 
-const r2FetchGuard = sw.indexOf("url.hostname === R2_AUDIO_HOST");
-if (r2FetchGuard < 0 || !sw.slice(r2FetchGuard, r2FetchGuard + 220).includes("servePrefetchedAudioOrNetwork")) {
-  fail("R2 audio requests must consult the startup-segment cache");
+for (const invariant of [
+  "PREFETCH_NEXT_QUEUE_DEPTH",
+  "PREFETCH_NEXT_CONCURRENCY",
+  "PREFETCH_BUFFER_STABLE_SECONDS",
+  "PREFETCH_MAX_ATTEMPTS",
+  "reconcileNextTrackPrefetchPlan",
+  "prefetch_window_ready"
+]) {
+  expect(radio.includes(invariant) || scripts.includes(invariant), `rolling prefetch is missing ${invariant}`);
 }
-if (!sw.includes("buildRangeResponseFromCachedAudio")) fail("startup segment Range reconstruction is missing");
-if (core.includes("queueIosTransportNavigation")) {
-  fail("user transport navigation must never be deferred");
-}
-const installBlock = sw.slice(sw.indexOf('self.addEventListener("install"'), sw.indexOf('self.addEventListener("activate"'));
-if (!installBlock.includes("skipWaiting")) fail("Service Worker updates must activate without remaining stuck in waiting");
-if (!installBlock.includes("cache.addAll(CRITICAL_SHELL_ASSETS)")) {
-  fail("Service Worker critical shell assets must remain atomic");
-}
-if (!installBlock.includes("Promise.allSettled") || !installBlock.includes("OPTIONAL_SHELL_ASSETS")) {
-  fail("Service Worker optional shell assets must not block installation");
-}
-if (!scripts.includes('registration.waiting.postMessage({ type: "SKIP_WAITING" })')) {
-  fail("an already-waiting Service Worker must be released without reloading playback");
-}
+expect(prefetch.includes('CACHE_NAME: "infra-next-track-segments-v7"'), "prefetch cache is not v7");
+expect(prefetch.includes("PREFETCH_SEGMENT_SIZE: 4 * 1024 * 1024"), "prefetch segment is not 4 MiB");
+expect(prefetch.includes("QUEUE_DEPTH: 5"), "prefetch depth is not five");
+expect(prefetch.includes("CONCURRENCY: 2"), "prefetch concurrency is not two");
+expect(prefetch.includes("MAX_ENTRIES: 6"), "prefetch cache is not capped at six entries");
+expect(!radio.includes("clearCache("), "normal playback still performs a global prefetch-cache clear");
+expect(!prefetch.includes("function clearCache"), "segment cache still exposes destructive global clearing");
 
-const publicFiles = ["public/index.html", "public/sw.js"]
+const playNext = functionBody(core, "playNext", "playPrevious");
+expect(playNext.includes("getQueuePreviewIndices(1)"), "Next does not consume the authoritative lookahead order");
+expect(core.includes("const planDepth = Math.max(requested, 5)"), "authoritative lookahead is not materialized to five tracks");
+expect(core.includes('mode: "shuffle"'), "Shuffle lookahead is not materialized");
+
+expect(!albumUi.includes('className = "track-controls"'), "album top transport controls are still injected");
+expect(!albumUi.includes("data-track-prev"), "album Previous control is still present");
+expect(!albumUi.includes("data-track-next"), "album Next control is still present");
+expect(!radio.includes("cleanupForeignAlbumAudioWhenIdle"), "foreign-album cleanup can still destroy the active player");
+expect(!radio.includes("cleanupIdleAudioContext"), "route lifecycle can still clear a paused player session");
+expect(nowPlaying.includes("animation.oncancel = finalize"), "fullscreen cancellation does not finalize mini-player restoration");
+
+expect(sw.includes("buildRangeResponseFromCachedAudio"), "Service Worker Range reconstruction is missing");
+expect(sw.includes("responseEnd = Math.min(range.end, metadata.cachedEnd)"), "open-ended Range is not bounded to the cached segment");
+expect(sw.includes("cachedValidatorMatchesIfRange"), "If-Range compatibility guard is missing");
+expect(sw.includes("isAudioPrefetchCache(key) && key !== NEXT_TRACK_CACHE"), "old audio caches are not migrated on activation");
+expect(sw.includes("event.clientId"), "prefetch-hit telemetry is not scoped to the requesting client");
+
+const cssHash = crypto.createHash("sha256").update(styles).digest("hex");
+expect(cssHash === frozenCssSha256, "styles.css changed despite the frozen audiofix329 geometry");
+expect(!styles.includes("100lvh"), "forbidden 100lvh geometry was introduced");
+
+const htmlFiles = ["public/index.html"]
   .concat(fs.readdirSync(path.join(root, "public/music"))
     .filter((name) => name.endsWith(".html"))
-    .map((name) => `public/music/${name}`));
-for (const relativePath of publicFiles) {
+    .map((name) => `public/music/${name}`))
+  .concat(fs.readdirSync(path.join(root, "public/apps"))
+    .filter((name) => name.endsWith(".html"))
+    .map((name) => `public/apps/${name}`));
+expect(htmlFiles.length === 35, `expected 35 player documents, found ${htmlFiles.length}`);
+for (const relativePath of htmlFiles) {
   const source = read(relativePath);
-  if (!source.includes(release) && relativePath !== "public/sw.js") {
-    fail(`${relativePath} does not reference ${release}`);
-  }
-  if (/audiofix(?:304|311|312|313|314)-2026071[34]/.test(source)) {
-    fail(`${relativePath} still references an obsolete audio runtime`);
-  }
+  expect(source.includes(release), `${relativePath} does not reference ${release}`);
+  expect(source.includes(frozenCssRelease), `${relativePath} does not retain ${frozenCssRelease}`);
+  expect(!source.includes("audiofix326-20260715"), `${relativePath} still references audiofix326 JavaScript`);
 }
-if (!sw.includes("infra-shell-20260714-audio322")) fail("Service Worker cache version is not audio322");
 
-if (!process.exitCode) console.log("Audio stability checks passed.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix330.");

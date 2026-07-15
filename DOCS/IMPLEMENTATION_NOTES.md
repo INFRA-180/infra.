@@ -1,5 +1,15 @@
 # Implementation Notes
 
+## 2026-07-15 — audiofix330 mobile Radio startup and rolling segment window
+
+- The home mini-player now prepares the real Radio catalogue and a materialized Radio queue from `tracks.json` without issuing any audio request. While that metadata is unavailable, cold Play remains disabled; the first accepted tap activates Radio and calls `audio.play()` directly in the same user-gesture stack, bypassing the historical 110 ms readiness wait.
+- Upcoming playback uses one authoritative order shared by the Next command and prefetch. Radio, linear album continuity and materialized Shuffle expose a rolling N+1…N+5 window; every consumed head rebases the window and appends the next target, so five changes naturally advance preparation to N+6…N+10.
+- Startup cache v7 stores 4 MiB initial segments, gives N+1 absolute priority while its two-attempt budget remains, then lets N+2…N+5 continue if that single file is unavailable. It permits at most two requests in flight and begins only after `playing` plus at least eight buffered seconds on the current track. Normal navigation keeps useful segments, aborts obsolete work and caps storage at six entries (about 20 MiB ahead / 24 MiB including the current prepared track); no playback path clears the complete cache.
+- The Service Worker serves a cached segment only as a valid bounded `206 Partial Content` response when the requested Range starts inside that segment and `If-Range` is compatible. Other ranges go to R2; corrupt entries alone are evicted, old prefetch cache generations are removed during activation, and cache-hit telemetry is scoped to the requesting client.
+- Album navigation no longer destroys a paused or starting session. Source, position, queue and the persistent mini-player survive route changes; fullscreen finish, cancel and timeout converge on the same finalizer. Album pages no longer inject their redundant top Previous/Play/Next/Shuffle controls, while row Play, favorites, downloads and the global transport remain.
+- The frozen fullscreen stylesheet remains byte-for-byte `audiofix329-20260715` (no viewport, height, bottom anchor, safe-area or `100lvh` change). JavaScript is published atomically as `audiofix330-20260715` with Service Worker `infra-shell-20260715-audio330`.
+- Regression coverage: synchronous cold Play, linear and materialized-Shuffle ordering, N+1 priority, rolling N+6…N+10 cycle, buffer gate, two-lane concurrency, selective cancellation, cache v7 normalization, Range `206`, timeout/migration behavior, fullscreen cancellation and the 35-document release boundary. Final latency and no-stall acceptance remain the user's real-iPhone/mobile-network validation.
+
 ## 2026-07-15 — audiofix329 iOS standalone full-screen viewport correction
 
 - Restored `viewport-fit=cover` on the main PWA shell so WebKit can paint the artwork behind the status bar and expose the top/bottom safe-area insets.

@@ -65,6 +65,7 @@
     const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () { return -1; });
     const beginAudioRecovery = method(ctx, "beginAudioRecovery");
     const failAudioRecovery = method(ctx, "failAudioRecovery");
+    const maybePrefetchNextTrack = method(ctx, "maybePrefetchNextTrack");
 
     function seekCurrentAudioToRatio(ratio) {
       const audio = audioState.audio;
@@ -88,6 +89,8 @@
       const nextToken = computePlaylistToken(list);
       if (nextToken !== audioState.playlistToken) {
         audioState.playlistToken = nextToken;
+        audioState.upcomingTrackPlan = null;
+        audioState.upcomingTrackPlanGeneration = Number(audioState.upcomingTrackPlanGeneration || 0) + 1;
         if (!opts.preserveRecent) audioState.recentPlayed = [];
       }
       savePlaybackQueueContext();
@@ -145,63 +148,123 @@
     }
 
     function getQueuePreviewIndices(limit) {
-      let list = audioState.playlist;
-      if (!Array.isArray(list) || !list.length) return [];
-      const currentIndex = getCurrentPlaylistIndexSafe();
-      if (
-        currentIndex >= 0 &&
-        currentIndex >= list.length - 1 &&
-        audioState.homeMode !== "radio" &&
-        !audioState.shuffleOn
-      ) {
-        const extendedIndex = extendAlbumPlaylistToNextAlbum({
-          reason: "queue_preview",
-          fromIndex: currentIndex
-        });
-        if (Number.isInteger(extendedIndex) && extendedIndex >= 0) {
-          list = audioState.playlist;
-        }
-      }
-      if (!Array.isArray(list) || list.length < 2) return [];
-      const max = Math.max(1, Math.min(Number(limit) || 8, list.length - 1));
-      if (currentIndex < 0 || currentIndex >= list.length) {
-        return list.map((_track, index) => index).slice(0, max);
-      }
+      let list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
+      if (!list.length) return [];
+      const requested = Math.max(1, Math.floor(Number(limit) || 8));
+      const planDepth = Math.max(requested, 5);
+      let currentIndex = getCurrentPlaylistIndexSafe();
+      if (currentIndex < 0 || currentIndex >= list.length) return [];
 
-      if (audioState.homeMode === "radio" && Array.isArray(audioState.radioQueue) && audioState.radioQueue.length) {
-        ensureRadioQueue(Math.max(audioState.radioQueueMinRemaining, max));
-        const cursor = Number.isInteger(audioState.radioQueueCursor) && audioState.radioQueueCursor >= 0
-          ? audioState.radioQueueCursor
-          : currentIndex;
+      if (audioState.homeMode === "radio" && Array.isArray(audioState.radioQueue)) {
+        ensureRadioQueue(Math.max(audioState.radioQueueMinRemaining || 0, planDepth));
+        list = audioState.playlist;
+        const currentSrc = getCurrentLogicalAudioSrc();
+        const bySrc = currentSrc
+          ? list.findIndex((track) => track && srcMatches(track.src, currentSrc))
+          : -1;
+        const cursor = bySrc >= 0
+          ? bySrc
+          : (Number.isInteger(audioState.radioQueueCursor) && audioState.radioQueueCursor >= 0
+            ? audioState.radioQueueCursor
+            : currentIndex);
         const ordered = [];
-        for (let step = 1; cursor + step < audioState.radioQueue.length && ordered.length < max; step += 1) {
-          ordered.push(cursor + step);
-        }
-        return ordered;
-      }
-
-      const randomMode = audioState.shuffleOn;
-      if (!randomMode) {
-        const ordered = [];
-        for (let index = currentIndex + 1; index < list.length && ordered.length < max; index += 1) {
+        for (let index = cursor + 1; index < list.length && ordered.length < planDepth; index += 1) {
           ordered.push(index);
         }
-        return ordered;
+        audioState.upcomingTrackPlan = {
+          mode: "radio",
+          baseSrc: String(list[cursor] && list[cursor].src ? list[cursor].src : currentSrc || ""),
+          baseIndex: cursor,
+          entries: ordered.map((index) => ({ index, src: String(list[index] && list[index].src ? list[index].src : "") }))
+        };
+        return ordered.slice(0, requested);
       }
 
-      const seedTrack = list[currentIndex];
-      const seed = hashString(
-        `${seedTrack && seedTrack.src ? seedTrack.src : currentIndex}|${audioState.playlistToken}|${audioState.homeMode}`
-      );
-      return list
+      if (!audioState.shuffleOn) {
+        const ordered = [];
+        let extensionGuard = 0;
+        while (ordered.length < planDepth) {
+          list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
+          const nextIndex = currentIndex + ordered.length + 1;
+          if (nextIndex < list.length) {
+            ordered.push(nextIndex);
+            continue;
+          }
+          if (extensionGuard >= planDepth) break;
+          extensionGuard += 1;
+          const extendedIndex = extendAlbumPlaylistToNextAlbum({
+            reason: "queue_preview",
+            fromIndex: list.length - 1
+          });
+          if (!Number.isInteger(extendedIndex) || extendedIndex < 0) break;
+        }
+        list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
+        audioState.upcomingTrackPlan = {
+          mode: "linear",
+          baseSrc: String(list[currentIndex] && list[currentIndex].src ? list[currentIndex].src : ""),
+          baseIndex: currentIndex,
+          entries: ordered.map((index) => ({ index, src: String(list[index] && list[index].src ? list[index].src : "") }))
+        };
+        return ordered.slice(0, requested);
+      }
+
+      const currentTrack = list[currentIndex];
+      const currentSrc = String(currentTrack && currentTrack.src ? currentTrack.src : "");
+      const existing = audioState.upcomingTrackPlan && audioState.upcomingTrackPlan.mode === "shuffle"
+        ? audioState.upcomingTrackPlan
+        : null;
+      let retained = [];
+      if (existing) {
+        if (srcMatches(existing.baseSrc, currentSrc)) {
+          retained = existing.entries.slice();
+        } else {
+          const consumedAt = existing.entries.findIndex((entry) => entry && srcMatches(entry.src, currentSrc));
+          if (consumedAt >= 0) retained = existing.entries.slice(consumedAt + 1);
+        }
+      }
+
+      const seen = new Set([currentSrc]);
+      retained = retained.map((entry) => {
+        const index = list.findIndex((track) => track && entry && srcMatches(track.src, entry.src));
+        return index >= 0 ? { index, src: String(list[index].src || "") } : null;
+      }).filter((entry) => {
+        if (!entry || !entry.src || seen.has(entry.src)) return false;
+        seen.add(entry.src);
+        return true;
+      });
+
+      const seed = hashString(`${currentSrc || currentIndex}|${audioState.playlistToken}|shuffle-materialized`);
+      const recentSet = new Set((audioState.recentPlayed || []).map((index) => {
+        const track = list[index];
+        return String(track && track.src ? track.src : "");
+      }).filter(Boolean));
+      const candidates = list
         .map((track, index) => ({
           index,
+          src: String(track && track.src ? track.src : ""),
           weight: hashString(`${seed}:${track && track.src ? track.src : index}:${index}`)
         }))
-        .filter((entry) => entry.index !== currentIndex)
-        .sort((left, right) => left.weight - right.weight)
-        .slice(0, max)
-        .map((entry) => entry.index);
+        .filter((entry) => entry.src && !seen.has(entry.src) && !recentSet.has(entry.src))
+        .sort((left, right) => left.weight - right.weight);
+      const fallback = list
+        .map((track, index) => ({ index, src: String(track && track.src ? track.src : "") }))
+        .filter((entry) => entry.src && !seen.has(entry.src));
+      candidates.concat(fallback).some((entry) => {
+        if (retained.length >= planDepth) return true;
+        if (!entry.src || seen.has(entry.src)) return false;
+        seen.add(entry.src);
+        retained.push({ index: entry.index, src: entry.src });
+        return false;
+      });
+
+      const entries = retained.slice(0, planDepth);
+      audioState.upcomingTrackPlan = {
+        mode: "shuffle",
+        baseSrc: currentSrc,
+        baseIndex: currentIndex,
+        entries
+      };
+      return entries.slice(0, requested).map((entry) => entry.index);
     }
 
     function resetAudioElementForSource(audio, srcLike) {
@@ -333,9 +396,10 @@
       const isAutoAdvance = Boolean(opts.auto);
       const isFromMediaSession = Boolean(opts.fromMediaSession);
       const isFromTransportControl = Boolean(opts.fromTransportControl);
+      const isImmediateUserGesture = Boolean(opts.immediatePlay && opts.userGesture);
       const preparedNextIndex = getAutoPrefetchedNextIndex();
       const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index;
-      const isFastSkip = isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget;
+      const isFastSkip = isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget || isImmediateUserGesture;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
 
       if (!isFastSkip && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
@@ -351,6 +415,8 @@
         audioState.playlistKind = "album";
       }
       if (nextSrc) audioState.activeLogicalSrc = nextSrc;
+      audioState.trackStartInFlight = true;
+      maybePrefetchNextTrack("track_change");
       rememberPlayedIndex(index);
       audioState.pendingSeekRatio = Number.isFinite(opts.seekRatio) ? opts.seekRatio : null;
       audioState.pendingStartTime = Number.isFinite(opts.startTime) ? opts.startTime : null;
@@ -368,11 +434,12 @@
         buildAudioMonitorPayload(target, index, nextSrc || target.src),
         {
           request_token: requestToken,
-          trigger: opts.auto ? "auto" : isFromMediaSession ? "media_session" : isFromTransportControl ? "transport" : opts.resume ? "resume" : isPreparedInitialRandom ? "initial_random" : "user",
+          trigger: opts.auto ? "auto" : isFromMediaSession ? "media_session" : isFromTransportControl ? "transport" : opts.resume ? "resume" : isImmediateUserGesture ? "cold_radio" : isPreparedInitialRandom ? "initial_random" : "user",
           from_media_session: isFromMediaSession,
           from_transport_control: isFromTransportControl,
           surface: opts.surface || "",
           initial_random: isPreparedInitialRandom,
+          immediate_play: isImmediateUserGesture,
           same_track: sameTrack
         }
       ));
@@ -395,7 +462,6 @@
           click_perf_ms: audioState.audioClickPerfTs
         }
       ));
-      audioState.trackStartInFlight = true;
       const shouldFastSourceSwitch = isFastSkip;
       const shouldFadeSwitch = !shouldFastSourceSwitch && !sameTrack && !audio.paused && Boolean(getCurrentPlayableAudioSrc(audio));
 
@@ -458,7 +524,6 @@
           network_state: audio.networkState,
           click_perf_ms: audioState.audioClickPerfTs
         });
-        audioState.trackStartInFlight = false;
         clearTrackFailure(target.src);
         clearTrackStatus(rowTrack);
         if (!sameTrack && !(isFastSkip || shouldSeamless)) {
@@ -489,7 +554,10 @@
           message: playErr && playErr.message ? playErr.message : "",
           ready_state: audio.readyState,
           network_state: audio.networkState,
-          click_perf_ms: audioState.audioClickPerfTs
+          click_perf_ms: audioState.audioClickPerfTs,
+          immediate_play: isImmediateUserGesture,
+          user_activation_active: Boolean(typeof navigator !== "undefined" && navigator.userActivation && navigator.userActivation.isActive),
+          user_activation_seen: Boolean(typeof navigator !== "undefined" && navigator.userActivation && navigator.userActivation.hasBeenActive)
         });
         if (playErr && playErr.name === "AbortError" && !isRetry) {
           beginAudioRecovery({
@@ -523,7 +591,10 @@
           surface: opts.surface || "",
           ready_state: audio.readyState,
           network_state: audio.networkState,
-          click_perf_ms: audioState.audioClickPerfTs
+          click_perf_ms: audioState.audioClickPerfTs,
+          immediate_play: isImmediateUserGesture,
+          user_activation_active: Boolean(typeof navigator !== "undefined" && navigator.userActivation && navigator.userActivation.isActive),
+          user_activation_seen: Boolean(typeof navigator !== "undefined" && navigator.userActivation && navigator.userActivation.hasBeenActive)
         });
         if (isAutoAdvance) scheduleSilentCheck(target, index, nextSrc || target.src, requestToken);
         audio.play()
@@ -534,7 +605,7 @@
       function beginPlayback() {
         if (requestToken !== audioState.startRequestToken) return;
         if (isFastSkip) {
-          attemptPlay({ sync: true });
+          attemptPlay({ sync: true, immediate: isImmediateUserGesture });
           return;
         }
         const readinessTimeout = isIosDevice() ? 110 : 220;
@@ -696,9 +767,11 @@
       }
       const fromMediaSession = Boolean(opts.fromMediaSession);
       const fromTransportControl = Boolean(opts.fromTransportControl);
-      const fastSkip = Boolean(opts.auto || fromMediaSession || fromTransportControl);
-      const prefetchedNextIndex = fastSkip ? getAutoPrefetchedNextIndex() : -1;
-      const nextIndex = prefetchedNextIndex >= 0 ? prefetchedNextIndex : resolveIndex(1);
+      const plannedNextIndices = getQueuePreviewIndices(1);
+      const plannedNextIndex = plannedNextIndices.length ? plannedNextIndices[0] : -1;
+      const readyNextIndex = getAutoPrefetchedNextIndex();
+      const prefetchedNextIndex = readyNextIndex === plannedNextIndex ? readyNextIndex : -1;
+      const nextIndex = plannedNextIndex >= 0 ? plannedNextIndex : resolveIndex(1);
       if (nextIndex >= 0) {
         if (opts.auto) {
           const nextTrack = audioState.playlist[nextIndex];

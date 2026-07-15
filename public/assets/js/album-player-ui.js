@@ -14,10 +14,6 @@
     const ctx = context || {};
     const audioState = ctx.audioState || {};
     const runtime = ctx.runtime || { baseUrl: window.location.href };
-    const PLAYER_ICON_PLAY = ctx.PLAYER_ICON_PLAY || "";
-    const PLAYER_ICON_STOP = ctx.PLAYER_ICON_STOP || "";
-    const PLAYER_ICON_PREVIOUS = ctx.PLAYER_ICON_PREVIOUS || "";
-    const PLAYER_ICON_NEXT = ctx.PLAYER_ICON_NEXT || "";
     const TRACK_CLICK_COOLDOWN_MS = Number.isFinite(Number(ctx.TRACK_CLICK_COOLDOWN_MS)) ? Number(ctx.TRACK_CLICK_COOLDOWN_MS) : 180;
     const getAudioAssetPathKey = method(ctx, "getAudioAssetPathKey", function () { return ""; });
     const fetchLiveCatalogDocument = method(ctx, "fetchLiveCatalogDocument", function () { return Promise.reject(new Error("missing live catalog loader")); });
@@ -31,7 +27,6 @@
     const savePlaybackQueueContext = method(ctx, "savePlaybackQueueContext");
     const syncMediaSessionMetadata = method(ctx, "syncMediaSessionMetadata");
     const ensureGlobalAudio = method(ctx, "ensureGlobalAudio", function () { return null; });
-    const ensureAlbumHeaderActions = method(ctx, "ensureAlbumHeaderActions", function () { return null; });
     const ensureAlbumFavoriteSelectionToolbar = method(ctx, "ensureAlbumFavoriteSelectionToolbar");
     const toAbsoluteUrl = method(ctx, "toAbsoluteUrl", function (value) { return String(value || ""); });
     const getCurrentAlbumTitle = method(ctx, "getCurrentAlbumTitle", function () { return ""; });
@@ -46,11 +41,7 @@
     const clearTrackFailure = method(ctx, "clearTrackFailure");
     const resetAudioElementForSource = method(ctx, "resetAudioElementForSource");
     const startTrack = method(ctx, "startTrack");
-    const cleanupForeignAlbumAudioWhenIdle = method(ctx, "cleanupForeignAlbumAudioWhenIdle");
     const syncPlaylistContext = method(ctx, "syncPlaylistContext");
-    const playPrevious = method(ctx, "playPrevious");
-    const playNext = method(ctx, "playNext");
-    const toggleAlbumShuffleMode = method(ctx, "toggleAlbumShuffleMode");
     const bindGlobalKeyboardShortcuts = method(ctx, "bindGlobalKeyboardShortcuts");
     const syncRadioQueueToPlaylist = method(ctx, "syncRadioQueueToPlaylist");
     const buildPreservedTrack = method(ctx, "buildPreservedTrack", function () { return null; });
@@ -224,23 +215,6 @@
       }
     });
 
-    const toggleActive = uiIndex >= 0 && (isPlaying || audioState.trackStartInFlight);
-    if (ui.toggleBtn) {
-      ui.toggleBtn.innerHTML = toggleActive ? PLAYER_ICON_STOP : PLAYER_ICON_PLAY;
-      ui.toggleBtn.classList.toggle("is-on", toggleActive);
-      ui.toggleBtn.setAttribute("aria-label", toggleActive ? "Pause" : "Lire l'album");
-    }
-
-    if (ui.shuffleBtn) {
-      const shuffleActive = Boolean(audioState.shuffleOn && audioState.homeMode !== "radio");
-      ui.shuffleBtn.textContent = shuffleActive ? "Mix on" : "Mix off";
-      ui.shuffleBtn.classList.toggle("is-on", shuffleActive);
-      ui.shuffleBtn.classList.toggle("is-muted-active", Boolean(audioState.shuffleOn && audioState.homeMode === "radio"));
-      ui.shuffleBtn.disabled = false;
-      ui.shuffleBtn.setAttribute("aria-pressed", shuffleActive ? "true" : "false");
-      ui.shuffleBtn.setAttribute("aria-label", shuffleActive ? "Desactiver la lecture aleatoire" : "Activer la lecture aleatoire");
-    }
-
     updateProgressUi();
   }
 
@@ -297,19 +271,9 @@
       return;
     }
 
-    const controls = document.createElement("div");
-    controls.className = "track-controls";
-    controls.innerHTML = [
-      `<button class="track-ctrl" type="button" data-track-prev aria-label="Piste precedente">${PLAYER_ICON_PREVIOUS}</button>`,
-      `<button class="track-ctrl" type="button" data-track-toggle aria-label="Lecture pause">${PLAYER_ICON_PLAY}</button>`,
-      `<button class="track-ctrl" type="button" data-track-next aria-label="Piste suivante">${PLAYER_ICON_NEXT}</button>`,
-      "<button class=\"track-ctrl\" type=\"button\" data-track-shuffle aria-label=\"Lecture aleatoire\">Mix off</button>"
-    ].join("");
-
-    const actions = ensureAlbumHeaderActions(section);
-    if (actions) actions.insertBefore(controls, actions.firstChild);
-    else section.insertBefore(controls, section.firstChild);
-    ensureAlbumFavoriteSelectionToolbar(section, controls);
+    // The persistent global transport owns previous/play/next/shuffle.
+    // Album pages only expose their track rows and favorite/download actions.
+    ensureAlbumFavoriteSelectionToolbar(section);
 
     const pageHref = toAbsoluteUrl(window.location.pathname);
     const albumTitle = getCurrentAlbumTitle();
@@ -318,11 +282,6 @@
 
     const ui = {
       section,
-      controls,
-      prevBtn: controls.querySelector("[data-track-prev]"),
-      toggleBtn: controls.querySelector("[data-track-toggle]"),
-      nextBtn: controls.querySelector("[data-track-next]"),
-      shuffleBtn: controls.querySelector("[data-track-shuffle]"),
       albumTitle,
       albumArtwork,
       tracks: [],
@@ -586,29 +545,18 @@
 
     audioState.ui = ui;
     const activeSrc = getCurrentLogicalAudioSrc();
-    if (document.body.classList.contains("album-screen")) {
-      if (activeSrc) {
-        const belongsToAlbumPage = ui.playlist.some((track) => srcMatches(track.src, activeSrc));
-        if (
-          belongsToAlbumPage &&
-          audioState.homeMode !== "radio" &&
-          audioState.playlistKind !== "global" &&
-          audioState.playlistKind !== "favorites"
-        ) {
-          audioState.playlist = ui.playlist.slice();
-          syncPlaylistContext(audioState.playlist);
-          const matchIndex = ui.playlist.findIndex((track) => srcMatches(track.src, activeSrc));
-          if (matchIndex >= 0) {
-            audioState.currentIndex = matchIndex;
-          }
-        } else {
-          cleanupForeignAlbumAudioWhenIdle(ui);
-        }
-      } else if (audioState.homeMode !== "radio") {
+    if (
+      document.body.classList.contains("album-screen") &&
+      activeSrc &&
+      audioState.homeMode !== "radio" &&
+      audioState.playlistKind === "album"
+    ) {
+      const matchIndex = ui.playlist.findIndex((track) => srcMatches(track.src, activeSrc));
+      if (matchIndex >= 0) {
         audioState.playlist = ui.playlist.slice();
         syncPlaylistContext(audioState.playlist);
+        audioState.currentIndex = matchIndex;
       }
-      cleanupForeignAlbumAudioWhenIdle(ui);
     }
     applyCachedTrackDurations(ui.tracks);
     loadTrackDurationData().then(function () {
@@ -634,36 +582,7 @@
       }
     });
 
-    if (ui.prevBtn) ui.prevBtn.addEventListener("click", function () {
-      audioState.ui = ui;
-      ensurePlaylistFromUi(ui);
-      playPrevious();
-    });
-
-    if (ui.nextBtn) ui.nextBtn.addEventListener("click", function () {
-      audioState.ui = ui;
-      ensurePlaylistFromUi(ui);
-      playNext();
-    });
-
-    if (ui.toggleBtn) ui.toggleBtn.addEventListener("click", function () {
-      audioState.ui = ui;
-      ensurePlaylistFromUi(ui);
-      togglePlayPause();
-    });
-
-    if (ui.shuffleBtn) ui.shuffleBtn.addEventListener("click", function () {
-      toggleAlbumShuffleMode();
-    });
-
     bindGlobalKeyboardShortcuts();
-
-    // If the current global track belongs to this page, bind the playlist for next/prev.
-    const currentSrc = getCurrentLogicalAudioSrc();
-    if (currentSrc && ui.playlist.some((track) => srcMatches(track.src, currentSrc))) {
-      audioState.playlist = ui.playlist.slice();
-      audioState.currentIndex = ui.playlist.findIndex((track) => srcMatches(track.src, currentSrc));
-    }
 
     syncAudioUi();
   }

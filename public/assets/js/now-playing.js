@@ -222,27 +222,20 @@
       easing: reduce ? "ease-out" : "cubic-bezier(0.32, 0.72, 0, 1)",
       fill: "both"
     });
-    let finished = false;
-    const finish = function () {
-      if (finished) return;
-      finished = true;
+    let finalized = false;
+    let fallbackTimer = 0;
+    const finalize = function () {
+      if (finalized) return;
+      finalized = true;
+      if (fallbackTimer) window.clearTimeout(fallbackTimer);
       panel.style.transform = "";
       panel.style.opacity = "";
       panel.style.transformOrigin = "";
       if (typeof done === "function") done();
     };
-    const fallbackTimer = window.setTimeout(finish, duration + 80);
-    animation.onfinish = function () {
-      window.clearTimeout(fallbackTimer);
-      finish();
-    };
-    animation.oncancel = function () {
-      window.clearTimeout(fallbackTimer);
-      finished = true;
-      panel.style.transform = "";
-      panel.style.opacity = "";
-      panel.style.transformOrigin = "";
-    };
+    fallbackTimer = window.setTimeout(finalize, duration + 80);
+    animation.onfinish = finalize;
+    animation.oncancel = finalize;
   }
 
   function disableNowPlayingOverlayUi() {

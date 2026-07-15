@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix326-20260715";
+window.INFRA_BUILD_TAG = "audiofix330-20260715";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -289,6 +289,18 @@ function openAppDownloadGatekeeper(appName, url) {
     nextPrefetchAttemptedSrc: "",
     nextPrefetchFailedSrc: "",
     nextPrefetchFailureReason: "",
+    nextPrefetchReadySrcs: new Set(),
+    nextPrefetchAttemptCounts: new Map(),
+    nextPrefetchInFlightSrcs: new Set(),
+    nextPrefetchControllers: new Map(),
+    nextPrefetchRetryTimers: new Map(),
+    nextPrefetchPlan: [],
+    nextPrefetchPlanKey: "",
+    nextPrefetchGeneration: 0,
+    nextPrefetchSuspendedReason: "",
+    nextPrefetchWindowReadyKey: "",
+    upcomingTrackPlan: null,
+    upcomingTrackPlanGeneration: 0,
     spaSwitchContext: null,
     favoriteEntries: [],
     favoritePaths: new Set(),
@@ -368,6 +380,22 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(prefetchConstants.THRESHOLD_SECONDS))
     ? Number(prefetchConstants.THRESHOLD_SECONDS)
     : 30;
+  const PREFETCH_NEXT_SEGMENT_BYTES = Number.isFinite(Number(prefetchConstants.PREFETCH_SEGMENT_SIZE))
+    ? Math.max(1, Number(prefetchConstants.PREFETCH_SEGMENT_SIZE))
+    : 4 * 1024 * 1024;
+  const PREFETCH_NEXT_QUEUE_DEPTH = Number.isFinite(Number(prefetchConstants.QUEUE_DEPTH))
+    ? Math.max(1, Number(prefetchConstants.QUEUE_DEPTH))
+    : 5;
+  const PREFETCH_NEXT_CONCURRENCY = Number.isFinite(Number(prefetchConstants.CONCURRENCY))
+    ? Math.max(1, Number(prefetchConstants.CONCURRENCY))
+    : 2;
+  const PREFETCH_NEXT_MAX_ENTRIES = Number.isFinite(Number(prefetchConstants.MAX_ENTRIES))
+    ? Math.max(PREFETCH_NEXT_QUEUE_DEPTH, Number(prefetchConstants.MAX_ENTRIES))
+    : 6;
+  const PREFETCH_BUFFER_STABLE_SECONDS = 8;
+  const PREFETCH_BUFFER_ABORT_SECONDS = 4;
+  const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
+  const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
@@ -392,7 +420,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix326-20260715";
+  const runtimeVersion = "audiofix330-20260715";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -607,10 +635,19 @@ function openAppDownloadGatekeeper(appName, url) {
       updateProgressUi,
       isBlobObjectUrl,
       extendAlbumPlaylistToNextAlbum,
+      getQueuePreviewIndices,
       prefetchApi,
       PREFETCH_NEXT_CACHE_NAME,
       PREFETCH_NEXT_MAX_BYTES,
-      PREFETCH_NEXT_THRESHOLD_SECONDS
+      PREFETCH_NEXT_THRESHOLD_SECONDS,
+      PREFETCH_NEXT_SEGMENT_BYTES,
+      PREFETCH_NEXT_QUEUE_DEPTH,
+      PREFETCH_NEXT_CONCURRENCY,
+      PREFETCH_NEXT_MAX_ENTRIES,
+      PREFETCH_BUFFER_STABLE_SECONDS,
+      PREFETCH_BUFFER_ABORT_SECONDS,
+      PREFETCH_REQUEST_TIMEOUT_MS,
+      PREFETCH_MAX_ATTEMPTS
     });
   }
 
@@ -646,9 +683,6 @@ function openAppDownloadGatekeeper(appName, url) {
       toggleRadioModeFromTransport: function () {},
       toggleAlbumShuffleMode: function () {},
       clearStoredPlaybackState: function () {},
-      cleanupIdleAudioContext: function () {},
-      resetHomePlaybackModeIfIdle: function () {},
-      cleanupForeignAlbumAudioWhenIdle: function () {},
       buildAlbumPlaylistFromRadioCache: function () {},
       sanitizeQueueTrack: function () {},
       savePlaybackQueueContext: function () {},
@@ -738,7 +772,8 @@ function openAppDownloadGatekeeper(appName, url) {
       markAudioPauseIntent,
       extendAlbumPlaylistToNextAlbum,
       beginAudioRecovery,
-      failAudioRecovery
+      failAudioRecovery,
+      maybePrefetchNextTrack
     });
   }
 
@@ -937,7 +972,6 @@ function openAppDownloadGatekeeper(appName, url) {
       clearTrackFailure,
       resetAudioElementForSource,
       startTrack,
-      cleanupForeignAlbumAudioWhenIdle,
       syncPlaylistContext,
       playPrevious,
       playNext,
@@ -1936,15 +1970,6 @@ function openAppDownloadGatekeeper(appName, url) {
   }
   function clearStoredPlaybackState() {
     return callAudioRadio("clearStoredPlaybackState", arguments);
-  }
-  function cleanupIdleAudioContext() {
-    return callAudioRadio("cleanupIdleAudioContext", arguments);
-  }
-  function resetHomePlaybackModeIfIdle() {
-    return callAudioRadio("resetHomePlaybackModeIfIdle", arguments);
-  }
-  function cleanupForeignAlbumAudioWhenIdle() {
-    return callAudioRadio("cleanupForeignAlbumAudioWhenIdle", arguments);
   }
   function getQuickActions() {
     if (catalogState.quickActions.length) return catalogState.quickActions.slice();
@@ -4301,7 +4326,11 @@ function openAppDownloadGatekeeper(appName, url) {
   function extendAlbumPlaylistToNextAlbum(options) {
     const list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
     const currentIndex = Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1;
-    if (!list.length || currentIndex < 0 || currentIndex < list.length - 1) return -1;
+    const requestedFromIndex = options && Number.isInteger(options.fromIndex)
+      ? options.fromIndex
+      : currentIndex;
+    const anchorIndex = Math.min(list.length - 1, requestedFromIndex);
+    if (!list.length || currentIndex < 0 || anchorIndex < list.length - 1) return -1;
     if (audioState.homeMode === "radio" || audioState.shuffleOn) return -1;
     if (audioState.playlistKind === "global" || audioState.playlistKind === "favorites") return -1;
     if (String(audioState.playlistToken || "").startsWith("manual-")) return -1;
@@ -4314,7 +4343,7 @@ function openAppDownloadGatekeeper(appName, url) {
       return -1;
     }
 
-    const currentTrack = list[currentIndex];
+    const currentTrack = list[anchorIndex];
     const currentAlbum = findTracksAlbumForContinuityTrack(currentTrack, tracksAlbums);
     const nextAlbum = findNextAlbumForContinuity(currentAlbum, tracksAlbums);
     if (!nextAlbum || !nextAlbum.album) return -1;
@@ -4325,12 +4354,12 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!nextTracks.length) return -1;
 
     const duplicateIndex = list.findIndex(function (existing, index) {
-      if (index <= currentIndex || !existing || !existing.src) return false;
+      if (index <= anchorIndex || !existing || !existing.src) return false;
       return nextTracks.some(function (track) {
         return track && track.src && srcMatches(existing.src, track.src);
       });
     });
-    if (duplicateIndex > currentIndex) return duplicateIndex;
+    if (duplicateIndex > anchorIndex) return duplicateIndex;
 
     const firstNextIndex = list.length;
     audioState.playlist = list.concat(nextTracks);
@@ -5176,7 +5205,9 @@ function openAppDownloadGatekeeper(appName, url) {
         {
           range: Boolean(data.range),
           range_header: data.range_header || "",
-          status: data.status || 200
+          status: Number.isFinite(Number(data.status)) ? Number(data.status) : 200,
+          strategy: data.strategy || "segment_v7",
+          client_id: data.client_id || ""
         }
       ));
     });
@@ -5692,7 +5723,6 @@ function openAppDownloadGatekeeper(appName, url) {
     initThemePreset();
     if (!adminMode) applyThemePreset("blanc", false);
 
-    cleanupIdleAudioContext({ preserveMode: true });
     ensureGlobalAudio();
     ensurePlayablePlaylistContext();
     syncFavoriteButtons();
@@ -5701,12 +5731,7 @@ function openAppDownloadGatekeeper(appName, url) {
     enforceHomeModuleOrder();
     enforceHomeAppsCollapsed(adminMode);
 
-    resetHomePlaybackModeIfIdle();
-    if (audioState.homeMode !== "radio") {
-      setHomePlayMode("album", { force: true });
-    } else {
-      syncAudioUi();
-    }
+    syncAudioUi();
 
     scheduleFavoritesPreload("home_restore");
     scheduleSpaPagePrefetch();
@@ -5723,7 +5748,7 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!adminMode) applyThemePreset("blanc", false);
 
     const isHomeScreen = document.body.classList.contains("home-screen");
-    const audioFeaturesNeeded = shouldInitAudioFeatures();
+    const audioFeaturesNeeded = isHomeScreen || shouldInitAudioFeatures();
     const durationDataReady = audioFeaturesNeeded
       ? loadTrackDurationData()
       : Promise.resolve();
@@ -5735,10 +5760,11 @@ function openAppDownloadGatekeeper(appName, url) {
       initAudioSessionTelemetry();
       ensurePlayablePlaylistContext();
     }
-
-    if (!document.body.classList.contains("album-screen")) {
-      cleanupIdleAudioContext({ preserveMode: true });
-    }
+    const initialRadioMetadataReady = isHomeScreen
+      ? tracksDataReady.then(function () {
+        return prepareInitialGlobalRandomPlayback("home_init");
+      })
+      : Promise.resolve(null);
 
     if (isHomeScreen) {
       initHomeFavoritesButton();
@@ -5758,12 +5784,7 @@ function openAppDownloadGatekeeper(appName, url) {
       if (!adminMode) enforceHomeModuleOrder();
       enforceHomeAppsCollapsed(adminMode);
 
-      resetHomePlaybackModeIfIdle();
-      if (audioState.homeMode !== "radio") {
-        setHomePlayMode("album", { force: true });
-      } else {
-        syncAudioUi();
-      }
+      syncAudioUi();
       syncFavoritesRoute();
     }
 
@@ -5780,7 +5801,8 @@ function openAppDownloadGatekeeper(appName, url) {
       initMinimalPlayers();
       syncTransportUi();
       if (isHomeScreen) {
-        scheduleInitialGlobalRandomPreparation("home_idle");
+        await initialRadioMetadataReady;
+        syncTransportUi();
       }
     }
 

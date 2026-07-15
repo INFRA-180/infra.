@@ -19,6 +19,14 @@
     const PREFETCH_NEXT_CACHE_NAME = ctx.PREFETCH_NEXT_CACHE_NAME || "infra-next-track";
     const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_MAX_BYTES)) ? Number(ctx.PREFETCH_NEXT_MAX_BYTES) : 12 * 1024 * 1024;
     const PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS)) ? Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS) : 24;
+    const PREFETCH_NEXT_SEGMENT_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_SEGMENT_BYTES)) ? Number(ctx.PREFETCH_NEXT_SEGMENT_BYTES) : 4 * 1024 * 1024;
+    const PREFETCH_NEXT_QUEUE_DEPTH = Number.isFinite(Number(ctx.PREFETCH_NEXT_QUEUE_DEPTH)) ? Math.max(1, Number(ctx.PREFETCH_NEXT_QUEUE_DEPTH)) : 5;
+    const PREFETCH_NEXT_CONCURRENCY = Number.isFinite(Number(ctx.PREFETCH_NEXT_CONCURRENCY)) ? Math.max(1, Number(ctx.PREFETCH_NEXT_CONCURRENCY)) : 2;
+    const PREFETCH_NEXT_MAX_ENTRIES = Number.isFinite(Number(ctx.PREFETCH_NEXT_MAX_ENTRIES)) ? Math.max(PREFETCH_NEXT_QUEUE_DEPTH, Number(ctx.PREFETCH_NEXT_MAX_ENTRIES)) : 6;
+    const PREFETCH_BUFFER_STABLE_SECONDS = Number.isFinite(Number(ctx.PREFETCH_BUFFER_STABLE_SECONDS)) ? Number(ctx.PREFETCH_BUFFER_STABLE_SECONDS) : 8;
+    const PREFETCH_BUFFER_ABORT_SECONDS = Number.isFinite(Number(ctx.PREFETCH_BUFFER_ABORT_SECONDS)) ? Number(ctx.PREFETCH_BUFFER_ABORT_SECONDS) : 4;
+    const PREFETCH_REQUEST_TIMEOUT_MS = Number.isFinite(Number(ctx.PREFETCH_REQUEST_TIMEOUT_MS)) ? Number(ctx.PREFETCH_REQUEST_TIMEOUT_MS) : 8000;
+    const PREFETCH_MAX_ATTEMPTS = Number.isFinite(Number(ctx.PREFETCH_MAX_ATTEMPTS)) ? Math.max(1, Number(ctx.PREFETCH_MAX_ATTEMPTS)) : 2;
     const SYSTEM_INTERRUPTION_GUARD_MS = 2 * 60 * 1000;
     const SYSTEM_INTERRUPTION_NEAR_END_SECONDS = 2.5;
     const loadTracksData = method(ctx, "loadTracksData", function () { return Promise.resolve({ albums: [] }); });
@@ -80,6 +88,7 @@
     const updateProgressUi = method(ctx, "updateProgressUi", function () {});
     const isBlobObjectUrl = method(ctx, "isBlobObjectUrl", function () { return false; });
     const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () { return -1; });
+    const getQueuePreviewIndices = method(ctx, "getQueuePreviewIndices", function () { return []; });
 
   function resyncMediaSessionControls() {
     bindMediaSessionActions({ force: true, quiet: true });
@@ -414,6 +423,12 @@
 
     const avoid = toAbsoluteUrlOrEmpty(avoidSrc || "");
     const recentSrcs = getRecentPlayedSrcSet();
+    const queuedSrcs = new Set(
+      (Array.isArray(audioState.radioQueue) ? audioState.radioQueue : [])
+        .slice(Math.max(0, Number.isInteger(audioState.radioQueueCursor) ? audioState.radioQueueCursor : 0))
+        .map(getTrackSource)
+        .filter(Boolean)
+    );
     const seen = new Set();
     const cleanList = [];
 
@@ -427,11 +442,12 @@
     const primary = cleanList.filter(function (track) {
       const src = getTrackSource(track);
       if (avoid && srcMatches(src, avoid)) return false;
+      if (queuedSrcs.has(src)) return false;
       return !recentSrcs.has(src);
     });
     const fallback = cleanList.filter(function (track) {
       const src = getTrackSource(track);
-      return !(avoid && srcMatches(src, avoid));
+      return !queuedSrcs.has(src) && !(avoid && srcMatches(src, avoid));
     });
     const pool = primary.length ? primary : fallback;
 
@@ -519,44 +535,53 @@
 
 
 
+  function activatePreparedInitialRadioPlayback() {
+    if (!audioState.initialRandomReady || !audioState.initialRandomPlaylist.length) return false;
+    const queue = consumePreparedInitialGlobalRandomPlaylist();
+    if (!queue || !queue.length) return false;
+    ensureGlobalAudio();
+    audioState.homeMode = "radio";
+    audioState.playlistKind = "radio";
+    audioState.shuffleOn = false;
+    audioState.radioQueue = queue.slice();
+    audioState.radioQueueCursor = 0;
+    audioState.playlist = audioState.radioQueue;
+    audioState.currentIndex = 0;
+    persistHomePlayMode("radio");
+    syncPlaylistContext(audioState.playlist, { preserveRecent: true });
+    savePlaybackQueueContext();
+    syncMediaSessionMetadata({ forcePosition: true });
+    startTrack(0, {
+      seamless: true,
+      initialRandom: true,
+      immediatePlay: true,
+      userGesture: true,
+      coldStart: true,
+      surface: "mini_cold"
+    });
+    return true;
+  }
+
+
+
   function startGlobalRandomPlayback() {
-    if (audioState.globalRandomStartInFlight) return;
+    if (audioState.globalRandomStartInFlight) return false;
     trackAudioRuntimeEvent("initial_random_tap", {
-      track: "global-random",
-      album: "global",
+      track: "radio-cold-start",
+      album: "radio",
       prepared: Boolean(audioState.initialRandomReady && audioState.initialRandomPlaylist.length),
       prefetch_src: audioState.initialRandomFirstSrc || "",
       prefetch_done: Boolean(audioState.nextPrefetchDoneSrc && srcMatches(audioState.nextPrefetchDoneSrc, audioState.initialRandomFirstSrc || ""))
     });
     audioState.globalRandomStartInFlight = true;
-    syncAudioUi();
-    ensureGlobalAudio();
-    const preparedPlaylist = consumePreparedInitialGlobalRandomPlaylist();
-    const buildOnTap = function () {
-      return loadTracksData().then(function (tracksData) {
-        return buildGlobalRandomPlaylistWithTelemetry(tracksData, "tap");
-      });
-    };
-    const playlistReady = preparedPlaylist
-      ? Promise.resolve(preparedPlaylist)
-      : (audioState.initialRandomPreparePromise
-        ? audioState.initialRandomPreparePromise.then(function (playlist) {
-          return playlist && playlist.length ? playlist : buildOnTap();
-        })
-        : buildOnTap());
-
-    playlistReady
-      .then(function (playlist) {
-        if (!setGlobalCatalogPlaylist(playlist)) return;
-        startTrack(0, { seamless: true, initialRandom: true });
-      })
-      .catch(function () {
-        syncAudioUi();
-      })
-      .finally(function () {
-        audioState.globalRandomStartInFlight = false;
-        syncAudioUi();
-      });
+    try {
+      const started = activatePreparedInitialRadioPlayback();
+      if (!started) prepareInitialGlobalRandomPlayback("cold_tap_not_ready");
+      return started;
+    } finally {
+      audioState.globalRandomStartInFlight = false;
+      syncAudioUi();
+    }
   }
 
 
@@ -584,9 +609,7 @@
 
   function shouldPrepareInitialGlobalRandomPlayback() {
     return Boolean(
-      PREFETCH_NEXT_ENABLED &&
       document.body.classList.contains("home-screen") &&
-      audioState.homeMode !== "radio" &&
       !audioState.globalRandomStartInFlight &&
       !hasPlaybackSession()
     );
@@ -595,7 +618,6 @@
 
 
   function prepareInitialGlobalRandomPlayback(reason) {
-    if (!PREFETCH_NEXT_ENABLED) return Promise.resolve(null);
     if (audioState.initialRandomReady && audioState.initialRandomPlaylist.length) {
       return Promise.resolve(audioState.initialRandomPlaylist.slice());
     }
@@ -608,17 +630,26 @@
       .then(function (tracksData) {
         if (token !== audioState.initialRandomPrepareToken) return null;
         if (!shouldPrepareInitialGlobalRandomPlayback()) return null;
-        const playlist = buildGlobalRandomPlaylistWithTelemetry(tracksData, reason || "idle");
-        if (!playlist.length) return null;
-        audioState.initialRandomPlaylist = playlist.slice();
-        audioState.initialRandomFirstSrc = normalizeAudioSourceUrl(playlist[0] && playlist[0].src ? playlist[0].src : "");
+        const radioPlaylist = buildGlobalCatalogPlaylist(tracksData);
+        if (!radioPlaylist.length) return null;
+        audioState.radioPlaylist = radioPlaylist.slice();
+        audioState.radioQueue = [];
+        audioState.radioQueueCursor = -1;
+        const queue = buildRadioQueue(radioPlaylist, audioState.radioQueueBatchSize, "");
+        if (!queue.length) return null;
+        audioState.initialRandomPlaylist = queue.slice();
+        audioState.initialRandomFirstSrc = normalizeAudioSourceUrl(queue[0] && queue[0].src ? queue[0].src : "");
         audioState.initialRandomReady = true;
-
-        if (audioState.initialRandomFirstSrc && isCloudflareAudioUrl(audioState.initialRandomFirstSrc)) {
-          startNextTrackPrefetch(0, playlist[0], audioState.initialRandomFirstSrc, reason || "initial_idle");
-        }
+        trackAudioRuntimeEvent("radio_metadata_ready", {
+          track: "radio-cold-start",
+          album: "radio",
+          reason: reason || "home_init",
+          tracks_count: radioPlaylist.length,
+          queue_count: queue.length,
+          audio_fetch: false
+        });
         syncAudioUi();
-        return playlist.slice();
+        return queue.slice();
       })
       .catch(function () {
         resetPreparedInitialGlobalRandomPlayback();
@@ -637,7 +668,6 @@
 
 
   function scheduleInitialGlobalRandomPreparation(reason) {
-    if (!PREFETCH_NEXT_ENABLED) return;
     const run = function () {
       prepareInitialGlobalRandomPlayback(reason || "home_idle");
     };
@@ -672,8 +702,9 @@
     const audio = audioState.audio;
     return Boolean(
       document.body.classList.contains("home-screen") &&
-      audioState.homeMode !== "radio" &&
       !audioState.globalRandomStartInFlight &&
+      audioState.initialRandomReady &&
+      audioState.initialRandomPlaylist.length > 0 &&
       !hasPlaybackSession() &&
       !(audio && getCurrentPlayableAudioSrc(audio))
     );
@@ -1150,88 +1181,6 @@
 
 
 
-  function cleanupIdleAudioContext(options) {
-    const opts = options || {};
-    const audio = audioState.audio;
-    if (audio && !audio.paused && getCurrentPlayableAudioSrc(audio)) return false;
-
-    if (audio) {
-      try {
-        audio.pause();
-      } catch (_err) {
-        // Ignore pause failures during idle cleanup.
-      }
-      try {
-        audio.removeAttribute("src");
-        audio.load();
-      } catch (_err) {
-        // Ignore reset failures during idle cleanup.
-      }
-    }
-
-    revokeActiveBlobUrl();
-    clearFadeTimer();
-    clearWaitingRecovery();
-    audioState.activeLogicalSrc = "";
-    audioState.pendingSeekRatio = null;
-    audioState.pendingStartTime = null;
-    audioState.trackStartInFlight = false;
-    audioState.startRequestToken += 1;
-    if (!opts.preserveMode || audioState.homeMode !== "radio") {
-      audioState.homeMode = "album";
-    }
-    audioState.shuffleOn = false;
-    audioState.playlistKind = "album";
-    audioState.playlist = [];
-    audioState.currentIndex = -1;
-    clearRadioQueue();
-    audioState.albumPlaylistSnapshot = [];
-    audioState.albumIndexSnapshot = -1;
-    syncPlaylistContext(audioState.playlist);
-    clearStoredPlaybackState();
-    syncMediaSessionMetadata({ forcePosition: true });
-    syncAudioUi();
-    return true;
-  }
-
-
-
-  function resetHomePlaybackModeIfIdle(options) {
-    return cleanupIdleAudioContext(Object.assign({ preserveMode: true }, options || {}));
-  }
-
-
-
-  function cleanupForeignAlbumAudioWhenIdle(ui) {
-    const audio = audioState.audio;
-    if (!audio || !ui || !Array.isArray(ui.playlist)) return;
-
-    function runCleanup() {
-      if (!audio.paused) return false;
-      const currentSrc = getCurrentLogicalAudioSrc() || getCurrentPlayableAudioSrc(audio);
-      if (!currentSrc) return false;
-      const belongsToAlbumPage = ui.playlist.some((track) => srcMatches(track.src, currentSrc));
-      if (belongsToAlbumPage) return false;
-      cleanupIdleAudioContext({ preserveMode: true });
-      return true;
-    }
-
-    if (runCleanup()) return;
-
-    function onPause() {
-      audio.removeEventListener("pause", onPause);
-      runCleanup();
-    }
-
-    audio.addEventListener("pause", onPause);
-    setTimeout(function () {
-      audio.removeEventListener("pause", onPause);
-      runCleanup();
-    }, 650);
-  }
-
-
-
   function buildAlbumPlaylistFromRadioCache(track) {
     if (!track || !track.src) return [];
     const radioList = Array.isArray(audioState.radioPlaylist) ? audioState.radioPlaylist : [];
@@ -1303,12 +1252,9 @@
     try {
       let list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
       if (audioState.homeMode === "radio") {
-        const currentTrack = getCurrentPlaylistTrack();
-        const preservedTrack = buildPreservedTrack(
-          currentTrack,
-          getCurrentLogicalAudioSrc() || (currentTrack && currentTrack.src) || ""
-        );
-        list = preservedTrack ? [preservedTrack] : [];
+        list = Array.isArray(audioState.radioQueue) && audioState.radioQueue.length
+          ? audioState.radioQueue
+          : list;
       }
       if (!list.length) {
         sessionStorage.removeItem(audioState.queueStorageKey);
@@ -1353,19 +1299,8 @@
 
 
   function queueMatchesCurrentPage(payload, restoredMode) {
-    if (restoredMode === "radio") return true;
     const playlist = payload && Array.isArray(payload.playlist) ? payload.playlist : [];
-    if (!playlist.length) return false;
-    if (payload && (payload.playlistKind === "global" || payload.playlistKind === "favorites")) return true;
-
-    if (document.body.classList.contains("album-screen")) {
-      const currentPage = toAbsoluteUrlOrEmpty(window.location.pathname);
-      return playlist.some(function (track) {
-        return track && track.page && toAbsoluteUrlOrEmpty(track.page) === currentPage;
-      });
-    }
-
-    return Boolean(getCurrentLogicalAudioSrc());
+    return Boolean(playlist.length);
   }
 
 
@@ -1415,7 +1350,9 @@
       audioState.albumPlaylistSnapshot = audioState.playlist.slice();
       audioState.albumIndexSnapshot = audioState.currentIndex;
     } else {
-      clearRadioQueue();
+      audioState.radioQueue = audioState.playlist.slice();
+      audioState.radioQueueCursor = audioState.currentIndex;
+      audioState.playlist = audioState.radioQueue;
     }
     savePlaybackQueueContext();
     return true;
@@ -1712,7 +1649,22 @@
       document.body.classList.contains("home-screen") &&
       !audioState.globalRandomStartInFlight
     ) {
-      startGlobalRandomPlayback();
+      if (canStartInitialGlobalRandomPlayback() && startGlobalRandomPlayback()) return;
+      ensurePlayablePlaylistContext();
+      if (audioState.playlist && audioState.playlist.length) {
+        const startIndex = Number.isInteger(audioState.currentIndex) && audioState.currentIndex >= 0
+          ? audioState.currentIndex
+          : 0;
+        startTrack(startIndex, {
+          seamless: true,
+          immediatePlay: true,
+          userGesture: true,
+          resume: true,
+          surface: "mini_restore"
+        });
+        return;
+      }
+      prepareInitialGlobalRandomPlayback("cold_tap_not_ready");
       return;
     }
     togglePlayPause();
@@ -1804,7 +1756,6 @@
       clearTrackFailureForCurrent();
       clearTrackStatus(getTrackByIndex(audioState.currentIndex));
       audioState.resumeOnVisible = false;
-      audioState.trackStartInFlight = false;
       syncAudioUi();
       syncMediaSessionMetadata({ forcePosition: true });
       startAudioRaf();
@@ -1948,6 +1899,7 @@
     });
 
     audio.addEventListener("seeking", function () {
+      suspendNextTrackPrefetch("seeking", true);
       const track = getCurrentPlaylistTrack();
       trackAudioRuntimeEvent("seek", Object.assign(
         buildAudioMonitorPayload(track, audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
@@ -1981,6 +1933,7 @@
     });
 
     audio.addEventListener("waiting", function () {
+      suspendNextTrackPrefetch("waiting", true);
       trackAudioRuntimeEvent("waiting", Object.assign(
         buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
         getAudioRuntimeProbeState()
@@ -1989,6 +1942,7 @@
       scheduleWaitingRecovery();
     });
     audio.addEventListener("stalled", function () {
+      suspendNextTrackPrefetch("stalled", true);
       trackAudioRuntimeEvent("stalled", Object.assign(
         buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
         getAudioRuntimeProbeState()
@@ -2045,10 +1999,10 @@
         });
       }
       clearWaitingRecovery();
+      audioState.trackStartInFlight = false;
       maybePrefetchNextTrack("playing");
       clearTrackFailureForCurrent();
       clearTrackStatus(getTrackByIndex(audioState.currentIndex));
-      audioState.trackStartInFlight = false;
       syncMediaSessionMetadata({ forcePosition: true });
     });
     audio.addEventListener("error", function () {
@@ -2182,53 +2136,13 @@
 
 
 
-  function resetNextTrackPrefetchState() {
-    audioState.nextPrefetchSrc = "";
-    audioState.nextPrefetchIndex = -1;
-    audioState.nextPrefetchFromIndex = -1;
-    audioState.nextPrefetchDoneSrc = "";
-    audioState.nextPrefetchServedSrc = "";
-    audioState.nextPrefetchAttemptedSrc = "";
-    audioState.nextPrefetchFailedSrc = "";
-    audioState.nextPrefetchFailureReason = "";
-  }
-
-
-
-  function clearNextTrackPrefetch(reason) {
-    audioState.nextPrefetchToken += 1;
-    audioState.nextPrefetchInFlight = false;
-    if (audioState.nextPrefetchAbortController) {
-      try {
-        audioState.nextPrefetchAbortController.abort();
-      } catch (_err) {
-        // Ignore abort failures; the request token still invalidates the result.
-      }
-      audioState.nextPrefetchAbortController = null;
-    }
-    resetNextTrackPrefetchState();
-    if (prefetchApi && typeof prefetchApi.clearCache === "function") {
-      prefetchApi.clearCache().catch(function () {
-        trackAudioRuntimeEvent("prefetch_error", {
-          track: "prefetch",
-          album: "prefetch",
-          reason: reason || "clear_failed"
-        });
-      });
-      return;
-    }
-    if (!("caches" in window)) return;
-    caches.open(PREFETCH_NEXT_CACHE_NAME).then(function (cache) {
-      return cache.keys().then(function (keys) {
-        return Promise.all(keys.map(function (key) { return cache.delete(key); }));
-      });
-    }).catch(function () {
-      trackAudioRuntimeEvent("prefetch_error", {
-        track: "prefetch",
-        album: "prefetch",
-        reason: reason || "clear_failed"
-      });
-    });
+  function ensureNextPrefetchCollections() {
+    if (!(audioState.nextPrefetchReadySrcs instanceof Set)) audioState.nextPrefetchReadySrcs = new Set();
+    if (!(audioState.nextPrefetchAttemptCounts instanceof Map)) audioState.nextPrefetchAttemptCounts = new Map();
+    if (!(audioState.nextPrefetchInFlightSrcs instanceof Set)) audioState.nextPrefetchInFlightSrcs = new Set();
+    if (!(audioState.nextPrefetchControllers instanceof Map)) audioState.nextPrefetchControllers = new Map();
+    if (!(audioState.nextPrefetchRetryTimers instanceof Map)) audioState.nextPrefetchRetryTimers = new Map();
+    if (!Array.isArray(audioState.nextPrefetchPlan)) audioState.nextPrefetchPlan = [];
   }
 
 
@@ -2245,33 +2159,196 @@
 
 
 
-  function shouldPrefetchNextTrackNow(reason) {
+  function getCurrentBufferAheadForPrefetch() {
     const audio = audioState.audio;
-    if (!audio || audio.paused || !getCurrentPlayableAudioSrc(audio)) return false;
-    const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+    if (!audio) return 0;
     const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    return Math.max(0, getCurrentBufferedEndForPrefetch(audio) - currentTime);
+  }
+
+
+
+  function shouldPrefetchNextTrackNow() {
+    const audio = audioState.audio;
+    if (
+      !audio ||
+      audio.paused ||
+      !audioState.mediaSessionAudioPlaying ||
+      audioState.trackStartInFlight ||
+      audioState.activeAudioRecovery ||
+      !getCurrentPlayableAudioSrc(audio)
+    ) {
+      return false;
+    }
     const bufferedEnd = getCurrentBufferedEndForPrefetch(audio);
-    if (duration <= 0) return false;
-    if (bufferedEnd >= duration * 0.98) return true;
-    if (duration - currentTime <= PREFETCH_NEXT_THRESHOLD_SECONDS) return true;
-    return reason === "playing" && duration <= PREFETCH_NEXT_THRESHOLD_SECONDS;
+    const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+    if (duration > 0 && bufferedEnd >= duration - 0.25) return true;
+    return getCurrentBufferAheadForPrefetch() >= PREFETCH_BUFFER_STABLE_SECONDS;
+  }
+
+
+
+  function getPrefetchKeepSources() {
+    const currentSrc = normalizeAudioSourceUrl(getCurrentLogicalAudioSrc());
+    return [currentSrc].concat(
+      (audioState.nextPrefetchPlan || []).map(function (target) { return target.src; })
+    ).filter(Boolean);
+  }
+
+
+
+  function abortPrefetchTarget(src, reason) {
+    ensureNextPrefetchCollections();
+    const normalized = normalizeAudioSourceUrl(src || "");
+    if (!normalized) return;
+    const retryTimer = audioState.nextPrefetchRetryTimers.get(normalized);
+    if (retryTimer) window.clearTimeout(retryTimer);
+    audioState.nextPrefetchRetryTimers.delete(normalized);
+    const record = audioState.nextPrefetchControllers.get(normalized);
+    if (record && record.timeout) window.clearTimeout(record.timeout);
+    if (record && record.controller) {
+      record.cancelReason = reason || "obsolete";
+      try { record.controller.abort(); } catch (_err) {}
+    }
+    audioState.nextPrefetchControllers.delete(normalized);
+    audioState.nextPrefetchInFlightSrcs.delete(normalized);
+    audioState.nextPrefetchInFlight = audioState.nextPrefetchInFlightSrcs.size > 0;
+  }
+
+
+
+  function reconcileNextTrackPrefetchPlan(reason) {
+    ensureNextPrefetchCollections();
+    const indices = getQueuePreviewIndices(PREFETCH_NEXT_QUEUE_DEPTH);
+    const list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
+    const seen = new Set();
+    const targets = [];
+    indices.forEach(function (index) {
+      const track = list[index];
+      const src = normalizeAudioSourceUrl(track && track.src ? track.src : "");
+      if (!src || seen.has(src) || !isCloudflareAudioUrl(src)) return;
+      seen.add(src);
+      targets.push({ index, track, src, rank: targets.length + 1 });
+    });
+    const currentSrc = normalizeAudioSourceUrl(getCurrentLogicalAudioSrc());
+    const planKey = `${currentSrc}|${targets.map(function (target) { return target.src; }).join("|")}`;
+    if (planKey === audioState.nextPrefetchPlanKey) {
+      audioState.nextPrefetchPlan = targets;
+      return targets;
+    }
+
+    audioState.nextPrefetchGeneration = Number(audioState.nextPrefetchGeneration || 0) + 1;
+    audioState.nextPrefetchPlanKey = planKey;
+    audioState.nextPrefetchPlan = targets;
+    audioState.nextPrefetchWindowReadyKey = "";
+    const useful = new Set(targets.map(function (target) { return target.src; }));
+    audioState.nextPrefetchControllers.forEach(function (_record, src) {
+      if (!useful.has(src) || (currentSrc && srcMatches(src, currentSrc))) {
+        abortPrefetchTarget(src, currentSrc && srcMatches(src, currentSrc) ? "became_current" : "window_rebased");
+      }
+    });
+    audioState.nextPrefetchRetryTimers.forEach(function (_timer, src) {
+      if (!useful.has(src)) abortPrefetchTarget(src, "window_rebased");
+    });
+    audioState.nextPrefetchAttemptCounts.forEach(function (_count, src) {
+      if (!useful.has(src)) audioState.nextPrefetchAttemptCounts.delete(src);
+    });
+    audioState.nextPrefetchReadySrcs.forEach(function (src) {
+      if (!useful.has(src) && !(currentSrc && srcMatches(src, currentSrc))) {
+        audioState.nextPrefetchReadySrcs.delete(src);
+      }
+    });
+
+    const first = targets[0] || null;
+    audioState.nextPrefetchSrc = first ? first.src : "";
+    audioState.nextPrefetchIndex = first ? first.index : -1;
+    audioState.nextPrefetchFromIndex = getCurrentPlaylistIndexSafe();
+    audioState.nextPrefetchSuspendedReason = "";
+    trackAudioRuntimeEvent("prefetch_plan", {
+      track: "prefetch-window",
+      album: audioState.homeMode === "radio" ? "radio" : "album",
+      reason: reason || "reconcile",
+      generation: audioState.nextPrefetchGeneration,
+      from_index: audioState.nextPrefetchFromIndex,
+      depth: targets.length,
+      sources: targets.map(function (target) { return target.src; })
+    });
+    if (prefetchApi && typeof prefetchApi.pruneCache === "function") {
+      prefetchApi.pruneCache({
+        keepSources: getPrefetchKeepSources(),
+        maxEntries: PREFETCH_NEXT_MAX_ENTRIES
+      }).catch(function () {});
+    }
+    return targets;
+  }
+
+
+
+  function resetNextTrackPrefetchState() {
+    ensureNextPrefetchCollections();
+    audioState.nextPrefetchSrc = "";
+    audioState.nextPrefetchIndex = -1;
+    audioState.nextPrefetchFromIndex = -1;
+    audioState.nextPrefetchDoneSrc = "";
+    audioState.nextPrefetchServedSrc = "";
+    audioState.nextPrefetchAttemptedSrc = "";
+    audioState.nextPrefetchFailedSrc = "";
+    audioState.nextPrefetchFailureReason = "";
+    audioState.nextPrefetchPlan = [];
+    audioState.nextPrefetchPlanKey = "";
+    audioState.nextPrefetchWindowReadyKey = "";
+    audioState.nextPrefetchAttemptCounts.clear();
+  }
+
+
+
+  function clearNextTrackPrefetch(reason) {
+    ensureNextPrefetchCollections();
+    audioState.nextPrefetchToken += 1;
+    Array.from(audioState.nextPrefetchControllers.keys()).forEach(function (src) {
+      abortPrefetchTarget(src, reason || "reset");
+    });
+    Array.from(audioState.nextPrefetchRetryTimers.keys()).forEach(function (src) {
+      abortPrefetchTarget(src, reason || "reset");
+    });
+    resetNextTrackPrefetchState();
+    audioState.upcomingTrackPlan = null;
+    audioState.nextPrefetchGeneration = Number(audioState.nextPrefetchGeneration || 0) + 1;
+    if (prefetchApi && typeof prefetchApi.pruneCache === "function") {
+      prefetchApi.pruneCache({
+        keepSources: getPrefetchKeepSources(),
+        maxEntries: PREFETCH_NEXT_MAX_ENTRIES
+      }).catch(function () {});
+    }
+  }
+
+
+
+  function suspendNextTrackPrefetch(reason, force) {
+    ensureNextPrefetchCollections();
+    if (!force && getCurrentBufferAheadForPrefetch() >= PREFETCH_BUFFER_ABORT_SECONDS) return;
+    const inflight = Array.from(audioState.nextPrefetchControllers.keys());
+    inflight.forEach(function (src) {
+      abortPrefetchTarget(src, reason || "buffer_priority");
+      audioState.nextPrefetchAttemptCounts.delete(src);
+    });
+    audioState.nextPrefetchSuspendedReason = reason || "buffer_priority";
+    if (inflight.length) {
+      trackAudioRuntimeEvent("prefetch_suspended", {
+        track: "prefetch-window",
+        album: audioState.homeMode === "radio" ? "radio" : "album",
+        reason: audioState.nextPrefetchSuspendedReason,
+        buffer_ahead: getCurrentBufferAheadForPrefetch(),
+        cancelled_count: inflight.length
+      });
+    }
   }
 
 
 
   function peekNextIndexForPrefetch() {
-    const list = audioState.playlist;
-    if (!Array.isArray(list) || !list.length) return -1;
-    const currentIndex = getCurrentPlaylistIndexSafe();
-    if (currentIndex < 0 || currentIndex >= list.length) return -1;
-    if (audioState.homeMode === "radio") return peekRadioNextIndexForPrefetch(currentIndex);
-    if (audioState.shuffleOn) return getRandomIndex(currentIndex);
-    if (currentIndex < list.length - 1) return currentIndex + 1;
-    const extendedIndex = extendAlbumPlaylistToNextAlbum({
-      reason: "prefetch",
-      fromIndex: currentIndex
-    });
-    return Number.isInteger(extendedIndex) && extendedIndex >= 0 ? extendedIndex : -1;
+    const targets = reconcileNextTrackPrefetchPlan("peek");
+    return targets.length ? targets[0].index : -1;
   }
 
 
@@ -2279,183 +2356,233 @@
   function rememberNextTrackPrefetch(index, src) {
     audioState.nextPrefetchIndex = index;
     audioState.nextPrefetchFromIndex = getCurrentPlaylistIndexSafe();
-    audioState.nextPrefetchSrc = src;
+    audioState.nextPrefetchSrc = normalizeAudioSourceUrl(src || "");
   }
 
 
 
   function getAutoPrefetchedNextIndex() {
     if (!PREFETCH_NEXT_ENABLED) return -1;
-    const currentIndex = getCurrentPlaylistIndexSafe();
-    if (
-      audioState.nextPrefetchDoneSrc &&
-      audioState.nextPrefetchFromIndex === currentIndex &&
-      Number.isInteger(audioState.nextPrefetchIndex) &&
-      audioState.nextPrefetchIndex >= 0 &&
-      audioState.nextPrefetchIndex < audioState.playlist.length
-    ) {
-      const track = audioState.playlist[audioState.nextPrefetchIndex];
-      const src = normalizeAudioSourceUrl(track && track.src ? track.src : "");
-      if (src && srcMatches(src, audioState.nextPrefetchDoneSrc)) return audioState.nextPrefetchIndex;
-    }
-    return -1;
+    ensureNextPrefetchCollections();
+    const targets = reconcileNextTrackPrefetchPlan("readiness");
+    const first = targets[0];
+    if (!first) return -1;
+    const ready = audioState.nextPrefetchReadySrcs.has(first.src) ||
+      (audioState.nextPrefetchServedSrc && srcMatches(audioState.nextPrefetchServedSrc, first.src));
+    return ready ? first.index : -1;
   }
 
 
 
   function startNextTrackPrefetch(index, track, src, reason) {
-    const prefetchSupported = prefetchApi && typeof prefetchApi.isSupported === "function"
-      ? prefetchApi.isSupported()
-      : ("caches" in window && typeof fetch === "function");
-    if (!PREFETCH_NEXT_ENABLED || !prefetchSupported) return;
-    const token = ++audioState.nextPrefetchToken;
+    const prefetchSupported = Boolean(
+      prefetchApi &&
+      typeof prefetchApi.isSupported === "function" &&
+      prefetchApi.isSupported() &&
+      typeof prefetchApi.putSingle === "function"
+    );
+    if (!PREFETCH_NEXT_ENABLED || !prefetchSupported) return false;
+    ensureNextPrefetchCollections();
+    const normalizedSrc = normalizeAudioSourceUrl(src || "");
+    if (!normalizedSrc || !isCloudflareAudioUrl(normalizedSrc)) return false;
+    if (audioState.nextPrefetchReadySrcs.has(normalizedSrc)) return false;
+    if (audioState.nextPrefetchInFlightSrcs.has(normalizedSrc)) return false;
+    if (audioState.nextPrefetchInFlightSrcs.size >= PREFETCH_NEXT_CONCURRENCY) return false;
+    const attempts = Number(audioState.nextPrefetchAttemptCounts.get(normalizedSrc) || 0);
+    if (attempts >= PREFETCH_MAX_ATTEMPTS) return false;
+
+    const generation = audioState.nextPrefetchGeneration;
+    const attempt = attempts + 1;
     const startedAt = Date.now();
-    const abortController = typeof AbortController === "function"
-      ? new AbortController()
-      : null;
-    audioState.nextPrefetchAbortController = abortController;
+    const fromIndexAtStart = getCurrentPlaylistIndexSafe();
+    const target = (audioState.nextPrefetchPlan || []).find(function (entry) { return srcMatches(entry.src, normalizedSrc); });
+    const abortController = typeof AbortController === "function" ? new AbortController() : null;
+    const record = {
+      controller: abortController,
+      timeout: 0,
+      timeoutFired: false,
+      cancelReason: "",
+      generation,
+      attempt
+    };
+    audioState.nextPrefetchAttemptCounts.set(normalizedSrc, attempt);
+    audioState.nextPrefetchControllers.set(normalizedSrc, record);
+    audioState.nextPrefetchInFlightSrcs.add(normalizedSrc);
     audioState.nextPrefetchInFlight = true;
-    rememberNextTrackPrefetch(index, src);
-    audioState.nextPrefetchAttemptedSrc = src;
+    audioState.nextPrefetchAbortController = abortController;
+    rememberNextTrackPrefetch(index, normalizedSrc);
+    audioState.nextPrefetchAttemptedSrc = normalizedSrc;
     audioState.nextPrefetchFailedSrc = "";
     audioState.nextPrefetchFailureReason = "";
     trackAudioRuntimeEvent("prefetch_start", Object.assign(
-      buildAudioMonitorPayload(track, index, src),
+      buildAudioMonitorPayload(track, index, normalizedSrc),
       {
         next_index: index,
-        from_index: audioState.nextPrefetchFromIndex,
-        reason: reason || "threshold"
+        from_index: fromIndexAtStart,
+        reason: reason || "buffer_stable",
+        generation,
+        rank: target ? target.rank : null,
+        attempt,
+        segment_bytes: PREFETCH_NEXT_SEGMENT_BYTES,
+        inflight_count: audioState.nextPrefetchInFlightSrcs.size
       }
     ));
 
-    const baseRequest = getPrefetchCacheRequest(src);
+    const baseRequest = getPrefetchCacheRequest(normalizedSrc);
     let fetchRequest = baseRequest;
     let fetchOptions;
     if (abortController) {
-      try {
-        fetchRequest = new Request(baseRequest, { signal: abortController.signal });
-      } catch (_err) {
-        fetchOptions = { signal: abortController.signal };
-      }
+      try { fetchRequest = new Request(baseRequest, { signal: abortController.signal }); }
+      catch (_err) { fetchOptions = { signal: abortController.signal }; }
+      record.timeout = window.setTimeout(function () {
+        record.timeoutFired = true;
+        record.cancelReason = "timeout";
+        try { abortController.abort(); } catch (_err) {}
+      }, PREFETCH_REQUEST_TIMEOUT_MS);
     }
 
     fetch(fetchRequest, fetchOptions).then(function (response) {
-      if (token !== audioState.nextPrefetchToken) return null;
-      if (!response || !response.ok) {
+      const stillUseful = (audioState.nextPrefetchPlan || []).some(function (entry) {
+        return srcMatches(entry.src, normalizedSrc);
+      });
+      if (!stillUseful) throw new Error("prefetch_obsolete");
+      if (!response || response.status !== 206) {
         throw new Error(`prefetch_http_${response ? response.status : "none"}`);
       }
-      const bytes = prefetchApi && typeof prefetchApi.getContentLength === "function"
-        ? prefetchApi.getContentLength(response)
-        : Number(response.headers.get("Content-Length") || response.headers.get("content-length") || 0);
+      const bytes = prefetchApi.getContentLength(response);
       if (!Number.isFinite(bytes) || bytes <= 0) throw new Error("prefetch_missing_content_length");
-      if (bytes > PREFETCH_NEXT_MAX_BYTES) {
-        if (response.body && typeof response.body.cancel === "function") {
-          response.body.cancel().catch(function () {});
-        }
-        throw new Error("prefetch_too_large");
+      if (bytes > PREFETCH_NEXT_SEGMENT_BYTES || bytes > PREFETCH_NEXT_MAX_BYTES) {
+        if (response.body && typeof response.body.cancel === "function") response.body.cancel().catch(function () {});
+        throw new Error("prefetch_segment_too_large");
       }
-      if (prefetchApi && typeof prefetchApi.putSingle === "function") {
-        return prefetchApi.putSingle(src, response).then(function () {
-          return bytes;
-        });
-      }
-      return caches.open(PREFETCH_NEXT_CACHE_NAME).then(function (cache) {
-        return cache.keys().then(function (keys) {
-          return Promise.all(keys.map(function (key) { return cache.delete(key); })).then(function () {
-            return cache.put(getPrefetchCacheRequest(src), response.clone()).then(function () {
-              return bytes;
-            });
-          });
-        });
-      });
+      return prefetchApi.putSingle(normalizedSrc, response, {
+        keepSources: getPrefetchKeepSources(),
+        maxEntries: PREFETCH_NEXT_MAX_ENTRIES
+      }).then(function () { return bytes; });
     }).then(function (bytes) {
-      if (token !== audioState.nextPrefetchToken || !bytes) return;
-      audioState.nextPrefetchDoneSrc = src;
+      const stillUseful = (audioState.nextPrefetchPlan || []).some(function (entry) {
+        return srcMatches(entry.src, normalizedSrc);
+      });
+      if (!bytes || !stillUseful) return;
+      audioState.nextPrefetchReadySrcs.add(normalizedSrc);
+      audioState.nextPrefetchDoneSrc = normalizedSrc;
+      audioState.nextPrefetchFailedSrc = "";
+      audioState.nextPrefetchFailureReason = "";
       trackAudioRuntimeEvent("prefetch_done", Object.assign(
-        buildAudioMonitorPayload(track, index, src),
+        buildAudioMonitorPayload(track, index, normalizedSrc),
         {
           next_index: index,
-          from_index: audioState.nextPrefetchFromIndex,
+          from_index: fromIndexAtStart,
           bytes,
-          ms: Date.now() - startedAt
+          ms: Date.now() - startedAt,
+          generation,
+          rank: target ? target.rank : null,
+          attempt,
+          ready_count: audioState.nextPrefetchReadySrcs.size
         }
       ));
     }).catch(function (err) {
-      if (token !== audioState.nextPrefetchToken) return;
-      audioState.nextPrefetchDoneSrc = "";
-      audioState.nextPrefetchFailedSrc = src;
-      audioState.nextPrefetchFailureReason = err && err.message ? err.message : "prefetch_failed";
-      trackAudioRuntimeEvent("prefetch_error", Object.assign(
-        buildAudioMonitorPayload(track, index, src),
+      const errorReason = record.timeoutFired
+        ? "timeout"
+        : (record.cancelReason || (err && err.message ? err.message : "prefetch_failed"));
+      const cancelled = Boolean(record.cancelReason && record.cancelReason !== "timeout") || errorReason === "prefetch_obsolete";
+      audioState.nextPrefetchFailedSrc = cancelled ? "" : normalizedSrc;
+      audioState.nextPrefetchFailureReason = cancelled ? "" : errorReason;
+      trackAudioRuntimeEvent(cancelled ? "prefetch_cancel" : "prefetch_error", Object.assign(
+        buildAudioMonitorPayload(track, index, normalizedSrc),
         {
           next_index: index,
-          from_index: audioState.nextPrefetchFromIndex,
-          reason: err && err.message ? err.message : "prefetch_failed",
-          ms: Date.now() - startedAt
+          from_index: fromIndexAtStart,
+          reason: errorReason,
+          ms: Date.now() - startedAt,
+          generation,
+          rank: target ? target.rank : null,
+          attempt
         }
       ));
     }).finally(function () {
-      if (token === audioState.nextPrefetchToken) {
-        audioState.nextPrefetchInFlight = false;
-        if (audioState.nextPrefetchAbortController === abortController) {
-          audioState.nextPrefetchAbortController = null;
-        }
+      if (record.timeout) window.clearTimeout(record.timeout);
+      if (audioState.nextPrefetchControllers.get(normalizedSrc) === record) {
+        audioState.nextPrefetchControllers.delete(normalizedSrc);
+        audioState.nextPrefetchInFlightSrcs.delete(normalizedSrc);
+      }
+      audioState.nextPrefetchInFlight = audioState.nextPrefetchInFlightSrcs.size > 0;
+      if (audioState.nextPrefetchAbortController === abortController) audioState.nextPrefetchAbortController = null;
+      const stillUseful = (audioState.nextPrefetchPlan || []).some(function (entry) {
+        return srcMatches(entry.src, normalizedSrc);
+      });
+      const retryable = !audioState.nextPrefetchReadySrcs.has(normalizedSrc) &&
+        (!record.cancelReason || record.cancelReason === "timeout") &&
+        stillUseful &&
+        attempt < PREFETCH_MAX_ATTEMPTS;
+      if (retryable) {
+        const retryTimer = window.setTimeout(function () {
+          audioState.nextPrefetchRetryTimers.delete(normalizedSrc);
+          maybePrefetchNextTrack("retry");
+        }, 300);
+        audioState.nextPrefetchRetryTimers.set(normalizedSrc, retryTimer);
+      } else {
+        window.setTimeout(function () { maybePrefetchNextTrack("queue_continue"); }, 0);
       }
     });
+    return true;
   }
 
 
 
   function maybePrefetchNextTrack(reason) {
     if (!PREFETCH_NEXT_ENABLED) return;
-    if (audioState.nextPrefetchInFlight) return;
-    if (!shouldPrefetchNextTrackNow(reason)) return;
-    const currentIndex = getCurrentPlaylistIndexSafe();
-    let nextIndex = -1;
-    if (
-      audioState.nextPrefetchFromIndex === currentIndex &&
-      Number.isInteger(audioState.nextPrefetchIndex) &&
-      audioState.nextPrefetchIndex >= 0 &&
-      audioState.nextPrefetchIndex < audioState.playlist.length
-    ) {
-      const selectedTrack = audioState.playlist[audioState.nextPrefetchIndex];
-      const selectedSrc = normalizeAudioSourceUrl(selectedTrack && selectedTrack.src ? selectedTrack.src : "");
-      if (selectedSrc && srcMatches(selectedSrc, audioState.nextPrefetchSrc)) {
-        nextIndex = audioState.nextPrefetchIndex;
-      }
-    }
-    if (nextIndex < 0) {
-      nextIndex = peekNextIndexForPrefetch();
-      if (nextIndex >= 0 && nextIndex < audioState.playlist.length) {
-        const selectedTrack = audioState.playlist[nextIndex];
-        const selectedSrc = normalizeAudioSourceUrl(selectedTrack && selectedTrack.src ? selectedTrack.src : "");
-        audioState.nextPrefetchDoneSrc = "";
-        audioState.nextPrefetchServedSrc = "";
-        audioState.nextPrefetchAttemptedSrc = "";
-        audioState.nextPrefetchFailedSrc = "";
-        audioState.nextPrefetchFailureReason = "";
-        rememberNextTrackPrefetch(nextIndex, selectedSrc);
-      }
-    }
-    if (nextIndex < 0 || nextIndex >= audioState.playlist.length) return;
-    const nextTrack = audioState.playlist[nextIndex];
-    const nextSrc = normalizeAudioSourceUrl(nextTrack && nextTrack.src ? nextTrack.src : "");
-    if (!nextSrc || !isCloudflareAudioUrl(nextSrc)) return;
-    if (
-      audioState.nextPrefetchDoneSrc &&
-      audioState.nextPrefetchFromIndex === currentIndex &&
-      srcMatches(audioState.nextPrefetchDoneSrc, nextSrc)
-    ) {
+    ensureNextPrefetchCollections();
+    const targets = reconcileNextTrackPrefetchPlan(reason || "update");
+    if (!targets.length) return;
+    if (reason === "track_change") {
+      suspendNextTrackPrefetch("track_change", true);
       return;
     }
-    if (
-      audioState.nextPrefetchAttemptedSrc &&
-      audioState.nextPrefetchFromIndex === currentIndex &&
-      srcMatches(audioState.nextPrefetchAttemptedSrc, nextSrc)
-    ) {
+    if (!shouldPrefetchNextTrackNow()) {
+      if (getCurrentBufferAheadForPrefetch() < PREFETCH_BUFFER_ABORT_SECONDS) {
+        suspendNextTrackPrefetch(reason || "buffer_priority", false);
+      }
       return;
     }
-    startNextTrackPrefetch(nextIndex, nextTrack, nextSrc, reason);
+    audioState.nextPrefetchSuspendedReason = "";
+
+    const first = targets[0];
+    const firstReady = audioState.nextPrefetchReadySrcs.has(first.src);
+    if (!firstReady) {
+      if (audioState.nextPrefetchInFlightSrcs.has(first.src)) return;
+      const firstStarted = startNextTrackPrefetch(first.index, first.track, first.src, reason || "n_plus_1");
+      if (firstStarted) return;
+      const firstAttempts = Number(audioState.nextPrefetchAttemptCounts.get(first.src) || 0);
+      // N+1 keeps absolute priority while it can still be fetched. Once its
+      // retry budget is exhausted, do not let one unavailable file starve the
+      // rest of the rolling window.
+      if (firstAttempts < PREFETCH_MAX_ATTEMPTS) return;
+    }
+
+    for (let offset = 1; offset < targets.length; offset += 1) {
+      if (audioState.nextPrefetchInFlightSrcs.size >= PREFETCH_NEXT_CONCURRENCY) break;
+      const target = targets[offset];
+      if (audioState.nextPrefetchReadySrcs.has(target.src)) continue;
+      if (audioState.nextPrefetchInFlightSrcs.has(target.src)) continue;
+      if (Number(audioState.nextPrefetchAttemptCounts.get(target.src) || 0) >= PREFETCH_MAX_ATTEMPTS) continue;
+      startNextTrackPrefetch(target.index, target.track, target.src, reason || "window_fill");
+    }
+
+    const readyKey = `${audioState.nextPrefetchGeneration}|${targets.map(function (target) { return target.src; }).join("|")}`;
+    if (
+      audioState.nextPrefetchWindowReadyKey !== readyKey &&
+      targets.every(function (target) { return audioState.nextPrefetchReadySrcs.has(target.src); })
+    ) {
+      audioState.nextPrefetchWindowReadyKey = readyKey;
+      trackAudioRuntimeEvent("prefetch_window_ready", {
+        track: "prefetch-window",
+        album: audioState.homeMode === "radio" ? "radio" : "album",
+        generation: audioState.nextPrefetchGeneration,
+        depth: targets.length,
+        bytes: targets.length * PREFETCH_NEXT_SEGMENT_BYTES
+      });
+    }
   }
 
 
@@ -2512,9 +2639,6 @@
       toggleRadioModeFromTransport,
       toggleAlbumShuffleMode,
       clearStoredPlaybackState,
-      cleanupIdleAudioContext,
-      resetHomePlaybackModeIfIdle,
-      cleanupForeignAlbumAudioWhenIdle,
       buildAlbumPlaylistFromRadioCache,
       sanitizeQueueTrack,
       savePlaybackQueueContext,
@@ -2578,9 +2702,6 @@
       toggleRadioModeFromTransport: function () {},
       toggleAlbumShuffleMode: function () {},
       clearStoredPlaybackState: function () {},
-      cleanupIdleAudioContext: function () { return false; },
-      resetHomePlaybackModeIfIdle: function () { return false; },
-      cleanupForeignAlbumAudioWhenIdle: function () {},
       buildAlbumPlaylistFromRadioCache: function () { return []; },
       sanitizeQueueTrack: function () { return null; },
       savePlaybackQueueContext: function () {},

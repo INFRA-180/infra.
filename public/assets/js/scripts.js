@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix324-20260715";
+window.INFRA_BUILD_TAG = "audiofix326-20260715";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -392,7 +392,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix324-20260715";
+  const runtimeVersion = "audiofix326-20260715";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||

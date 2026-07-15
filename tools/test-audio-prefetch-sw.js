@@ -20,6 +20,7 @@ const deletedAudioEntries = [];
 const requestedClientIds = [];
 const clientMessages = [];
 const shellPutRequests = [];
+const networkRequestModes = [];
 
 const shellCache = {
   addAll: () => Promise.resolve(),
@@ -47,6 +48,7 @@ const sandbox = {
   Headers,
   fetch: (request) => {
     fetchCalls += 1;
+    networkRequestModes.push(request && request.mode ? request.mode : "");
     if (typeof fetchOverride === "function") return fetchOverride(request);
     return Promise.resolve(new Response("network", { status: 200 }));
   },
@@ -65,7 +67,9 @@ const sandbox = {
       "infra-shell-20260715-audio330-shell",
       "infra-shell-20260715-audio330-runtime",
       "infra-shell-20260715-audio331-shell",
-      "infra-shell-20260715-audio331-runtime"
+      "infra-shell-20260715-audio331-runtime",
+      "infra-shell-20260716-audio332-shell",
+      "infra-shell-20260716-audio332-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -126,20 +130,23 @@ function validCachedSegment(overrides) {
   return response;
 }
 
-async function dispatchAudioFetch(headers, clientId) {
+async function dispatchAudioFetch(headers, clientId, mode) {
   let responsePromise = null;
   const lifetimePromises = [];
-  const request = new Request(
-    "https://pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev/test.m4a",
-    { headers: headers || {} }
-  );
+  const request = {
+    url: "https://pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev/test.m4a",
+    method: "GET",
+    mode: mode || "cors",
+    destination: "audio",
+    headers: new Headers(headers || {})
+  };
   fetchHandler({
     request,
     clientId: clientId === undefined ? "client-a" : clientId,
     respondWith: (promise) => { responsePromise = Promise.resolve(promise); },
     waitUntil: (promise) => { lifetimePromises.push(Promise.resolve(promise)); }
   });
-  assert(responsePromise, "R2 audio requests must be handled by the Service Worker");
+  if (!responsePromise) return null;
   const response = await responsePromise;
   await Promise.all(lifetimePromises);
   return response;
@@ -176,17 +183,23 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260715-audio329-runtime",
     "infra-shell-20260715-audio329-shell",
     "infra-shell-20260715-audio330-runtime",
-    "infra-shell-20260715-audio330-shell"
+    "infra-shell-20260715-audio330-shell",
+    "infra-shell-20260715-audio331-runtime",
+    "infra-shell-20260715-audio331-shell"
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v7"));
   assert(!deletedCaches.includes("infra-covers"));
-  assert(!deletedCaches.includes("infra-shell-20260715-audio331-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260715-audio331-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260716-audio332-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260716-audio332-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
+  const fetchesBeforeBypass = fetchCalls;
   cachedAudio = validCachedSegment();
   let response = await dispatchAudioFetch({});
-  assert.strictEqual(await response.text(), "network", "A request without Range must use the network");
+  assert.strictEqual(response, null, "A request without Range must bypass the Service Worker");
+  response = await dispatchAudioFetch({ Range: "bytes=0-" }, "client-no-cors", "no-cors");
+  assert.strictEqual(response, null, "A no-cors media Range must bypass the Service Worker");
+  assert.strictEqual(fetchCalls, fetchesBeforeBypass, "Bypassed media requests must not call fetch() inside the Service Worker");
   assert.strictEqual(deletedAudioEntries.length, 0);
 
   cachedAudioArrayBufferCalls = 0;
@@ -194,6 +207,8 @@ async function dispatchSiteFetch(request) {
   response = await dispatchAudioFetch({ Range: "bytes=0-" }, "client-hit");
   assert.strictEqual(response.status, 206);
   assert.strictEqual(response.headers.get("Content-Range"), "bytes 0-1023/8192");
+  assert.strictEqual(response.headers.get("Access-Control-Allow-Origin"), "https://site.test");
+  assert.strictEqual(response.headers.get("Vary"), "Origin");
   assert.strictEqual((await response.arrayBuffer()).byteLength, 1024);
   assert.strictEqual(
     cachedAudioArrayBufferCalls,
@@ -217,11 +232,12 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(await response.text(), "network", "A range starting outside the segment must use the network");
   cachedAudio = validCachedSegment();
   response = await dispatchAudioFetch({ Range: "bytes=0-10,20-30" });
-  assert.strictEqual(await response.text(), "network", "A multi-range request must use the network");
+  assert.strictEqual(response, null, "A multi-range request must bypass the Service Worker");
   cachedAudio = validCachedSegment();
   response = await dispatchAudioFetch({ Range: "bytes=0-", "If-Range": '"track-v2"' });
   assert.strictEqual(await response.text(), "network", "An If-Range mismatch must use the network");
-  assert.strictEqual(fetchCalls, networkBeforeMisses + 3);
+  assert.strictEqual(fetchCalls, networkBeforeMisses + 2);
+  assert(networkRequestModes.slice(-2).every((value) => value === "cors"), "Every Service Worker network fallback must remain CORS");
   assert.strictEqual(deletedAudioEntries.length, 0, "Ordinary misses must not evict a valid segment");
 
   cachedAudio = validCachedSegment();

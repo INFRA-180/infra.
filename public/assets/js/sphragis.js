@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
+  const WORKER_URL = "https://infra180-api.pages.dev";
   const root = document.querySelector("[data-sphragis]");
   if (!root) return;
 

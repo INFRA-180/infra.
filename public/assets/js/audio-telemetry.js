@@ -8,14 +8,6 @@
     "audio_session_state",
     "cache_hit",
     "click_track",
-    "cover_error",
-    "cover_prepare_done",
-    "cover_prepare_error",
-    "cover_prepare_item",
-    "cover_prepare_start",
-    "cover_decode_duration",
-    "cover_loaded",
-    "cover_request",
     "error",
     "album_continuity_extend",
     "album_open_done",
@@ -29,21 +21,7 @@
     "external_resume_recovery_start",
     "external_resume_recovery_resolved",
     "external_resume_recovery_failed",
-    "fav:path_missing",
-    "fav:path_resolved",
-    "fav:write",
-    "fav_select_tap",
     "first_byte",
-    "favorite_add",
-    "favorite_remove",
-    "favorites_open",
-    "favorites_play",
-    "favorites_reorder",
-    "favorites_render_done",
-    "favorites_render_fail",
-    "favorites_render_start",
-    "favorites_visible",
-    "home_fav_tap",
     "global_playlist_build_done",
     "global_playlist_build_start",
     "heartbeat",
@@ -99,10 +77,36 @@
   const MAX_REQUESTS = 24;
   const DB_NAME = "infra_audio_telemetry_v1";
   const DB_STORE = "events";
-  const QUEUE_CAP = 500;
+  const QUEUE_CAP = 100;
+  const QUEUE_TTL_MS = 24 * 60 * 60 * 1000;
   const FLUSH_THRESHOLD = 40;
   const FLUSH_INTERVAL_MS = 60000;
   const HEARTBEAT_MS = 15000;
+  const TELEMETRY_STRING_FIELDS = new Set([
+    "event", "trace_id", "build", "track", "album", "source", "ua_class",
+    "effective_type", "visibility_state", "trigger", "surface", "branch",
+    "reason", "error_name", "action", "strategy", "cache_hint", "state",
+    "phase", "mode", "playlist_kind", "audio_session_state", "audio_session_type",
+    "from_album", "to_album", "result", "recovery_reason", "intent_reason"
+  ]);
+  const TELEMETRY_NUMBER_FIELDS = new Set([
+    "timestamp_ms", "delta_ms", "duration_before_play_ms", "duration_ms", "delay_ms",
+    "ms", "request_token", "ready_state", "network_state", "current_time",
+    "buffered_end", "duration", "bytes", "segment_bytes", "transfer_size",
+    "encoded_body_size", "decoded_body_size", "rank", "attempt", "ready_count",
+    "inflight_count", "from_index", "next_index", "generation", "depth", "status",
+    "error_code", "timeout_ms", "recovery_ms", "advanced_ms", "buffer_ahead",
+    "cancelled_count", "health_session_age_ms", "volume", "click_perf_ms",
+    "guard_age_ms", "guard_current_time", "progressed_seconds", "playback_rate"
+  ]);
+  const TELEMETRY_BOOLEAN_FIELDS = new Set([
+    "fine_event", "navigator_on_line", "auto", "error", "health_session_active",
+    "cached", "range", "paused", "muted", "sync", "retry", "ready", "same_track",
+    "immediate_play", "from_media_session", "from_transport_control", "initial_random",
+    "reused_current_source", "user_activation_active", "user_activation_seen",
+    "controllerchange", "sw_reload_between", "reload_executed", "audio_fetch",
+    "served_from_prefetch", "is_ios", "is_standalone"
+  ]);
 
   function now() {
     return typeof performance !== "undefined" && typeof performance.now === "function"
@@ -110,7 +114,7 @@
       : Date.now();
   }
 
-  function createSessionId() {
+  function createTraceId() {
     try {
       if (window.crypto && typeof window.crypto.randomUUID === "function") {
         return window.crypto.randomUUID();
@@ -118,7 +122,27 @@
     } catch (_err) {
       // Fallback below.
     }
-    return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    return `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function sanitizeTelemetryEvent(input) {
+    if (!input || typeof input !== "object") return null;
+    const output = {};
+    TELEMETRY_STRING_FIELDS.forEach(function (key) {
+      if (typeof input[key] !== "string") return;
+      const value = input[key].trim().slice(0, key === "track" ? 240 : 120);
+      if (value) output[key] = value;
+    });
+    TELEMETRY_NUMBER_FIELDS.forEach(function (key) {
+      if (input[key] === null || input[key] === "") return;
+      const value = Number(input[key]);
+      if (Number.isFinite(value)) output[key] = value;
+    });
+    TELEMETRY_BOOLEAN_FIELDS.forEach(function (key) {
+      if (typeof input[key] === "boolean") output[key] = input[key];
+    });
+    if (!Number.isFinite(output.timestamp_ms) || output.timestamp_ms <= 0) return null;
+    return output;
   }
 
   function call(ctx, name) {
@@ -134,7 +158,7 @@
     const ctx = context || {};
     const fineStarts = new Map();
     const fineAuto = new Map();
-    const sessionId = createSessionId();
+    const traceIds = new Map();
     let dbPromise = null;
     let queue = [];
     let queueLoaded = false;
@@ -147,6 +171,7 @@
     let healthSessionStartedAt = 0;
 
     function getWorkerUrl() {
+      if (call(ctx, "isTelemetryOriginAllowed") === false) return "";
       return String(call(ctx, "getWorkerUrl") || "").trim();
     }
 
@@ -172,27 +197,21 @@
 
     function getEnvironment() {
       const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-      let localTime = "";
-      try {
-        localTime = new Date().toLocaleString(undefined, {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false,
-          timeZoneName: "short"
-        });
-      } catch (_err) {
-        localTime = new Date().toString();
-      }
       return {
         effective_type: connection && connection.effectiveType ? String(connection.effectiveType) : "",
         navigator_on_line: typeof navigator.onLine === "boolean" ? navigator.onLine : null,
-        visibility_state: document.visibilityState || "",
-        local_time: localTime
+        visibility_state: document.visibilityState || ""
       };
+    }
+
+    function getTraceId(requestToken) {
+      const token = Number(requestToken);
+      if (!Number.isFinite(token) || token <= 0) return "";
+      if (!traceIds.has(token)) traceIds.set(token, createTraceId());
+      while (traceIds.size > MAX_REQUESTS) {
+        traceIds.delete(traceIds.keys().next().value);
+      }
+      return traceIds.get(token) || "";
     }
 
     function getAutoFlag(type, data, requestToken) {
@@ -330,10 +349,20 @@
     }
 
     function pruneQueue() {
-      if (queue.length <= QUEUE_CAP) return;
-      const dropCount = queue.length - QUEUE_CAP;
-      const dropped = queue.splice(0, dropCount);
-      deleteEvents(dropped.map(function (event) { return event._telemetry_id; }));
+      const cutoff = Date.now() - QUEUE_TTL_MS;
+      const dropped = [];
+      queue = queue.filter(function (event) {
+        const timestamp = Number(event && event.timestamp_ms);
+        const keep = Number.isFinite(timestamp) && timestamp >= cutoff;
+        if (!keep && event && event._telemetry_id) dropped.push(event);
+        return keep;
+      });
+      if (queue.length > QUEUE_CAP) {
+        dropped.push.apply(dropped, queue.splice(0, queue.length - QUEUE_CAP));
+      }
+      if (dropped.length) {
+        deleteEvents(dropped.map(function (event) { return event._telemetry_id; }).filter(Boolean));
+      }
     }
 
     function loadQueue() {
@@ -343,7 +372,12 @@
       }).then(function (stored) {
         const merged = new Map();
         (Array.isArray(stored) ? stored : []).forEach(function (event) {
-          if (event && event._telemetry_id) merged.set(event._telemetry_id, event);
+          const sanitized = sanitizeTelemetryEvent(event);
+          if (sanitized && event && event._telemetry_id) {
+            merged.set(event._telemetry_id, Object.assign({ _telemetry_id: event._telemetry_id }, sanitized));
+          } else if (event && event._telemetry_id) {
+            deleteEvents([event._telemetry_id]);
+          }
         });
         queue.forEach(function (event) {
           if (event && event._telemetry_id) merged.set(event._telemetry_id, event);
@@ -374,10 +408,12 @@
     function postBatch(batch) {
       const workerUrl = getWorkerUrl();
       if (!batch.length || typeof fetch !== "function" || !workerUrl) return Promise.resolve(false);
+      const payload = batch.map(sanitizeTelemetryEvent).filter(Boolean);
+      if (!payload.length) return Promise.resolve(false);
       return fetch(`${workerUrl.replace(/\/+$/, "")}/log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(batch),
+        body: JSON.stringify(payload),
         keepalive: false
       }).then(function (response) {
         return response && response.ok;
@@ -391,12 +427,14 @@
       if (flushInFlight) return Promise.resolve(false);
       flushInFlight = true;
       return loadQueue().then(function () {
+        pruneQueue();
         if (!queue.length) return false;
         const batch = queue.slice(0, QUEUE_CAP);
         const workerUrl = getWorkerUrl();
         if (opts.beacon && navigator.sendBeacon && workerUrl) {
           try {
-            const blob = new Blob([JSON.stringify(batch)], { type: "application/json" });
+            const payload = batch.map(sanitizeTelemetryEvent).filter(Boolean);
+            const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
             const queued = navigator.sendBeacon(`${workerUrl.replace(/\/+$/, "")}/log`, blob);
             if (queued) {
               removeBatch(batch);
@@ -425,7 +463,9 @@
 
     function enqueue(event) {
       if (!event || typeof event !== "object") return;
-      const queued = Object.assign({ _telemetry_id: createEventId() }, event);
+      const sanitized = sanitizeTelemetryEvent(Object.assign({ timestamp_ms: Date.now() }, event));
+      if (!sanitized) return;
+      const queued = Object.assign({ _telemetry_id: createEventId() }, sanitized);
       queue.push(queued);
       pruneQueue();
       persistEvent(queued);
@@ -435,12 +475,6 @@
     }
 
     function getMonitorTrackValue(payload) {
-      const path = String(payload && payload.track_path ? payload.track_path : "").trim();
-      if (path) {
-        return path
-          .replace(/^assets\/music\/streams\//, "")
-          .replace(/^assets\/audio\//, "audio/");
-      }
       return String(payload && payload.track ? payload.track : "unknown");
     }
 
@@ -455,7 +489,12 @@
       if (!FINE_EVENTS.has(eventType)) return;
 
       const source = data && typeof data === "object" ? data : {};
-      const requestToken = Number(source.request_token);
+      const audioState = getAudioState();
+      const explicitRequestToken = Number(source.request_token);
+      const activeRequestToken = Number(audioState.playRequestToken || audioState.startRequestToken);
+      const requestToken = Number.isFinite(explicitRequestToken) && explicitRequestToken > 0
+        ? explicitRequestToken
+        : activeRequestToken;
       const eventNow = now();
 
       if (eventType === "playing" || eventType === "play_resolved" || eventType === "heartbeat") {
@@ -468,14 +507,12 @@
         pruneFineMaps();
       }
 
-      const audioState = getAudioState();
       const startedAt = Number.isFinite(requestToken) && fineStarts.has(requestToken)
         ? fineStarts.get(requestToken)
         : audioState.audioClickPerfTs;
       const deltaMs = Number.isFinite(startedAt) && startedAt > 0 ? Math.max(0, Math.round(eventNow - startedAt)) : null;
       const auto = getAutoFlag(eventType, source, requestToken);
       const errorName = source.reason || source.error_name || "";
-      const trackPath = String(source.track_path || "").trim();
       const trackValue = getMonitorTrackValue(source);
       const providedDeltaMs = Number(source.delta_ms);
       const normalizedDeltaMs = Number.isFinite(providedDeltaMs)
@@ -485,21 +522,18 @@
       const body = Object.assign({}, source, getEnvironment(), getHealthSessionState(), {
         event: eventType,
         fine_event: true,
-        session_id: sessionId,
+        trace_id: getTraceId(requestToken),
         build: getRuntimeVersion(),
         timestamp_ms: Date.now(),
-        ts_client: new Date().toISOString(),
         delta_ms: normalizedDeltaMs,
         duration_before_play_ms: eventType === "click_track" ? 0 : normalizedDeltaMs,
         track: trackValue,
-        track_path: trackPath,
         album: String(source.album || "").toLowerCase(),
         source: source.source || getAudioSource(source.src),
         ua_class: getUaClass(),
         auto,
         error: eventType === "play_rejected",
-        error_name: errorName,
-        browser: String(navigator.userAgent || "")
+        error_name: errorName
       });
 
       enqueue(body);
@@ -516,13 +550,20 @@
       const payload = buildMonitorPayload(track, index, src);
       const audioState = getAudioState();
       const elapsed = audioState.playRequestTs ? Date.now() - audioState.playRequestTs : null;
-      const body = Object.assign({
+      const requestToken = Number(audioState.playRequestToken || audioState.startRequestToken);
+      const monitorError = Boolean(data && data.error === true);
+      const body = Object.assign({}, getEnvironment(), data || {}, {
+        event: monitorError ? "monitor_error" : "monitor_play",
+        trace_id: getTraceId(requestToken),
+        build: getRuntimeVersion(),
+        timestamp_ms: Date.now(),
+        request_token: Number.isFinite(requestToken) ? requestToken : null,
         track: getMonitorTrackValue(payload),
         album: String(payload.album || "").toLowerCase(),
         duration_before_play_ms: Number.isFinite(elapsed) ? Math.max(0, Math.round(elapsed)) : null,
-        error: false,
-        browser: String(navigator.userAgent || "")
-      }, getEnvironment(), data || {});
+        error: monitorError,
+        ua_class: getUaClass()
+      });
 
       enqueue(body);
     }

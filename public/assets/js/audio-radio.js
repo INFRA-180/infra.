@@ -1491,6 +1491,7 @@
     if (!restoredSrc || isBlobObjectUrl(restoredSrc)) return;
     revokeActiveBlobUrl();
     audioState.activeLogicalSrc = restoredSrc;
+    audio.crossOrigin = "anonymous";
     audio.src = restoredSrc;
     audioState.pendingStartTime = Number.isFinite(payload.time) ? payload.time : 0;
     restorePlaybackQueueContext();
@@ -1738,8 +1739,7 @@
     const root = getSpaPersistRoot();
 
     if (audioState.audio) {
-      audioState.audio.crossOrigin = "";
-      audioState.audio.removeAttribute("crossorigin");
+      audioState.audio.crossOrigin = "anonymous";
       audioState.audio.preload = "none";
       root.appendChild(audioState.audio);
       bindMediaSessionActions();
@@ -1756,13 +1756,11 @@
       audio.id = "infraGlobalAudio";
       audio.preload = "none";
       audio.playsInline = true;
-      audio.crossOrigin = "";
-      audio.removeAttribute("crossorigin");
+      audio.crossOrigin = "anonymous";
       audio.setAttribute("playsinline", "");
       root.appendChild(audio);
     } else {
-      audio.crossOrigin = "";
-      audio.removeAttribute("crossorigin");
+      audio.crossOrigin = "anonymous";
       audio.preload = "none";
       root.appendChild(audio);
     }

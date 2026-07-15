@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix331-20260715";
+window.INFRA_BUILD_TAG = "audiofix332-20260716";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -396,7 +396,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_BUFFER_ABORT_SECONDS = 4;
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
-  const WORKER_URL = "https://infra180-audio.zaccary-caillol.workers.dev";
+  const WORKER_URL = "https://infra180-api.pages.dev";
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
   const LOCAL_CATALOG_VERSION = "audiofix255-20260627";
@@ -420,7 +420,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix331-20260715";
+  const runtimeVersion = "audiofix332-20260716";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -481,6 +481,9 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!factory) return createNoopAudioTelemetryApi();
     return factory({
       fineTelemetryEnabled: true,
+      isTelemetryOriginAllowed: function () {
+        return window.location.origin === "https://infra-180.github.io";
+      },
       getWorkerUrl: function () { return WORKER_URL; },
       getRuntimeVersion: function () { return runtimeVersion; },
       getAudioState: function () { return audioState; },

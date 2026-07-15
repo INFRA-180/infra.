@@ -14,9 +14,9 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix331-20260715";
-const shellRelease = "infra-shell-20260715-audio331";
-const coverCssRelease = "audiofix331-20260715";
+const release = "audiofix332-20260716";
+const shellRelease = "infra-shell-20260716-audio332";
+const coverCssRelease = "audiofix332-20260716";
 const frozenCssSha256 = "2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
@@ -25,6 +25,8 @@ const prefetch = read("public/assets/js/audio-prefetch.js");
 const catalogLoader = read("public/assets/js/catalog-loader.js");
 const albumUi = read("public/assets/js/album-player-ui.js");
 const nowPlaying = read("public/assets/js/now-playing.js");
+const telemetry = read("public/assets/js/audio-telemetry.js");
+const sphragis = read("public/assets/js/sphragis.js");
 const sw = read("public/sw.js");
 const styles = read("public/assets/css/styles.css");
 
@@ -38,9 +40,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix331");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix331");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio331");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix332");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix332");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio332");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v7"'), "Service Worker does not use segment cache v7");
 
 const coldPreparation = functionBody(radio, "prepareInitialGlobalRandomPlayback", "scheduleInitialGlobalRandomPreparation");
@@ -118,6 +120,25 @@ expect(sw.includes("metadata.bodyValidated"), "zero-copy 206 is not restricted t
 expect(sw.includes("cachedValidatorMatchesIfRange"), "If-Range compatibility guard is missing");
 expect(sw.includes("isAudioPrefetchCache(key) && key !== NEXT_TRACK_CACHE"), "old audio caches are not migrated on activation");
 expect(sw.includes("event.clientId"), "prefetch-hit telemetry is not scoped to the requesting client");
+expect(sw.includes('request.mode === "cors" && isSingleRange'), "Service Worker can still intercept a no-cors media request");
+expect(sw.includes('headers.set("Access-Control-Allow-Origin", self.location.origin)'), "cached 206 does not use the active PWA origin");
+expect(sw.includes('headers.set("Vary", "Origin")'), "cached 206 lacks Vary: Origin");
+expect(prefetch.includes('mode: "cors"'), "prefetch request is not explicitly CORS");
+expect(!radio.includes('removeAttribute("crossorigin")'), "global audio still removes crossorigin");
+expect(!albumUi.includes('removeAttribute("crossorigin")'), "album audio still removes crossorigin");
+expect(radio.includes('audio.crossOrigin = "anonymous"'), "global audio is not configured for anonymous CORS");
+expect(core.includes('audio.crossOrigin = "anonymous"'), "source assignment does not reaffirm anonymous CORS");
+expect(telemetry.includes("const QUEUE_CAP = 100"), "telemetry queue is not capped at 100 events");
+expect(telemetry.includes("const QUEUE_TTL_MS = 24 * 60 * 60 * 1000"), "telemetry queue lacks the 24-hour TTL");
+expect(!telemetry.includes("navigator.userAgent"), "full user-agent is still transmitted");
+expect(!telemetry.includes("local_time:"), "local time is still transmitted");
+expect(!telemetry.includes("session_id:"), "global session identifier is still transmitted");
+expect(scripts.includes('window.location.origin === "https://infra-180.github.io"'), "telemetry is not restricted to the official origin client-side");
+expect(scripts.includes('https://infra180-api.pages.dev'), "runtime does not use the neutral API hostname");
+expect(sphragis.includes('https://infra180-api.pages.dev'), "Sphragis does not use the neutral API hostname");
+expect(!scripts.includes('workers.dev'), "a Workers account hostname remains in the runtime");
+expect(!sphragis.includes('workers.dev'), "a Workers account hostname remains in Sphragis");
+expect(!telemetry.includes('"cover_prepare_item"'), "cover loading still floods remote audio telemetry");
 expect(sw.includes("htmlCacheFirst(request, SHELL_CACHE"), "PWA navigation is not shell cache-first");
 expect(catalogLoader.includes("readCachedLiveCatalogLatest()"), "validated live CacheStorage is not consulted at startup");
 expect(catalogLoader.includes('catalogState.catalogBundleSource = cachedLive ? "live-cache" : "local"'), "catalogue startup does not preserve cached live releases");
@@ -143,4 +164,4 @@ for (const relativePath of htmlFiles) {
   expect(!source.includes("audiofix326-20260715"), `${relativePath} still references audiofix326 JavaScript`);
 }
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix331.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix332.");

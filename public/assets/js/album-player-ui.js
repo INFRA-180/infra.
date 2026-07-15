@@ -314,8 +314,7 @@
       if (rawSrc) row.setAttribute("data-audio-src", rawSrc);
       if (favoritePath) row.setAttribute("data-favorite-path", favoritePath);
       if (audioEl) {
-        audioEl.crossOrigin = "";
-        audioEl.removeAttribute("crossorigin");
+        audioEl.crossOrigin = "anonymous";
         audioEl.preload = "none";
         audioEl.setAttribute("preload", "none");
         audioEl.removeAttribute("src");

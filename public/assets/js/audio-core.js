@@ -287,6 +287,7 @@
       }
       try {
         audioState.activeLogicalSrc = src;
+        audio.crossOrigin = "anonymous";
         audio.src = src;
         loadMediaElementForPlayback(audio);
         return true;
@@ -495,6 +496,7 @@
           audioState.activeLogicalSrc = nextSrc;
           audioState.mediaSessionAudioPlaying = false;
           if (!sameTrack) {
+            audio.crossOrigin = "anonymous";
             audio.src = nextSrc;
           }
           logAudioAuditEvent("source_assigned", target, index, nextSrc, {

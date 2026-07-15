@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260715-audio331";
+const VERSION = "infra-shell-20260716-audio332";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
@@ -12,28 +12,28 @@ const SHELL_ASSETS = [
   "./sphragis/",
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
-  "./assets/css/styles.css?v=audiofix331-20260715",
-  "./assets/js/covers.js?v=audiofix331-20260715",
-  "./assets/js/favorites.js?v=audiofix331-20260715",
-  "./assets/js/favorites-ui.js?v=audiofix331-20260715",
-  "./assets/js/transport-ui.js?v=audiofix331-20260715",
-  "./assets/js/now-playing.js?v=audiofix331-20260715",
-  "./assets/js/album-player-ui.js?v=audiofix331-20260715",
-  "./assets/js/spa-renderer.js?v=audiofix331-20260715",
-  "./assets/js/audio-radio.js?v=audiofix331-20260715",
-  "./assets/js/media-session.js?v=audiofix331-20260715",
-  "./assets/js/audio-prefetch.js?v=audiofix331-20260715",
-  "./assets/js/spa-router.js?v=audiofix331-20260715",
-  "./assets/js/catalog-fallback.js?v=audiofix331-20260715",
-  "./assets/js/catalog-loader.js?v=audiofix331-20260715",
-  "./assets/js/audio-telemetry.js?v=audiofix331-20260715",
-  "./assets/js/downloads.js?v=audiofix331-20260715",
-  "./assets/js/home-catalog.js?v=audiofix331-20260715",
-  "./assets/js/audio-core.js?v=audiofix331-20260715",
-  "./assets/js/pwa-install.js?v=audiofix331-20260715",
-  "./assets/js/share-qr.js?v=audiofix331-20260715",
-  "./assets/js/scripts.js?v=audiofix331-20260715",
-  "./assets/js/scripts.admin.js?v=audiofix331-20260715",
+  "./assets/css/styles.css?v=audiofix332-20260716",
+  "./assets/js/covers.js?v=audiofix332-20260716",
+  "./assets/js/favorites.js?v=audiofix332-20260716",
+  "./assets/js/favorites-ui.js?v=audiofix332-20260716",
+  "./assets/js/transport-ui.js?v=audiofix332-20260716",
+  "./assets/js/now-playing.js?v=audiofix332-20260716",
+  "./assets/js/album-player-ui.js?v=audiofix332-20260716",
+  "./assets/js/spa-renderer.js?v=audiofix332-20260716",
+  "./assets/js/audio-radio.js?v=audiofix332-20260716",
+  "./assets/js/media-session.js?v=audiofix332-20260716",
+  "./assets/js/audio-prefetch.js?v=audiofix332-20260716",
+  "./assets/js/spa-router.js?v=audiofix332-20260716",
+  "./assets/js/catalog-fallback.js?v=audiofix332-20260716",
+  "./assets/js/catalog-loader.js?v=audiofix332-20260716",
+  "./assets/js/audio-telemetry.js?v=audiofix332-20260716",
+  "./assets/js/downloads.js?v=audiofix332-20260716",
+  "./assets/js/home-catalog.js?v=audiofix332-20260716",
+  "./assets/js/audio-core.js?v=audiofix332-20260716",
+  "./assets/js/pwa-install.js?v=audiofix332-20260716",
+  "./assets/js/share-qr.js?v=audiofix332-20260716",
+  "./assets/js/scripts.js?v=audiofix332-20260716",
+  "./assets/js/scripts.admin.js?v=audiofix332-20260716",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./assets/js/sphragis.js?v=sphragis20260625",
   "./assets/fonts/antique-olive-nord.woff2",
@@ -351,8 +351,9 @@ async function buildRangeResponseFromCachedAudio(cached, rangeHeader) {
   headers.set("Accept-Ranges", "bytes");
   headers.set("Content-Range", `bytes ${range.start}-${responseEnd}/${metadata.total}`);
   headers.set("Content-Length", String(responseLength));
-  headers.set("Access-Control-Allow-Origin", cached.headers.get("Access-Control-Allow-Origin") || "*");
+  headers.set("Access-Control-Allow-Origin", self.location.origin);
   headers.set("Access-Control-Expose-Headers", "Accept-Ranges,Content-Range,Content-Length,Content-Type,ETag");
+  headers.set("Vary", "Origin");
   const etag = cached.headers.get("ETag") || cached.headers.get("etag");
   if (etag) headers.set("ETag", etag);
   headers.set("Cache-Control", "public, max-age=31536000, immutable");
@@ -421,9 +422,13 @@ self.addEventListener("fetch", (event) => {
   if (!request) return;
   const url = new URL(request.url);
   if (url.hostname === R2_AUDIO_HOST) {
-    if (request.method === "GET") {
+    const rangeHeader = request.headers.get("Range") || request.headers.get("range") || "";
+    const isSingleRange = /^bytes=(?:\d+-\d*|-\d+)$/i.test(rangeHeader);
+    if (request.method === "GET" && request.mode === "cors" && isSingleRange) {
       event.respondWith(servePrefetchedAudioOrNetwork(request, url, event));
     }
+    // WebKit must handle no-cors and non-Range media requests natively. Relaying
+    // those through fetch(request) strips media-specific headers on iOS.
     return;
   }
   if (request.method !== "GET") return;

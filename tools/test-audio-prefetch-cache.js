@@ -72,6 +72,7 @@ function segmentResponse(seed) {
 
   const request = api.createRequest("https://media.test/next.m4a");
   assert.strictEqual(request.headers.get("Range"), "bytes=0-4194303");
+  assert.strictEqual(request.mode, "cors");
   assert.strictEqual(request.credentials, "omit");
 
   await assert.rejects(

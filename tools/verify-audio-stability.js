@@ -14,14 +14,15 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix330-20260715";
-const shellRelease = "infra-shell-20260715-audio330";
-const frozenCssRelease = "audiofix329-20260715";
-const frozenCssSha256 = "1b9cd26ebcd33d3b2331ccb160b340e870f7fcd904aca2f30d588b4dfd6a402d";
+const release = "audiofix331-20260715";
+const shellRelease = "infra-shell-20260715-audio331";
+const coverCssRelease = "audiofix331-20260715";
+const frozenCssSha256 = "2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");
 const prefetch = read("public/assets/js/audio-prefetch.js");
+const catalogLoader = read("public/assets/js/catalog-loader.js");
 const albumUi = read("public/assets/js/album-player-ui.js");
 const nowPlaying = read("public/assets/js/now-playing.js");
 const sw = read("public/sw.js");
@@ -37,9 +38,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix330");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix330");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio330");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix331");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix331");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio331");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v7"'), "Service Worker does not use segment cache v7");
 
 const coldPreparation = functionBody(radio, "prepareInitialGlobalRandomPlayback", "scheduleInitialGlobalRandomPreparation");
@@ -47,6 +48,8 @@ expect(coldPreparation.includes("buildRadioQueue"), "cold startup does not mater
 expect(coldPreparation.includes("audio_fetch: false"), "cold metadata preparation is not explicitly audio-free");
 expect(!/\bfetch\s*\(/.test(coldPreparation), "cold metadata preparation must not download audio");
 expect(!coldPreparation.includes("startNextTrackPrefetch"), "cold metadata preparation must not prefetch a media segment");
+expect(coldPreparation.includes("promoteCachedPreparedInitialTrack"), "cold Radio preparation does not reuse an existing v7 segment");
+expect(prefetch.includes("findFirstValidCachedSegment"), "v7 cache does not expose ordered cached-source lookup");
 
 const coldActivation = functionBody(radio, "activatePreparedInitialRadioPlayback", "startGlobalRandomPlayback");
 for (const invariant of [
@@ -88,6 +91,7 @@ for (const invariant of [
   expect(radio.includes(invariant) || scripts.includes(invariant), `rolling prefetch is missing ${invariant}`);
 }
 expect(prefetch.includes('CACHE_NAME: "infra-next-track-segments-v7"'), "prefetch cache is not v7");
+expect(prefetch.includes('headers.set("X-Infra-Body-Validated", "1")'), "v7 writes lack an integrity-at-write marker");
 expect(prefetch.includes("PREFETCH_SEGMENT_SIZE: 4 * 1024 * 1024"), "prefetch segment is not 4 MiB");
 expect(prefetch.includes("QUEUE_DEPTH: 5"), "prefetch depth is not five");
 expect(prefetch.includes("CONCURRENCY: 2"), "prefetch concurrency is not two");
@@ -109,13 +113,20 @@ expect(nowPlaying.includes("animation.oncancel = finalize"), "fullscreen cancell
 
 expect(sw.includes("buildRangeResponseFromCachedAudio"), "Service Worker Range reconstruction is missing");
 expect(sw.includes("responseEnd = Math.min(range.end, metadata.cachedEnd)"), "open-ended Range is not bounded to the cached segment");
+expect(sw.includes("new Response(cached.body"), "full cached segments still require an arrayBuffer copy");
+expect(sw.includes("metadata.bodyValidated"), "zero-copy 206 is not restricted to bodies validated at write time");
 expect(sw.includes("cachedValidatorMatchesIfRange"), "If-Range compatibility guard is missing");
 expect(sw.includes("isAudioPrefetchCache(key) && key !== NEXT_TRACK_CACHE"), "old audio caches are not migrated on activation");
 expect(sw.includes("event.clientId"), "prefetch-hit telemetry is not scoped to the requesting client");
+expect(sw.includes("htmlCacheFirst(request, SHELL_CACHE"), "PWA navigation is not shell cache-first");
+expect(catalogLoader.includes("readCachedLiveCatalogLatest()"), "validated live CacheStorage is not consulted at startup");
+expect(catalogLoader.includes('catalogState.catalogBundleSource = cachedLive ? "live-cache" : "local"'), "catalogue startup does not preserve cached live releases");
+expect(catalogLoader.includes("fetchLiveCatalogLatest().catch(function () {})"), "live catalogue refresh is not detached from startup");
 
 const cssHash = crypto.createHash("sha256").update(styles).digest("hex");
-expect(cssHash === frozenCssSha256, "styles.css changed despite the frozen audiofix329 geometry");
+expect(cssHash === frozenCssSha256, "styles.css differs from the frozen geometry plus the isolated cover clip fix");
 expect(!styles.includes("100lvh"), "forbidden 100lvh geometry was introduced");
+expect(styles.includes("transform: translateZ(0) scale(1.002)"), "WebKit cover seam guard is missing");
 
 const htmlFiles = ["public/index.html"]
   .concat(fs.readdirSync(path.join(root, "public/music"))
@@ -128,8 +139,8 @@ expect(htmlFiles.length === 35, `expected 35 player documents, found ${htmlFiles
 for (const relativePath of htmlFiles) {
   const source = read(relativePath);
   expect(source.includes(release), `${relativePath} does not reference ${release}`);
-  expect(source.includes(frozenCssRelease), `${relativePath} does not retain ${frozenCssRelease}`);
+  expect(source.includes(coverCssRelease), `${relativePath} does not reference ${coverCssRelease}`);
   expect(!source.includes("audiofix326-20260715"), `${relativePath} still references audiofix326 JavaScript`);
 }
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix330.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix331.");

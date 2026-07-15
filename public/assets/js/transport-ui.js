@@ -487,7 +487,7 @@
         "    <button class=\"global-transport-mini-progress\" type=\"button\" data-transport-mini-progress aria-label=\"Avancer dans le morceau\">",
         "      <span class=\"global-transport-mini-fill\" data-transport-mini-fill></span>",
         "    </button>",
-        "    <span class=\"global-transport-mini-time\" data-transport-mini-duration>--:--</span>",
+        "    <span class=\"global-transport-mini-time\" data-transport-mini-duration>0:00</span>",
         "  </div>",
         "</div>",
         "<div class=\"global-transport-controls\">",
@@ -1460,15 +1460,17 @@
     transport.nowMini.hidden = !hasSource;
     if (!hasSource) {
       if (transport.miniCurrent) transport.miniCurrent.textContent = "0:00";
-      if (transport.miniDuration) transport.miniDuration.textContent = "--:--";
+      if (transport.miniDuration) transport.miniDuration.textContent = "0:00";
       if (transport.miniFill) transport.miniFill.style.width = "0%";
       if (transport.miniProgress) transport.miniProgress.disabled = true;
       syncNowPlayingOverlayProgress();
       return;
     }
 
-    const currentTime = hasDuration ? formatTrackDuration(audio.currentTime) : "0:00";
-    const duration = hasDuration ? formatTrackDuration(audio.duration) : "--:--";
+    const currentTime = hasDuration && Number.isFinite(audio.currentTime) && audio.currentTime > 0
+      ? formatTrackDuration(audio.currentTime)
+      : "0:00";
+    const duration = hasDuration ? formatTrackDuration(audio.duration) : "0:00";
     const percent = hasDuration ? Math.max(0, Math.min(100, (audio.currentTime / audio.duration) * 100)) : 0;
 
     if (transport.miniCurrent) transport.miniCurrent.textContent = currentTime;
@@ -1512,10 +1514,11 @@
     const canStartInitialRandom = canStartInitialGlobalRandomPlayback();
     const isRadioMode = audioState.homeMode === "radio";
     const isHome = document.body.classList.contains("home-screen");
+    const isAlbum = document.body.classList.contains("album-screen");
     const isMobileLayout = typeof window.matchMedia === "function"
       ? window.matchMedia("(max-width: 980px)").matches
       : false;
-    const shouldShow = Boolean(isHome || hasPlaybackSessionActive);
+    const shouldShow = Boolean(isHome || isAlbum || hasPlaybackSessionActive);
     const transportShouldShow = Boolean(shouldShow && !audioState.nowPlayingOpen);
     const mobileDockVisible = Boolean(isMobileLayout && transportShouldShow);
     const canOpenNowPlaying = Boolean(hasPlaybackSessionActive);

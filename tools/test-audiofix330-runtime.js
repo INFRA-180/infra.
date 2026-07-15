@@ -12,6 +12,8 @@ const RADIO_PATH = path.join(ROOT, "public/assets/js/audio-radio.js");
 const PREFETCH_PATH = path.join(ROOT, "public/assets/js/audio-prefetch.js");
 const ALBUM_UI_PATH = path.join(ROOT, "public/assets/js/album-player-ui.js");
 const NOW_PLAYING_PATH = path.join(ROOT, "public/assets/js/now-playing.js");
+const TRANSPORT_UI_PATH = path.join(ROOT, "public/assets/js/transport-ui.js");
+const STYLES_PATH = path.join(ROOT, "public/assets/css/styles.css");
 
 function createStorage() {
   const values = new Map();
@@ -289,6 +291,88 @@ function testPreparedColdPlayIsSynchronous() {
   );
 }
 
+async function testCachedTrackIsPromotedBeforeColdTap() {
+  const sandbox = createSandbox();
+  loadScript(sandbox, RADIO_PATH);
+  const sourceTracks = makeTracks(6);
+  const inspectedWindows = [];
+  const startCalls = [];
+  const state = {
+    audio: makeAudio(),
+    homeModeInitialized: true,
+    homeModeStorageKey: "infra_home_mode_test",
+    queueStorageKey: "infra_queue_test",
+    resumeStorageKey: "infra_resume_test",
+    initialRandomPlaylist: [],
+    initialRandomFirstSrc: "",
+    initialRandomReady: false,
+    initialRandomPreparing: false,
+    initialRandomPreparePromise: null,
+    initialRandomPrepareToken: 0,
+    globalRandomStartInFlight: false,
+    playlist: [],
+    playlistKind: "album",
+    currentIndex: -1,
+    recentPlayed: [],
+    radioQueue: [],
+    radioQueueCursor: -1,
+    radioQueueBatchSize: 6,
+    radioQueueExtendBy: 6,
+    radioQueueMinRemaining: 5
+  };
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    runtime: { baseUrl: new URL("https://site.test/") },
+    prefetchApi: {
+      findFirstValidCachedSegment(sources) {
+        inspectedWindows.push(sources.slice());
+        return Promise.resolve({ src: sources[2], valid: true, bytes: 1024 });
+      }
+    },
+    loadTracksData: () => Promise.resolve({
+      albums: [{
+        title: "Runtime test",
+        page: "music/runtime.html",
+        cover: "assets/runtime.webp",
+        tracks: sourceTracks.map((track) => ({ src: track.src, title: track.name }))
+      }]
+    }),
+    resolveManagedAudioSrc: (src) => String(src || ""),
+    getAudioAssetPathKey: (src) => String(src || ""),
+    toRuntimeAbsoluteUrl: (value) => String(value || ""),
+    normalizeAudioSourceUrl: (src) => String(src || ""),
+    toAbsoluteUrlOrEmpty: (src) => String(src || ""),
+    srcMatches: (left, right) => String(left || "") === String(right || ""),
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc || "",
+    getCurrentPlayableAudioSrc: (audio) => audio.currentSrc || audio.src || "",
+    syncAudioUi() {},
+    syncPlaylistContext() {},
+    syncMediaSessionMetadata() {},
+    startTrack(index, options) { startCalls.push({ index, options }); }
+  });
+
+  await radio.prepareInitialGlobalRandomPlayback("cached_first_test");
+  await flushAsyncWork();
+  assert.strictEqual(inspectedWindows.length, 1, "Cold metadata preparation must inspect v7 once");
+  const cachedSrc = inspectedWindows[0][2];
+  assert.strictEqual(
+    state.initialRandomFirstSrc,
+    cachedSrc,
+    "A valid existing v7 segment must be promoted to the prepared Radio head"
+  );
+  assert.strictEqual(state.initialRandomPlaylist[0].src, cachedSrc);
+
+  const timersBeforeTap = sandbox.__timerCalls.length;
+  assert.strictEqual(radio.startGlobalRandomPlayback(), true);
+  assert.strictEqual(startCalls.length, 1);
+  assert.strictEqual(state.playlist[0].src, cachedSrc, "The synchronous tap must consume the promoted cached head");
+  assert.strictEqual(
+    sandbox.__timerCalls.length,
+    timersBeforeTap,
+    "The cache lookup must finish before the tap and never be awaited from the gesture stack"
+  );
+}
+
 function testAuthoritativeRollingWindow() {
   const harness = createCoreHarness({ playlist: makeTracks(11), currentIndex: 0 });
   assert.deepStrictEqual(
@@ -343,6 +427,199 @@ async function flushAsyncWork() {
   await Promise.resolve();
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setTimeout(resolve, 10));
+}
+
+function createPrefetchRehydrationHarness(inspectCachedSegment) {
+  const fetchUrls = [];
+  const putSources = [];
+  const events = [];
+  const sandbox = createSandbox({
+    fetch(request) {
+      fetchUrls.push(request && request.url ? request.url : String(request || ""));
+      return Promise.resolve(validSegmentResponse());
+    }
+  });
+  loadScript(sandbox, RADIO_PATH);
+
+  const playlist = makeTracks(8);
+  const audio = makeAudio();
+  audio.paused = false;
+  audio.src = playlist[0].src;
+  audio.currentSrc = playlist[0].src;
+  audio.currentTime = 10;
+  audio.duration = 180;
+  audio.buffered = { length: 1, end: () => 30 };
+  const state = {
+    audio,
+    playlist,
+    currentIndex: 0,
+    activeLogicalSrc: playlist[0].src,
+    homeMode: "album",
+    playlistKind: "album",
+    playlistToken: playlist.map((track) => track.src).join("|"),
+    recentPlayed: [],
+    mediaSessionAudioPlaying: true,
+    trackStartInFlight: false,
+    activeAudioRecovery: null,
+    nextPrefetchGeneration: 0
+  };
+  const prefetchApi = {
+    isSupported: () => true,
+    createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-4194303" } }),
+    getContentLength: (response) => Number(response.headers.get("Content-Length") || 0),
+    inspectCachedSegment,
+    putSingle(src) {
+      putSources.push(src);
+      return Promise.resolve(true);
+    },
+    pruneCache: () => Promise.resolve(true)
+  };
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    runtime: { baseUrl: new URL("https://site.test/") },
+    PREFETCH_NEXT_ENABLED: true,
+    prefetchApi,
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc,
+    getCurrentPlayableAudioSrc: () => state.activeLogicalSrc,
+    normalizeAudioSourceUrl: (src) => String(src || ""),
+    srcMatches: (left, right) => String(left || "") === String(right || ""),
+    isCloudflareAudioUrl: () => true,
+    getCurrentPlaylistIndexSafe: () => state.currentIndex,
+    getQueuePreviewIndices(limit) {
+      const indices = [];
+      for (let index = state.currentIndex + 1; index < playlist.length && indices.length < limit; index += 1) {
+        indices.push(index);
+      }
+      return indices;
+    },
+    buildAudioMonitorPayload: () => ({}),
+    trackAudioRuntimeEvent(name, payload) {
+      events.push({ name, payload });
+    }
+  });
+
+  return { radio, state, playlist, audio, fetchUrls, putSources, events };
+}
+
+async function testPrefetchCacheRehydrationAndCorruptFallback() {
+  const inspected = [];
+  const cachedHarness = createPrefetchRehydrationHarness(function (src) {
+    inspected.push(src);
+    return Promise.resolve({ src, found: true, valid: true, bytes: 1024 });
+  });
+  cachedHarness.radio.maybePrefetchNextTrack("cache_rehydration_test");
+  assert.strictEqual(cachedHarness.fetchUrls.length, 0, "Network must wait for v7 cache inspection");
+  await flushAsyncWork();
+  assert.deepStrictEqual(
+    inspected,
+    cachedHarness.playlist.slice(1, 6).map((track) => track.src),
+    "The complete N+1 through N+5 window must be inspected in queue order"
+  );
+  assert.deepStrictEqual(
+    Array.from(cachedHarness.state.nextPrefetchReadySrcs),
+    cachedHarness.playlist.slice(1, 6).map((track) => track.src),
+    "Valid cached v7 segments must rehydrate the ready window"
+  );
+  assert.strictEqual(cachedHarness.fetchUrls.length, 0, "A valid rehydrated window must not be refetched");
+  assert.strictEqual(cachedHarness.putSources.length, 0, "A valid rehydrated window must not be rewritten");
+  assert(
+    cachedHarness.events.some((entry) => entry.name === "prefetch_cache_rehydrated"),
+    "Cache reuse must remain observable"
+  );
+
+  const corruptHarness = createPrefetchRehydrationHarness(function (src) {
+    const isCorruptNPlusOne = src === corruptHarness.playlist[1].src;
+    return Promise.resolve({
+      src,
+      found: true,
+      valid: !isCorruptNPlusOne,
+      bytes: isCorruptNPlusOne ? 0 : 1024,
+      reason: isCorruptNPlusOne ? "cache_corrupt" : "cache_hit"
+    });
+  });
+  corruptHarness.radio.maybePrefetchNextTrack("cache_corrupt_test");
+  await flushAsyncWork();
+  assert.deepStrictEqual(
+    corruptHarness.fetchUrls,
+    [corruptHarness.playlist[1].src],
+    "A corrupt N+1 cache entry must fall back to one bounded network request"
+  );
+  assert.deepStrictEqual(
+    corruptHarness.putSources,
+    [corruptHarness.playlist[1].src],
+    "Only the corrupt segment must be normalized back into v7"
+  );
+}
+
+function createDeferredCacheInspectionHarness() {
+  const pending = [];
+  const harness = createPrefetchRehydrationHarness(function (src) {
+    return new Promise((resolve) => {
+      pending.push({ src, resolve });
+    });
+  });
+  return { harness, pending };
+}
+
+async function resolveDeferredCacheWindow(pending) {
+  await Promise.resolve();
+  pending.slice().forEach(function (entry) {
+    entry.resolve({ src: entry.src, found: true, valid: true, bytes: 1024 });
+  });
+  await flushAsyncWork();
+}
+
+async function testPrefetchCacheRehydrationRejectsStaleSnapshots() {
+  const staleGeneration = createDeferredCacheInspectionHarness();
+  staleGeneration.harness.radio.maybePrefetchNextTrack("stale_generation_test");
+  await Promise.resolve();
+  assert.strictEqual(staleGeneration.pending.length, 5);
+  staleGeneration.harness.state.nextPrefetchGeneration += 1;
+  await resolveDeferredCacheWindow(staleGeneration.pending);
+  assert.strictEqual(
+    staleGeneration.harness.state.nextPrefetchReadySrcs.size,
+    0,
+    "A stale generation must never rehydrate ready sources"
+  );
+  assert.strictEqual(staleGeneration.harness.fetchUrls.length, 0);
+
+  const stalePlan = createDeferredCacheInspectionHarness();
+  stalePlan.harness.radio.maybePrefetchNextTrack("stale_plan_test");
+  await Promise.resolve();
+  assert.strictEqual(stalePlan.pending.length, 5);
+  stalePlan.harness.state.nextPrefetchPlanKey += "|superseded";
+  await resolveDeferredCacheWindow(stalePlan.pending);
+  assert.strictEqual(
+    stalePlan.harness.state.nextPrefetchReadySrcs.size,
+    0,
+    "A stale plan key must never rehydrate ready sources"
+  );
+  assert.strictEqual(stalePlan.harness.fetchUrls.length, 0);
+}
+
+async function testPrefetchCacheRehydrationSkipsSourceThatBecameCurrent() {
+  const deferred = createDeferredCacheInspectionHarness();
+  const harness = deferred.harness;
+  harness.radio.maybePrefetchNextTrack("became_current_test");
+  await Promise.resolve();
+  assert.strictEqual(deferred.pending.length, 5);
+  const becameCurrent = harness.playlist[1].src;
+  harness.state.activeLogicalSrc = becameCurrent;
+  harness.audio.src = becameCurrent;
+  harness.audio.currentSrc = becameCurrent;
+  await resolveDeferredCacheWindow(deferred.pending);
+  assert.strictEqual(
+    harness.state.nextPrefetchReadySrcs.has(becameCurrent),
+    false,
+    "An async cache hit must not re-add the source that became current"
+  );
+  assert.strictEqual(
+    (harness.state.nextPrefetchPlan || []).some((target) => target.src === becameCurrent),
+    false,
+    "The reconciled rolling window must exclude the current source"
+  );
+  assert.strictEqual(harness.fetchUrls.length, 0);
+  assert.strictEqual(harness.putSources.length, 0);
 }
 
 async function testPrefetchGatePriorityAndConcurrency() {
@@ -601,17 +878,51 @@ function testPersistentAlbumAndFullscreenContracts() {
       nowPlayingSource.includes("animation.oncancel = finalize"),
     "Fullscreen completion and cancellation must share the mini-player restoration finalizer"
   );
+
+  const transportSource = fs.readFileSync(TRANSPORT_UI_PATH, "utf8");
+  const transportSyncBody = extractFunctionBody(transportSource, "syncTransportUi");
+  assert(
+    transportSyncBody.includes('const isAlbum = document.body.classList.contains("album-screen")') &&
+      transportSyncBody.includes("isHome || isAlbum || hasPlaybackSessionActive"),
+    "The cold mini-player must remain visible on album routes"
+  );
+  assert(
+    transportSyncBody.includes("const canOpenNowPlaying = Boolean(hasPlaybackSessionActive)"),
+    "A cold album route must not make fullscreen available before a playback session exists"
+  );
+
+  const miniSyncBody = extractFunctionBody(transportSource, "syncTransportMiniUi");
+  assert(
+    transportSource.includes("data-transport-mini-duration>0:00</span>") &&
+      !miniSyncBody.includes('"--:--"') &&
+      miniSyncBody.includes("audio.currentTime > 0"),
+    "The mini-player duration placeholder must be 0:00 while metadata is unavailable"
+  );
+
+  const stylesSource = fs.readFileSync(STYLES_PATH, "utf8");
+  const coverWrapBlock = stylesSource.match(/\.now-playing-cover-wrap\s*\{([^}]*)\}/);
+  const coverBlock = stylesSource.match(/\.now-playing-cover\s*\{([^}]*)\}/);
+  assert(coverWrapBlock && /overflow:\s*hidden/.test(coverWrapBlock[1]));
+  assert(coverWrapBlock && /transform:\s*translateZ\(0\)/.test(coverWrapBlock[1]));
+  assert(coverWrapBlock && /backface-visibility:\s*hidden/.test(coverWrapBlock[1]));
+  assert(coverBlock && /border-radius:\s*0/.test(coverBlock[1]));
+  assert(coverBlock && /transform:\s*translateZ\(0\) scale\(1\.002\)/.test(coverBlock[1]));
+  assert(coverBlock && /backface-visibility:\s*hidden/.test(coverBlock[1]));
 }
 
 (async function run() {
   testPreparedColdPlayIsSynchronous();
+  await testCachedTrackIsPromotedBeforeColdTap();
   testAuthoritativeRollingWindow();
   testMaterializedShuffleOrder();
+  await testPrefetchCacheRehydrationAndCorruptFallback();
+  await testPrefetchCacheRehydrationRejectsStaleSnapshots();
+  await testPrefetchCacheRehydrationSkipsSourceThatBecameCurrent();
   await testPrefetchGatePriorityAndConcurrency();
   await testPrefetchTimeoutRetriesOnce();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix330 runtime checks passed.");
+  console.log("audiofix331 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

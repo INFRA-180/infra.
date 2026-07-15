@@ -8,8 +8,14 @@ const vm = require("node:vm");
 
 const entries = new Map();
 const mutationLog = [];
+let fetchCalls = 0;
 const cache = {
   keys: () => Promise.resolve(Array.from(entries.values(), (entry) => entry.request)),
+  match: (request) => {
+    const url = typeof request === "string" ? request : request.url;
+    const entry = entries.get(url);
+    return Promise.resolve(entry ? entry.response : undefined);
+  },
   delete: (request) => {
     const url = typeof request === "string" ? request : request.url;
     mutationLog.push(`delete:${url}`);
@@ -29,7 +35,10 @@ const sandbox = {
   Promise,
   location: { href: "https://site.test/" },
   caches: { open: () => Promise.resolve(cache) },
-  fetch: () => Promise.resolve(new Response())
+  fetch: () => {
+    fetchCalls += 1;
+    return Promise.resolve(new Response());
+  }
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
@@ -80,7 +89,60 @@ function segmentResponse(seed) {
   assert.strictEqual(stored.headers.get("X-Infra-Range-Start"), "0");
   assert.strictEqual(stored.headers.get("X-Infra-Range-End"), "1023");
   assert.strictEqual(stored.headers.get("X-Infra-Total-Length"), "8192");
+  assert.strictEqual(stored.headers.get("X-Infra-Body-Validated"), "1");
   assert.strictEqual((await stored.clone().arrayBuffer()).byteLength, 1024);
+
+  let cachedBodyReads = 0;
+  stored.arrayBuffer = function () {
+    cachedBodyReads += 1;
+    throw new Error("Cached-segment inspection must not consume the body");
+  };
+  const storedInfo = await api.inspectCachedSegment("https://media.test/track-0.m4a");
+  assert.strictEqual(storedInfo.valid, true, "A normalized v7 segment must be rehydration-ready");
+  assert.strictEqual(storedInfo.bytes, 1024);
+  assert.strictEqual(storedInfo.rangeStart, 0);
+  assert.strictEqual(storedInfo.rangeEnd, 1023);
+  assert.strictEqual(storedInfo.totalLength, 8192);
+  assert.strictEqual(storedInfo.bodyValidated, true);
+  assert.strictEqual(cachedBodyReads, 0, "Cache rehydration must validate headers only");
+
+  const corruptUrl = "https://media.test/corrupt.m4a";
+  const corruptResponse = new Response(new Uint8Array(1024), {
+    status: 200,
+    headers: {
+      "Content-Length": "1024",
+      "X-Infra-Audio-Partial": "1",
+      "X-Infra-Audio-Cache-Version": "6",
+      "X-Infra-Range-Start": "0",
+      "X-Infra-Range-End": "1023",
+      "X-Infra-Total-Length": "8192"
+    }
+  });
+  let corruptBodyReads = 0;
+  corruptResponse.arrayBuffer = function () {
+    corruptBodyReads += 1;
+    throw new Error("Corrupt cache detection must remain headers-only");
+  };
+  entries.set(corruptUrl, {
+    request: new Request(corruptUrl),
+    response: corruptResponse
+  });
+  const corruptInfo = await api.inspectCachedSegment(corruptUrl);
+  assert.strictEqual(corruptInfo.found, true);
+  assert.strictEqual(corruptInfo.valid, false, "A non-v7 segment must not be rehydrated");
+  assert.strictEqual(corruptInfo.reason, "cache_corrupt");
+  assert.strictEqual(corruptBodyReads, 0);
+
+  const firstCached = await api.findFirstValidCachedSegment([
+    "https://media.test/missing.m4a",
+    corruptUrl,
+    "https://media.test/track-0.m4a"
+  ]);
+  assert(firstCached && firstCached.valid, "The ordered helper must find the first valid cached source");
+  assert.strictEqual(firstCached.src, "https://media.test/track-0.m4a");
+  assert.strictEqual(fetchCalls, 0, "Cache inspection helpers must never trigger a network fetch");
+
+  entries.delete(corruptUrl);
 
   await Promise.all(Array.from({ length: 7 }, (_unused, index) => (
     api.putSingle(`https://media.test/track-${index + 1}.m4a`, segmentResponse(index + 1))

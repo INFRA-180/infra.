@@ -617,6 +617,50 @@
 
 
 
+  function promoteCachedPreparedInitialTrack(token, reason) {
+    if (!prefetchApi || typeof prefetchApi.findFirstValidCachedSegment !== "function") return;
+    const preparedSnapshot = Array.isArray(audioState.initialRandomPlaylist)
+      ? audioState.initialRandomPlaylist.slice()
+      : [];
+    const sources = preparedSnapshot.map(function (track) {
+      return normalizeAudioSourceUrl(track && track.src ? track.src : "");
+    }).filter(Boolean);
+    if (!sources.length) return;
+
+    Promise.resolve(prefetchApi.findFirstValidCachedSegment(sources)).then(function (result) {
+      if (
+        !result ||
+        !result.valid ||
+        token !== audioState.initialRandomPrepareToken ||
+        !audioState.initialRandomReady ||
+        !shouldPrepareInitialGlobalRandomPlayback()
+      ) {
+        return;
+      }
+      const cachedSrc = normalizeAudioSourceUrl(result.src || "");
+      const cachedIndex = audioState.initialRandomPlaylist.findIndex(function (track) {
+        return srcMatches(normalizeAudioSourceUrl(track && track.src ? track.src : ""), cachedSrc);
+      });
+      if (cachedIndex < 0) return;
+      if (cachedIndex > 0) {
+        const cachedTrack = audioState.initialRandomPlaylist.splice(cachedIndex, 1)[0];
+        audioState.initialRandomPlaylist.unshift(cachedTrack);
+      }
+      audioState.initialRandomFirstSrc = cachedSrc;
+      trackAudioRuntimeEvent("radio_cached_first_ready", {
+        track: "radio-cold-start",
+        album: "radio",
+        reason: reason || "home_init",
+        queue_index: cachedIndex,
+        bytes: Number(result.bytes) || 0,
+        audio_fetch: false
+      });
+      syncAudioUi();
+    }).catch(function () {});
+  }
+
+
+
   function prepareInitialGlobalRandomPlayback(reason) {
     if (audioState.initialRandomReady && audioState.initialRandomPlaylist.length) {
       return Promise.resolve(audioState.initialRandomPlaylist.slice());
@@ -640,6 +684,7 @@
         audioState.initialRandomPlaylist = queue.slice();
         audioState.initialRandomFirstSrc = normalizeAudioSourceUrl(queue[0] && queue[0].src ? queue[0].src : "");
         audioState.initialRandomReady = true;
+        promoteCachedPreparedInitialTrack(token, reason);
         trackAudioRuntimeEvent("radio_metadata_ready", {
           track: "radio-cold-start",
           album: "radio",
@@ -2143,6 +2188,11 @@
     if (!(audioState.nextPrefetchControllers instanceof Map)) audioState.nextPrefetchControllers = new Map();
     if (!(audioState.nextPrefetchRetryTimers instanceof Map)) audioState.nextPrefetchRetryTimers = new Map();
     if (!Array.isArray(audioState.nextPrefetchPlan)) audioState.nextPrefetchPlan = [];
+    if (typeof audioState.nextPrefetchCacheHydrationKey !== "string") audioState.nextPrefetchCacheHydrationKey = "";
+    if (typeof audioState.nextPrefetchCacheHydratedKey !== "string") audioState.nextPrefetchCacheHydratedKey = "";
+    if (!audioState.nextPrefetchCacheHydrationPromise || typeof audioState.nextPrefetchCacheHydrationPromise.then !== "function") {
+      audioState.nextPrefetchCacheHydrationPromise = null;
+    }
   }
 
 
@@ -2197,6 +2247,101 @@
 
 
 
+  function isPrefetchPlanSnapshotCurrent(generation, planKey) {
+    return Number(audioState.nextPrefetchGeneration || 0) === generation &&
+      String(audioState.nextPrefetchPlanKey || "") === String(planKey || "");
+  }
+
+
+
+  function isPrefetchTargetUsefulForSnapshot(src, generation, planKey) {
+    if (!isPrefetchPlanSnapshotCurrent(generation, planKey)) return false;
+    const normalizedSrc = normalizeAudioSourceUrl(src || "");
+    const currentSrc = normalizeAudioSourceUrl(getCurrentLogicalAudioSrc());
+    if (!normalizedSrc || (currentSrc && srcMatches(normalizedSrc, currentSrc))) return false;
+    return (audioState.nextPrefetchPlan || []).some(function (entry) {
+      return entry && srcMatches(entry.src, normalizedSrc);
+    });
+  }
+
+
+
+  function hydrateNextTrackPrefetchPlanFromCache(targets) {
+    if (!prefetchApi || typeof prefetchApi.inspectCachedSegment !== "function") return false;
+    const planTargets = Array.isArray(targets) ? targets.slice() : [];
+    if (!planTargets.length) return false;
+    const generation = Number(audioState.nextPrefetchGeneration || 0);
+    const planKey = String(audioState.nextPrefetchPlanKey || "");
+    if (!planKey) return false;
+    const hydrationKey = `${generation}|${planKey}`;
+    if (audioState.nextPrefetchCacheHydratedKey === hydrationKey) return false;
+    if (audioState.nextPrefetchCacheHydrationKey === hydrationKey) return true;
+
+    audioState.nextPrefetchCacheHydrationKey = hydrationKey;
+    const inspections = planTargets.map(function (target) {
+      return Promise.resolve().then(function () {
+        return prefetchApi.inspectCachedSegment(target.src);
+      }).catch(function () {
+        return null;
+      });
+    });
+    const hydrationPromise = Promise.all(inspections).then(function (results) {
+      if (!isPrefetchPlanSnapshotCurrent(generation, planKey)) return false;
+      const currentSrc = normalizeAudioSourceUrl(getCurrentLogicalAudioSrc());
+      const usefulSources = new Set((audioState.nextPrefetchPlan || []).map(function (target) {
+        return normalizeAudioSourceUrl(target && target.src ? target.src : "");
+      }).filter(Boolean));
+      const restoredSources = [];
+      let restoredBytes = 0;
+      results.forEach(function (result, index) {
+        const target = planTargets[index];
+        const src = normalizeAudioSourceUrl(target && target.src ? target.src : "");
+        if (
+          !result ||
+          !result.valid ||
+          !src ||
+          !usefulSources.has(src) ||
+          (currentSrc && srcMatches(src, currentSrc))
+        ) {
+          return;
+        }
+        audioState.nextPrefetchReadySrcs.add(src);
+        audioState.nextPrefetchAttemptCounts.delete(src);
+        restoredSources.push(src);
+        restoredBytes += Number.isFinite(Number(result.bytes)) ? Number(result.bytes) : 0;
+      });
+      audioState.nextPrefetchCacheHydratedKey = hydrationKey;
+      if (restoredSources.length) {
+        audioState.nextPrefetchDoneSrc = restoredSources[0];
+        trackAudioRuntimeEvent("prefetch_cache_rehydrated", {
+          track: "prefetch-window",
+          album: audioState.homeMode === "radio" ? "radio" : "album",
+          generation,
+          depth: planTargets.length,
+          restored_count: restoredSources.length,
+          bytes: restoredBytes,
+          sources: restoredSources
+        });
+      }
+      return true;
+    }).catch(function () {
+      if (!isPrefetchPlanSnapshotCurrent(generation, planKey)) return false;
+      audioState.nextPrefetchCacheHydratedKey = hydrationKey;
+      return true;
+    }).then(function (activePlan) {
+      if (audioState.nextPrefetchCacheHydrationKey === hydrationKey) {
+        audioState.nextPrefetchCacheHydrationKey = "";
+        audioState.nextPrefetchCacheHydrationPromise = null;
+      }
+      if (activePlan) maybePrefetchNextTrack("cache_rehydrated");
+      return activePlan;
+    });
+    audioState.nextPrefetchCacheHydrationPromise = hydrationPromise;
+    return true;
+  }
+
+
+
   function abortPrefetchTarget(src, reason) {
     ensureNextPrefetchCollections();
     const normalized = normalizeAudioSourceUrl(src || "");
@@ -2219,6 +2364,7 @@
 
   function reconcileNextTrackPrefetchPlan(reason) {
     ensureNextPrefetchCollections();
+    const currentSrc = normalizeAudioSourceUrl(getCurrentLogicalAudioSrc());
     const indices = getQueuePreviewIndices(PREFETCH_NEXT_QUEUE_DEPTH);
     const list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
     const seen = new Set();
@@ -2226,11 +2372,15 @@
     indices.forEach(function (index) {
       const track = list[index];
       const src = normalizeAudioSourceUrl(track && track.src ? track.src : "");
-      if (!src || seen.has(src) || !isCloudflareAudioUrl(src)) return;
+      if (
+        !src ||
+        seen.has(src) ||
+        !isCloudflareAudioUrl(src) ||
+        (currentSrc && srcMatches(src, currentSrc))
+      ) return;
       seen.add(src);
       targets.push({ index, track, src, rank: targets.length + 1 });
     });
-    const currentSrc = normalizeAudioSourceUrl(getCurrentLogicalAudioSrc());
     const planKey = `${currentSrc}|${targets.map(function (target) { return target.src; }).join("|")}`;
     if (planKey === audioState.nextPrefetchPlanKey) {
       audioState.nextPrefetchPlan = targets;
@@ -2241,6 +2391,9 @@
     audioState.nextPrefetchPlanKey = planKey;
     audioState.nextPrefetchPlan = targets;
     audioState.nextPrefetchWindowReadyKey = "";
+    audioState.nextPrefetchCacheHydrationKey = "";
+    audioState.nextPrefetchCacheHydratedKey = "";
+    audioState.nextPrefetchCacheHydrationPromise = null;
     const useful = new Set(targets.map(function (target) { return target.src; }));
     audioState.nextPrefetchControllers.forEach(function (_record, src) {
       if (!useful.has(src) || (currentSrc && srcMatches(src, currentSrc))) {
@@ -2254,7 +2407,7 @@
       if (!useful.has(src)) audioState.nextPrefetchAttemptCounts.delete(src);
     });
     audioState.nextPrefetchReadySrcs.forEach(function (src) {
-      if (!useful.has(src) && !(currentSrc && srcMatches(src, currentSrc))) {
+      if (!useful.has(src) || (currentSrc && srcMatches(src, currentSrc))) {
         audioState.nextPrefetchReadySrcs.delete(src);
       }
     });
@@ -2297,6 +2450,9 @@
     audioState.nextPrefetchPlan = [];
     audioState.nextPrefetchPlanKey = "";
     audioState.nextPrefetchWindowReadyKey = "";
+    audioState.nextPrefetchCacheHydrationKey = "";
+    audioState.nextPrefetchCacheHydratedKey = "";
+    audioState.nextPrefetchCacheHydrationPromise = null;
     audioState.nextPrefetchAttemptCounts.clear();
   }
 
@@ -2391,7 +2547,8 @@
     const attempts = Number(audioState.nextPrefetchAttemptCounts.get(normalizedSrc) || 0);
     if (attempts >= PREFETCH_MAX_ATTEMPTS) return false;
 
-    const generation = audioState.nextPrefetchGeneration;
+    const generation = Number(audioState.nextPrefetchGeneration || 0);
+    const planKey = String(audioState.nextPrefetchPlanKey || "");
     const attempt = attempts + 1;
     const startedAt = Date.now();
     const fromIndexAtStart = getCurrentPlaylistIndexSafe();
@@ -2403,6 +2560,7 @@
       timeoutFired: false,
       cancelReason: "",
       generation,
+      planKey,
       attempt
     };
     audioState.nextPrefetchAttemptCounts.set(normalizedSrc, attempt);
@@ -2442,9 +2600,7 @@
     }
 
     fetch(fetchRequest, fetchOptions).then(function (response) {
-      const stillUseful = (audioState.nextPrefetchPlan || []).some(function (entry) {
-        return srcMatches(entry.src, normalizedSrc);
-      });
+      const stillUseful = isPrefetchTargetUsefulForSnapshot(normalizedSrc, generation, planKey);
       if (!stillUseful) throw new Error("prefetch_obsolete");
       if (!response || response.status !== 206) {
         throw new Error(`prefetch_http_${response ? response.status : "none"}`);
@@ -2460,9 +2616,7 @@
         maxEntries: PREFETCH_NEXT_MAX_ENTRIES
       }).then(function () { return bytes; });
     }).then(function (bytes) {
-      const stillUseful = (audioState.nextPrefetchPlan || []).some(function (entry) {
-        return srcMatches(entry.src, normalizedSrc);
-      });
+      const stillUseful = isPrefetchTargetUsefulForSnapshot(normalizedSrc, generation, planKey);
       if (!bytes || !stillUseful) return;
       audioState.nextPrefetchReadySrcs.add(normalizedSrc);
       audioState.nextPrefetchDoneSrc = normalizedSrc;
@@ -2508,9 +2662,7 @@
       }
       audioState.nextPrefetchInFlight = audioState.nextPrefetchInFlightSrcs.size > 0;
       if (audioState.nextPrefetchAbortController === abortController) audioState.nextPrefetchAbortController = null;
-      const stillUseful = (audioState.nextPrefetchPlan || []).some(function (entry) {
-        return srcMatches(entry.src, normalizedSrc);
-      });
+      const stillUseful = isPrefetchTargetUsefulForSnapshot(normalizedSrc, generation, planKey);
       const retryable = !audioState.nextPrefetchReadySrcs.has(normalizedSrc) &&
         (!record.cancelReason || record.cancelReason === "timeout") &&
         stillUseful &&
@@ -2539,6 +2691,7 @@
       suspendNextTrackPrefetch("track_change", true);
       return;
     }
+    if (hydrateNextTrackPrefetchPlanFromCache(targets)) return;
     if (!shouldPrefetchNextTrackNow()) {
       if (getCurrentBufferAheadForPrefetch() < PREFETCH_BUFFER_ABORT_SECONDS) {
         suspendNextTrackPrefetch(reason || "buffer_priority", false);

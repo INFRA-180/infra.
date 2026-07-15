@@ -11,16 +11,23 @@ let installHandler = null;
 let activateHandler = null;
 let cachedAudio = null;
 let fetchCalls = 0;
+let cachedAudioArrayBufferCalls = 0;
 let skipWaitingCalls = 0;
+let shellMatchResponse = null;
+let fetchOverride = null;
 const deletedCaches = [];
 const deletedAudioEntries = [];
 const requestedClientIds = [];
 const clientMessages = [];
+const shellPutRequests = [];
 
 const shellCache = {
   addAll: () => Promise.resolve(),
-  match: () => Promise.resolve(null),
-  put: () => Promise.resolve(),
+  match: () => Promise.resolve(shellMatchResponse ? shellMatchResponse.clone() : null),
+  put: (request) => {
+    shellPutRequests.push(typeof request === "string" ? request : request.url);
+    return Promise.resolve();
+  },
   keys: () => Promise.resolve([]),
   delete: () => Promise.resolve(true)
 };
@@ -38,8 +45,9 @@ const sandbox = {
   Request,
   Response,
   Headers,
-  fetch: () => {
+  fetch: (request) => {
     fetchCalls += 1;
+    if (typeof fetchOverride === "function") return fetchOverride(request);
     return Promise.resolve(new Response("network", { status: 200 }));
   },
   caches: {
@@ -55,7 +63,9 @@ const sandbox = {
       "infra-shell-20260715-audio329-shell",
       "infra-shell-20260715-audio329-runtime",
       "infra-shell-20260715-audio330-shell",
-      "infra-shell-20260715-audio330-runtime"
+      "infra-shell-20260715-audio330-runtime",
+      "infra-shell-20260715-audio331-shell",
+      "infra-shell-20260715-audio331-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -99,10 +109,21 @@ function validCachedSegment(overrides) {
     "X-Infra-Range-Start": "0",
     "X-Infra-Range-End": "1023",
     "X-Infra-Total-Length": "8192",
+    "X-Infra-Body-Validated": "1",
     "ETag": '"track-v1"',
     "Last-Modified": "Wed, 15 Jul 2026 12:00:00 GMT"
   }, opts.headers || {});
-  return new Response(bytes, { status: 200, headers });
+  if (opts.bodyValidated === false) delete headers["X-Infra-Body-Validated"];
+  const response = new Response(bytes, { status: 200, headers });
+  if (opts.trackArrayBuffer) {
+    const originalArrayBuffer = response.arrayBuffer.bind(response);
+    response.arrayBuffer = function () {
+      cachedAudioArrayBufferCalls += 1;
+      return originalArrayBuffer();
+    };
+    response.clone = function () { return response; };
+  }
+  return response;
 }
 
 async function dispatchAudioFetch(headers, clientId) {
@@ -124,6 +145,17 @@ async function dispatchAudioFetch(headers, clientId) {
   return response;
 }
 
+async function dispatchSiteFetch(request) {
+  let responsePromise = null;
+  fetchHandler({
+    request,
+    respondWith: (promise) => { responsePromise = Promise.resolve(promise); },
+    waitUntil() {}
+  });
+  assert(responsePromise, "The same-origin site request must be handled by the Service Worker");
+  return responsePromise;
+}
+
 (async function () {
   assert(installHandler, "Service Worker install handler missing");
   let installPromise = null;
@@ -142,12 +174,14 @@ async function dispatchAudioFetch(headers, clientId) {
     "infra-next-track-v2",
     "infra-shell-20260714-audio320-shell",
     "infra-shell-20260715-audio329-runtime",
-    "infra-shell-20260715-audio329-shell"
+    "infra-shell-20260715-audio329-shell",
+    "infra-shell-20260715-audio330-runtime",
+    "infra-shell-20260715-audio330-shell"
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v7"));
   assert(!deletedCaches.includes("infra-covers"));
-  assert(!deletedCaches.includes("infra-shell-20260715-audio330-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260715-audio330-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260715-audio331-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260715-audio331-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   cachedAudio = validCachedSegment();
@@ -155,11 +189,17 @@ async function dispatchAudioFetch(headers, clientId) {
   assert.strictEqual(await response.text(), "network", "A request without Range must use the network");
   assert.strictEqual(deletedAudioEntries.length, 0);
 
-  cachedAudio = validCachedSegment();
+  cachedAudioArrayBufferCalls = 0;
+  cachedAudio = validCachedSegment({ trackArrayBuffer: true });
   response = await dispatchAudioFetch({ Range: "bytes=0-" }, "client-hit");
   assert.strictEqual(response.status, 206);
   assert.strictEqual(response.headers.get("Content-Range"), "bytes 0-1023/8192");
   assert.strictEqual((await response.arrayBuffer()).byteLength, 1024);
+  assert.strictEqual(
+    cachedAudioArrayBufferCalls,
+    0,
+    "A request covering the cached segment must stream its body without a 4 MiB arrayBuffer copy"
+  );
   assert.deepStrictEqual(requestedClientIds, ["client-hit"]);
   assert.strictEqual(clientMessages.length, 1);
   assert.strictEqual(clientMessages[0].clientId, "client-hit");
@@ -188,10 +228,46 @@ async function dispatchAudioFetch(headers, clientId) {
   response = await dispatchAudioFetch({ Range: "bytes=0-", "If-Range": '"track-v1"' });
   assert.strictEqual(response.status, 206, "A matching strong If-Range may use the segment");
 
-  cachedAudio = validCachedSegment({ bodyLength: 1000 });
+  cachedAudioArrayBufferCalls = 0;
+  cachedAudio = validCachedSegment({
+    bodyLength: 1000,
+    bodyValidated: false,
+    trackArrayBuffer: true
+  });
   response = await dispatchAudioFetch({ Range: "bytes=0-" });
   assert.strictEqual(await response.text(), "network");
+  assert.strictEqual(
+    cachedAudioArrayBufferCalls,
+    1,
+    "A legacy/unvalidated full segment must be copied once so a truncated body cannot use the zero-copy path"
+  );
   assert(deletedAudioEntries.length >= 1, "A corrupt cached body is evicted before network fallback");
+
+  let resolveNavigationRefresh = null;
+  shellMatchResponse = new Response("cached-shell", {
+    status: 200,
+    headers: { "Content-Type": "text/html" }
+  });
+  fetchOverride = () => new Promise((resolve) => { resolveNavigationRefresh = resolve; });
+  const navigationFetchCalls = fetchCalls;
+  response = await dispatchSiteFetch({
+    url: "https://site.test/",
+    method: "GET",
+    mode: "navigate",
+    destination: "document"
+  });
+  assert.strictEqual(
+    await response.text(),
+    "cached-shell",
+    "A warm PWA navigation must return the installed shell without waiting for the network"
+  );
+  assert.strictEqual(fetchCalls, navigationFetchCalls + 1, "The shell must still revalidate in the background");
+  resolveNavigationRefresh(new Response("fresh-shell", { status: 200 }));
+  await Promise.resolve();
+  await Promise.resolve();
+  assert(shellPutRequests.includes("https://site.test/"), "The background navigation refresh must update the shell");
+  fetchOverride = null;
+  shellMatchResponse = null;
 
   console.log("Audio startup-segment v7 Service Worker checks passed.");
 })().catch(function (error) {

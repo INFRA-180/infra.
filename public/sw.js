@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260715-audio330";
+const VERSION = "infra-shell-20260715-audio331";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers";
@@ -12,28 +12,28 @@ const SHELL_ASSETS = [
   "./sphragis/",
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
-  "./assets/css/styles.css?v=audiofix329-20260715",
-  "./assets/js/covers.js?v=audiofix330-20260715",
-  "./assets/js/favorites.js?v=audiofix330-20260715",
-  "./assets/js/favorites-ui.js?v=audiofix330-20260715",
-  "./assets/js/transport-ui.js?v=audiofix330-20260715",
-  "./assets/js/now-playing.js?v=audiofix330-20260715",
-  "./assets/js/album-player-ui.js?v=audiofix330-20260715",
-  "./assets/js/spa-renderer.js?v=audiofix330-20260715",
-  "./assets/js/audio-radio.js?v=audiofix330-20260715",
-  "./assets/js/media-session.js?v=audiofix330-20260715",
-  "./assets/js/audio-prefetch.js?v=audiofix330-20260715",
-  "./assets/js/spa-router.js?v=audiofix330-20260715",
-  "./assets/js/catalog-fallback.js?v=audiofix330-20260715",
-  "./assets/js/catalog-loader.js?v=audiofix330-20260715",
-  "./assets/js/audio-telemetry.js?v=audiofix330-20260715",
-  "./assets/js/downloads.js?v=audiofix330-20260715",
-  "./assets/js/home-catalog.js?v=audiofix330-20260715",
-  "./assets/js/audio-core.js?v=audiofix330-20260715",
-  "./assets/js/pwa-install.js?v=audiofix330-20260715",
-  "./assets/js/share-qr.js?v=audiofix330-20260715",
-  "./assets/js/scripts.js?v=audiofix330-20260715",
-  "./assets/js/scripts.admin.js?v=audiofix330-20260715",
+  "./assets/css/styles.css?v=audiofix331-20260715",
+  "./assets/js/covers.js?v=audiofix331-20260715",
+  "./assets/js/favorites.js?v=audiofix331-20260715",
+  "./assets/js/favorites-ui.js?v=audiofix331-20260715",
+  "./assets/js/transport-ui.js?v=audiofix331-20260715",
+  "./assets/js/now-playing.js?v=audiofix331-20260715",
+  "./assets/js/album-player-ui.js?v=audiofix331-20260715",
+  "./assets/js/spa-renderer.js?v=audiofix331-20260715",
+  "./assets/js/audio-radio.js?v=audiofix331-20260715",
+  "./assets/js/media-session.js?v=audiofix331-20260715",
+  "./assets/js/audio-prefetch.js?v=audiofix331-20260715",
+  "./assets/js/spa-router.js?v=audiofix331-20260715",
+  "./assets/js/catalog-fallback.js?v=audiofix331-20260715",
+  "./assets/js/catalog-loader.js?v=audiofix331-20260715",
+  "./assets/js/audio-telemetry.js?v=audiofix331-20260715",
+  "./assets/js/downloads.js?v=audiofix331-20260715",
+  "./assets/js/home-catalog.js?v=audiofix331-20260715",
+  "./assets/js/audio-core.js?v=audiofix331-20260715",
+  "./assets/js/pwa-install.js?v=audiofix331-20260715",
+  "./assets/js/share-qr.js?v=audiofix331-20260715",
+  "./assets/js/scripts.js?v=audiofix331-20260715",
+  "./assets/js/scripts.admin.js?v=audiofix331-20260715",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./assets/js/sphragis.js?v=sphragis20260625",
   "./assets/fonts/antique-olive-nord.woff2",
@@ -188,6 +188,19 @@ async function staleWhileRevalidate(request, cacheName) {
   return cached || networkPromise;
 }
 
+async function shellFirstOrRuntime(request) {
+  const shell = await caches.open(SHELL_CACHE);
+  const cached = await shell.match(request);
+  if (!cached) return staleWhileRevalidate(request, RUNTIME_CACHE);
+
+  fetch(request)
+    .then((response) => {
+      if (response && response.ok) shell.put(request, response.clone()).catch(() => undefined);
+    })
+    .catch(() => undefined);
+  return cached;
+}
+
 async function cacheFirst(request, cacheName, options) {
   const opts = options || {};
   const cache = await caches.open(cacheName);
@@ -299,6 +312,7 @@ function getCachedAudioSegmentMetadata(cached) {
   const cachedStart = Number(cachedStartValue);
   const cachedEnd = Number(cachedEndValue);
   const total = Number(totalValue);
+  const bodyValidated = cached.headers.get("X-Infra-Body-Validated") === "1";
   if (
     !cached.ok ||
     cached.status !== 200 ||
@@ -322,7 +336,7 @@ function getCachedAudioSegmentMetadata(cached) {
     error.code = "cached_audio_corrupt";
     throw error;
   }
-  return { storedLength, cachedStart, cachedEnd, total };
+  return { storedLength, cachedStart, cachedEnd, total, bodyValidated };
 }
 
 async function buildRangeResponseFromCachedAudio(cached, rangeHeader) {
@@ -331,6 +345,27 @@ async function buildRangeResponseFromCachedAudio(cached, rangeHeader) {
   if (!range) return null;
   if (range.start < metadata.cachedStart || range.start > metadata.cachedEnd) return null;
   const responseEnd = Math.min(range.end, metadata.cachedEnd);
+  const responseLength = responseEnd - range.start + 1;
+  const headers = new Headers();
+  headers.set("Content-Type", cached.headers.get("Content-Type") || cached.headers.get("content-type") || "audio/mp4");
+  headers.set("Accept-Ranges", "bytes");
+  headers.set("Content-Range", `bytes ${range.start}-${responseEnd}/${metadata.total}`);
+  headers.set("Content-Length", String(responseLength));
+  headers.set("Access-Control-Allow-Origin", cached.headers.get("Access-Control-Allow-Origin") || "*");
+  headers.set("Access-Control-Expose-Headers", "Accept-Ranges,Content-Range,Content-Length,Content-Type,ETag");
+  const etag = cached.headers.get("ETag") || cached.headers.get("etag");
+  if (etag) headers.set("ETag", etag);
+  headers.set("Cache-Control", "public, max-age=31536000, immutable");
+
+  if (
+    range.start === metadata.cachedStart &&
+    responseEnd === metadata.cachedEnd &&
+    metadata.bodyValidated &&
+    cached.body
+  ) {
+    return new Response(cached.body, { status: 206, statusText: "Partial Content", headers });
+  }
+
   const buffer = await cached.arrayBuffer();
   if (!buffer || buffer.byteLength !== metadata.storedLength) {
     const error = new Error("cached_audio_corrupt");
@@ -342,16 +377,6 @@ async function buildRangeResponseFromCachedAudio(cached, rangeHeader) {
     range.start - metadata.cachedStart,
     responseEnd - metadata.cachedStart + 1
   );
-  const headers = new Headers();
-  headers.set("Content-Type", cached.headers.get("Content-Type") || cached.headers.get("content-type") || "audio/mp4");
-  headers.set("Accept-Ranges", "bytes");
-  headers.set("Content-Range", `bytes ${range.start}-${responseEnd}/${metadata.total}`);
-  headers.set("Content-Length", String(sliced.byteLength));
-  headers.set("Access-Control-Allow-Origin", cached.headers.get("Access-Control-Allow-Origin") || "*");
-  headers.set("Access-Control-Expose-Headers", "Accept-Ranges,Content-Range,Content-Length,Content-Type,ETag");
-  const etag = cached.headers.get("ETag") || cached.headers.get("etag");
-  if (etag) headers.set("ETag", etag);
-  headers.set("Cache-Control", "public, max-age=31536000, immutable");
   return new Response(sliced, { status: 206, statusText: "Partial Content", headers });
 }
 
@@ -410,7 +435,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isHtmlRequest(request)) {
-    event.respondWith(networkFirst(request, SHELL_CACHE, "./index.html"));
+    event.respondWith(htmlCacheFirst(request, SHELL_CACHE, "./index.html"));
     return;
   }
 
@@ -428,7 +453,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isStaticAsset(request, url)) {
-    event.respondWith(staleWhileRevalidate(request, RUNTIME_CACHE));
+    event.respondWith(shellFirstOrRuntime(request));
     return;
   }
 });

@@ -106,6 +106,7 @@
       headers.set("X-Infra-Range-Start", String(range.start));
       headers.set("X-Infra-Range-End", String(range.end));
       headers.set("X-Infra-Total-Length", String(range.total));
+      headers.set("X-Infra-Body-Validated", "1");
       headers.set("Cache-Control", "public, max-age=31536000, immutable");
       return new Response(buffer, {
         status: 200,
@@ -120,6 +121,125 @@
       return Promise.resolve(null);
     }
     return globalObject.caches.open(constants.CACHE_NAME);
+  }
+
+  function readStoredInteger(headers, name) {
+    if (!headers || typeof headers.get !== "function") return null;
+    const rawValue = headers.get(name);
+    if (rawValue === null || rawValue === "") return null;
+    const value = Number(rawValue);
+    return Number.isSafeInteger(value) ? value : null;
+  }
+
+  function getStoredSegmentMetadata(response) {
+    if (!response || !response.headers || !response.ok || response.status !== 200) return null;
+    const headers = response.headers;
+    const storedLength = readStoredInteger(headers, "Content-Length");
+    const rangeStart = readStoredInteger(headers, "X-Infra-Range-Start");
+    const rangeEnd = readStoredInteger(headers, "X-Infra-Range-End");
+    const totalLength = readStoredInteger(headers, "X-Infra-Total-Length");
+    if (
+      headers.get("X-Infra-Audio-Partial") !== "1" ||
+      headers.get("X-Infra-Audio-Cache-Version") !== "7" ||
+      storedLength === null ||
+      rangeStart !== 0 ||
+      rangeEnd === null ||
+      totalLength === null ||
+      storedLength <= 0 ||
+      storedLength > constants.PREFETCH_SEGMENT_SIZE ||
+      rangeEnd < rangeStart ||
+      totalLength <= rangeEnd ||
+      storedLength !== rangeEnd - rangeStart + 1
+    ) {
+      return null;
+    }
+    return {
+      bytes: storedLength,
+      rangeStart,
+      rangeEnd,
+      totalLength,
+      bodyValidated: headers.get("X-Infra-Body-Validated") === "1"
+    };
+  }
+
+  function inspectCachedSegment(src) {
+    const normalizedSrc = sourceUrl(src);
+    if (!normalizedSrc) {
+      return Promise.resolve({
+        src: "",
+        found: false,
+        valid: false,
+        reason: "invalid_source"
+      });
+    }
+    return openCache().then(function (cache) {
+      if (!cache || typeof cache.match !== "function") {
+        return {
+          src: normalizedSrc,
+          found: false,
+          valid: false,
+          reason: "cache_unavailable"
+        };
+      }
+      const request = createStorageRequest(normalizedSrc);
+      return cache.match(request, { ignoreVary: true }).then(function (response) {
+        if (!response) {
+          return {
+            src: normalizedSrc,
+            found: false,
+            valid: false,
+            reason: "cache_miss"
+          };
+        }
+        const metadata = getStoredSegmentMetadata(response);
+        if (!metadata) {
+          return {
+            src: normalizedSrc,
+            found: true,
+            valid: false,
+            reason: "cache_corrupt"
+          };
+        }
+        return {
+          src: normalizedSrc,
+          found: true,
+          valid: true,
+          reason: "cache_hit",
+          bytes: metadata.bytes,
+          rangeStart: metadata.rangeStart,
+          rangeEnd: metadata.rangeEnd,
+          totalLength: metadata.totalLength,
+          bodyValidated: metadata.bodyValidated
+        };
+      });
+    }).catch(function () {
+      return {
+        src: normalizedSrc,
+        found: false,
+        valid: false,
+        reason: "cache_error"
+      };
+    });
+  }
+
+  function findFirstValidCachedSegment(sources) {
+    const candidates = [];
+    const seen = new Set();
+    (Array.isArray(sources) ? sources : []).forEach(function (src) {
+      const normalizedSrc = sourceUrl(src);
+      if (!normalizedSrc || seen.has(normalizedSrc)) return;
+      seen.add(normalizedSrc);
+      candidates.push(normalizedSrc);
+    });
+
+    function inspectAt(index) {
+      if (index >= candidates.length) return Promise.resolve(null);
+      return inspectCachedSegment(candidates[index]).then(function (result) {
+        return result && result.valid ? result : inspectAt(index + 1);
+      });
+    }
+
+    return inspectAt(0);
   }
 
   function enqueueMutation(operation) {
@@ -193,6 +313,8 @@
     createRequest,
     getContentLength,
     normalizeAudioResponseForCache,
+    inspectCachedSegment,
+    findFirstValidCachedSegment,
     pruneCache,
     putSingle
   });

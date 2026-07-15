@@ -306,12 +306,23 @@
       }
     }
 
+    function getLiveCatalogLatestUrl() {
+      if (!WORKER_URL) return "";
+      return `${WORKER_URL.replace(/\/+$/, "")}/catalog/latest`;
+    }
+
+    function readCachedLiveCatalogLatest() {
+      const url = getLiveCatalogLatestUrl();
+      if (!url) return Promise.resolve(null);
+      return readCachedLiveCatalogDocument(url, isCatalogLatestDocument);
+    }
+
     async function fetchLiveCatalogLatest() {
       if (catalogState.latestCatalogPayload) return catalogState.latestCatalogPayload;
       if (catalogState.latestCatalogPromise) return catalogState.latestCatalogPromise;
       if (!WORKER_URL) return Promise.reject(new Error("live catalog worker unavailable"));
 
-      const url = `${WORKER_URL.replace(/\/+$/, "")}/catalog/latest`;
+      const url = getLiveCatalogLatestUrl();
       const controller = typeof AbortController === "function" ? new AbortController() : null;
       const timeout = controller ? setTimeout(function () { controller.abort(); }, LIVE_CATALOG_TIMEOUT_MS) : 0;
       catalogState.latestCatalogPromise = (async function () {
@@ -388,19 +399,30 @@
       if (catalogState.catalogBundlePromise) return catalogState.catalogBundlePromise;
 
       catalogState.catalogBundlePromise = (async function () {
-        try {
-          const live = await fetchLiveCatalogLatest();
-          catalogState.catalogBundlePayload = live;
-          catalogState.catalogBundleSource = "live";
-          catalogState.catalogBundleReleaseId = live.releaseId || "";
-          return live;
-        } catch (_err) {
-          const local = await fetchLocalCatalogBundle();
-          catalogState.catalogBundlePayload = local;
-          catalogState.catalogBundleSource = "local";
-          catalogState.catalogBundleReleaseId = local.releaseId || "";
-          return local;
+        const results = await Promise.all([
+          fetchLocalCatalogBundle().catch(function () { return null; }),
+          readCachedLiveCatalogLatest().catch(function () { return null; })
+        ]);
+        const local = results[0];
+        const cachedLive = results[1];
+        const startupBundle = cachedLive || local;
+        if (startupBundle) {
+          catalogState.catalogBundlePayload = startupBundle;
+          catalogState.catalogBundleSource = cachedLive ? "live-cache" : "local";
+          catalogState.catalogBundleReleaseId = startupBundle.releaseId || "";
+          // Refresh /catalog/latest only after a local CacheStorage/shell source
+          // is ready. It updates the next launch without rebuilding this one.
+          fetchLiveCatalogLatest().catch(function () {});
+          return startupBundle;
         }
+
+        // With neither shell JSON nor a validated live cache, network is the
+        // exceptional blocking fallback instead of a normal startup gate.
+        const live = await fetchLiveCatalogLatest();
+        catalogState.catalogBundlePayload = live;
+        catalogState.catalogBundleSource = "live";
+        catalogState.catalogBundleReleaseId = live.releaseId || "";
+        return live;
       })().finally(function () {
         catalogState.catalogBundlePromise = null;
       });

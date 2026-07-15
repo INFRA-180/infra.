@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-07-15 — audiofix326 iOS fullscreen status-bar layer removal
+
+- A real installed-PWA test on iPhone 13 Pro / iOS 18.7.1 proved that .now-playing-overlay::after paints directly behind the status-bar clock and icons, while a runtime theme-color change does not alter the Home Indicator area.
+- Removed only the solid .now-playing-overlay::after safe-area layer. The dynamic backdrop and overlay remain at inset: 0; top safe-area spacing stays on the panel and controls; the lower player layout is unchanged.
+- setThemeColor(safeColor) remains intact because the physical-device test excluded it as the source of the lower system area.
+- The release is atomically versioned as audiofix326-20260715 across the 35 player HTML documents, runtime identifiers and Service Worker precache, with cache namespace infra-shell-20260715-audio326.
+- Audio, N+1 prefetch, Media Session, transport behavior and Service Worker routing are unchanged. Final conformity remains conditional on the installed iOS 18.7.1 PWA test after publication.
+
 ## 2026-07-15 — audiofix325 iOS fullscreen safe-area split
 
 - A real iPhone test showed that audiofix324's artwork-derived color on `html` and `body` also painted the lower system area behind the Home Indicator as a separate band.

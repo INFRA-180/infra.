@@ -400,7 +400,7 @@
       const isImmediateUserGesture = Boolean(opts.immediatePlay && opts.userGesture);
       const preparedNextIndex = getAutoPrefetchedNextIndex();
       const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index;
-      const isFastSkip = isAutoAdvance || isFromMediaSession || hasPreparedTransportTarget || isImmediateUserGesture;
+      const isFastSkip = isAutoAdvance || isFromMediaSession || isFromTransportControl || hasPreparedTransportTarget || isImmediateUserGesture;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
 
       if (!isFastSkip && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {

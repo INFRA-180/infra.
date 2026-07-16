@@ -168,6 +168,38 @@ const telemetry = sandbox.InfraAudioTelemetry.createTelemetry({
   assert.strictEqual(Object.prototype.hasOwnProperty.call(posted[3][0], "src"), false);
   assert.strictEqual(Object.prototype.hasOwnProperty.call(posted[3][0], "track_path"), false);
 
+  telemetry.trackRuntimeEvent("prefetch_cancel", {
+    track: "Next",
+    album: "Album",
+    reason: "became_current",
+    response_ms: 41,
+    body_ms: 220,
+    queue_ms: 3,
+    cache_ms: 12
+  });
+  telemetry.trackRuntimeEvent("prefetch_suspended", {
+    track: "prefetch-window",
+    album: "Album",
+    cancelled_count: 1,
+    buffer_ahead: 3.5
+  });
+  telemetry.trackRuntimeEvent("prefetch_cache_rehydrated", {
+    track: "prefetch-window",
+    album: "Album",
+    restored_count: 5,
+    sources: ["https://secret.example/must-not-leave-device.m4a"]
+  });
+  assert.strictEqual(await telemetry.flushQueue(), true);
+  assert.deepStrictEqual(posted[4].map((event) => event.event), [
+    "prefetch_cancel",
+    "prefetch_suspended",
+    "prefetch_cache_rehydrated"
+  ]);
+  assert.strictEqual(posted[4][0].response_ms, 41);
+  assert.strictEqual(posted[4][1].cancelled_count, 1);
+  assert.strictEqual(posted[4][2].restored_count, 5);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(posted[4][2], "sources"), false, "Prefetch source URLs leaked");
+
   console.log("Audio telemetry privacy checks passed.");
 })().catch((error) => {
   console.error(error);

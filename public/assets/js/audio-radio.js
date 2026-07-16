@@ -17,9 +17,9 @@
     const PREFETCH_NEXT_ENABLED = Boolean(ctx.PREFETCH_NEXT_ENABLED);
     const prefetchApi = ctx.prefetchApi || null;
     const PREFETCH_NEXT_CACHE_NAME = ctx.PREFETCH_NEXT_CACHE_NAME || "infra-next-track";
-    const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_MAX_BYTES)) ? Number(ctx.PREFETCH_NEXT_MAX_BYTES) : 12 * 1024 * 1024;
+    const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_MAX_BYTES)) ? Number(ctx.PREFETCH_NEXT_MAX_BYTES) : 1 * 1024 * 1024;
     const PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS)) ? Number(ctx.PREFETCH_NEXT_THRESHOLD_SECONDS) : 24;
-    const PREFETCH_NEXT_SEGMENT_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_SEGMENT_BYTES)) ? Number(ctx.PREFETCH_NEXT_SEGMENT_BYTES) : 4 * 1024 * 1024;
+    const PREFETCH_NEXT_SEGMENT_BYTES = Number.isFinite(Number(ctx.PREFETCH_NEXT_SEGMENT_BYTES)) ? Number(ctx.PREFETCH_NEXT_SEGMENT_BYTES) : 1 * 1024 * 1024;
     const PREFETCH_NEXT_QUEUE_DEPTH = Number.isFinite(Number(ctx.PREFETCH_NEXT_QUEUE_DEPTH)) ? Math.max(1, Number(ctx.PREFETCH_NEXT_QUEUE_DEPTH)) : 5;
     const PREFETCH_NEXT_CONCURRENCY = Number.isFinite(Number(ctx.PREFETCH_NEXT_CONCURRENCY)) ? Math.max(1, Number(ctx.PREFETCH_NEXT_CONCURRENCY)) : 2;
     const PREFETCH_NEXT_MAX_ENTRIES = Number.isFinite(Number(ctx.PREFETCH_NEXT_MAX_ENTRIES)) ? Math.max(PREFETCH_NEXT_QUEUE_DEPTH, Number(ctx.PREFETCH_NEXT_MAX_ENTRIES)) : 6;
@@ -1976,7 +1976,7 @@
     });
 
     audio.addEventListener("waiting", function () {
-      suspendNextTrackPrefetch("waiting", true);
+      suspendNextTrackPrefetch("waiting", false);
       trackAudioRuntimeEvent("waiting", Object.assign(
         buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
         getAudioRuntimeProbeState()
@@ -1985,7 +1985,7 @@
       scheduleWaitingRecovery();
     });
     audio.addEventListener("stalled", function () {
-      suspendNextTrackPrefetch("stalled", true);
+      suspendNextTrackPrefetch("stalled", false);
       trackAudioRuntimeEvent("stalled", Object.assign(
         buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
         getAudioRuntimeProbeState()
@@ -2020,6 +2020,7 @@
       ));
       clearWaitingRecovery();
       clearTrackStatus(getTrackByIndex(audioState.currentIndex));
+      maybePrefetchNextTrack("canplay");
     });
     audio.addEventListener("canplaythrough", function () {
       clearWaitingRecovery();
@@ -2221,8 +2222,6 @@
     if (
       !audio ||
       audio.paused ||
-      !audioState.mediaSessionAudioPlaying ||
-      audioState.trackStartInFlight ||
       audioState.activeAudioRecovery ||
       !getCurrentPlayableAudioSrc(audio)
     ) {
@@ -2435,12 +2434,6 @@
       depth: targets.length,
       sources: targets.map(function (target) { return target.src; })
     });
-    if (prefetchApi && typeof prefetchApi.pruneCache === "function") {
-      prefetchApi.pruneCache({
-        keepSources: getPrefetchKeepSources(),
-        maxEntries: PREFETCH_NEXT_MAX_ENTRIES
-      }).catch(function () {});
-    }
     return targets;
   }
 
@@ -2491,20 +2484,32 @@
 
   function suspendNextTrackPrefetch(reason, force) {
     ensureNextPrefetchCollections();
-    if (!force && getCurrentBufferAheadForPrefetch() >= PREFETCH_BUFFER_ABORT_SECONDS) return;
-    const inflight = Array.from(audioState.nextPrefetchControllers.keys());
-    inflight.forEach(function (src) {
+    const bufferAhead = getCurrentBufferAheadForPrefetch();
+    if (!force && bufferAhead >= PREFETCH_BUFFER_ABORT_SECONDS) return;
+    const inflight = Array.from(audioState.nextPrefetchControllers.entries())
+      .sort(function (left, right) {
+        const leftRank = Number.isFinite(Number(left[1] && left[1].rank)) ? Number(left[1].rank) : Number.MAX_SAFE_INTEGER;
+        const rightRank = Number.isFinite(Number(right[1] && right[1].rank)) ? Number(right[1].rank) : Number.MAX_SAFE_INTEGER;
+        return rightRank - leftRank;
+      });
+    // A critical current buffer sheds the least useful speculative lane but
+    // keeps the closest target progressing. Explicit seeking remains the only
+    // forced path that stops every speculative request.
+    const cancelCount = force ? inflight.length : Math.max(0, inflight.length - 1);
+    const cancelled = inflight.slice(0, cancelCount);
+    cancelled.forEach(function (entry) {
+      const src = entry[0];
       abortPrefetchTarget(src, reason || "buffer_priority");
       audioState.nextPrefetchAttemptCounts.delete(src);
     });
     audioState.nextPrefetchSuspendedReason = reason || "buffer_priority";
-    if (inflight.length) {
+    if (cancelled.length) {
       trackAudioRuntimeEvent("prefetch_suspended", {
         track: "prefetch-window",
         album: audioState.homeMode === "radio" ? "radio" : "album",
         reason: audioState.nextPrefetchSuspendedReason,
-        buffer_ahead: getCurrentBufferAheadForPrefetch(),
-        cancelled_count: inflight.length
+        buffer_ahead: bufferAhead,
+        cancelled_count: cancelled.length
       });
     }
   }
@@ -2719,18 +2724,13 @@
   function maybePrefetchNextTrack(reason) {
     if (!PREFETCH_NEXT_ENABLED) return;
     ensureNextPrefetchCollections();
-    const currentSrcAtChange = normalizeAudioSourceUrl(getCurrentLogicalAudioSrc());
-    const currentWasPrepared = reason === "track_change" && Boolean(
-      (currentSrcAtChange && audioState.nextPrefetchReadySrcs.has(currentSrcAtChange)) ||
-      (currentSrcAtChange && audioState.nextPrefetchServedSrc && srcMatches(audioState.nextPrefetchServedSrc, currentSrcAtChange))
-    );
     const targets = reconcileNextTrackPrefetchPlan(reason || "update");
     if (!targets.length) return;
     if (reason === "track_change") {
-      // Reconcile already cancels only the source that became current and the
-      // targets that left the window. Useful in-flight N+2...N+5 survive only
-      // a prepared fast skip; an unprepared current track gets network priority.
-      if (!currentWasPrepared) suspendNextTrackPrefetch("track_change_unprepared", true);
+      // Reconcile cancels only the source that became current and targets that
+      // left the rolling window. One still-useful speculative request may keep
+      // progressing beside the native media request instead of resetting the
+      // complete N+1...N+5 cycle after every fast transport tap.
       return;
     }
     if (hydrateNextTrackPrefetchPlanFromCache(targets)) return;
@@ -2745,16 +2745,18 @@
     const first = targets[0];
     const firstReady = audioState.nextPrefetchReadySrcs.has(first.src);
     if (!firstReady) {
-      if (audioState.nextPrefetchInFlightSrcs.has(first.src)) return;
-      const firstStarted = startNextTrackPrefetch(first.index, first.track, first.src, reason || "n_plus_1");
-      if (firstStarted) return;
       const firstAttempts = Number(audioState.nextPrefetchAttemptCounts.get(first.src) || 0);
-      // N+1 keeps absolute priority while it can still be fetched. Once its
-      // retry budget is exhausted, do not let one unavailable file starve the
-      // rest of the rolling window.
-      if (firstAttempts < PREFETCH_MAX_ATTEMPTS) return;
+      if (
+        !audioState.nextPrefetchInFlightSrcs.has(first.src) &&
+        firstAttempts < PREFETCH_MAX_ATTEMPTS
+      ) {
+        startNextTrackPrefetch(first.index, first.track, first.src, reason || "n_plus_1");
+      }
     }
 
+    // N+1 is always selected first, but it no longer monopolizes the complete
+    // scheduler. The second mobile connection starts N+2 immediately and then
+    // advances through the rest of the rolling window as slots become free.
     for (let offset = 1; offset < targets.length; offset += 1) {
       if (audioState.nextPrefetchInFlightSrcs.size >= PREFETCH_NEXT_CONCURRENCY) break;
       const target = targets[offset];

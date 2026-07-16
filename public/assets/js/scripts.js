@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix333-20260716";
+window.INFRA_BUILD_TAG = "audiofix334-20260716";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -376,13 +376,13 @@ function openAppDownloadGatekeeper(appName, url) {
   const PWA_COVER_PREPARE_LIMIT = 8;
   const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(prefetchConstants.MAX_BYTES))
     ? Number(prefetchConstants.MAX_BYTES)
-    : 15 * 1024 * 1024;
+    : 1 * 1024 * 1024;
   const PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(prefetchConstants.THRESHOLD_SECONDS))
     ? Number(prefetchConstants.THRESHOLD_SECONDS)
     : 30;
   const PREFETCH_NEXT_SEGMENT_BYTES = Number.isFinite(Number(prefetchConstants.PREFETCH_SEGMENT_SIZE))
     ? Math.max(1, Number(prefetchConstants.PREFETCH_SEGMENT_SIZE))
-    : 4 * 1024 * 1024;
+    : 1 * 1024 * 1024;
   const PREFETCH_NEXT_QUEUE_DEPTH = Number.isFinite(Number(prefetchConstants.QUEUE_DEPTH))
     ? Math.max(1, Number(prefetchConstants.QUEUE_DEPTH))
     : 5;
@@ -420,7 +420,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix333-20260716";
+  const runtimeVersion = "audiofix334-20260716";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -5212,7 +5212,7 @@ function openAppDownloadGatekeeper(appName, url) {
           range_end: Number.isFinite(Number(data.range_end)) ? Number(data.range_end) : null,
           bytes: Number.isFinite(Number(data.bytes)) ? Number(data.bytes) : null,
           status: Number.isFinite(Number(data.status)) ? Number(data.status) : 200,
-          strategy: data.strategy || "segment_v7",
+          strategy: data.strategy || "segment_v8",
           client_id: data.client_id || ""
         }
       ));

@@ -53,13 +53,14 @@ const sandbox = {
     return Promise.resolve(new Response("network", { status: 200 }));
   },
   caches: {
-    open: (name) => Promise.resolve(name === "infra-next-track-segments-v7" ? audioCache : shellCache),
+    open: (name) => Promise.resolve(name === "infra-next-track-segments-v8" ? audioCache : shellCache),
     keys: () => Promise.resolve([
       "infra-next-track",
       "infra-next-track-v2",
       "infra-next-track-full-v3",
       "infra-next-track-segments-v6",
       "infra-next-track-segments-v7",
+      "infra-next-track-segments-v8",
       "infra-covers",
       "infra-shell-20260714-audio320-shell",
       "infra-shell-20260715-audio329-shell",
@@ -71,7 +72,9 @@ const sandbox = {
       "infra-shell-20260716-audio332-shell",
       "infra-shell-20260716-audio332-runtime",
       "infra-shell-20260716-audio333-shell",
-      "infra-shell-20260716-audio333-runtime"
+      "infra-shell-20260716-audio333-runtime",
+      "infra-shell-20260716-audio334-shell",
+      "infra-shell-20260716-audio334-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -111,7 +114,7 @@ function validCachedSegment(overrides) {
     "Content-Type": "audio/mp4",
     "Content-Length": "1024",
     "X-Infra-Audio-Partial": "1",
-    "X-Infra-Audio-Cache-Version": "7",
+    "X-Infra-Audio-Cache-Version": "8",
     "X-Infra-Range-Start": "0",
     "X-Infra-Range-End": "1023",
     "X-Infra-Total-Length": "8192",
@@ -181,6 +184,7 @@ async function dispatchSiteFetch(request) {
     "infra-next-track",
     "infra-next-track-full-v3",
     "infra-next-track-segments-v6",
+    "infra-next-track-segments-v7",
     "infra-next-track-v2",
     "infra-shell-20260714-audio320-shell",
     "infra-shell-20260715-audio329-runtime",
@@ -190,12 +194,14 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260715-audio331-runtime",
     "infra-shell-20260715-audio331-shell",
     "infra-shell-20260716-audio332-runtime",
-    "infra-shell-20260716-audio332-shell"
+    "infra-shell-20260716-audio332-shell",
+    "infra-shell-20260716-audio333-runtime",
+    "infra-shell-20260716-audio333-shell"
   ]);
-  assert(!deletedCaches.includes("infra-next-track-segments-v7"));
+  assert(!deletedCaches.includes("infra-next-track-segments-v8"));
   assert(!deletedCaches.includes("infra-covers"));
-  assert(!deletedCaches.includes("infra-shell-20260716-audio333-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260716-audio333-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260716-audio334-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260716-audio334-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;
@@ -218,7 +224,7 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(
     cachedAudioArrayBufferCalls,
     0,
-    "A request covering the cached segment must stream its body without a 4 MiB arrayBuffer copy"
+    "A request covering the cached segment must stream its body without a 1 MiB arrayBuffer copy"
   );
   assert.deepStrictEqual(requestedClientIds, ["client-hit"]);
   assert.strictEqual(clientMessages.length, 1);
@@ -234,13 +240,29 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(
     cachedAudioArrayBufferCalls,
     0,
-    "The WebKit bytes=0-1 probe must use cached header bytes without reading the 4 MiB body"
+    "The WebKit bytes=0-1 probe must use cached header bytes without reading the 1 MiB body"
   );
   assert.strictEqual(clientMessages[1].clientId, "client-probe");
-  assert.strictEqual(clientMessages[1].message.strategy, "startup_probe_v7");
+  assert.strictEqual(clientMessages[1].message.strategy, "startup_probe_v8");
   assert.strictEqual(clientMessages[1].message.range_start, 0);
   assert.strictEqual(clientMessages[1].message.range_end, 1);
   assert.strictEqual(clientMessages[1].message.bytes, 2);
+
+  cachedAudioArrayBufferCalls = 0;
+  cachedAudio = validCachedSegment({
+    bodyLength: 1024 * 1024,
+    trackArrayBuffer: true,
+    headers: {
+      "Content-Length": String(1024 * 1024),
+      "X-Infra-Range-End": String(1024 * 1024 - 1),
+      "X-Infra-Total-Length": String(8 * 1024 * 1024)
+    }
+  });
+  response = await dispatchAudioFetch({ Range: "bytes=0-" }, "client-real-segment");
+  assert.strictEqual(response.status, 206);
+  assert.strictEqual(response.headers.get("Content-Length"), String(1024 * 1024));
+  assert.strictEqual((await response.arrayBuffer()).byteLength, 1024 * 1024);
+  assert.strictEqual(cachedAudioArrayBufferCalls, 0, "The real 1 MiB segment must use the zero-copy 206 path");
 
   cachedAudio = validCachedSegment();
   response = await dispatchAudioFetch({ Range: "bytes=512-1535" });
@@ -307,7 +329,7 @@ async function dispatchSiteFetch(request) {
   fetchOverride = null;
   shellMatchResponse = null;
 
-  console.log("Audio startup-segment v7 Service Worker checks passed.");
+  console.log("Audio startup-segment v8 Service Worker checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

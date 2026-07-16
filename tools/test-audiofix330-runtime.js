@@ -392,6 +392,142 @@ function testAuthoritativeRollingWindow() {
   );
 }
 
+async function testIntegratedFivePreparedTransportSkips() {
+  const sandbox = createSandbox();
+  loadScript(sandbox, RADIO_PATH);
+  loadScript(sandbox, CORE_PATH);
+
+  const playlist = makeTracks(11);
+  let playCalls = 0;
+  let globalClearCalls = 0;
+  let fadeCalls = 0;
+  const audio = makeAudio(() => { playCalls += 1; });
+  audio.paused = false;
+  audio.src = playlist[0].src;
+  audio.currentSrc = playlist[0].src;
+  audio.currentTime = 12;
+  audio.duration = 180;
+  audio.buffered = { length: 1, end: () => 24 };
+  const state = {
+    audio,
+    playlist,
+    playlistKind: "album",
+    playlistToken: playlist.map((track) => track.src).join("|"),
+    currentIndex: 0,
+    activeLogicalSrc: playlist[0].src,
+    homeMode: "album",
+    shuffleOn: false,
+    recentPlayed: [],
+    recentPlayedLimit: 20,
+    mediaSessionAudioPlaying: true,
+    trackStartInFlight: false,
+    activeAudioRecovery: null,
+    startRequestToken: 0,
+    nextPrefetchGeneration: 0
+  };
+
+  let core;
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    runtime: { baseUrl: new URL("https://site.test/") },
+    PREFETCH_NEXT_ENABLED: true,
+    prefetchApi: {
+      isSupported: () => true,
+      inspectCachedSegment: (src) => Promise.resolve({
+        src,
+        found: true,
+        valid: true,
+        probeReady: true,
+        bytes: 1024 * 1024
+      }),
+      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-1048575" } }),
+      getContentLength: (response) => Number(response.headers.get("Content-Length") || 0),
+      putSingle: () => Promise.resolve(true),
+      pruneCache: () => Promise.resolve(true)
+    },
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc || "",
+    getCurrentPlayableAudioSrc: () => state.activeLogicalSrc || "",
+    normalizeAudioSourceUrl: (src) => String(src || ""),
+    srcMatches: (left, right) => String(left || "") === String(right || ""),
+    isCloudflareAudioUrl: () => true,
+    getCurrentPlaylistIndexSafe: () => state.currentIndex,
+    getQueuePreviewIndices: (limit) => core.getQueuePreviewIndices(limit),
+    buildAudioMonitorPayload: () => ({}),
+    trackAudioRuntimeEvent() {}
+  });
+
+  core = sandbox.InfraAudioCore.createAudioCore({
+    audioState: state,
+    PREFETCH_NEXT_ENABLED: true,
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc || "",
+    getCurrentPlayableAudioSrc: () => state.activeLogicalSrc || "",
+    srcMatches: (left, right) => String(left || "") === String(right || ""),
+    extractFilenameFromSrc: (src) => String(src || "").split("/").pop(),
+    hashString,
+    normalizeAudioSourceUrl: (src) => String(src || ""),
+    toAbsoluteUrlOrEmpty: (src) => String(src || ""),
+    getAudioTelemetryNow: () => Date.now(),
+    getAudioAssetPath: (src) => String(src || ""),
+    getAudioSource: () => "r2dev",
+    getTrackByIndex: () => null,
+    getAutoPrefetchedNextIndex: () => radio.getAutoPrefetchedNextIndex(),
+    clearNextTrackPrefetch(reason) {
+      globalClearCalls += 1;
+      radio.clearNextTrackPrefetch(reason);
+    },
+    maybePrefetchNextTrack: (reason) => radio.maybePrefetchNextTrack(reason),
+    ensureRadioPlaylistForNavigation: () => true,
+    ensurePlayablePlaylistContext() {},
+    savePlaybackQueueContext() {},
+    revokeActiveBlobUrl() {},
+    clearFadeTimer() {},
+    clearWaitingRecovery() {},
+    clearOtherTrackStatuses() {},
+    clearTrackStatus() {},
+    setTrackStatus() {},
+    syncAudioUi() {},
+    syncMediaSessionMetadata() {},
+    scheduleMediaSessionResync() {},
+    bindMediaSessionActions() {},
+    startAudioRaf() {},
+    clearTrackFailure() {},
+    forceAudioFullVolume() {},
+    fadeInAudio() {},
+    fadeOutAudio() {
+      fadeCalls += 1;
+      return Promise.resolve();
+    },
+    isIosDevice: () => true,
+    buildAudioMonitorPayload: () => ({}),
+    trackAudioRuntimeEvent() {},
+    logAudioAuditEvent() {},
+    extendAlbumPlaylistToNextAlbum: () => -1
+  });
+
+  radio.maybePrefetchNextTrack("integrated_cache_prepare");
+  await flushAsyncWork();
+  assert.deepStrictEqual(
+    Array.from(state.nextPrefetchReadySrcs),
+    playlist.slice(1, 6).map((track) => track.src),
+    "The integrated Radio scheduler must expose a ready N+1 through N+5 window to core"
+  );
+
+  const timersBefore = sandbox.__timerCalls.length;
+  for (let expected = 1; expected <= 5; expected += 1) {
+    core.playNext({ fromTransportControl: true, seamless: true, surface: "test" });
+    assert.strictEqual(state.currentIndex, expected, `Transport tap ${expected} must consume the prepared queue head`);
+    assert.strictEqual(playCalls, expected, `Transport tap ${expected} must call audio.play() synchronously`);
+  }
+  assert.strictEqual(globalClearCalls, 0, "Five transport taps must not clear the rolling prefetch state globally");
+  assert.strictEqual(fadeCalls, 0, "Transport skips must not wait for a fade");
+  assert.strictEqual(sandbox.__timerCalls.length, timersBefore, "Transport skips must bypass the iOS readiness timer");
+  assert.deepStrictEqual(
+    Array.from(core.getQueuePreviewIndices(5)),
+    [6, 7, 8, 9, 10],
+    "After five prepared skips the authoritative window must roll to N+6 through N+10"
+  );
+}
+
 function testMaterializedShuffleOrder() {
   const harness = createCoreHarness({ playlist: makeTracks(12), currentIndex: 0, shuffleOn: true });
   const preview = Array.from(harness.api.getQueuePreviewIndices(5));
@@ -465,7 +601,7 @@ function createPrefetchRehydrationHarness(inspectCachedSegment) {
   };
   const prefetchApi = {
     isSupported: () => true,
-    createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-4194303" } }),
+    createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-1048575" } }),
     getContentLength: (response) => Number(response.headers.get("Content-Length") || 0),
     inspectCachedSegment,
     putSingle(src) {
@@ -508,7 +644,7 @@ async function testPrefetchCacheRehydrationAndCorruptFallback() {
     return Promise.resolve({ src, found: true, valid: true, bytes: 1024 });
   });
   cachedHarness.radio.maybePrefetchNextTrack("cache_rehydration_test");
-  assert.strictEqual(cachedHarness.fetchUrls.length, 0, "Network must wait for v7 cache inspection");
+  assert.strictEqual(cachedHarness.fetchUrls.length, 0, "Network must wait for v8 cache inspection");
   await flushAsyncWork();
   assert.deepStrictEqual(
     inspected,
@@ -518,7 +654,7 @@ async function testPrefetchCacheRehydrationAndCorruptFallback() {
   assert.deepStrictEqual(
     Array.from(cachedHarness.state.nextPrefetchReadySrcs),
     cachedHarness.playlist.slice(1, 6).map((track) => track.src),
-    "Valid cached v7 segments must rehydrate the ready window"
+    "Valid cached v8 segments must rehydrate the ready window"
   );
   assert.strictEqual(cachedHarness.fetchUrls.length, 0, "A valid rehydrated window must not be refetched");
   assert.strictEqual(cachedHarness.putSources.length, 0, "A valid rehydrated window must not be rewritten");
@@ -547,7 +683,7 @@ async function testPrefetchCacheRehydrationAndCorruptFallback() {
   assert.deepStrictEqual(
     corruptHarness.putSources,
     [corruptHarness.playlist[1].src],
-    "Only the corrupt segment must be normalized back into v7"
+    "Only the corrupt segment must be normalized back into v8"
   );
 
   const legacyProbeHarness = createPrefetchRehydrationHarness(function (src) {
@@ -566,7 +702,7 @@ async function testPrefetchCacheRehydrationAndCorruptFallback() {
   assert.deepStrictEqual(
     legacyProbeHarness.fetchUrls,
     [legacyProbeHarness.playlist[1].src],
-    "An older v7 N+1 entry must be refreshed once to gain the WebKit probe fast path"
+    "An older v8 N+1 entry must be refreshed once to gain the WebKit probe fast path"
   );
   assert.deepStrictEqual(legacyProbeHarness.putSources, [legacyProbeHarness.playlist[1].src]);
 }
@@ -668,7 +804,7 @@ async function testPrefetchGatePriorityAndConcurrency() {
   loadScript(sandbox, RADIO_PATH);
 
   const playlist = makeTracks(11);
-  let bufferedEnd = 20;
+  let bufferedEnd = 19.99;
   const audio = makeAudio();
   audio.paused = false;
   audio.src = playlist[0].src;
@@ -687,7 +823,7 @@ async function testPrefetchGatePriorityAndConcurrency() {
     shuffleOn: false,
     recentPlayed: [],
     mediaSessionAudioPlaying: false,
-    trackStartInFlight: false,
+    trackStartInFlight: true,
     activeAudioRecovery: null,
     nextPrefetchToken: 0,
     nextPrefetchGeneration: 0
@@ -695,7 +831,7 @@ async function testPrefetchGatePriorityAndConcurrency() {
   const prefetchApi = {
     isSupported: () => true,
     createRequest: (src) => new Request(src, {
-      headers: { Range: "bytes=0-4194303" }
+      headers: { Range: "bytes=0-1048575" }
     }),
     getContentLength: (response) => Number(response.headers.get("Content-Length") || 0),
     putSingle: () => Promise.resolve(true),
@@ -726,10 +862,9 @@ async function testPrefetchGatePriorityAndConcurrency() {
     trackAudioRuntimeEvent() {}
   });
 
-  radio.maybePrefetchNextTrack("before_playing");
-  assert.strictEqual(pendingFetches.length, 0, "Prefetch must not start before the playing confirmation");
+  radio.maybePrefetchNextTrack("before_playing_buffer_short");
+  assert.strictEqual(pendingFetches.length, 0, "Early prefetch must still wait for eight buffered seconds");
 
-  state.mediaSessionAudioPlaying = true;
   bufferedEnd = audio.currentTime + 7.99;
   radio.maybePrefetchNextTrack("buffer_too_short");
   assert.strictEqual(pendingFetches.length, 0, "Prefetch must wait for at least eight buffered seconds");
@@ -738,17 +873,17 @@ async function testPrefetchGatePriorityAndConcurrency() {
   radio.maybePrefetchNextTrack("buffer_stable");
   assert.deepStrictEqual(
     pendingFetches.map((entry) => entry.url),
-    [playlist[1].src],
-    "N+1 must be the only first request"
+    [playlist[1].src, playlist[2].src],
+    "A stable pre-playing buffer must start N+1 first and immediately occupy the second lane with N+2"
   );
-  assert.strictEqual(state.nextPrefetchInFlightSrcs.size, 1);
+  assert.strictEqual(state.nextPrefetchInFlightSrcs.size, 2);
 
   pendingFetches[0].resolve(validSegmentResponse());
   await flushAsyncWork();
   assert.deepStrictEqual(
-    pendingFetches.slice(1).map((entry) => entry.url),
-    [playlist[2].src, playlist[3].src],
-    "Once N+1 is ready, the remaining window may fill two lanes"
+    pendingFetches.slice(2).map((entry) => entry.url),
+    [playlist[3].src],
+    "The freed N+1 lane must advance immediately to N+3 while N+2 continues"
   );
   assert.strictEqual(
     state.nextPrefetchInFlightSrcs.size,
@@ -801,25 +936,18 @@ async function testPrefetchGatePriorityAndConcurrency() {
   assert(unpreparedFetch, "A new speculative request must start after the reset");
   const unpreparedIndex = playlist.findIndex((track) => track.src === unpreparedFetch.url);
   assert(unpreparedIndex > state.currentIndex);
-  unpreparedFetch.resolve(validSegmentResponse());
-  await flushAsyncWork();
   const speculativeRecords = Array.from(state.nextPrefetchControllers.values());
-  assert(speculativeRecords.length > 0, "Useful speculation must be active before the unprepared skip");
-  state.nextPrefetchReadySrcs.delete(unpreparedFetch.url);
+  assert.strictEqual(speculativeRecords.length, 2, "Both mobile lanes must be active before the unprepared skip");
+  const obsoleteCurrentRecord = state.nextPrefetchControllers.get(unpreparedFetch.url);
+  const usefulRecord = speculativeRecords.find((record) => record !== obsoleteCurrentRecord);
   state.currentIndex = unpreparedIndex;
   state.activeLogicalSrc = unpreparedFetch.url;
   audio.src = unpreparedFetch.url;
   audio.currentSrc = unpreparedFetch.url;
   radio.maybePrefetchNextTrack("track_change");
-  assert.strictEqual(
-    state.nextPrefetchInFlightSrcs.size,
-    0,
-    "An unprepared current track must stop speculative downloads until playback stabilizes"
-  );
-  assert(
-    speculativeRecords.every((record) => record.controller.signal.aborted),
-    "Unprepared playback must receive mobile bandwidth priority over useful speculation"
-  );
+  assert(obsoleteCurrentRecord.controller.signal.aborted, "The duplicate prefetch for the new current track must be aborted");
+  assert(usefulRecord && !usefulRecord.controller.signal.aborted, "A still-useful rolling-window request must survive the skip");
+  assert.strictEqual(state.nextPrefetchInFlightSrcs.size, 1, "The native current request keeps bandwidth beside one useful speculative lane");
   await flushAsyncWork();
 }
 
@@ -871,7 +999,7 @@ async function testPrefetchTimeoutRetriesOnce() {
     PREFETCH_MAX_ATTEMPTS: 2,
     prefetchApi: {
       isSupported: () => true,
-      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-4194303" } }),
+      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-1048575" } }),
       getContentLength: () => 0,
       putSingle: () => Promise.resolve(true),
       pruneCache: () => Promise.resolve(true)
@@ -933,7 +1061,7 @@ function testNoGlobalPrefetchClear() {
   assert.strictEqual(
     sandbox.InfraAudioPrefetch.clearCache,
     undefined,
-    "The v7 prefetch API must not expose a global clear operation"
+    "The v8 prefetch API must not expose a global clear operation"
   );
 }
 
@@ -994,6 +1122,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   testPreparedColdPlayIsSynchronous();
   await testCachedTrackIsPromotedBeforeColdTap();
   testAuthoritativeRollingWindow();
+  await testIntegratedFivePreparedTransportSkips();
   testMaterializedShuffleOrder();
   await testPrefetchCacheRehydrationAndCorruptFallback();
   await testPrefetchCacheRehydrationRejectsStaleSnapshots();
@@ -1002,7 +1131,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchTimeoutRetriesOnce();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix333 runtime checks passed.");
+  console.log("audiofix334 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

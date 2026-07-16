@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix335-20260716";
+window.INFRA_BUILD_TAG = "audiofix336-20260716";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -190,6 +190,7 @@ function openAppDownloadGatekeeper(appName, url) {
     suiteOn: true,
     homeMode: "album",
     homeModeInitialized: false,
+    modeTransitionToken: 0,
     homeModeStorageKey: "infra_home_play_mode_v2",
     radioPlaylist: [],
     radioQueue: [],
@@ -199,6 +200,8 @@ function openAppDownloadGatekeeper(appName, url) {
     radioQueueExtendBy: 10,
     radioLoadingPromise: null,
     radioNavigationPromise: null,
+    radioNavigationRequest: null,
+    albumContinuityNavigationRequest: null,
     tracksData: null,
     tracksLoadingPromise: null,
     albumPlaylistSnapshot: [],
@@ -236,6 +239,9 @@ function openAppDownloadGatekeeper(appName, url) {
     resumeOnVisible: false,
     recentPlayed: [],
     recentPlayedLimit: 12,
+    shuffleHistory: [],
+    shuffleHistoryCursor: -1,
+    shuffleSessionSeed: "",
     playlistToken: "",
     lastResumeSaveTs: 0,
     overlayEscapeBound: false,
@@ -267,8 +273,11 @@ function openAppDownloadGatekeeper(appName, url) {
     trackDurationCache: new Map(),
     activeStatusTrack: null,
     coverUpdateToken: 0,
+    coverLoadPromises: new Map(),
+    coverLoadResults: new Map(),
     playRequestTs: 0,
     playRequestToken: 0,
+    playAbortRetryToken: 0,
     lastMonitorPlayToken: 0,
     lastAudioCurrentTime: 0,
     loggedCacheHitSrc: "",
@@ -323,11 +332,15 @@ function openAppDownloadGatekeeper(appName, url) {
     homeFavoritesDelegatedBound: false,
     albumCoverCacheWarmupScheduled: false,
     albumCoverCacheWarmupDone: false,
+    albumCoverWarmupResumePending: false,
     albumCoverPreparePromise: null,
     albumCoverReadyUrls: new Set(),
     albumCoverImageCache: new Map(),
     albumCoverPrimeUrls: new Set(),
-    coverTelemetryRecent: new Map()
+    coverTelemetryRecent: new Map(),
+    lastSavedQueueSignature: "",
+    trackFailureRecovery: null,
+    stallRecovery: null
   };
 
   const pwaState = {
@@ -421,7 +434,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix335-20260716";
+  const runtimeVersion = "audiofix336-20260716";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -632,6 +645,7 @@ function openAppDownloadGatekeeper(appName, url) {
       logAudioAuditEvent,
       setTrackStatus,
       scheduleWaitingRecovery,
+      scheduleAlbumCoverCacheWarmup,
       getAudioRuntimeProbeState,
       confirmAudioRecovery,
       sendAudioMonitoringLog,
@@ -639,6 +653,7 @@ function openAppDownloadGatekeeper(appName, url) {
       updateProgressUi,
       isBlobObjectUrl,
       extendAlbumPlaylistToNextAlbum,
+      extendAlbumPlaylistToPreviousAlbum,
       getQueuePreviewIndices,
       prefetchApi,
       PREFETCH_NEXT_CACHE_NAME,
@@ -730,7 +745,6 @@ function openAppDownloadGatekeeper(appName, url) {
       savePlaybackQueueContext,
       getCurrentLogicalAudioSrc,
       srcMatches,
-      extractFilenameFromSrc,
       hashString,
       ensureRadioQueue,
       normalizeAudioSourceUrl,
@@ -775,6 +789,7 @@ function openAppDownloadGatekeeper(appName, url) {
       saveResumeState,
       markAudioPauseIntent,
       extendAlbumPlaylistToNextAlbum,
+      extendAlbumPlaylistToPreviousAlbum,
       beginAudioRecovery,
       failAudioRecovery,
       maybePrefetchNextTrack
@@ -2525,9 +2540,26 @@ function openAppDownloadGatekeeper(appName, url) {
     return selected.slice(0, Math.min(PWA_COVER_PREPARE_LIMIT, selected.length));
   }
 
-  function decodeCoverForSession(url) {
+  function shouldPauseAlbumCoverWarmup() {
+    const audio = audioState.audio;
+    const recentPlayRequest = Number(audioState.playRequestTs || 0) > 0 &&
+      Date.now() - Number(audioState.playRequestTs || 0) < 3000;
+    const audioBusy = Boolean(
+      audioState.trackStartInFlight ||
+      audioState.sourceMetadataPending ||
+      audioState.mediaSessionAudioPlaying ||
+      audioState.activeAudioRecovery ||
+      audioState.stallRecovery ||
+      recentPlayRequest ||
+      (audio && !audio.paused)
+    );
+    const pwaNavigationBusy = Boolean(spaState.navigationActive && isMobilePwaCoverNavigation());
+    return Boolean(audioBusy || pwaNavigationBusy);
+  }
+
+  function decodeCoverForSession(url, signal) {
     return new Promise(function (resolve) {
-      if (!url) {
+      if (!url || (signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
         resolve(false);
         return;
       }
@@ -2540,10 +2572,36 @@ function openAppDownloadGatekeeper(appName, url) {
         return;
       }
       const image = new Image();
+      let settled = false;
       image.decoding = "async";
+
+      function done(value) {
+        if (settled) return;
+        settled = true;
+        image.onload = null;
+        image.onerror = null;
+        if (signal && typeof signal.removeEventListener === "function") {
+          signal.removeEventListener("abort", abortDecode);
+        }
+        resolve(Boolean(value));
+      }
+
+      function abortDecode() {
+        try {
+          image.removeAttribute("src");
+        } catch (_err) {
+          // The detached image may already have completed.
+        }
+        done(false);
+      }
+
       function remember() {
+        if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
+          done(false);
+          return;
+        }
         rememberAlbumCoverImage(url, image);
-        resolve(true);
+        done(true);
       }
       image.onload = function () {
         if (typeof image.decode === "function") {
@@ -2556,15 +2614,19 @@ function openAppDownloadGatekeeper(appName, url) {
         remember();
       };
       image.onerror = function () {
-        resolve(false);
+        done(false);
       };
+      if (signal && typeof signal.addEventListener === "function") {
+        signal.addEventListener("abort", abortDecode, { once: true });
+      }
       image.src = url;
     });
   }
 
-  function prepareAlbumCoverEntry(cache, entry, reason) {
+  function prepareAlbumCoverEntry(cache, entry, reason, signal) {
     if (!entry || !entry.url) return Promise.resolve(false);
     if (audioState.albumCoverReadyUrls.has(entry.url)) return Promise.resolve(true);
+    if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) return Promise.resolve(false);
     const startedAt = getAudioTelemetryNow();
     const request = new Request(entry.url, {
       method: "GET",
@@ -2573,6 +2635,9 @@ function openAppDownloadGatekeeper(appName, url) {
     });
 
     return cache.match(request).then(function (cached) {
+      if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
+        return { aborted: true, cacheHint: cached ? "cache" : "unknown" };
+      }
       if (cached) return { response: cached, cacheHint: "cache" };
       logCoverRuntimeEvent("cover_request", {
         album: entry.album,
@@ -2580,7 +2645,7 @@ function openAppDownloadGatekeeper(appName, url) {
         cover_url: entry.url,
         reason: reason || "session"
       }, { dedupeMs: 30000 });
-      return fetch(request).then(function (response) {
+      return fetch(request, signal ? { signal } : {}).then(function (response) {
         if (response && response.ok) {
           cache.put(request, response.clone()).catch(function () {});
           return { response, cacheHint: "network" };
@@ -2588,7 +2653,11 @@ function openAppDownloadGatekeeper(appName, url) {
         throw new Error("cover_prepare_http");
       });
     }).then(function (result) {
-      return decodeCoverForSession(entry.url).then(function (decoded) {
+      if (!result || result.aborted || (signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
+        return false;
+      }
+      return decodeCoverForSession(entry.url, signal).then(function (decoded) {
+        if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) return false;
         if (decoded) audioState.albumCoverReadyUrls.add(entry.url);
         trackAudioRuntimeEvent("cover_prepare_item", Object.assign({
           album: entry.album,
@@ -2604,6 +2673,7 @@ function openAppDownloadGatekeeper(appName, url) {
         return Boolean(decoded);
       });
     }).catch(function (err) {
+      if ((signal && signal.aborted) || (err && err.name === "AbortError")) return false;
       trackAudioRuntimeEvent("cover_prepare_error", {
         album: entry.album,
         cover_url: entry.url,
@@ -2614,10 +2684,6 @@ function openAppDownloadGatekeeper(appName, url) {
       });
       return false;
     });
-  }
-
-  function shouldPauseCoverPrepareForPwaNavigation() {
-    return Boolean(spaState.navigationActive && isMobilePwaCoverNavigation());
   }
 
   function rememberAlbumCoverImage(url, image) {
@@ -2645,10 +2711,32 @@ function openAppDownloadGatekeeper(appName, url) {
     if (audioState.albumCoverCacheWarmupDone) return Promise.resolve();
     if (audioState.albumCoverPreparePromise) return audioState.albumCoverPreparePromise;
     if (typeof caches === "undefined" || !caches.open) return Promise.resolve();
+    if (shouldPauseAlbumCoverWarmup()) {
+      audioState.albumCoverCacheWarmupScheduled = false;
+      audioState.albumCoverWarmupResumePending = true;
+      return Promise.resolve();
+    }
 
     audioState.albumCoverCacheWarmupScheduled = true;
     const startedAt = getAudioTelemetryNow();
+    const abortController = typeof AbortController === "function" ? new AbortController() : null;
+    const signal = abortController ? abortController.signal : null;
+    const warmupAudio = audioState.audio;
+    let pausedForActivity = false;
+    const pauseForAudio = function () {
+      pausedForActivity = true;
+      if (abortController && !abortController.signal.aborted) abortController.abort();
+    };
+    if (warmupAudio && typeof warmupAudio.addEventListener === "function") {
+      warmupAudio.addEventListener("loadstart", pauseForAudio);
+      warmupAudio.addEventListener("play", pauseForAudio);
+      warmupAudio.addEventListener("playing", pauseForAudio);
+    }
     audioState.albumCoverPreparePromise = loadTracksData().then(function (tracksData) {
+      if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
+        pausedForActivity = true;
+        return;
+      }
       const covers = limitAlbumCoverWarmupUrls(orderAlbumCoverWarmupUrls(getAlbumCoverWarmupUrls(tracksData)));
       if (!covers.length) {
         audioState.albumCoverCacheWarmupDone = true;
@@ -2664,15 +2752,15 @@ function openAppDownloadGatekeeper(appName, url) {
         const workerCount = Math.min(COVER_SESSION_PREPARE_CONCURRENCY, covers.length);
         const workers = Array.from({ length: workerCount }, function () {
           return Promise.resolve().then(function runNext() {
-            if (shouldPauseCoverPrepareForPwaNavigation()) {
-              audioState.albumCoverCacheWarmupScheduled = false;
-              scheduleAlbumCoverCacheWarmup("nav_idle_resume");
+            if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
+              pausedForActivity = true;
+              if (abortController && !abortController.signal.aborted) abortController.abort();
               return;
             }
             const entry = covers[cursor];
             cursor += 1;
             if (!entry) return;
-            return prepareAlbumCoverEntry(cache, entry, reason).then(function (decoded) {
+            return prepareAlbumCoverEntry(cache, entry, reason, signal).then(function (decoded) {
               if (decoded) decodedCount += 1;
               return runNext();
             });
@@ -2698,8 +2786,16 @@ function openAppDownloadGatekeeper(appName, url) {
         error_message: err && err.message ? err.message : "cover_prepare_failed"
       });
     }).finally(function () {
+      if (warmupAudio && typeof warmupAudio.removeEventListener === "function") {
+        warmupAudio.removeEventListener("loadstart", pauseForAudio);
+        warmupAudio.removeEventListener("play", pauseForAudio);
+        warmupAudio.removeEventListener("playing", pauseForAudio);
+      }
       audioState.albumCoverCacheWarmupScheduled = false;
       audioState.albumCoverPreparePromise = null;
+      if ((pausedForActivity || shouldPauseAlbumCoverWarmup()) && !audioState.albumCoverCacheWarmupDone) {
+        audioState.albumCoverWarmupResumePending = true;
+      }
     });
 
     return audioState.albumCoverPreparePromise;
@@ -2709,9 +2805,9 @@ function openAppDownloadGatekeeper(appName, url) {
     if (COVER_SESSION_PREPARE_ENABLED) return prepareAlbumCoversForSession(reason || "warmup");
     if (audioState.albumCoverCacheWarmupDone) return Promise.resolve();
     if (typeof caches === "undefined" || !caches.open) return Promise.resolve();
-    if (shouldPauseCoverPrepareForPwaNavigation()) {
+    if (shouldPauseAlbumCoverWarmup()) {
       audioState.albumCoverCacheWarmupScheduled = false;
-      scheduleAlbumCoverCacheWarmup("nav_idle_resume");
+      audioState.albumCoverWarmupResumePending = true;
       return Promise.resolve();
     }
     return loadTracksData().then(function (tracksData) {
@@ -2724,10 +2820,10 @@ function openAppDownloadGatekeeper(appName, url) {
         let chain = Promise.resolve();
         covers.forEach(function (entry, index) {
           chain = chain.then(function () {
-            if (shouldPauseCoverPrepareForPwaNavigation()) {
+            if (shouldPauseAlbumCoverWarmup()) {
               audioState.albumCoverCacheWarmupScheduled = false;
-              scheduleAlbumCoverCacheWarmup("nav_idle_resume");
-              throw new Error("cover_warmup_paused_for_navigation");
+              audioState.albumCoverWarmupResumePending = true;
+              throw new Error("cover_warmup_paused_for_activity");
             }
             return new Promise(function (resolve) {
               setTimeout(resolve, index === 0 ? 0 : 45);
@@ -2788,6 +2884,7 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function scheduleAlbumCoverCacheWarmup(reason) {
     if (audioState.albumCoverCacheWarmupScheduled || audioState.albumCoverCacheWarmupDone) return;
+    audioState.albumCoverWarmupResumePending = false;
     audioState.albumCoverCacheWarmupScheduled = true;
     const run = function () {
       warmAlbumCoverCache(reason || "idle");
@@ -3688,77 +3785,36 @@ function openAppDownloadGatekeeper(appName, url) {
     return String(value || "").trim();
   }
 
-  function extractFilenameFromSrc(value) {
-    const raw = normalizeSrcValue(value);
-    if (!raw) return "";
-    try {
-      const url = new URL(raw, window.location.href);
-      const path = decodeURIComponent(url.pathname || "");
-      const parts = path.split("/");
-      return String(parts[parts.length - 1] || "").toLowerCase();
-    } catch (_err) {
-      const plain = decodeURIComponent(raw.split("?")[0].split("#")[0]);
-      const parts = plain.split("/");
-      return String(parts[parts.length - 1] || "").toLowerCase();
-    }
-  }
-
-  function buildSrcTokens(value) {
-    const raw = normalizeSrcValue(value);
-    if (!raw) return [];
-    const tokens = new Set();
-    tokens.add(raw);
-    tokens.add(raw.toLowerCase());
-
-    try {
-      const url = new URL(raw, window.location.href);
-      const href = String(url.href || "").trim();
-      const pathname = String(url.pathname || "").trim();
-      const decodedPath = decodeURIComponent(pathname || "");
-      const pathWithSearch = `${pathname}${url.search || ""}`;
-      const decodedWithSearch = `${decodedPath}${url.search || ""}`;
-
-      [href, decodeURIComponent(href), pathname, decodedPath, pathWithSearch, decodedWithSearch].forEach((token) => {
-        const normalized = String(token || "").trim();
-        if (!normalized) return;
-        tokens.add(normalized);
-        tokens.add(normalized.toLowerCase());
-      });
-    } catch (_err) {
-      const plain = raw.split("#")[0];
-      const noQuery = plain.split("?")[0];
-      [plain, noQuery, decodeURIComponent(plain), decodeURIComponent(noQuery)].forEach((token) => {
-        const normalized = String(token || "").trim();
-        if (!normalized) return;
-        tokens.add(normalized);
-        tokens.add(normalized.toLowerCase());
-      });
-    }
-
-    const file = extractFilenameFromSrc(raw);
-    if (file) tokens.add(file);
-
-    return Array.from(tokens).filter(Boolean);
-  }
-
   function srcMatches(a, b) {
     const left = normalizeSrcValue(a);
     const right = normalizeSrcValue(b);
     if (!left || !right) return false;
     if (left === right) return true;
 
-    const leftTokens = buildSrcTokens(left);
-    const rightSet = new Set(buildSrcTokens(right));
-    if (leftTokens.some((token) => rightSet.has(token))) return true;
-
-    for (const lt of leftTokens) {
-      for (const rt of rightSet) {
-        if (!lt || !rt) continue;
-        if (lt.endsWith(rt) || rt.endsWith(lt)) return true;
-      }
+    // Audio filenames are not unique across the catalogue (for example both
+    // MOREMI AJASORO and PECHES contain `04-favora.m4a`). Compare their full
+    // managed asset keys before any generic URL fallback so two albums can
+    // never be mistaken for the same source.
+    const leftAudioKey = getAudioAssetPathKey(left, window.location.href);
+    const rightAudioKey = getAudioAssetPathKey(right, window.location.href);
+    if (leftAudioKey || rightAudioKey) {
+      return Boolean(leftAudioKey && rightAudioKey && leftAudioKey === rightAudioKey);
     }
 
-    return false;
+    try {
+      const leftUrl = new URL(left, window.location.href);
+      const rightUrl = new URL(right, window.location.href);
+      leftUrl.hash = "";
+      rightUrl.hash = "";
+      const leftHref = decodeURIComponent(leftUrl.href).normalize("NFC");
+      const rightHref = decodeURIComponent(rightUrl.href).normalize("NFC");
+      if (leftHref === rightHref) return true;
+      const leftPath = decodeURIComponent(leftUrl.pathname || "").normalize("NFC");
+      const rightPath = decodeURIComponent(rightUrl.pathname || "").normalize("NFC");
+      return Boolean(leftPath && rightPath && leftPath === rightPath);
+    } catch (_err) {
+      return left.normalize("NFC") === right.normalize("NFC");
+    }
   }
 
   function hashString(value) {
@@ -3963,7 +4019,23 @@ function openAppDownloadGatekeeper(appName, url) {
       return Promise.resolve({ ok: false, src: url });
     }
 
-    return new Promise(function (resolve) {
+    const resultCache = audioState.coverLoadResults instanceof Map
+      ? audioState.coverLoadResults
+      : (audioState.coverLoadResults = new Map());
+    const promiseCache = audioState.coverLoadPromises instanceof Map
+      ? audioState.coverLoadPromises
+      : (audioState.coverLoadPromises = new Map());
+    const cached = resultCache.get(url);
+    const cachedAt = cached && Number(cached.cachedAt || 0);
+    if (cached && (cached.ok || (cachedAt > 0 && Date.now() - cachedAt < 5000))) {
+      return Promise.resolve({ ok: Boolean(cached.ok), src: url, cached: true });
+    }
+    if (cached) resultCache.delete(url);
+
+    const inFlight = promiseCache.get(url);
+    if (inFlight) return inFlight;
+
+    const loadPromise = new Promise(function (resolve) {
       const image = new Image();
       let settled = false;
 
@@ -3972,7 +4044,15 @@ function openAppDownloadGatekeeper(appName, url) {
         settled = true;
         image.onload = null;
         image.onerror = null;
-        resolve({ ok: Boolean(ok), src: url });
+        const result = { ok: Boolean(ok), src: url, cachedAt: Date.now() };
+        resultCache.delete(url);
+        resultCache.set(url, result);
+        while (resultCache.size > 96) {
+          const oldest = resultCache.keys().next();
+          if (oldest.done) break;
+          resultCache.delete(oldest.value);
+        }
+        resolve({ ok: result.ok, src: url });
       }
 
       try {
@@ -4022,6 +4102,11 @@ function openAppDownloadGatekeeper(appName, url) {
         }
       }
     });
+    promiseCache.set(url, loadPromise);
+    loadPromise.finally(function () {
+      if (promiseCache.get(url) === loadPromise) promiseCache.delete(url);
+    });
+    return loadPromise;
   }
 
   function setCoverWhenReady(imgElement, nextSrc, fallbackSrc, token) {
@@ -4283,27 +4368,66 @@ function openAppDownloadGatekeeper(appName, url) {
     });
 
     if (catalogIndex >= 0 && catalogAlbums.length > 1) {
-      for (let offset = 1; offset <= catalogAlbums.length; offset += 1) {
-        const candidateCatalog = catalogAlbums[(catalogIndex + offset) % catalogAlbums.length];
+      for (let candidateIndex = catalogIndex + 1; candidateIndex < catalogAlbums.length; candidateIndex += 1) {
+        const candidateCatalog = catalogAlbums[candidateIndex];
         const candidateAlbum = findTracksAlbumByCatalogEntry(candidateCatalog, tracksAlbums);
         if (!candidateAlbum || candidateAlbum === currentAlbum) continue;
         return {
           album: candidateAlbum,
           catalog: candidateCatalog || null,
-          wrapped: catalogIndex + offset >= catalogAlbums.length
+          wrapped: false
         };
       }
     }
 
     const tracksIndex = tracksAlbums.indexOf(currentAlbum);
     if (tracksIndex < 0) return null;
-    for (let offset = 1; offset <= tracksAlbums.length; offset += 1) {
-      const candidateAlbum = tracksAlbums[(tracksIndex + offset) % tracksAlbums.length];
+    for (let candidateIndex = tracksIndex + 1; candidateIndex < tracksAlbums.length; candidateIndex += 1) {
+      const candidateAlbum = tracksAlbums[candidateIndex];
       if (!candidateAlbum || candidateAlbum === currentAlbum) continue;
       return {
         album: candidateAlbum,
         catalog: null,
-        wrapped: tracksIndex + offset >= tracksAlbums.length
+        wrapped: false
+      };
+    }
+    return null;
+  }
+
+  function findPreviousAlbumForContinuity(currentAlbum, tracksAlbums) {
+    if (!currentAlbum || tracksAlbums.length < 2) return null;
+
+    const catalogAlbums = getAlbumContinuityCatalogAlbums();
+    const currentPage = normalizeAlbumContinuityPage(currentAlbum.page || "");
+    const currentTitle = normalizeAlbumTitle(currentAlbum.title || "");
+    const catalogIndex = catalogAlbums.findIndex(function (entry) {
+      const entryPage = normalizeAlbumContinuityPage(entry && entry.page ? entry.page : "");
+      const entryTitle = normalizeAlbumTitle(entry && entry.title ? entry.title : "");
+      return (currentPage && entryPage === currentPage) || (currentTitle && entryTitle === currentTitle);
+    });
+
+    if (catalogIndex >= 0 && catalogAlbums.length > 1) {
+      for (let candidateIndex = catalogIndex - 1; candidateIndex >= 0; candidateIndex -= 1) {
+        const candidateCatalog = catalogAlbums[candidateIndex];
+        const candidateAlbum = findTracksAlbumByCatalogEntry(candidateCatalog, tracksAlbums);
+        if (!candidateAlbum || candidateAlbum === currentAlbum) continue;
+        return {
+          album: candidateAlbum,
+          catalog: candidateCatalog || null,
+          wrapped: false
+        };
+      }
+    }
+
+    const tracksIndex = tracksAlbums.indexOf(currentAlbum);
+    if (tracksIndex < 0) return null;
+    for (let candidateIndex = tracksIndex - 1; candidateIndex >= 0; candidateIndex -= 1) {
+      const candidateAlbum = tracksAlbums[candidateIndex];
+      if (!candidateAlbum || candidateAlbum === currentAlbum) continue;
+      return {
+        album: candidateAlbum,
+        catalog: null,
+        wrapped: false
       };
     }
     return null;
@@ -4347,9 +4471,13 @@ function openAppDownloadGatekeeper(appName, url) {
 
     const tracksAlbums = getAlbumContinuityTracksData();
     if (!tracksAlbums.length) {
-      loadTracksData().catch(function () {
-        // Keep the current playlist unchanged if metadata is unavailable.
-      });
+      if (options && options.reason === "next") {
+        scheduleAlbumContinuityNavigationRetry("next", options.navigationOptions);
+      } else {
+        loadTracksData().catch(function () {
+          // Keep the current playlist unchanged if metadata is unavailable.
+        });
+      }
       return -1;
     }
 
@@ -4385,6 +4513,120 @@ function openAppDownloadGatekeeper(appName, url) {
       reason: options && options.reason ? String(options.reason) : ""
     });
     return firstNextIndex;
+  }
+
+  function extendAlbumPlaylistToPreviousAlbum(options) {
+    const list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
+    const currentIndex = Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1;
+    const requestedFromIndex = options && Number.isInteger(options.fromIndex)
+      ? options.fromIndex
+      : currentIndex;
+    if (!list.length || currentIndex < 0 || requestedFromIndex > 0) return -1;
+    if (audioState.homeMode === "radio" || audioState.shuffleOn) return -1;
+    if (audioState.playlistKind === "global" || audioState.playlistKind === "favorites") return -1;
+    if (String(audioState.playlistToken || "").startsWith("manual-")) return -1;
+
+    const tracksAlbums = getAlbumContinuityTracksData();
+    if (!tracksAlbums.length) {
+      if (options && options.reason === "previous") {
+        scheduleAlbumContinuityNavigationRetry("previous", options.navigationOptions);
+      } else {
+        loadTracksData().catch(function () {});
+      }
+      return -1;
+    }
+
+    const currentTrack = list[0];
+    const currentAlbum = findTracksAlbumForContinuityTrack(currentTrack, tracksAlbums);
+    const previousAlbum = findPreviousAlbumForContinuity(currentAlbum, tracksAlbums);
+    if (!previousAlbum || !previousAlbum.album) return -1;
+    const previousTracks = previousAlbum.album.tracks
+      .map(function (track) { return buildAlbumContinuityTrack(track, previousAlbum.album, previousAlbum.catalog); })
+      .filter(Boolean);
+    if (!previousTracks.length) return -1;
+
+    const lastPreviousTrack = previousTracks[previousTracks.length - 1];
+    const duplicateIndex = list.findIndex(function (existing) {
+      return existing && existing.src && lastPreviousTrack && srcMatches(existing.src, lastPreviousTrack.src);
+    });
+    if (duplicateIndex >= 0) return duplicateIndex;
+
+    audioState.playlist = previousTracks.concat(list);
+    audioState.currentIndex = currentIndex + previousTracks.length;
+    audioState.playlistKind = "album";
+    syncPlaylistContext(audioState.playlist, { preserveRecent: true });
+    const previousIndex = previousTracks.length - 1;
+    trackAudioRuntimeEvent("album_continuity_extend", {
+      from_index: currentIndex,
+      to_index: previousIndex,
+      from_album: normalizeAlbumTitle(currentAlbum && currentAlbum.title ? currentAlbum.title : ""),
+      to_album: normalizeAlbumTitle(previousAlbum.album.title || ""),
+      prepended_count: previousTracks.length,
+      wrapped: Boolean(previousAlbum.wrapped),
+      direction: "previous",
+      reason: options && options.reason ? String(options.reason) : ""
+    });
+    return previousIndex;
+  }
+
+  function scheduleAlbumContinuityNavigationRetry(direction, navigationOptions) {
+    const opts = navigationOptions || {};
+    if (opts.albumContinuityRetry) return;
+    const currentTrack = getCurrentPlaylistTrack();
+    const guardSrc = toAbsoluteUrlOrEmpty(
+      getCurrentLogicalAudioSrc() || (currentTrack && currentTrack.src) || ""
+    );
+    const guardMatches = function (request) {
+      if (!request) return false;
+      const liveTrack = getCurrentPlaylistTrack();
+      const liveSrc = toAbsoluteUrlOrEmpty(
+        getCurrentLogicalAudioSrc() || (liveTrack && liveTrack.src) || ""
+      );
+      const sameSrc = request.src
+        ? Boolean(liveSrc && srcMatches(liveSrc, request.src))
+        : !liveSrc;
+      return Number(audioState.startRequestToken || 0) === request.startRequestToken &&
+        Number(audioState.modeTransitionToken || 0) === request.modeTransitionToken &&
+        audioState.homeMode === request.homeMode &&
+        Boolean(audioState.shuffleOn) === request.shuffleOn &&
+        sameSrc;
+    };
+    const activeRequest = audioState.albumContinuityNavigationRequest;
+    if (activeRequest && guardMatches(activeRequest)) {
+      if (activeRequest.commands.length < 8) {
+        activeRequest.commands.push({
+          direction: direction === "previous" ? "previous" : "next",
+          options: Object.assign({}, opts, { albumContinuityRetry: true })
+        });
+      }
+      return;
+    }
+    if (activeRequest) audioState.albumContinuityNavigationRequest = null;
+    const request = {
+      startRequestToken: Number(audioState.startRequestToken || 0),
+      modeTransitionToken: Number(audioState.modeTransitionToken || 0),
+      src: guardSrc,
+      homeMode: audioState.homeMode,
+      shuffleOn: Boolean(audioState.shuffleOn),
+      commands: [{
+        direction: direction === "previous" ? "previous" : "next",
+        options: Object.assign({}, opts, { albumContinuityRetry: true })
+      }]
+    };
+    audioState.albumContinuityNavigationRequest = request;
+    loadTracksData().then(function () {
+      if (audioState.albumContinuityNavigationRequest !== request) return;
+      audioState.albumContinuityNavigationRequest = null;
+      if (!guardMatches(request)) return;
+      request.commands.splice(0, request.commands.length).forEach(function (command) {
+        if (command.direction === "previous") playPrevious(command.options);
+        else playNext(command.options);
+      });
+    }).catch(function () {
+      if (audioState.albumContinuityNavigationRequest === request) {
+        audioState.albumContinuityNavigationRequest = null;
+      }
+    });
   }
 
   function buildPreservedTrack(track, fallbackSrc) {
@@ -4566,22 +4808,30 @@ function openAppDownloadGatekeeper(appName, url) {
   }
 
   function buildArtworkBlobAndSetMetadata(track, metadataArgs) {
-    const artworkEntries = buildMediaSessionArtwork(track);
-    const firstSrc = artworkEntries[0] && artworkEntries[0].src ? artworkEntries[0].src : "";
+    const artworkEntries = metadataArgs && Array.isArray(metadataArgs.artworkEntries)
+      ? metadataArgs.artworkEntries
+      : buildMediaSessionArtwork(track);
     const metadataKey = String(metadataArgs && metadataArgs.key ? metadataArgs.key : "");
 
     function isCurrentMetadataRequest() {
       return !metadataKey || audioState.lastMediaSessionKey === metadataKey;
     }
 
-    function commitMetadata(artworkSrc, artworkType) {
+    function commitMetadata() {
       if (!isCurrentMetadataRequest()) return;
+      const artwork = artworkEntries.length
+        ? artworkEntries
+        : [{
+            src: getMediaSessionFallbackArtwork(),
+            sizes: "512x512",
+            type: "image/png"
+          }];
       if (mediaSessionApi && typeof mediaSessionApi.setMetadata === "function") {
         mediaSessionApi.setMetadata({
           title: metadataArgs.title,
           artist: metadataArgs.artist,
           album: metadataArgs.album,
-          artwork: [{ src: artworkSrc, sizes: "512x512", type: artworkType }]
+          artwork
         });
         return;
       }
@@ -4590,68 +4840,15 @@ function openAppDownloadGatekeeper(appName, url) {
           title: metadataArgs.title,
           artist: metadataArgs.artist,
           album: metadataArgs.album,
-          artwork: [{ src: artworkSrc, sizes: "512x512", type: artworkType }]
+          artwork
         });
       } catch (_err) {}
     }
 
-    if (!firstSrc || typeof Image === "undefined" || typeof HTMLCanvasElement === "undefined") {
-      commitMetadata((artworkEntries[0] && artworkEntries[0].src) || getMediaSessionFallbackArtwork(), "image/png");
-      return;
-    }
-
-    if (
-      firstSrc &&
-      window._infraArtworkBlobUrl &&
-      window._infraArtworkLastSrc === firstSrc
-    ) {
-      commitMetadata(window._infraArtworkBlobUrl, "image/jpeg");
-      return;
-    }
-
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = function () {
-      if (!isCurrentMetadataRequest()) return;
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = 512;
-        canvas.height = 512;
-        canvas.getContext("2d").drawImage(img, 0, 0, 512, 512);
-        canvas.toBlob(function (blob) {
-          if (!isCurrentMetadataRequest()) return;
-          if (!blob) {
-            commitMetadata(firstSrc, "image/jpeg");
-            return;
-          }
-          const blobUrl = URL.createObjectURL(blob);
-          if (!isCurrentMetadataRequest()) {
-            try {
-              URL.revokeObjectURL(blobUrl);
-            } catch (_err) {
-              // Ignore cleanup failures for an obsolete artwork request.
-            }
-            return;
-          }
-          if (window._infraArtworkBlobUrl) {
-            try {
-              URL.revokeObjectURL(window._infraArtworkBlobUrl);
-            } catch (_e) {
-              // Ignore revoke errors.
-            }
-          }
-          window._infraArtworkBlobUrl = blobUrl;
-          window._infraArtworkLastSrc = firstSrc;
-          commitMetadata(blobUrl, "image/jpeg");
-        }, "image/jpeg", 0.92);
-      } catch (_err) {
-        commitMetadata(firstSrc, "image/jpeg");
-      }
-    };
-    img.onerror = function () {
-      commitMetadata(firstSrc, "image/jpeg");
-    };
-    img.src = firstSrc;
+    // Media Session can consume the canonical cover URLs directly. Avoiding an
+    // extra Image + canvas + blob pipeline removes a duplicate fetch/decode and
+    // keeps the metadata commit guarded by the current track key.
+    commitMetadata();
   }
 
   function buildResponsiveCoverCandidate(urlValue, targetWidth) {
@@ -4664,70 +4861,27 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function buildMediaSessionArtwork(track) {
     const fallbackArtwork = getMediaSessionFallbackArtwork();
-    const trackArtwork = resolveCoverUrl(track || null, { width: 900 });
-    const tracksArtwork = resolveTracksAlbumArtwork(track)
-      ? normalizeCoverUrl(resolveTracksAlbumArtwork(track), { width: 900 })
-      : "";
-    const catalogArtwork = resolveCatalogAlbumArtwork(track)
-      ? normalizeCoverUrl(resolveCatalogAlbumArtwork(track), { width: 900 })
-      : "";
-    const docArtwork = getAlbumCoverFromDoc(document, window.location.href);
-    const domArtwork = docArtwork
-      ? normalizeArtworkUrl(docArtwork)
-      : "";
-    const baseSources = [trackArtwork, tracksArtwork, catalogArtwork, domArtwork].filter(Boolean);
-    const candidates = [];
-    const unique = [];
-    const seen = new Set();
-
-    baseSources.forEach(function (src) {
-      candidates.push({
-        src,
-        sizes: inferArtworkSizeHint(src)
-      });
-    });
-
-    baseSources.forEach(function (src) {
-      const responsive900 = buildResponsiveCoverCandidate(src, 900);
-      const responsive480 = buildResponsiveCoverCandidate(src, 480);
-      if (responsive900) candidates.push({ src: responsive900, sizes: "900x900" });
-      if (responsive480) candidates.push({ src: responsive480, sizes: "480x480" });
-    });
-
-    candidates.push({
-      src: fallbackArtwork,
-      sizes: "512x512"
-    });
-
-    candidates.forEach(function (candidate) {
-      if (!candidate || !candidate.src) return;
-      const normalizedSrc = normalizeArtworkUrl(candidate.src);
-      const dedupeKey = `${normalizedSrc}|${candidate.sizes || inferArtworkSizeHint(normalizedSrc)}`;
-      if (seen.has(dedupeKey)) return;
-      seen.add(dedupeKey);
-      const versionedSrc = withMediaSessionArtworkVersion(normalizedSrc, track);
-      unique.push({
-        src: versionedSrc,
-        sizes: candidate.sizes || inferArtworkSizeHint(normalizedSrc),
-        type: getArtworkType(normalizedSrc)
-      });
-    });
-
-    if (!unique.length) {
-      unique.push({
-        src: withMediaSessionArtworkVersion(fallbackArtwork, track),
-        sizes: "512x512",
-        type: "image/png"
-      });
-    }
-
-    return unique;
+    const canonicalArtwork = resolveCoverUrl(track || null, { width: 900 }) || fallbackArtwork;
+    const normalizedSrc = normalizeArtworkUrl(canonicalArtwork || fallbackArtwork);
+    return [{
+      src: withMediaSessionArtworkVersion(normalizedSrc, track),
+      sizes: srcMatches(normalizedSrc, fallbackArtwork) ? "512x512" : inferArtworkSizeHint(normalizedSrc),
+      type: getArtworkType(normalizedSrc)
+    }];
   }
 
-  function clearWaitingRecovery() {
+  function clearWaitingRecovery(options) {
+    const opts = options || {};
     if (audioState.waitingRecoveryTimer) {
       clearTimeout(audioState.waitingRecoveryTimer);
       audioState.waitingRecoveryTimer = null;
+    }
+    if (!opts.preserveStallRecovery && audioState.stallRecovery) {
+      const recovery = audioState.stallRecovery;
+      if (recovery.audio && recovery.listener) {
+        recovery.audio.removeEventListener("canplay", recovery.listener);
+      }
+      audioState.stallRecovery = null;
     }
     audioState.prefetchPausedUntil = 0;
   }
@@ -4747,15 +4901,14 @@ function openAppDownloadGatekeeper(appName, url) {
     const src = getCurrentLogicalAudioSrc();
     if (!src) return;
 
+    clearWaitingRecovery();
+    const requestToken = audioState.startRequestToken;
     const resumeAt = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-
-    try {
-      audio.load();
-    } catch (_err) {
-      // Ignore.
-    }
-
     const resume = function () {
+      if (audioState.stallRecovery !== recovery) return;
+      audioState.stallRecovery = null;
+      if (requestToken !== audioState.startRequestToken) return;
+      if (!srcMatches(src, getCurrentLogicalAudioSrc())) return;
       if (Number.isFinite(resumeAt) && resumeAt > 0) {
         try {
           audio.currentTime = resumeAt;
@@ -4764,14 +4917,43 @@ function openAppDownloadGatekeeper(appName, url) {
         }
       }
       audio.play().catch(function () {
-        // Ignore autoplay errors.
+        failAudioRecovery({
+          request_token: requestToken,
+          reason: "stall_reload_play_rejected",
+          strategy: "reload_current_source"
+        });
       });
     };
-
+    const recovery = { audio, listener: resume, requestToken, src };
+    audioState.stallRecovery = recovery;
     audio.addEventListener("canplay", resume, { once: true });
+    beginAudioRecovery({
+      request_token: requestToken,
+      reason: "midtrack_stall",
+      strategy: "reload_current_source"
+    });
+    markAudioPauseIntent("source_reset", "stall_recovery");
+    try {
+      audio.load();
+    } catch (_err) {
+      clearWaitingRecovery();
+      failAudioRecovery({
+        request_token: requestToken,
+        reason: "stall_reload_failed",
+        strategy: "reload_current_source"
+      });
+    }
   }
 
   function scheduleWaitingRecovery() {
+    const activeStallRecovery = audioState.stallRecovery;
+    if (
+      activeStallRecovery &&
+      activeStallRecovery.requestToken === audioState.startRequestToken &&
+      srcMatches(activeStallRecovery.src, getCurrentLogicalAudioSrc())
+    ) {
+      return;
+    }
     clearWaitingRecovery();
     const audio = audioState.audio;
     if (!audio || audio.paused) return;
@@ -4966,7 +5148,7 @@ function openAppDownloadGatekeeper(appName, url) {
         `artwork=${artworkEntries[0] && artworkEntries[0].src ? artworkEntries[0].src : ""}`
       );
       try {
-        buildArtworkBlobAndSetMetadata(track, { title, artist, album, key });
+        buildArtworkBlobAndSetMetadata(track, { title, artist, album, key, artworkEntries });
       } catch (_err) {
         // Ignore metadata errors.
       }
@@ -5182,6 +5364,12 @@ function openAppDownloadGatekeeper(appName, url) {
     trackAudioRuntimeEvent("recovery_failed", buildAudioRecoveryPayload(recovery, {
       paused: Boolean(audioState.audio && audioState.audio.paused)
     }));
+    if (
+      audioState.stallRecovery &&
+      audioState.stallRecovery.requestToken === recovery.requestToken
+    ) {
+      clearWaitingRecovery();
+    }
     clearActiveAudioRecovery();
   }
 
@@ -5811,7 +5999,6 @@ function openAppDownloadGatekeeper(appName, url) {
         // Keep fallback in place if remote catalog loading fails.
       });
       await hydrateHomeCatalog();
-      prepareAlbumCoversForSession("home_start");
       if (!adminMode) enforceHomeModuleOrder();
       enforceHomeAppsCollapsed(adminMode);
 

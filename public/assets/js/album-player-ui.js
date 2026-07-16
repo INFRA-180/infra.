@@ -234,8 +234,24 @@
   function prepareAlbumUiTrackForPlayback(ui, index) {
     if (!ui || !Array.isArray(ui.playlist) || !ui.playlist[index]) return index;
     if (audioState.homeMode !== "radio") {
+      const selectedTrack = ui.playlist[index];
+      const currentSrc = getCurrentLogicalAudioSrc();
+      const changesShuffleAlbum = Boolean(
+        audioState.shuffleOn &&
+        (!currentSrc || !ui.playlist.some(function (track) {
+          return track && srcMatches(track.src, currentSrc);
+        }))
+      );
       audioState.playlistKind = "album";
       ensurePlaylistFromUi(ui);
+      if (changesShuffleAlbum) {
+        const selectedSrc = String(selectedTrack && selectedTrack.src || "");
+        audioState.shuffleSessionSeed = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+        audioState.shuffleHistory = selectedSrc ? [selectedSrc] : [];
+        audioState.shuffleHistoryCursor = audioState.shuffleHistory.length - 1;
+        audioState.upcomingTrackPlan = null;
+        savePlaybackQueueContext();
+      }
       return index;
     }
 
@@ -430,17 +446,26 @@
         }
 
         const playIndex = prepareAlbumUiTrackForPlayback(ui, index);
-        startTrack(playIndex, { seamless: true });
+        startTrack(playIndex, {
+          seamless: true,
+          immediatePlay: true,
+          userGesture: true,
+          surface: "album_track"
+        });
       });
 
       retryBtn.addEventListener("click", function (event) {
         event.stopPropagation();
         audioState.ui = ui;
         clearTrackFailure(track.src);
-        const audio = audioState.audio;
-        if (audio) resetAudioElementForSource(audio, track.src);
         const playIndex = prepareAlbumUiTrackForPlayback(ui, index);
-        startTrack(playIndex, { seamless: true });
+        startTrack(playIndex, {
+          seamless: true,
+          immediatePlay: true,
+          userGesture: true,
+          forceReload: true,
+          surface: "album_retry"
+        });
       });
 
       row.addEventListener("click", function (event) {
@@ -468,7 +493,12 @@
           return;
         }
         const playIndex = prepareAlbumUiTrackForPlayback(ui, index);
-        startTrack(playIndex, { seamless: true });
+        startTrack(playIndex, {
+          seamless: true,
+          immediatePlay: true,
+          userGesture: true,
+          surface: "album_row"
+        });
       });
 
       let seeking = false;
@@ -496,7 +526,13 @@
           return;
         }
 
-        startTrack(playIndex, { seekRatio: clamped, resume: true });
+        startTrack(playIndex, {
+          seekRatio: clamped,
+          resume: true,
+          immediatePlay: Boolean(shouldPlay),
+          userGesture: Boolean(shouldPlay),
+          surface: "album_seek"
+        });
         if (!shouldPlay) {
           // If user dragged without intent to play, keep paused once metadata is ready.
           audio.pause();

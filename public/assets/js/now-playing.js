@@ -43,6 +43,7 @@
     const getCurrentTrackArtwork = method(ctx, "getCurrentTrackArtwork", function () { return ""; });
     const normalizeArtworkUrl = method(ctx, "normalizeArtworkUrl", function (value) { return String(value || ""); });
     const formatTrackDuration = method(ctx, "formatTrackDuration", function () { return "0:00"; });
+    let nowPlayingQueueRenderKey = "";
 
   function readNowPlayingVolumeVisible() {
     if (isIosDevice()) return false;
@@ -357,7 +358,7 @@
       transport.overlayQueueToggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
     }
     if (shouldOpen) {
-      syncNowPlayingQueue();
+      syncNowPlayingQueue({ force: true });
       requestAnimationFrame(function () {
         transport.overlayQueueSheet.classList.add("is-visible");
         if (transport.overlayQueueList) transport.overlayQueueList.scrollTop = 0;
@@ -414,12 +415,12 @@
     if (transport.overlayShuffle) {
       transport.overlayShuffle.disabled = !canSkip;
       transport.overlayShuffle.classList.toggle("is-on", shuffleActive);
-      transport.overlayShuffle.classList.toggle("is-muted-active", Boolean(audioState.shuffleOn && isRadioMode));
+      transport.overlayShuffle.classList.remove("is-muted-active");
       transport.overlayShuffle.setAttribute("aria-pressed", shuffleActive ? "true" : "false");
       transport.overlayShuffle.setAttribute(
         "aria-label",
         isRadioMode
-          ? (audioState.shuffleOn ? "Shuffle memorise, ignore pendant la radio" : "Memoriser le shuffle album")
+          ? "Activer le shuffle album et desactiver la radio"
           : (shuffleActive ? "Desactiver le shuffle album" : "Activer le shuffle album")
       );
     }
@@ -464,19 +465,22 @@
     syncNowPlayingOverlayProgress();
   }
 
-  function syncNowPlayingQueue() {
+  function syncNowPlayingQueue(options) {
+    const opts = options || {};
     const transport = audioState.transport;
     if (!transport || !transport.overlayQueue || !transport.overlayQueueList) return;
-    const list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
+    let list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
     const currentIndex = getCurrentPlaylistIndexSafe();
     const nextIndices = getQueuePreviewIndices(48);
+    // Radio can extend and replace its materialized queue while calculating the
+    // preview, so always render/count against the resulting playlist instance.
+    list = Array.isArray(audioState.playlist) ? audioState.playlist : list;
     const indices = currentIndex >= 0 && currentIndex < list.length
       ? [currentIndex].concat(nextIndices.filter(function (index) { return index !== currentIndex; }))
       : nextIndices;
     const hasQueue = indices.length > 1;
 
     transport.overlayQueue.hidden = !hasQueue;
-    transport.overlayQueueList.replaceChildren();
     if (transport.overlayQueueToggle) {
       transport.overlayQueueToggle.disabled = !hasQueue;
       transport.overlayQueueToggle.setAttribute("aria-expanded", audioState.nowPlayingQueueOpen && hasQueue ? "true" : "false");
@@ -488,9 +492,38 @@
     }
 
     if (!hasQueue || !list.length) {
+      if (nowPlayingQueueRenderKey || transport.overlayQueueList.childNodes.length) {
+        transport.overlayQueueList.replaceChildren();
+        nowPlayingQueueRenderKey = "";
+      }
       if (audioState.nowPlayingQueueOpen) setNowPlayingQueueOpen(false);
       return;
     }
+
+    // Keep the closed queue lightweight: only its availability and count need
+    // to stay current. The rows (and their covers) are rendered on demand.
+    if (!audioState.nowPlayingOpen || !audioState.nowPlayingQueueOpen) return;
+
+    const renderKey = [
+      String(audioState.playlistKind || ""),
+      String(audioState.homeMode || ""),
+      audioState.shuffleOn ? "1" : "0",
+      String(currentIndex),
+      indices.map(function (index) {
+        const sourceTrack = list[index] || {};
+        const meta = getTrackMetaByAssetPath(sourceTrack.src || "") || {};
+        return [
+          index,
+          sourceTrack.src || "",
+          sourceTrack.name || meta.name || "",
+          sourceTrack.album || meta.album || "",
+          sourceTrack.artwork || meta.artwork || "",
+          sourceTrack.duration || getCachedTrackDuration(sourceTrack.src || "") || meta.duration || ""
+        ].join("\u001e");
+      }).join("\u001d")
+    ].join("\u001f");
+    if (!opts.force && renderKey === nowPlayingQueueRenderKey) return;
+    transport.overlayQueueList.replaceChildren();
 
     const fragment = document.createDocumentFragment();
     indices.forEach(function (index, position) {
@@ -501,7 +534,7 @@
       const album = normalizeAlbumTitle(track && track.album ? track.album : "");
       const meta = getTrackMetaByAssetPath(track && track.src ? track.src : "");
       const duration = String((track && track.duration) || getCachedTrackDuration(track && track.src ? track.src : "") || (meta && meta.duration) || "").trim() || "--:--";
-      const artwork = normalizeArtworkUrl(
+      const artwork = resolveCoverUrl(track, { width: 480 }) || normalizeArtworkUrl(
         (track && track.artwork) ||
         (meta && meta.artwork) ||
         getCurrentTrackArtwork(track) ||
@@ -576,6 +609,7 @@
     });
 
     transport.overlayQueueList.appendChild(fragment);
+    nowPlayingQueueRenderKey = renderKey;
   }
 
   function syncNowPlayingOverlayProgress() {

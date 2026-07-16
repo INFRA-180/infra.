@@ -23,7 +23,6 @@
     "first_byte",
     "global_playlist_build_done",
     "global_playlist_build_start",
-    "heartbeat",
     "initial_random_tap",
     "source_resolved",
     "source_assigned",
@@ -69,17 +68,17 @@
     "sw_reload_executed",
     "sw_reload_pending",
     "suspend",
-    "visibilitychange",
     "waiting"
   ]);
   const MAX_REQUESTS = 24;
-  const DB_NAME = "infra_audio_telemetry_v1";
-  const DB_STORE = "events";
-  const QUEUE_CAP = 100;
-  const QUEUE_TTL_MS = 24 * 60 * 60 * 1000;
-  const FLUSH_THRESHOLD = 40;
-  const FLUSH_INTERVAL_MS = 60000;
-  const HEARTBEAT_MS = 15000;
+  const DB_NAME = "infra_audio_telemetry_v2";
+  const DB_STORE = "sessions";
+  const LEGACY_DB_NAME = "infra_audio_telemetry_v1";
+  const SESSION_SCHEMA_VERSION = 2;
+  const SESSION_EVENT_CAP = 48;
+  const SESSION_STORE_CAP = 4;
+  const SESSION_TTL_MS = 72 * 60 * 60 * 1000;
+  const SESSION_ENVELOPE_MAX_BYTES = 32 * 1024;
   const TELEMETRY_STRING_FIELDS = new Set([
     "event", "trace_id", "build", "track", "album", "source", "ua_class",
     "effective_type", "visibility_state", "trigger", "surface", "branch",
@@ -113,7 +112,7 @@
       : Date.now();
   }
 
-  function createTraceId() {
+  function createRandomId() {
     try {
       if (window.crypto && typeof window.crypto.randomUUID === "function") {
         return window.crypto.randomUUID();
@@ -121,7 +120,28 @@
     } catch (_err) {
       // Fallback below.
     }
-    return `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    return `${Math.random().toString(36).slice(2, 10)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function createTraceId() {
+    return `t-${createRandomId()}`;
+  }
+
+  function createSessionId() {
+    return `s-${Date.now().toString(36)}-${createRandomId()}`
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "")
+      .slice(0, 96);
+  }
+
+  function byteLength(value) {
+    const text = String(value || "");
+    if (typeof TextEncoder === "function") return new TextEncoder().encode(text).byteLength;
+    try {
+      return unescape(encodeURIComponent(text)).length;
+    } catch (_err) {
+      return text.length * 2;
+    }
   }
 
   function sanitizeTelemetryEvent(input) {
@@ -144,6 +164,85 @@
     return output;
   }
 
+  function sanitizeStoredSession(input) {
+    if (!input || typeof input !== "object") return null;
+    const sessionId = String(input.session_id || "").trim().slice(0, 96);
+    const startedAt = Number(input.started_at_ms);
+    if (!/^s-[a-z0-9-]{12,94}$/.test(sessionId) || !Number.isFinite(startedAt) || startedAt <= 0) {
+      return null;
+    }
+    const status = input.status === "sealed" ? "sealed" : "active";
+    const events = (Array.isArray(input.events) ? input.events : [])
+      .map(sanitizeTelemetryEvent)
+      .filter(Boolean)
+      .slice(-SESSION_EVENT_CAP);
+    const lastAt = Number(input.last_at_ms);
+    const endedAt = Number(input.ended_at_ms);
+    return {
+      schema_version: SESSION_SCHEMA_VERSION,
+      session_id: sessionId,
+      status,
+      build: String(input.build || "").trim().slice(0, 120),
+      ua_class: String(input.ua_class || "").trim().slice(0, 32),
+      effective_type: String(input.effective_type || "").trim().slice(0, 32),
+      started_at_ms: startedAt,
+      last_at_ms: Number.isFinite(lastAt) && lastAt >= startedAt ? lastAt : startedAt,
+      ended_at_ms: status === "sealed" && Number.isFinite(endedAt) && endedAt >= startedAt ? endedAt : 0,
+      close_reason: String(input.close_reason || "").trim().slice(0, 40),
+      dropped_events: Math.max(0, Math.floor(Number(input.dropped_events) || 0)),
+      events
+    };
+  }
+
+  function toSessionReport(input) {
+    const session = sanitizeStoredSession(input);
+    if (!session || session.status !== "sealed" || !session.events.length) return null;
+    const endedAt = session.ended_at_ms || session.last_at_ms || session.started_at_ms;
+    return {
+      schema_version: SESSION_SCHEMA_VERSION,
+      session_id: session.session_id,
+      build: session.build,
+      ua_class: session.ua_class,
+      effective_type: session.effective_type,
+      started_at_ms: session.started_at_ms,
+      ended_at_ms: endedAt,
+      duration_ms: Math.max(0, endedAt - session.started_at_ms),
+      close_reason: session.close_reason || "unknown",
+      dropped_events: session.dropped_events,
+      events: session.events.map(function (event) { return Object.assign({}, event); })
+    };
+  }
+
+  function buildSessionEnvelope(inputReports) {
+    const reports = (Array.isArray(inputReports) ? inputReports : [])
+      .map(toSessionReport)
+      .filter(Boolean)
+      .slice(0, SESSION_STORE_CAP);
+    if (!reports.length) return null;
+
+    let envelope = { schema_version: SESSION_SCHEMA_VERSION, reports };
+    let serialized = JSON.stringify(envelope);
+    while (byteLength(serialized) > SESSION_ENVELOPE_MAX_BYTES && reports.length) {
+      let largest = null;
+      reports.forEach(function (report) {
+        if (!largest || report.events.length > largest.events.length) largest = report;
+      });
+      if (largest && largest.events.length > 1) {
+        largest.events.shift();
+        largest.dropped_events += 1;
+      } else if (reports.length > 1) {
+        reports.shift();
+      } else {
+        return null;
+      }
+      envelope = { schema_version: SESSION_SCHEMA_VERSION, reports };
+      serialized = JSON.stringify(envelope);
+    }
+    return byteLength(serialized) <= SESSION_ENVELOPE_MAX_BYTES
+      ? { envelope, serialized }
+      : null;
+  }
+
   function call(ctx, name) {
     if (!ctx || typeof ctx[name] !== "function") return undefined;
     try {
@@ -158,14 +257,15 @@
     const fineStarts = new Map();
     const fineAuto = new Map();
     const traceIds = new Map();
+    const sessions = new Map();
     let dbPromise = null;
-    let queue = [];
-    let queueLoaded = false;
-    let flushInFlight = false;
-    let flushTimer = null;
-    let heartbeatTimer = null;
-    let eventCounter = 0;
+    let sessionsLoaded = false;
+    let sessionsLoadingPromise = null;
+    let flushInFlightPromise = null;
+    let lifecycleFlushAfterInFlight = false;
+    let currentSessionId = "";
     let lifecycleInitialized = false;
+    let lifecycleDeliveryAttempted = false;
     let healthSessionActive = false;
     let healthSessionStartedAt = 0;
 
@@ -207,18 +307,14 @@
       const token = Number(requestToken);
       if (!Number.isFinite(token) || token <= 0) return "";
       if (!traceIds.has(token)) traceIds.set(token, createTraceId());
-      while (traceIds.size > MAX_REQUESTS) {
-        traceIds.delete(traceIds.keys().next().value);
-      }
+      while (traceIds.size > MAX_REQUESTS) traceIds.delete(traceIds.keys().next().value);
       return traceIds.get(token) || "";
     }
 
     function getAutoFlag(type, data, requestToken) {
       if (data && data.trigger === "auto") return true;
       if (data && data.auto === true) return true;
-      if (Number.isFinite(requestToken) && fineAuto.has(requestToken)) {
-        return Boolean(fineAuto.get(requestToken));
-      }
+      if (Number.isFinite(requestToken) && fineAuto.has(requestToken)) return Boolean(fineAuto.get(requestToken));
       return false;
     }
 
@@ -272,16 +368,6 @@
       };
     }
 
-    function createEventId() {
-      eventCounter += 1;
-      return [
-        "ev",
-        Date.now().toString(36),
-        eventCounter.toString(36),
-        Math.random().toString(36).slice(2, 8)
-      ].join("-");
-    }
-
     function openDb() {
       if (!("indexedDB" in window)) return Promise.resolve(null);
       if (dbPromise) return dbPromise;
@@ -295,19 +381,11 @@
         }
         request.onupgradeneeded = function () {
           const db = request.result;
-          if (!db.objectStoreNames.contains(DB_STORE)) {
-            db.createObjectStore(DB_STORE, { keyPath: "_telemetry_id" });
-          }
+          if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, { keyPath: "session_id" });
         };
-        request.onsuccess = function () {
-          resolve(request.result);
-        };
-        request.onerror = function () {
-          resolve(null);
-        };
-        request.onblocked = function () {
-          resolve(null);
-        };
+        request.onsuccess = function () { resolve(request.result); };
+        request.onerror = function () { resolve(null); };
+        request.onblocked = function () { resolve(null); };
       });
       return dbPromise;
     }
@@ -324,12 +402,8 @@
             transaction.oncomplete = function () {
               resolve(result && Object.prototype.hasOwnProperty.call(result, "result") ? result.result : result);
             };
-            transaction.onerror = function () {
-              resolve(null);
-            };
-            transaction.onabort = function () {
-              resolve(null);
-            };
+            transaction.onerror = function () { resolve(null); };
+            transaction.onabort = function () { resolve(null); };
           } catch (_err) {
             resolve(null);
           }
@@ -337,131 +411,194 @@
       });
     }
 
-    function deleteEvents(ids) {
-      if (!ids || !ids.length) return;
+    function deleteStoredSessions(ids) {
+      if (!Array.isArray(ids) || !ids.length) return;
       withStore("readwrite", function (store) {
-        ids.forEach(function (id) {
-          store.delete(id);
-        });
+        ids.forEach(function (id) { store.delete(id); });
         return true;
       }).catch(function () {});
     }
 
-    function pruneQueue() {
-      const cutoff = Date.now() - QUEUE_TTL_MS;
+    function persistSession(session) {
+      const sanitized = sanitizeStoredSession(session);
+      if (!sanitized) return;
+      withStore("readwrite", function (store) { return store.put(sanitized); }).catch(function () {});
+    }
+
+    function clearLegacyDb() {
+      if (!("indexedDB" in window) || typeof indexedDB.deleteDatabase !== "function") return;
+      try { indexedDB.deleteDatabase(LEGACY_DB_NAME); } catch (_err) {}
+    }
+
+    function pruneSessions() {
+      const cutoff = Date.now() - SESSION_TTL_MS;
       const dropped = [];
-      queue = queue.filter(function (event) {
-        const timestamp = Number(event && event.timestamp_ms);
-        const keep = Number.isFinite(timestamp) && timestamp >= cutoff;
-        if (!keep && event && event._telemetry_id) dropped.push(event);
-        return keep;
+      sessions.forEach(function (session, id) {
+        const timestamp = Number(session.ended_at_ms || session.last_at_ms || session.started_at_ms);
+        if (!Number.isFinite(timestamp) || timestamp < cutoff) {
+          sessions.delete(id);
+          dropped.push(id);
+        }
       });
-      if (queue.length > QUEUE_CAP) {
-        dropped.push.apply(dropped, queue.splice(0, queue.length - QUEUE_CAP));
+      const ordered = Array.from(sessions.values()).sort(function (left, right) {
+        return Number(left.last_at_ms || left.started_at_ms) - Number(right.last_at_ms || right.started_at_ms);
+      });
+      while (ordered.length > SESSION_STORE_CAP) {
+        let index = ordered.findIndex(function (session) { return session.session_id !== currentSessionId; });
+        if (index < 0) index = 0;
+        const removed = ordered.splice(index, 1)[0];
+        if (removed) {
+          sessions.delete(removed.session_id);
+          dropped.push(removed.session_id);
+        }
       }
-      if (dropped.length) {
-        deleteEvents(dropped.map(function (event) { return event._telemetry_id; }).filter(Boolean));
+      if (dropped.length) deleteStoredSessions(dropped);
+    }
+
+    function loadSessions() {
+      if (sessionsLoaded) return Promise.resolve(Array.from(sessions.values()));
+      if (sessionsLoadingPromise) return sessionsLoadingPromise;
+      sessionsLoadingPromise = withStore("readonly", function (store) { return store.getAll(); })
+        .then(function (stored) {
+          (Array.isArray(stored) ? stored : []).forEach(function (candidate) {
+            const session = sanitizeStoredSession(candidate);
+            if (session && !sessions.has(session.session_id)) sessions.set(session.session_id, session);
+          });
+          sessionsLoaded = true;
+          pruneSessions();
+          return Array.from(sessions.values());
+        })
+        .finally(function () { sessionsLoadingPromise = null; });
+      return sessionsLoadingPromise;
+    }
+
+    function createActiveSession() {
+      const environment = getEnvironment();
+      const startedAt = Date.now();
+      const session = {
+        schema_version: SESSION_SCHEMA_VERSION,
+        session_id: createSessionId(),
+        status: "active",
+        build: getRuntimeVersion(),
+        ua_class: getUaClass(),
+        effective_type: environment.effective_type || "",
+        started_at_ms: startedAt,
+        last_at_ms: startedAt,
+        ended_at_ms: 0,
+        close_reason: "",
+        dropped_events: 0,
+        events: []
+      };
+      currentSessionId = session.session_id;
+      lifecycleDeliveryAttempted = false;
+      sessions.set(session.session_id, session);
+      pruneSessions();
+      persistSession(session);
+      return session;
+    }
+
+    function ensureActiveSession() {
+      const current = currentSessionId ? sessions.get(currentSessionId) : null;
+      if (current && current.status === "active") return current;
+      if (lifecycleInitialized && document.visibilityState === "hidden") return null;
+      return createActiveSession();
+    }
+
+    function sealCurrentSession(reason) {
+      const current = currentSessionId ? sessions.get(currentSessionId) : null;
+      currentSessionId = "";
+      if (!current || current.status !== "active") return null;
+      if (!current.events.length) {
+        sessions.delete(current.session_id);
+        deleteStoredSessions([current.session_id]);
+        return null;
       }
+      current.status = "sealed";
+      current.close_reason = String(reason || "hidden").slice(0, 40);
+      current.ended_at_ms = Date.now();
+      current.last_at_ms = Math.max(current.last_at_ms || 0, current.ended_at_ms);
+      persistSession(current);
+      return current;
     }
 
-    function loadQueue() {
-      if (queueLoaded) return Promise.resolve(queue);
-      return withStore("readonly", function (store) {
-        return store.getAll();
-      }).then(function (stored) {
-        const merged = new Map();
-        (Array.isArray(stored) ? stored : []).forEach(function (event) {
-          const sanitized = sanitizeTelemetryEvent(event);
-          if (sanitized && event && event._telemetry_id) {
-            merged.set(event._telemetry_id, Object.assign({ _telemetry_id: event._telemetry_id }, sanitized));
-          } else if (event && event._telemetry_id) {
-            deleteEvents([event._telemetry_id]);
-          }
-        });
-        queue.forEach(function (event) {
-          if (event && event._telemetry_id) merged.set(event._telemetry_id, event);
-        });
-        queue = Array.from(merged.values()).sort(function (a, b) {
-          return Number(a.timestamp_ms || 0) - Number(b.timestamp_ms || 0);
-        });
-        queueLoaded = true;
-        pruneQueue();
-        return queue;
+    function sealInterruptedSessions() {
+      sessions.forEach(function (session) {
+        if (session.status !== "active" || session.session_id === currentSessionId) return;
+        session.status = "sealed";
+        session.close_reason = "interrupted";
+        session.ended_at_ms = session.last_at_ms || session.started_at_ms;
+        persistSession(session);
       });
     }
 
-    function persistEvent(event) {
-      withStore("readwrite", function (store) {
-        return store.put(event);
-      }).catch(function () {});
+    function removeReports(reports) {
+      const ids = reports.map(function (report) { return report.session_id; }).filter(Boolean);
+      ids.forEach(function (id) { sessions.delete(id); });
+      deleteStoredSessions(ids);
     }
 
-    function removeBatch(batch) {
-      const ids = new Set(batch.map(function (event) { return event._telemetry_id; }));
-      queue = queue.filter(function (event) {
-        return !ids.has(event._telemetry_id);
-      });
-      deleteEvents(Array.from(ids));
-    }
-
-    function postBatch(batch, options) {
+    function postSealedSessions(options) {
       const opts = options || {};
       const workerUrl = getWorkerUrl();
-      if (!batch.length || typeof fetch !== "function" || !workerUrl) return Promise.resolve(false);
-      const payload = batch.map(sanitizeTelemetryEvent).filter(Boolean);
-      if (!payload.length) return Promise.resolve(false);
+      if (typeof fetch !== "function" || !workerUrl) return Promise.resolve(false);
+      const sealed = Array.from(sessions.values())
+        .filter(function (session) { return session.status === "sealed" && session.events.length; })
+        .sort(function (left, right) { return left.started_at_ms - right.started_at_ms; })
+        .slice(0, SESSION_STORE_CAP);
+      const built = buildSessionEnvelope(sealed);
+      if (!built) return Promise.resolve(false);
+      const sentReports = built.envelope.reports;
       return fetch(`${workerUrl.replace(/\/+$/, "")}/log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: built.serialized,
         credentials: "omit",
         keepalive: Boolean(opts.keepalive)
       }).then(function (response) {
-        return response && response.ok;
-      }).catch(function () {
-        return false;
-      });
+        if (!response || !response.ok) return false;
+        removeReports(sentReports);
+        return true;
+      }).catch(function () { return false; });
     }
 
     function flushQueue(options) {
       const opts = options || {};
-      if (flushInFlight) return Promise.resolve(false);
-      flushInFlight = true;
-      return loadQueue().then(function () {
-        pruneQueue();
-        if (!queue.length) return false;
-        const batch = queue.slice(0, QUEUE_CAP);
-        // Cross-origin sendBeacon carries credentials in WebKit and triggered
-        // Safari's CORS rejection. Keep the batch in IndexedDB until an
-        // anonymous keepalive fetch is actually acknowledged.
-        return postBatch(batch, { keepalive: Boolean(opts.beacon) }).then(function (ok) {
-          if (ok) removeBatch(batch);
-          return ok;
+      const keepalive = Boolean(opts.beacon || opts.keepalive);
+      if (flushInFlightPromise) {
+        // A startup retry can still be in flight when iOS hides the PWA. Keep
+        // exactly one lifecycle flush pending so the newly sealed session is
+        // attempted as soon as that request settles instead of waiting for a
+        // later launch.
+        if (keepalive) lifecycleFlushAfterInFlight = true;
+        return flushInFlightPromise;
+      }
+      flushInFlightPromise = loadSessions()
+        .then(function () {
+          pruneSessions();
+          return postSealedSessions({ keepalive });
+        })
+        .finally(function () {
+          flushInFlightPromise = null;
+          if (!lifecycleFlushAfterInFlight) return;
+          lifecycleFlushAfterInFlight = false;
+          flushQueue({ keepalive: true });
         });
-      }).finally(function () {
-        flushInFlight = false;
-      });
-    }
-
-    function scheduleFlush(delayMs) {
-      if (flushTimer) return;
-      flushTimer = window.setTimeout(function () {
-        flushTimer = null;
-        flushQueue();
-      }, Math.max(0, Number(delayMs) || 0));
+      return flushInFlightPromise;
     }
 
     function enqueue(event) {
       if (!event || typeof event !== "object") return;
       const sanitized = sanitizeTelemetryEvent(Object.assign({ timestamp_ms: Date.now() }, event));
       if (!sanitized) return;
-      const queued = Object.assign({ _telemetry_id: createEventId() }, sanitized);
-      queue.push(queued);
-      pruneQueue();
-      persistEvent(queued);
-      if (queue.length >= FLUSH_THRESHOLD) {
-        scheduleFlush(0);
+      const session = ensureActiveSession();
+      if (!session) return;
+      session.events.push(sanitized);
+      if (session.events.length > SESSION_EVENT_CAP) {
+        session.dropped_events += session.events.length - SESSION_EVENT_CAP;
+        session.events.splice(0, session.events.length - SESSION_EVENT_CAP);
       }
+      session.last_at_ms = Math.max(session.last_at_ms || 0, sanitized.timestamp_ms);
+      persistSession(session);
     }
 
     function getMonitorTrackValue(payload) {
@@ -477,7 +614,6 @@
       if (ctx.fineTelemetryEnabled === false || typeof fetch !== "function" || !workerUrl) return;
       const eventType = String(type || "").trim();
       if (!FINE_EVENTS.has(eventType)) return;
-
       const source = data && typeof data === "object" ? data : {};
       const audioState = getAudioState();
       const explicitRequestToken = Number(source.request_token);
@@ -487,10 +623,7 @@
         : activeRequestToken;
       const eventNow = now();
 
-      if (eventType === "playing" || eventType === "play_resolved" || eventType === "heartbeat") {
-        markHealthSessionActive();
-      }
-
+      if (eventType === "playing" || eventType === "play_resolved") markHealthSessionActive();
       if (eventType === "click_track" && Number.isFinite(requestToken)) {
         fineStarts.set(requestToken, eventNow);
         fineAuto.set(requestToken, getAutoFlag(eventType, source, requestToken));
@@ -501,15 +634,11 @@
         ? fineStarts.get(requestToken)
         : audioState.audioClickPerfTs;
       const deltaMs = Number.isFinite(startedAt) && startedAt > 0 ? Math.max(0, Math.round(eventNow - startedAt)) : null;
-      const auto = getAutoFlag(eventType, source, requestToken);
-      const errorName = source.reason || source.error_name || "";
-      const trackValue = getMonitorTrackValue(source);
       const providedDeltaMs = Number(source.delta_ms);
       const normalizedDeltaMs = Number.isFinite(providedDeltaMs)
         ? Math.max(0, Math.round(providedDeltaMs))
         : (eventType === "click_track" ? 0 : deltaMs);
-
-      const body = Object.assign({}, source, getEnvironment(), getHealthSessionState(), {
+      enqueue(Object.assign({}, source, getEnvironment(), getHealthSessionState(), {
         event: eventType,
         fine_event: true,
         trace_id: getTraceId(requestToken),
@@ -517,16 +646,14 @@
         timestamp_ms: Date.now(),
         delta_ms: normalizedDeltaMs,
         duration_before_play_ms: eventType === "click_track" ? 0 : normalizedDeltaMs,
-        track: trackValue,
+        track: getMonitorTrackValue(source),
         album: String(source.album || "").toLowerCase(),
         source: source.source || getAudioSource(source.src),
         ua_class: getUaClass(),
-        auto,
+        auto: getAutoFlag(eventType, source, requestToken),
         error: eventType === "play_rejected",
-        error_name: errorName
-      });
-
-      enqueue(body);
+        error_name: source.reason || source.error_name || ""
+      }));
     }
 
     function buildMonitorPayload(track, index, src) {
@@ -542,7 +669,7 @@
       const elapsed = audioState.playRequestTs ? Date.now() - audioState.playRequestTs : null;
       const requestToken = Number(audioState.playRequestToken || audioState.startRequestToken);
       const monitorError = Boolean(data && data.error === true);
-      const body = Object.assign({}, getEnvironment(), data || {}, {
+      enqueue(Object.assign({}, getEnvironment(), data || {}, {
         event: monitorError ? "monitor_error" : "monitor_play",
         trace_id: getTraceId(requestToken),
         build: getRuntimeVersion(),
@@ -553,86 +680,54 @@
         duration_before_play_ms: Number.isFinite(elapsed) ? Math.max(0, Math.round(elapsed)) : null,
         error: monitorError,
         ua_class: getUaClass()
-      });
-
-      enqueue(body);
+      }));
     }
 
     function logAuditEvent(type, track, index, src, data) {
-      trackRuntimeEvent(type, Object.assign(
-        buildMonitorPayload(track, index, src),
-        data || {}
-      ));
+      trackRuntimeEvent(type, Object.assign(buildMonitorPayload(track, index, src), data || {}));
     }
 
     function startHeartbeat() {
-      if (heartbeatTimer) return;
-      heartbeatTimer = window.setInterval(function () {
-        const audioState = getAudioState();
-        const audio = getAudio();
-        const playableSrc = call(ctx, "getCurrentPlayableAudioSrc", audio);
-        if (!audio || audio.paused || !playableSrc) return;
-        if (!healthSessionActive) return;
-        trackRuntimeEvent("heartbeat", Object.assign(
-          buildMonitorPayload(
-            call(ctx, "getCurrentPlaylistTrack"),
-            audioState.currentIndex,
-            audioState.activeLogicalSrc || audio.currentSrc || audio.src
-          ),
-          getRuntimeProbeState()
-        ));
-      }, HEARTBEAT_MS);
+      // Session v2 is event-driven; periodic telemetry is intentionally disabled.
     }
 
     function stopHeartbeat() {
-      if (!heartbeatTimer) return;
-      window.clearInterval(heartbeatTimer);
-      heartbeatTimer = null;
+      // Kept as a no-op for the public API used by scripts.js.
     }
 
     function hasPendingEvents() {
-      return queue.length > 0;
+      return Array.from(sessions.values()).some(function (session) { return session.events.length > 0; });
+    }
+
+    function attemptLifecycleDelivery(reason) {
+      const sealed = sealCurrentSession(reason);
+      if (!sealed || lifecycleDeliveryAttempted) return;
+      lifecycleDeliveryAttempted = true;
+      flushQueue({ beacon: true });
     }
 
     function initLifecycle() {
       if (lifecycleInitialized) return;
       lifecycleInitialized = true;
-
-      loadQueue().then(function () {
-        if (queue.length) scheduleFlush(5000);
-      }).catch(function () {});
-
-      window.setInterval(function () {
-        if (queue.length) flushQueue();
-      }, FLUSH_INTERVAL_MS);
-
-      window.addEventListener("online", function () {
+      clearLegacyDb();
+      loadSessions().then(function () {
+        sealInterruptedSessions();
+        pruneSessions();
+        ensureActiveSession();
+        // A previous iOS force-quit cannot send on exit. Retry only those sealed
+        // sessions once on the next launch; the current session remains local.
         flushQueue();
-      });
-
-      window.addEventListener("pagehide", function () {
-        flushQueue({ beacon: true });
-      });
-
-      window.addEventListener("beforeunload", function () {
-        flushQueue({ beacon: true });
-      });
+      }).catch(function () { ensureActiveSession(); });
 
       document.addEventListener("visibilitychange", function () {
-        const audioState = getAudioState();
-        const audio = getAudio();
-        trackRuntimeEvent("visibilitychange", Object.assign(
-          buildMonitorPayload(
-            call(ctx, "getCurrentPlaylistTrack"),
-            audioState.currentIndex,
-            audioState.activeLogicalSrc || (audio && (audio.currentSrc || audio.src)) || ""
-          ),
-          getRuntimeProbeState(),
-          { visibility_state: document.visibilityState || "" }
-        ));
-        if (document.visibilityState === "visible") {
-          flushQueue();
+        if (document.visibilityState === "hidden") {
+          attemptLifecycleDelivery("hidden");
+          return;
         }
+        if (document.visibilityState === "visible") ensureActiveSession();
+      });
+      window.addEventListener("pagehide", function () {
+        if (!lifecycleDeliveryAttempted) attemptLifecycleDelivery("pagehide");
       });
     }
 

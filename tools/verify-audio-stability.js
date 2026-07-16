@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix335-20260716";
-const shellRelease = "infra-shell-20260716-audio335";
+const release = "audiofix336-20260716";
+const shellRelease = "infra-shell-20260716-audio336";
 const coverCssRelease = "audiofix332-20260716";
 const frozenCssSha256 = "2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb";
 const scripts = read("public/assets/js/scripts.js");
@@ -25,6 +25,7 @@ const prefetch = read("public/assets/js/audio-prefetch.js");
 const catalogLoader = read("public/assets/js/catalog-loader.js");
 const albumUi = read("public/assets/js/album-player-ui.js");
 const nowPlaying = read("public/assets/js/now-playing.js");
+const transport = read("public/assets/js/transport-ui.js");
 const telemetry = read("public/assets/js/audio-telemetry.js");
 const sphragis = read("public/assets/js/sphragis.js");
 const sphragisPage = read("public/sphragis/index.html");
@@ -41,9 +42,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix335");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix335");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio335");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix336");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix336");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio336");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v8"'), "Service Worker does not use segment cache v8");
 
 const coldPreparation = functionBody(radio, "prepareInitialGlobalRandomPlayback", "scheduleInitialGlobalRandomPreparation");
@@ -79,9 +80,10 @@ const beginPlayback = startTrack.slice(beginPlaybackStart, beginPlaybackEnd);
 expect(beginPlayback.indexOf("attemptPlay({ sync: true, immediate: isImmediateUserGesture })") < beginPlayback.indexOf("waitForAudioReadiness(audio"), "immediate Play is ordered after the readiness wait");
 
 const playHandlerStart = radio.indexOf('audio.addEventListener("play"');
+const pauseHandlerStart = radio.indexOf('audio.addEventListener("pause"', playHandlerStart);
 const playingHandlerStart = radio.indexOf('audio.addEventListener("playing"');
-expect(playHandlerStart >= 0 && playingHandlerStart > playHandlerStart, "play/playing event handlers are missing");
-expect(!radio.slice(playHandlerStart, playingHandlerStart).includes("trackStartInFlight = false"), "play must not confirm a pending start");
+expect(playHandlerStart >= 0 && pauseHandlerStart > playHandlerStart && playingHandlerStart > pauseHandlerStart, "play/pause/playing event handlers are missing");
+expect(!radio.slice(playHandlerStart, pauseHandlerStart).includes("trackStartInFlight = false"), "play must not confirm a pending start");
 expect(radio.slice(playingHandlerStart, playingHandlerStart + 1400).includes("trackStartInFlight = false"), "playing must confirm the pending start");
 
 for (const invariant of [
@@ -110,10 +112,12 @@ expect(putSingle.includes("opts.onBodyReady"), "network timeout cannot end befor
 expect(prefetch.includes('"X-Infra-First-Two-Bytes"'), "cached segments lack the WebKit two-byte probe header");
 expect(prefetch.includes("result.probeReady !== false"), "cold playback can still promote an older v8 segment without the probe fast path");
 expect(radio.includes("result.probeReady === false"), "rolling hydration can still mark an older v8 segment ready");
-expect(!radio.includes('suspendNextTrackPrefetch("track_change_unprepared", true)'), "a transport skip still destroys useful rolling-window requests");
-expect(radio.includes('suspendNextTrackPrefetch("waiting", false)') && radio.includes('suspendNextTrackPrefetch("stalled", false)'), "buffer events still force-clear the rolling window");
-expect(radio.includes("Math.max(0, inflight.length - 1)"), "critical buffering does not retain the closest speculative target");
-expect(radio.includes("The second mobile connection starts N+2 immediately"), "N+2 is still blocked behind N+1");
+expect(radio.includes('reason === "track_change" && !opts.consumedPrepared'), "an unprepared transport skip can still compete with speculative requests");
+expect(radio.includes('suspendNextTrackPrefetch("waiting")') && radio.includes('suspendNextTrackPrefetch("stalled")'), "buffer events do not stop speculative network work");
+expect(radio.includes('suspendNextTrackPrefetch("media_error")'), "media errors do not stop speculative network work");
+expect(radio.includes('pauseContext === "explicit" && audioState.trackStartInFlight'), "an explicit pause cannot cancel a pending startup");
+expect(transport.includes("const radioIdleReady = !isRadioMode"), "Radio Play can still be enabled before a synchronous queue exists");
+expect(radio.includes("only once N+1 is actually available"), "N+1 no longer has strict mobile-network priority");
 expect(!radio.includes("clearCache("), "normal playback still performs a global prefetch-cache clear");
 expect(!prefetch.includes("function clearCache"), "segment cache still exposes destructive global clearing");
 
@@ -123,8 +127,8 @@ expect(core.includes("const planDepth = Math.max(requested, 5)"), "authoritative
 expect(core.includes('mode: "shuffle"'), "Shuffle lookahead is not materialized");
 const queuePreview = functionBody(core, "getQueuePreviewIndices", "resetAudioElementForSource");
 const resolveIndex = functionBody(core, "resolveIndex", "playNext");
-expect(!queuePreview.includes("extendAlbumPlaylistToNextAlbum"), "album lookahead still extends into another album");
-expect(!resolveIndex.includes("extendAlbumPlaylistToNextAlbum"), "album Next still extends into another album");
+expect(queuePreview.includes("extendAlbumPlaylistToNextAlbum"), "album lookahead does not continue into the next chronological album");
+expect(resolveIndex.includes("extendAlbumPlaylistToNextAlbum"), "album Next does not continue into the next chronological album");
 expect(radio.includes("scopeAlbumPlaylistToCurrentTrack"), "legacy album queues are not scoped during restoration");
 expect(radio.includes('maybePrefetchNextTrack("shuffle_mode_change")'), "Shuffle changes still discard the rolling prefetch window");
 
@@ -135,10 +139,17 @@ expect(!radio.includes("cleanupForeignAlbumAudioWhenIdle"), "foreign-album clean
 expect(!radio.includes("cleanupIdleAudioContext"), "route lifecycle can still clear a paused player session");
 expect(nowPlaying.includes("animation.oncancel = finalize"), "fullscreen cancellation does not finalize mini-player restoration");
 expect(nowPlaying.includes("audioState.sourceMetadataPending"), "fullscreen time does not reset while new metadata is pending");
-expect(read("public/assets/js/transport-ui.js").includes("audioState.sourceMetadataPending"), "mini-player time does not reset while new metadata is pending");
+expect(transport.includes("audioState.sourceMetadataPending"), "mini-player time does not reset while new metadata is pending");
 expect(startTrack.includes("bindMediaSessionActions();"), "track changes no longer bind Media Session actions");
 expect(!startTrack.includes("bindMediaSessionActions({ force: true })"), "track changes still force-bind Media Session actions");
 expect(scripts.includes('getAttribute("onerror")'), "SPA cover fallbacks are not rebased with their source document");
+const nextAlbumContinuity = functionBody(scripts, "findNextAlbumForContinuity", "findPreviousAlbumForContinuity");
+const previousAlbumContinuity = functionBody(scripts, "findPreviousAlbumForContinuity", "buildAlbumContinuityTrack");
+expect(!nextAlbumContinuity.includes("% catalogAlbums.length") && !nextAlbumContinuity.includes("% tracksAlbums.length"), "album Next continuity still wraps and can grow without bound");
+expect(!previousAlbumContinuity.includes("% catalogAlbums.length") && !previousAlbumContinuity.includes("% tracksAlbums.length"), "album Previous continuity still wraps and can grow without bound");
+const stallRecovery = functionBody(scripts, "recoverPlaybackFromStall", "scheduleWaitingRecovery");
+expect(stallRecovery.indexOf('audio.addEventListener("canplay", resume') < stallRecovery.indexOf("audio.load()"), "stall recovery still binds canplay after load");
+expect(radio.includes('clearWaitingRecovery({ preserveStallRecovery: Boolean(audioState.stallRecovery) })'), "metadata readiness can still cancel a current stall recovery");
 
 expect(sw.includes("buildRangeResponseFromCachedAudio"), "Service Worker Range reconstruction is missing");
 expect(sw.includes("responseEnd = Math.min(range.end, metadata.cachedEnd)"), "open-ended Range is not bounded to the cached segment");
@@ -157,15 +168,16 @@ expect(!radio.includes('removeAttribute("crossorigin")'), "global audio still re
 expect(!albumUi.includes('removeAttribute("crossorigin")'), "album audio still removes crossorigin");
 expect(radio.includes('audio.crossOrigin = "anonymous"'), "global audio is not configured for anonymous CORS");
 expect(core.includes('audio.crossOrigin = "anonymous"'), "source assignment does not reaffirm anonymous CORS");
-expect(telemetry.includes("const QUEUE_CAP = 100"), "telemetry queue is not capped at 100 events");
-expect(telemetry.includes("const QUEUE_TTL_MS = 24 * 60 * 60 * 1000"), "telemetry queue lacks the 24-hour TTL");
+expect(telemetry.includes("const SESSION_EVENT_CAP = 48"), "session telemetry is not capped at 48 events");
+expect(telemetry.includes("const SESSION_STORE_CAP = 4"), "pending telemetry is not capped at four sessions");
+expect(telemetry.includes("const SESSION_TTL_MS = 72 * 60 * 60 * 1000"), "pending sessions lack the 72-hour TTL");
 expect(telemetry.includes('"response_ms", "body_ms", "queue_ms", "cache_ms"'), "prefetch stage timings are not retained by telemetry sanitation");
 expect(telemetry.includes('"prefetch_suspended"') && telemetry.includes('"prefetch_window_ready"'), "useful prefetch health telemetry is not retained");
 expect(telemetry.includes('credentials: "omit"'), "telemetry requests may still carry credentials");
 expect(!telemetry.includes("navigator.sendBeacon"), "cross-origin telemetry still uses sendBeacon");
 expect(!telemetry.includes("navigator.userAgent"), "full user-agent is still transmitted");
 expect(!telemetry.includes("local_time:"), "local time is still transmitted");
-expect(!telemetry.includes("session_id:"), "global session identifier is still transmitted");
+expect(telemetry.includes("session_id: createSessionId()"), "session telemetry lacks its random retry-deduplication identifier");
 expect(scripts.includes('window.location.origin === "https://infra-180.github.io"'), "telemetry is not restricted to the official origin client-side");
 expect(scripts.includes('https://infra180-api.pages.dev'), "runtime does not use the neutral API hostname");
 expect(sphragis.includes('https://infra180-api.pages.dev'), "Sphragis does not use the neutral API hostname");
@@ -199,4 +211,4 @@ for (const relativePath of htmlFiles) {
   expect(!source.includes("audiofix326-20260715"), `${relativePath} still references audiofix326 JavaScript`);
 }
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix335.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix336.");

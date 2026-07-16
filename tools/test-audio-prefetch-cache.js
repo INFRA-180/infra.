@@ -33,6 +33,8 @@ const sandbox = {
   Response,
   Headers,
   Promise,
+  setTimeout,
+  clearTimeout,
   location: { href: "https://site.test/" },
   caches: { open: () => Promise.resolve(cache) },
   fetch: () => {
@@ -70,6 +72,7 @@ function segmentResponse(seed) {
   assert.strictEqual(api.constants.CONCURRENCY, 2);
   assert.strictEqual(api.constants.MAX_ENTRIES, 6);
   assert.strictEqual(api.clearCache, undefined, "The v8 API must not expose a global cache clear");
+  assert.strictEqual(typeof api.waitForMutationIdle, "function");
 
   const request = api.createRequest("https://media.test/next.m4a");
   assert.strictEqual(request.headers.get("Range"), "bytes=0-1048575");
@@ -81,6 +84,69 @@ function segmentResponse(seed) {
     /prefetch_requires_valid_206/
   );
   assert.strictEqual(entries.size, 0, "A non-206 response must never enter CacheStorage");
+
+  function rejectedResponse(status, headers) {
+    let cancellations = 0;
+    let bodyReads = 0;
+    return {
+      response: {
+        status,
+        headers: new Headers(headers || {}),
+        body: {
+          cancel() {
+            cancellations += 1;
+            return Promise.resolve();
+          }
+        },
+        arrayBuffer() {
+          bodyReads += 1;
+          return Promise.reject(new Error("invalid_response_body_must_not_be_read"));
+        }
+      },
+      get cancellations() { return cancellations; },
+      get bodyReads() { return bodyReads; }
+    };
+  }
+
+  const invalidStatus = rejectedResponse(200, {
+    "Content-Length": "1024"
+  });
+  await assert.rejects(
+    api.putSingle("https://media.test/invalid-status.m4a", invalidStatus.response),
+    /prefetch_requires_valid_206/
+  );
+  assert.strictEqual(invalidStatus.cancellations, 1, "An invalid HTTP status must cancel its unread response body");
+  assert.strictEqual(invalidStatus.bodyReads, 0);
+
+  const invalidRange = rejectedResponse(206, {
+    "Content-Length": "1024",
+    "Content-Range": "bytes malformed"
+  });
+  await assert.rejects(
+    api.putSingle("https://media.test/invalid-range.m4a", invalidRange.response),
+    /prefetch_requires_valid_206/
+  );
+  assert.strictEqual(invalidRange.cancellations, 1, "An invalid Content-Range must cancel its unread response body");
+  assert.strictEqual(invalidRange.bodyReads, 0);
+
+  const mismatchedLength = rejectedResponse(206, {
+    "Content-Length": "512",
+    "Content-Range": "bytes 0-1023/8192"
+  });
+  await assert.rejects(
+    api.putSingle("https://media.test/mismatched-length.m4a", mismatchedLength.response),
+    /prefetch_content_length_mismatch/
+  );
+  assert.strictEqual(mismatchedLength.cancellations, 1, "A contradictory length must cancel its unread response body");
+  assert.strictEqual(mismatchedLength.bodyReads, 0);
+
+  const obsoleteStored = await api.putSingle(
+    "https://media.test/obsolete.m4a",
+    segmentResponse(99),
+    { shouldStore: () => false }
+  );
+  assert.strictEqual(obsoleteStored, false, "An obsolete generation must not commit to CacheStorage");
+  assert(!entries.has("https://media.test/obsolete.m4a"));
 
   await api.putSingle("https://media.test/track-0.m4a", segmentResponse(0));
   const stored = entries.get("https://media.test/track-0.m4a").response;
@@ -221,6 +287,46 @@ function segmentResponse(seed) {
     10,
     "Parallel body validation must still produce one serialized cache write per segment"
   );
+
+  const normalPut = cache.put;
+  let slowMutationActive = false;
+  let overlappedMutation = false;
+  cache.put = function (request, response) {
+    if (request.url === "https://media.test/cache-timeout.m4a") {
+      slowMutationActive = true;
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          slowMutationActive = false;
+          resolve();
+        }, 25);
+      });
+    }
+    if (slowMutationActive) overlappedMutation = true;
+    return normalPut(request, response);
+  };
+  await assert.rejects(
+    api.putSingle(
+      "https://media.test/cache-timeout.m4a",
+      segmentResponse(10),
+      { timeoutMs: 5 }
+    ),
+    /prefetch_cache_timeout/
+  );
+  let mutationIdleResolved = false;
+  const mutationIdle = api.waitForMutationIdle().then(function () {
+    mutationIdleResolved = true;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.strictEqual(
+    mutationIdleResolved,
+    false,
+    "The cache API must expose the timed-out mutation until its underlying put really settles"
+  );
+  await mutationIdle;
+  await api.putSingle("https://media.test/after-timeout.m4a", segmentResponse(11));
+  cache.put = normalPut;
+  assert.strictEqual(overlappedMutation, false, "Timed-out cache work must remain serialized until it settles");
+  assert(entries.has("https://media.test/after-timeout.m4a"), "The queue must continue after timed-out cache work settles");
 
   const realBytes = new Uint8Array(1024 * 1024);
   realBytes.fill(10);

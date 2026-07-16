@@ -16,8 +16,6 @@
     const audioState = ctx.audioState || {};
     const spaRouterApi = ctx.spaRouterApi || null;
     const COVERS_CACHE_NAME = ctx.COVERS_CACHE_NAME || "infra-covers";
-    const COVER_SESSION_NAVIGATION_GATE_ENABLED = ctx.COVER_SESSION_NAVIGATION_GATE_ENABLED !== false;
-    const COVER_SESSION_PREPARE_ENABLED = ctx.COVER_SESSION_PREPARE_ENABLED !== false;
     const setSpaCachedHtml = method(ctx, "setSpaCachedHtml");
     const getSpaCachedHtml = method(ctx, "getSpaCachedHtml", function () { return ""; });
     const getSpaPersistRoot = method(ctx, "getSpaPersistRoot", function () { return document.body; });
@@ -27,7 +25,6 @@
     const trackAudioRuntimeEvent = method(ctx, "trackAudioRuntimeEvent");
     const parseSrcsetCandidates = method(ctx, "parseSrcsetCandidates", function () { return []; });
     const normalizeUrlAgainstBase = method(ctx, "normalizeUrlAgainstBase", function (value) { return String(value || ""); });
-    const prepareAlbumCoversForSession = method(ctx, "prepareAlbumCoversForSession", function () { return Promise.resolve(); });
     const rememberAlbumCoverImage = method(ctx, "rememberAlbumCoverImage");
     const saveCurrentScrollPositionInHistory = method(ctx, "saveCurrentScrollPositionInHistory");
     const buildSpaHistoryState = method(ctx, "buildSpaHistoryState", function (urlLike) { return { __infraSpa: 1, url: String(urlLike || "") }; });
@@ -569,7 +566,8 @@
         : "";
       const currentCoverSrc = currentCover
         ? preferPwaCoverSource(currentCover.currentSrc || currentCover.src || getImagePreferredSrc(currentCover, window.location.href, { preferredWidth: coverWidth }))
-        : linkedCoverSrc;
+        : "";
+      const temporaryCoverSrc = linkedCoverSrc || (currentCoverSrc === target ? currentCoverSrc : "");
       function applyTargetCover() {
         image.setAttribute("src", target);
         image.setAttribute("srcset", `${target} ${coverWidth}w`);
@@ -587,11 +585,11 @@
         });
       }
       function applyTemporaryCover() {
-        if (!currentCoverSrc) {
+        if (!temporaryCoverSrc) {
           applyTargetCover();
           return;
         }
-        image.setAttribute("src", currentCoverSrc);
+        image.setAttribute("src", temporaryCoverSrc);
         image.removeAttribute("srcset");
         image.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), 290px");
         image.setAttribute("loading", "eager");
@@ -639,34 +637,8 @@
       });
     }
 
-    if (COVER_SESSION_NAVIGATION_GATE_ENABLED && COVER_SESSION_PREPARE_ENABLED) {
-      const gateStartedAt = getAudioTelemetryNow();
-      let gateTimedOut = false;
-      const gateTimeout = new Promise(function (resolve) {
-        window.setTimeout(function () {
-          gateTimedOut = true;
-          resolve("timeout");
-        }, 2600);
-      });
-      return Promise.race([
-        prepareAlbumCoversForSession("album_gate").then(function () { return "prepared"; }),
-        gateTimeout
-      ]).then(function (status) {
-        const ready = audioState.albumCoverReadyUrls && audioState.albumCoverReadyUrls.has(target);
-        const memory = audioState.albumCoverImageCache && audioState.albumCoverImageCache.has(target);
-        trackAudioRuntimeEvent("cover_decode_duration", Object.assign({}, telemetry || {}, {
-          image_count: 1,
-          decoded_count: ready || memory ? 1 : 0,
-          timed_out: Boolean(gateTimedOut),
-          album_cover_only: true,
-          cache_hint: ready || memory ? "memory_gate" : String(status || "gate"),
-          duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - gateStartedAt))
-        }));
-        if (ready || memory) return;
-        return waitWithCacheHint();
-      });
-    }
-
+    // Navigation only waits for the destination album cover. A global session
+    // warmup here delayed the page for unrelated covers and competed with audio.
     return waitWithCacheHint();
   }
 

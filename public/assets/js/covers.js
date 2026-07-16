@@ -54,14 +54,30 @@
 
   function rewriteLegacyMusicAssetsPath(parsedUrl, options) {
     const currentOrigin = getLocationOrigin(options);
-    if (
-      parsedUrl &&
-      parsedUrl.origin === currentOrigin &&
-      /^\/music\/assets\//i.test(parsedUrl.pathname)
-    ) {
+    if (!parsedUrl || parsedUrl.origin !== currentOrigin) return;
+    if (/^\/music\/assets\//i.test(parsedUrl.pathname)) {
       parsedUrl.pathname = parsedUrl.pathname.replace(/^\/music\/assets\//i, "/assets/");
       parsedUrl.search = "";
       parsedUrl.hash = "";
+    }
+
+    // Old live/session payloads sometimes stored a GitHub Pages artwork as
+    // `/assets/...`, losing the repository prefix (`/infra./`). Repair only
+    // same-origin assets and derive the prefix from the runtime base URL.
+    if (!/^\/assets\//i.test(parsedUrl.pathname)) return;
+    try {
+      const runtimeBase = new URL(getBaseUrl(options), getLocationHref(options));
+      let basePath = String(runtimeBase.pathname || "/");
+      if (!basePath.endsWith("/")) {
+        basePath = basePath.slice(0, basePath.lastIndexOf("/") + 1) || "/";
+      }
+      if (basePath === "/") return;
+      const prefix = `/${basePath.replace(/^\/+|\/+$/g, "")}`;
+      parsedUrl.pathname = `${prefix}${parsedUrl.pathname}`;
+      parsedUrl.search = "";
+      parsedUrl.hash = "";
+    } catch (_err) {
+      // Keep the original URL if the runtime base itself is invalid.
     }
   }
 

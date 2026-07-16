@@ -75,8 +75,8 @@ const sandbox = {
       "infra-shell-20260716-audio333-runtime",
       "infra-shell-20260716-audio334-shell",
       "infra-shell-20260716-audio334-runtime",
-      "infra-shell-20260716-audio335-shell",
-      "infra-shell-20260716-audio335-runtime"
+      "infra-shell-20260716-audio336-shell",
+      "infra-shell-20260716-audio336-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -204,8 +204,8 @@ async function dispatchSiteFetch(request) {
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v8"));
   assert(!deletedCaches.includes("infra-covers"));
-  assert(!deletedCaches.includes("infra-shell-20260716-audio335-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260716-audio335-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260716-audio336-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260716-audio336-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;

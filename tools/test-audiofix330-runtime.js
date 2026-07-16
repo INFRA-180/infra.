@@ -10,6 +10,7 @@ const ROOT = path.resolve(__dirname, "..");
 const CORE_PATH = path.join(ROOT, "public/assets/js/audio-core.js");
 const RADIO_PATH = path.join(ROOT, "public/assets/js/audio-radio.js");
 const PREFETCH_PATH = path.join(ROOT, "public/assets/js/audio-prefetch.js");
+const COVERS_PATH = path.join(ROOT, "public/assets/js/covers.js");
 const ALBUM_UI_PATH = path.join(ROOT, "public/assets/js/album-player-ui.js");
 const NOW_PLAYING_PATH = path.join(ROOT, "public/assets/js/now-playing.js");
 const TRANSPORT_UI_PATH = path.join(ROOT, "public/assets/js/transport-ui.js");
@@ -104,6 +105,36 @@ function makeTracks(count) {
   }));
 }
 
+function testSameOriginRootArtworkRepair() {
+  const sandbox = createSandbox({
+    location: {
+      href: "https://infra-180.github.io/infra./music/v-23pi56-infra.html",
+      origin: "https://infra-180.github.io"
+    }
+  });
+  loadScript(sandbox, COVERS_PATH);
+  const options = {
+    baseUrl: "https://infra-180.github.io/infra./",
+    currentHref: sandbox.location.href,
+    currentOrigin: sandbox.location.origin,
+    fallbackArtwork: "https://infra-180.github.io/infra./assets/pwa/icon.png"
+  };
+  assert.strictEqual(
+    sandbox.InfraCovers.normalizeArtworkUrl(
+      "https://infra-180.github.io/assets/music/v-23pi56-cover.jpg",
+      options
+    ),
+    "https://infra-180.github.io/infra./assets/music/v-23pi56-cover.jpg"
+  );
+  assert.strictEqual(
+    sandbox.InfraCovers.normalizeArtworkUrl(
+      "https://infra-180.github.io/music/assets/music/v-23pi56-cover.jpg",
+      options
+    ),
+    "https://infra-180.github.io/infra./assets/music/v-23pi56-cover.jpg"
+  );
+}
+
 function hashString(value) {
   let hash = 2166136261;
   const input = String(value || "");
@@ -153,8 +184,10 @@ function createCoreHarness(options) {
     playlistToken: playlist.map((track) => track.src).join("|"),
     currentIndex: Number.isInteger(opts.currentIndex) ? opts.currentIndex : 0,
     activeLogicalSrc: playlist[Number.isInteger(opts.currentIndex) ? opts.currentIndex : 0].src,
-    homeMode: "album",
+    homeMode: opts.homeMode === "radio" ? "radio" : "album",
     shuffleOn: Boolean(opts.shuffleOn),
+    shuffleHistory: opts.shuffleOn ? [playlist[Number.isInteger(opts.currentIndex) ? opts.currentIndex : 0].src] : [],
+    shuffleHistoryCursor: opts.shuffleOn ? 0 : -1,
     recentPlayed: [],
     recentPlayedLimit: 20,
     startRequestToken: 0,
@@ -179,6 +212,9 @@ function createCoreHarness(options) {
     getTrackByIndex: () => null,
     getAutoPrefetchedNextIndex: () => -1,
     ensureRadioPlaylistForNavigation: () => true,
+    ensureRadioQueue: opts.ensureRadioQueue || (() => false),
+    syncRadioQueueToPlaylist: opts.syncRadioQueueToPlaylist || function () {},
+    ensureRadioPlaylistLoaded: opts.ensureRadioPlaylistLoaded || (() => Promise.resolve([])),
     ensurePlayablePlaylistContext() {},
     savePlaybackQueueContext() {},
     maybePrefetchNextTrack() {},
@@ -199,10 +235,47 @@ function createCoreHarness(options) {
     buildAudioMonitorPayload: () => ({}),
     trackAudioRuntimeEvent() {},
     logAudioAuditEvent() {},
-    extendAlbumPlaylistToNextAlbum: opts.extendAlbumPlaylistToNextAlbum || (() => -1)
+    extendAlbumPlaylistToNextAlbum: opts.extendAlbumPlaylistToNextAlbum || (() => -1),
+    extendAlbumPlaylistToPreviousAlbum: opts.extendAlbumPlaylistToPreviousAlbum || (() => -1)
   });
 
   return { api, audio, state, sandbox, getPlayCalls: () => playCalls, getBindCalls: () => bindCalls.slice() };
+}
+
+function testRadioIdlePlayUsesSynchronousPreparedQueueAndDedupesPendingPlay() {
+  const playlist = makeTracks(8);
+  let harness = null;
+  harness = createCoreHarness({
+    playlist,
+    currentIndex: 0,
+    homeMode: "radio",
+    ensureRadioQueue: () => true,
+    syncRadioQueueToPlaylist() {
+      harness.state.playlist = harness.state.radioQueue;
+      harness.state.currentIndex = harness.state.radioQueueCursor;
+    }
+  });
+  harness.state.radioPlaylist = playlist.slice();
+  harness.state.radioQueue = playlist.slice();
+  harness.state.radioQueueCursor = 0;
+  harness.state.playlist = [];
+  harness.state.currentIndex = -1;
+  harness.state.activeLogicalSrc = "";
+  harness.audio.src = "";
+  harness.audio.currentSrc = "";
+  harness.audio.paused = true;
+  harness.api.togglePlayPause();
+  assert.strictEqual(harness.getPlayCalls(), 1, "A prepared Radio queue must play inside the tap stack");
+  assert.strictEqual(harness.state.currentIndex, 0);
+
+  harness.audio.paused = true;
+  harness.state.trackStartInFlight = true;
+  harness.state.playRequestTs = Date.now();
+  harness.api.togglePlayPause();
+  assert.strictEqual(harness.getPlayCalls(), 1, "A second Play during startup must not call audio.play twice");
+  harness.state.playRequestTs = Date.now() - 1000;
+  harness.api.togglePlayPause();
+  assert.strictEqual(harness.getPlayCalls(), 2, "A genuinely stalled startup must not lock the Play control forever");
 }
 
 function testPreparedColdPlayIsSynchronous() {
@@ -289,6 +362,206 @@ function testPreparedColdPlayIsSynchronous() {
     coreHarness.sandbox.__timerCalls.length,
     coreTimersBefore,
     "The immediate user-gesture path must bypass the 110/220 ms readiness wait"
+  );
+}
+
+function testInMemoryColdPlayIsSynchronous() {
+  const sandbox = createSandbox();
+  loadScript(sandbox, RADIO_PATH);
+  const sourceTracks = makeTracks(8);
+  const startCalls = [];
+  let metadataLoadCalls = 0;
+  const audio = makeAudio();
+  const state = {
+    audio,
+    tracksData: {
+      albums: [{
+        title: "Runtime test",
+        page: "music/runtime.html",
+        cover: "assets/runtime.webp",
+        tracks: sourceTracks.map((track) => ({ src: track.src, title: track.name }))
+      }]
+    },
+    homeModeInitialized: true,
+    homeModeStorageKey: "infra_home_mode_memory_test",
+    queueStorageKey: "infra_queue_memory_test",
+    resumeStorageKey: "infra_resume_memory_test",
+    initialRandomReady: false,
+    initialRandomPlaylist: [],
+    initialRandomFirstSrc: "",
+    initialRandomPreparing: false,
+    initialRandomPreparePromise: null,
+    initialRandomPrepareToken: 0,
+    globalRandomStartInFlight: false,
+    playlist: [],
+    playlistKind: "album",
+    currentIndex: -1,
+    recentPlayed: [],
+    radioPlaylist: [],
+    radioQueue: [],
+    radioQueueCursor: -1,
+    radioQueueBatchSize: 8,
+    radioQueueExtendBy: 4,
+    radioQueueMinRemaining: 5
+  };
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    runtime: { baseUrl: new URL("https://site.test/") },
+    loadTracksData() {
+      metadataLoadCalls += 1;
+      return Promise.reject(new Error("The in-memory cold tap must not reload metadata"));
+    },
+    resolveManagedAudioSrc: (src) => String(src || ""),
+    getAudioAssetPathKey: (src) => String(src || ""),
+    toRuntimeAbsoluteUrl: (value) => String(value || ""),
+    getSpaPersistRoot: () => sandbox.__root,
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc || "",
+    getCurrentPlayableAudioSrc: (element) => element.currentSrc || element.src || "",
+    normalizeAudioSourceUrl: (src) => String(src || ""),
+    toAbsoluteUrlOrEmpty: (src) => String(src || ""),
+    toAbsoluteUrl: (src) => String(src || ""),
+    normalizeTrackTitle: (value) => String(value || ""),
+    normalizeAlbumTitle: (value) => String(value || ""),
+    srcMatches: (left, right) => String(left || "") === String(right || ""),
+    syncPlaylistContext() {},
+    syncMediaSessionMetadata() {},
+    syncAudioUi() {},
+    bindMediaSessionActions() {},
+    ensureGlobalTransportUi() {},
+    syncTransportUi() {},
+    startTrack(index, startOptions) {
+      startCalls.push({ index, options: startOptions });
+    }
+  });
+
+  assert.strictEqual(
+    radio.canStartInitialGlobalRandomPlayback(),
+    true,
+    "In-memory catalogue metadata must make the cold transport actionable"
+  );
+  const timersBefore = sandbox.__timerCalls.length;
+  const result = radio.startGlobalRandomPlayback();
+  assert.strictEqual(result, true, "A cold tap backed by tracksData must start synchronously");
+  assert.strictEqual(result && typeof result.then, "undefined", "The in-memory cold path must not return a Promise");
+  assert.strictEqual(metadataLoadCalls, 0, "The gesture stack must not await or restart catalogue loading");
+  assert.strictEqual(startCalls.length, 1, "The first tap must reach startTrack before returning");
+  assert.strictEqual(startCalls[0].index, 0);
+  assert.strictEqual(startCalls[0].options.immediatePlay, true);
+  assert.strictEqual(startCalls[0].options.userGesture, true);
+  assert.strictEqual(startCalls[0].options.coldStart, true);
+  assert.strictEqual(sandbox.__timerCalls.length, timersBefore, "The in-memory cold path must not insert a timer");
+  assert.strictEqual(state.homeMode, "radio");
+  assert.strictEqual(state.playlist, state.radioQueue);
+  assert.strictEqual(state.playlist.length, sourceTracks.length);
+}
+
+function createDeferredRadioNavigationHarness() {
+  let resolveTracksData;
+  const tracksDataPromise = new Promise((resolve) => {
+    resolveTracksData = resolve;
+  });
+  const sandbox = createSandbox();
+  loadScript(sandbox, RADIO_PATH);
+  const calls = [];
+  const state = {
+    audio: makeAudio(),
+    homeMode: "radio",
+    modeTransitionToken: 7,
+    homeModeStorageKey: "infra_home_mode_navigation_test",
+    queueStorageKey: "infra_queue_navigation_test",
+    resumeStorageKey: "infra_resume_navigation_test",
+    playlist: [],
+    playlistKind: "radio",
+    currentIndex: -1,
+    recentPlayed: [],
+    radioPlaylist: [],
+    radioLoadingPromise: null,
+    radioNavigationRequest: null,
+    radioNavigationPromise: null,
+    radioQueue: [],
+    radioQueueCursor: -1,
+    radioQueueBatchSize: 8,
+    radioQueueExtendBy: 4,
+    radioQueueMinRemaining: 5
+  };
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    runtime: { baseUrl: new URL("https://site.test/") },
+    loadTracksData: () => tracksDataPromise,
+    resolveManagedAudioSrc: (src) => String(src || ""),
+    toRuntimeAbsoluteUrl: (value) => String(value || ""),
+    normalizeTrackTitle: (value) => String(value || ""),
+    normalizeAlbumTitle: (value) => String(value || ""),
+    toAbsoluteUrlOrEmpty: (value) => String(value || ""),
+    toAbsoluteUrl: (value) => String(value || ""),
+    normalizeAudioSourceUrl: (value) => String(value || ""),
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc || "",
+    srcMatches: (left, right) => String(left || "") === String(right || ""),
+    syncPlaylistContext() {},
+    syncMediaSessionMetadata() {},
+    syncAudioUi() {},
+    playNext(options) { calls.push({ direction: "next", options }); },
+    playPrevious(options) { calls.push({ direction: "previous", options }); }
+  });
+  const tracks = makeTracks(10);
+  const resolve = () => resolveTracksData({
+    albums: [{
+      title: "Runtime test",
+      page: "music/runtime.html",
+      cover: "assets/runtime.webp",
+      tracks: tracks.map((track) => ({ src: track.src, title: track.name }))
+    }]
+  });
+  return { radio, state, calls, resolve };
+}
+
+async function testQueuedRadioNavigationReplaysInOrderAndInvalidatesOnModeChange() {
+  const queued = createDeferredRadioNavigationHarness();
+  assert.strictEqual(queued.radio.ensureRadioPlaylistForNavigation("next", { surface: "mini" }), false);
+  assert.strictEqual(queued.radio.ensureRadioPlaylistForNavigation("previous", { surface: "fullscreen" }), false);
+  assert.strictEqual(queued.radio.ensureRadioPlaylistForNavigation("next", { surface: "media_session" }), false);
+  assert.strictEqual(queued.state.radioNavigationRequest.commands.length, 3);
+  queued.resolve();
+  await flushAsyncWork();
+  assert.deepStrictEqual(
+    queued.calls.map((call) => call.direction),
+    ["next", "previous", "next"],
+    "Commands accepted while Radio metadata loads must replay exactly in tap order"
+  );
+  assert.deepStrictEqual(
+    queued.calls.map((call) => call.options.surface),
+    ["mini", "fullscreen", "media_session"],
+    "Queued navigation must preserve each command's transport options"
+  );
+  assert(queued.calls.every((call) => call.options.radioNavigationRetry === true));
+  assert.strictEqual(queued.state.radioNavigationRequest, null);
+  assert.strictEqual(queued.state.radioNavigationPromise, null);
+
+  const invalidated = createDeferredRadioNavigationHarness();
+  invalidated.radio.ensureRadioPlaylistForNavigation("next", { surface: "mini" });
+  const tokenBeforeModeChange = invalidated.state.modeTransitionToken;
+  invalidated.radio.setHomePlayMode("album", { force: true });
+  assert.strictEqual(invalidated.state.homeMode, "album");
+  assert.strictEqual(invalidated.state.modeTransitionToken, tokenBeforeModeChange + 1);
+  invalidated.resolve();
+  await flushAsyncWork();
+  assert.deepStrictEqual(
+    invalidated.calls,
+    [],
+    "A Radio command waiting on metadata must be discarded after leaving Radio mode"
+  );
+
+  const reanchored = createDeferredRadioNavigationHarness();
+  reanchored.radio.ensureRadioPlaylistForNavigation("next", { surface: "old_source" });
+  reanchored.state.startRequestToken = 1;
+  reanchored.state.activeLogicalSrc = "https://media.test/selected-during-load.m4a";
+  reanchored.radio.ensureRadioPlaylistForNavigation("previous", { surface: "new_source" });
+  reanchored.resolve();
+  await flushAsyncWork();
+  assert.deepStrictEqual(
+    reanchored.calls.map((call) => call.options.surface),
+    ["new_source"],
+    "A track selection during Radio loading must invalidate commands captured for the old source"
   );
 }
 
@@ -393,7 +666,7 @@ function testAuthoritativeRollingWindow() {
   );
 }
 
-function testAlbumNeverExtendsPastItsLastTrack() {
+function testAlbumContinuesChronologicallyPastItsLastTrack() {
   const playlist = makeTracks(3);
   let extensionCalls = 0;
   const harness = createCoreHarness({
@@ -401,24 +674,26 @@ function testAlbumNeverExtendsPastItsLastTrack() {
     currentIndex: playlist.length - 1,
     extendAlbumPlaylistToNextAlbum() {
       extensionCalls += 1;
-      playlist.push({
-        src: "https://media.test/foreign-album.m4a",
-        name: "Foreign",
-        album: "Other album"
-      });
-      return playlist.length - 1;
+      if (extensionCalls > 1) return -1;
+      const firstNextIndex = playlist.length;
+      playlist.push(...Array.from({ length: 5 }, (_unused, index) => ({
+        src: `https://media.test/next-album-${index}.m4a`,
+        name: `Next album ${index}`,
+        album: "Next album"
+      })));
+      return firstNextIndex;
     }
   });
 
   assert.deepStrictEqual(
     Array.from(harness.api.getQueuePreviewIndices(5)),
-    [],
-    "The final album track must not create an N+1 from another album"
+    [3, 4, 5, 6, 7],
+    "The final album track must expose the next chronological album as N+1"
   );
   harness.api.playNext({ fromMediaSession: true, seamless: true });
-  assert.strictEqual(harness.state.currentIndex, 2, "Next at the end of an album must leave the current track unchanged");
-  assert.strictEqual(extensionCalls, 0, "Album navigation must never invoke the cross-album extension hook");
-  assert.strictEqual(playlist.length, 3, "The album playlist must remain immutable at its boundary");
+  assert.strictEqual(harness.state.currentIndex, 3, "Next must consume the same chronological N+1 exposed to prefetch");
+  assert.strictEqual(extensionCalls, 1, "The next album must be appended only once");
+  assert.strictEqual(playlist.length, 8, "The existing album queue must be extended without replacing the current track");
 }
 
 async function testTransportMediaSessionActionsAreNotForcedPerTrack() {
@@ -507,8 +782,63 @@ function testRestoredNonRadioQueueIsScopedToCurrentAlbum() {
   }
 }
 
-function testShuffleScopesTheCurrentAlbumWhenRadioIsOff() {
+function testLargeRadioQueuePersistenceRetainsActiveTrack() {
   const sandbox = createSandbox();
+  loadScript(sandbox, RADIO_PATH);
+  const queue = makeTracks(283);
+  const activeIndex = 275;
+  const activeSrc = queue[activeIndex].src;
+  const state = {
+    audio: makeAudio(),
+    playlist: queue,
+    playlistKind: "radio",
+    currentIndex: activeIndex,
+    activeLogicalSrc: activeSrc,
+    homeMode: "radio",
+    shuffleOn: false,
+    homeModeStorageKey: "infra_home_mode_large_queue_test",
+    queueStorageKey: "infra_queue_large_queue_test",
+    resumeStorageKey: "infra_resume_large_queue_test",
+    radioPlaylist: queue.slice(),
+    radioQueue: queue,
+    radioQueueCursor: activeIndex,
+    recentPlayed: [],
+    lastSavedQueueSignature: ""
+  };
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    runtime: { baseUrl: new URL("https://site.test/") },
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc,
+    toAbsoluteUrlOrEmpty: (value) => String(value || ""),
+    toAbsoluteUrl: (value) => String(value || ""),
+    normalizeAudioSourceUrl: (value) => String(value || ""),
+    normalizeTrackTitle: (value) => String(value || ""),
+    normalizeAlbumTitle: (value) => String(value || ""),
+    srcMatches: (left, right) => String(left || "") === String(right || ""),
+    getCurrentTrackArtwork: () => ""
+  });
+
+  radio.savePlaybackQueueContext();
+  const payload = JSON.parse(sandbox.sessionStorage.getItem(state.queueStorageKey));
+  assert.strictEqual(payload.playlist.length, 260, "Session storage must remain bounded to 260 tracks");
+  assert.strictEqual(payload.currentSrc, activeSrc, "The active source must survive bounded persistence");
+  assert(payload.currentIndex >= 0 && payload.currentIndex < payload.playlist.length);
+  assert.strictEqual(
+    payload.playlist[payload.currentIndex].src,
+    activeSrc,
+    "An active Radio track beyond index 260 must remain addressable after windowing"
+  );
+  assert(
+    payload.playlist.some((track) => track.src === activeSrc),
+    "The bounded persistence window must be centered around, not truncate before, the active track"
+  );
+}
+
+function testShuffleScopesTheCurrentAlbumWhenRadioIsOff() {
+  let randomCursor = 0;
+  const controlledMath = Object.create(Math);
+  controlledMath.random = () => [0.125, 0.625, 0.875][randomCursor++ % 3];
+  const sandbox = createSandbox({ Math: controlledMath });
   loadScript(sandbox, RADIO_PATH);
   const globalPlaylist = [
     { src: "https://media.test/a-1.m4a", name: "A1", album: "Album A", page: "https://site.test/music/a.html" },
@@ -550,6 +880,8 @@ function testShuffleScopesTheCurrentAlbumWhenRadioIsOff() {
 
   radio.toggleAlbumShuffleMode();
   assert.strictEqual(state.shuffleOn, true);
+  const firstShuffleSeed = state.shuffleSessionSeed;
+  assert(firstShuffleSeed, "Shuffle activation must create a session seed");
   assert.strictEqual(state.playlistKind, "album");
   assert.deepStrictEqual(
     Array.from(state.playlist, (track) => track.src),
@@ -561,7 +893,97 @@ function testShuffleScopesTheCurrentAlbumWhenRadioIsOff() {
 
   radio.toggleAlbumShuffleMode();
   assert.strictEqual(state.shuffleOn, false);
+  assert.strictEqual(state.shuffleSessionSeed, "", "Disabling Shuffle must close the seeded ordering session");
   assert.deepStrictEqual(Array.from(state.playlist, (track) => track.src), globalPlaylist.slice(0, 2).map((track) => track.src));
+
+  radio.toggleAlbumShuffleMode();
+  const secondShuffleSeed = state.shuffleSessionSeed;
+  assert(state.shuffleOn);
+  assert(secondShuffleSeed && secondShuffleSeed !== firstShuffleSeed, "Each Shuffle activation must materialize a fresh order");
+  assert.deepStrictEqual(Array.from(state.shuffleHistory), [globalPlaylist[1].src]);
+  assert.strictEqual(state.shuffleHistoryCursor, 0);
+  const persisted = JSON.parse(sandbox.sessionStorage.getItem(state.queueStorageKey));
+  assert.strictEqual(persisted.shuffleSeed, secondShuffleSeed, "The materialized Shuffle order seed must survive session persistence");
+}
+
+function testShuffleFromRadioSwitchesToCurrentAlbumWithoutRestart() {
+  const sandbox = createSandbox();
+  loadScript(sandbox, RADIO_PATH);
+  const radioPlaylist = [
+    { src: "https://media.test/a-1.m4a", name: "A1", album: "Album A", page: "https://site.test/music/a.html" },
+    { src: "https://media.test/a-2.m4a", name: "A2", album: "Album A", page: "https://site.test/music/a.html" },
+    { src: "https://media.test/b-1.m4a", name: "B1", album: "Album B", page: "https://site.test/music/b.html" }
+  ];
+  const audio = makeAudio();
+  audio.src = radioPlaylist[0].src;
+  audio.currentSrc = radioPlaylist[0].src;
+  const state = {
+    audio,
+    playlist: radioPlaylist.slice(),
+    playlistKind: "radio",
+    currentIndex: 0,
+    activeLogicalSrc: radioPlaylist[0].src,
+    homeMode: "radio",
+    shuffleOn: false,
+    homeModeStorageKey: "infra_home_mode_test",
+    queueStorageKey: "infra_queue_test",
+    resumeStorageKey: "infra_resume_test",
+    radioPlaylist: [],
+    radioQueue: radioPlaylist.slice(),
+    radioQueueCursor: 0,
+    upcomingTrackPlan: { mode: "linear", entries: [] },
+    tracksData: {
+      albums: [
+        {
+          title: "Album A",
+          page: "https://site.test/music/a.html",
+          cover: "https://site.test/assets/a.webp",
+          tracks: radioPlaylist.slice(0, 2).map((track) => ({ src: track.src, title: track.name }))
+        },
+        {
+          title: "Album B",
+          page: "https://site.test/music/b.html",
+          cover: "https://site.test/assets/b.webp",
+          tracks: [{ src: radioPlaylist[2].src, title: radioPlaylist[2].name }]
+        }
+      ]
+    }
+  };
+  let startCalls = 0;
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    runtime: { baseUrl: new URL("https://site.test/") },
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc,
+    getCurrentPlaylistTrack: () => state.playlist[state.currentIndex] || null,
+    toAbsoluteUrlOrEmpty: (value) => String(value || ""),
+    toAbsoluteUrl: (value) => String(value || ""),
+    normalizeAudioSourceUrl: (value) => String(value || ""),
+    normalizeTrackTitle: (value) => String(value || ""),
+    normalizeAlbumTitle: (value) => String(value || ""),
+    resolveManagedAudioSrc: (value) => String(value || ""),
+    getAudioAssetPathKey: (value) => String(value || ""),
+    toRuntimeAbsoluteUrl: (value) => String(value || ""),
+    srcMatches: (left, right) => String(left || "") === String(right || ""),
+    syncPlaylistContext() {},
+    syncMediaSessionMetadata() {},
+    syncAudioUi() {},
+    maybePrefetchNextTrack() {},
+    startTrack() { startCalls += 1; }
+  });
+
+  radio.toggleAlbumShuffleMode();
+  assert.strictEqual(state.homeMode, "album", "Shuffle must explicitly leave Radio mode");
+  assert.strictEqual(state.shuffleOn, true);
+  assert.strictEqual(state.playlistKind, "album");
+  assert.deepStrictEqual(
+    Array.from(state.playlist, (track) => track.src),
+    radioPlaylist.slice(0, 2).map((track) => track.src),
+    "Shuffle activated from Radio must remain inside the current album"
+  );
+  assert.strictEqual(state.activeLogicalSrc, radioPlaylist[0].src);
+  assert.strictEqual(startCalls, 0, "Changing mode must not restart the current audio source");
+  assert.deepStrictEqual(Array.from(state.shuffleHistory), [radioPlaylist[0].src]);
+  assert.strictEqual(state.radioPlaylist.length, 3, "A restored Radio session must rebuild album context from tracksData");
 }
 
 function testPendingSourceShowsZeroTimeInMiniAndOverlay() {
@@ -639,7 +1061,7 @@ async function testIntegratedFivePreparedTransportSkips() {
   audio.currentSrc = playlist[0].src;
   audio.currentTime = 12;
   audio.duration = 180;
-  audio.buffered = { length: 1, end: () => 24 };
+  audio.buffered = { length: 1, start: () => 0, end: () => 24 };
   const state = {
     audio,
     playlist,
@@ -772,10 +1194,42 @@ function testMaterializedShuffleOrder() {
     preview[0],
     "Next must consume the same Shuffle head exposed to prefetch"
   );
+  harness.api.playPrevious({ fromMediaSession: true, seamless: true });
+  assert.strictEqual(
+    harness.state.currentIndex,
+    0,
+    "Previous in Shuffle must walk the materialized history instead of choosing another random track"
+  );
+  harness.api.playNext({ fromMediaSession: true, seamless: true });
+  assert.strictEqual(
+    harness.state.currentIndex,
+    preview[0],
+    "Next after Shuffle Previous must walk forward through the same history"
+  );
   assert.deepStrictEqual(
     Array.from(harness.api.getQueuePreviewIndices(4)),
     preview.slice(1),
     "The remaining materialized Shuffle order must survive consumption of its head"
+  );
+
+  harness.api.playPrevious({ fromMediaSession: true, seamless: true });
+  assert.strictEqual(harness.state.currentIndex, 0);
+  assert.strictEqual(harness.state.shuffleHistoryCursor, 0);
+  assert.deepStrictEqual(
+    Array.from(harness.state.shuffleHistory),
+    [harness.state.playlist[0].src, harness.state.playlist[preview[0]].src],
+    "Previous must move the cursor inside the existing Shuffle history without rewriting it"
+  );
+  harness.audio.currentTime = 17;
+  const playCallsAtHistoryStart = harness.getPlayCalls();
+  harness.api.playPrevious({ fromMediaSession: true, seamless: true });
+  assert.strictEqual(harness.state.currentIndex, 0, "Previous at the start of Shuffle history must not select a random track");
+  assert.strictEqual(harness.state.shuffleHistoryCursor, 0);
+  assert.strictEqual(harness.audio.currentTime, 0, "Previous at the history boundary may restart only the current track");
+  assert.strictEqual(
+    harness.getPlayCalls(),
+    playCallsAtHistoryStart,
+    "The Shuffle history boundary must not create a second source load or play call"
   );
 }
 
@@ -816,7 +1270,7 @@ function createPrefetchRehydrationHarness(inspectCachedSegment) {
   audio.currentSrc = playlist[0].src;
   audio.currentTime = 10;
   audio.duration = 180;
-  audio.buffered = { length: 1, end: () => 30 };
+  audio.buffered = { length: 1, start: () => 0, end: () => 30 };
   const state = {
     audio,
     playlist,
@@ -961,7 +1415,7 @@ async function testPrefetchCacheRehydrationRejectsStaleSnapshots() {
   const staleGeneration = createDeferredCacheInspectionHarness();
   staleGeneration.harness.radio.maybePrefetchNextTrack("stale_generation_test");
   await Promise.resolve();
-  assert.strictEqual(staleGeneration.pending.length, 5);
+  assert.strictEqual(staleGeneration.pending.length, 1, "N+1 cache inspection must run before the tail window");
   staleGeneration.harness.state.nextPrefetchGeneration += 1;
   await resolveDeferredCacheWindow(staleGeneration.pending);
   assert.strictEqual(
@@ -974,7 +1428,7 @@ async function testPrefetchCacheRehydrationRejectsStaleSnapshots() {
   const stalePlan = createDeferredCacheInspectionHarness();
   stalePlan.harness.radio.maybePrefetchNextTrack("stale_plan_test");
   await Promise.resolve();
-  assert.strictEqual(stalePlan.pending.length, 5);
+  assert.strictEqual(stalePlan.pending.length, 1, "A stale plan must not have started four unnecessary inspections");
   stalePlan.harness.state.nextPrefetchPlanKey += "|superseded";
   await resolveDeferredCacheWindow(stalePlan.pending);
   assert.strictEqual(
@@ -990,7 +1444,7 @@ async function testPrefetchCacheRehydrationSkipsSourceThatBecameCurrent() {
   const harness = deferred.harness;
   harness.radio.maybePrefetchNextTrack("became_current_test");
   await Promise.resolve();
-  assert.strictEqual(deferred.pending.length, 5);
+  assert.strictEqual(deferred.pending.length, 1, "The authoritative N+1 must be inspected first");
   const becameCurrent = harness.playlist[1].src;
   harness.state.activeLogicalSrc = becameCurrent;
   harness.audio.src = becameCurrent;
@@ -1043,7 +1497,7 @@ async function testPrefetchGatePriorityAndConcurrency() {
   audio.currentSrc = playlist[0].src;
   audio.currentTime = 12;
   audio.duration = 180;
-  audio.buffered = { length: 1, end: () => bufferedEnd };
+  audio.buffered = { length: 1, start: () => 0, end: () => bufferedEnd };
   const state = {
     audio,
     playlist,
@@ -1105,17 +1559,17 @@ async function testPrefetchGatePriorityAndConcurrency() {
   radio.maybePrefetchNextTrack("buffer_stable");
   assert.deepStrictEqual(
     pendingFetches.map((entry) => entry.url),
-    [playlist[1].src, playlist[2].src],
-    "A stable pre-playing buffer must start N+1 first and immediately occupy the second lane with N+2"
+    [playlist[1].src],
+    "A stable mobile buffer must reserve the first request for N+1"
   );
-  assert.strictEqual(state.nextPrefetchInFlightSrcs.size, 2);
+  assert.strictEqual(state.nextPrefetchInFlightSrcs.size, 1);
 
   pendingFetches[0].resolve(validSegmentResponse());
   await flushAsyncWork();
   assert.deepStrictEqual(
-    pendingFetches.slice(2).map((entry) => entry.url),
-    [playlist[3].src],
-    "The freed N+1 lane must advance immediately to N+3 while N+2 continues"
+    pendingFetches.slice(1).map((entry) => entry.url),
+    [playlist[2].src, playlist[3].src],
+    "Once N+1 is ready, both lanes must advance through N+2 and N+3"
   );
   assert.strictEqual(
     state.nextPrefetchInFlightSrcs.size,
@@ -1133,7 +1587,7 @@ async function testPrefetchGatePriorityAndConcurrency() {
   state.activeLogicalSrc = playlist[1].src;
   audio.src = playlist[1].src;
   audio.currentSrc = playlist[1].src;
-  radio.maybePrefetchNextTrack("track_change");
+  radio.maybePrefetchNextTrack("track_change", { consumedPrepared: true });
   assert(state.nextPrefetchGeneration > generationBeforeSkip, "A fast skip must rebase the rolling window");
   assert.deepStrictEqual(
     Array.from(state.nextPrefetchInFlightSrcs).sort(),
@@ -1178,25 +1632,134 @@ async function testPrefetchGatePriorityAndConcurrency() {
   audio.currentSrc = unpreparedFetch.url;
   radio.maybePrefetchNextTrack("track_change");
   assert(obsoleteCurrentRecord.controller.signal.aborted, "The duplicate prefetch for the new current track must be aborted");
-  assert(usefulRecord && !usefulRecord.controller.signal.aborted, "A still-useful rolling-window request must survive the skip");
-  assert.strictEqual(state.nextPrefetchInFlightSrcs.size, 1, "The native current request keeps bandwidth beside one useful speculative lane");
+  assert(usefulRecord && usefulRecord.controller.signal.aborted, "An unprepared skip must stop every speculative lane");
+  assert.strictEqual(state.nextPrefetchInFlightSrcs.size, 0, "The native request must own all mobile bandwidth for an unprepared track");
   await flushAsyncWork();
 }
 
-async function testPrefetchTimeoutRetriesOnce() {
+async function testPrefetchReorderPreemptsWeakestLaneForNewNPlusOne() {
+  const pendingFetches = [];
+  const sandbox = createSandbox({
+    fetch(request) {
+      return new Promise((resolve, reject) => {
+        const pending = {
+          url: request && request.url ? request.url : String(request || ""),
+          resolve,
+          reject,
+          aborted: false
+        };
+        pendingFetches.push(pending);
+        const signal = request && request.signal;
+        if (signal && typeof signal.addEventListener === "function") {
+          signal.addEventListener("abort", function () {
+            pending.aborted = true;
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          }, { once: true });
+        }
+      });
+    }
+  });
+  loadScript(sandbox, RADIO_PATH);
+
+  const playlist = makeTracks(8);
+  let previewOrder = [1, 2, 3, 4, 5];
+  const audio = makeAudio();
+  audio.paused = false;
+  audio.src = playlist[0].src;
+  audio.currentSrc = playlist[0].src;
+  audio.currentTime = 10;
+  audio.duration = 180;
+  audio.buffered = { length: 1, start: () => 0, end: () => 30 };
+  const state = {
+    audio,
+    playlist,
+    currentIndex: 0,
+    activeLogicalSrc: playlist[0].src,
+    homeMode: "album",
+    playlistKind: "album",
+    playlistToken: playlist.map((track) => track.src).join("|"),
+    activeAudioRecovery: null,
+    nextPrefetchGeneration: 0
+  };
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    runtime: { baseUrl: new URL("https://site.test/") },
+    PREFETCH_NEXT_ENABLED: true,
+    prefetchApi: {
+      isSupported: () => true,
+      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-1048575" } }),
+      getContentLength: (response) => Number(response.headers.get("Content-Length") || 0),
+      putSingle: () => Promise.resolve(true),
+      pruneCache: () => Promise.resolve(true)
+    },
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc,
+    getCurrentPlayableAudioSrc: () => state.activeLogicalSrc,
+    normalizeAudioSourceUrl: (src) => String(src || ""),
+    srcMatches: (left, right) => String(left || "") === String(right || ""),
+    isCloudflareAudioUrl: () => true,
+    getCurrentPlaylistIndexSafe: () => state.currentIndex,
+    getQueuePreviewIndices: (limit) => previewOrder.slice(0, limit),
+    buildAudioMonitorPayload: () => ({}),
+    trackAudioRuntimeEvent() {}
+  });
+
+  radio.maybePrefetchNextTrack("initial_order");
+  pendingFetches[0].resolve(validSegmentResponse());
+  await flushAsyncWork();
+  assert.deepStrictEqual(
+    Array.from(state.nextPrefetchInFlightSrcs).sort(),
+    [playlist[2].src, playlist[3].src].sort(),
+    "The original lower-priority lanes must be active before the reorder"
+  );
+
+  previewOrder = [4, 2, 3, 5, 6];
+  radio.maybePrefetchNextTrack("shuffle_reordered");
+  await flushAsyncWork();
+  assert.strictEqual(
+    pendingFetches.find((entry) => entry.url === playlist[3].src).aborted,
+    true,
+    "The weakest still-useful old lane must be preempted"
+  );
+  assert.deepStrictEqual(
+    Array.from(state.nextPrefetchInFlightSrcs).sort(),
+    [playlist[2].src, playlist[4].src].sort(),
+    "The new N+1 must start immediately beside the strongest preserved lane"
+  );
+  assert.strictEqual(state.nextPrefetchInFlightSrcs.size, 2, "Priority preemption must keep the two-lane bound");
+  radio.clearNextTrackPrefetch("reorder_test_complete");
+  await flushAsyncWork();
+}
+
+function testServedMarkerCannotAuthorizeFutureGenerationReadiness() {
+  const harness = createPrefetchRehydrationHarness(function () {
+    return Promise.resolve({ found: false, valid: false });
+  });
+  harness.state.nextPrefetchServedSrc = harness.playlist[1].src;
+  assert.strictEqual(
+    harness.radio.getAutoPrefetchedNextIndex(),
+    -1,
+    "A stale Service Worker hit must not make a future N+1 look prepared"
+  );
+  assert.strictEqual(
+    harness.state.nextPrefetchServedSrc,
+    "",
+    "A new prefetch generation must invalidate the consumed served marker"
+  );
+}
+
+async function testCacheTimeoutInspectsSerializedPutBeforeNetworkRetry() {
   const fetchUrls = [];
+  const inspections = [];
+  let cacheReady = false;
+  let firstPut = true;
+  let releaseMutationIdle = null;
+  const mutationIdle = new Promise((resolve) => { releaseMutationIdle = resolve; });
   const sandbox = createSandbox({
     fetch(request) {
       fetchUrls.push(request && request.url ? request.url : String(request || ""));
-      return new Promise((_resolve, reject) => {
-        const signal = request && request.signal;
-        if (!signal || typeof signal.addEventListener !== "function") return;
-        signal.addEventListener("abort", function () {
-          const error = new Error("aborted");
-          error.name = "AbortError";
-          reject(error);
-        }, { once: true });
-      });
+      return Promise.resolve(validSegmentResponse());
     }
   });
   loadScript(sandbox, RADIO_PATH);
@@ -1208,7 +1771,120 @@ async function testPrefetchTimeoutRetriesOnce() {
   audio.currentSrc = playlist[0].src;
   audio.currentTime = 10;
   audio.duration = 180;
-  audio.buffered = { length: 1, end: () => 30 };
+  audio.buffered = { length: 1, start: () => 0, end: () => 30 };
+  const state = {
+    audio,
+    playlist,
+    currentIndex: 0,
+    activeLogicalSrc: playlist[0].src,
+    homeMode: "album",
+    playlistKind: "album",
+    playlistToken: playlist.map((track) => track.src).join("|"),
+    activeAudioRecovery: null,
+    nextPrefetchGeneration: 0
+  };
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    runtime: { baseUrl: new URL("https://site.test/") },
+    PREFETCH_NEXT_ENABLED: true,
+    PREFETCH_MAX_ATTEMPTS: 2,
+    PREFETCH_RETRY_BASE_MS: 20,
+    PREFETCH_RETRY_MAX_MS: 20,
+    prefetchApi: {
+      isSupported: () => true,
+      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-1048575" } }),
+      getContentLength: (response) => Number(response.headers.get("Content-Length") || 0),
+      inspectCachedSegment(src) {
+        inspections.push(src);
+        return Promise.resolve({
+          src,
+          found: cacheReady,
+          valid: cacheReady,
+          probeReady: cacheReady,
+          bytes: cacheReady ? 1024 : 0
+        });
+      },
+      waitForMutationIdle() {
+        return mutationIdle;
+      },
+      putSingle(src) {
+        if (src === playlist[1].src && firstPut) {
+          firstPut = false;
+          setTimeout(function () {
+            cacheReady = true;
+            releaseMutationIdle(true);
+          }, 45);
+          return Promise.reject(new Error("prefetch_cache_timeout"));
+        }
+        return Promise.resolve(true);
+      },
+      pruneCache: () => Promise.resolve(true)
+    },
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc,
+    getCurrentPlayableAudioSrc: () => state.activeLogicalSrc,
+    normalizeAudioSourceUrl: (src) => String(src || ""),
+    srcMatches: (left, right) => String(left || "") === String(right || ""),
+    isCloudflareAudioUrl: () => true,
+    getCurrentPlaylistIndexSafe: () => state.currentIndex,
+    getQueuePreviewIndices: (limit) => Array.from({ length: Math.min(5, limit) }, (_unused, offset) => offset + 1),
+    buildAudioMonitorPayload: () => ({}),
+    trackAudioRuntimeEvent() {}
+  });
+
+  radio.maybePrefetchNextTrack("cache_timeout_test");
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.strictEqual(
+    inspections.filter((src) => src === playlist[1].src).length,
+    1,
+    "The cache-timeout retry must wait for the still-running serialized mutation"
+  );
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  await flushAsyncWork();
+  assert.strictEqual(
+    fetchUrls.filter((src) => src === playlist[1].src).length,
+    1,
+    "A timed-out CacheStorage caller must not duplicate the still-serialized network segment"
+  );
+  assert(
+    inspections.filter((src) => src === playlist[1].src).length >= 2,
+    "The retry path must inspect N+1 again after the cache mutation backoff"
+  );
+  assert(state.nextPrefetchReadySrcs.has(playlist[1].src), "The completed serialized put must rehydrate N+1 readiness");
+}
+
+async function testPrefetchNPlusOneRetriesAfterTwoTransientFailures() {
+  const fetchUrls = [];
+  let bufferedEnd = 30;
+  let nPlusOneUrl = "";
+  const sandbox = createSandbox({
+    fetch(request) {
+      const url = request && request.url ? request.url : String(request || "");
+      fetchUrls.push(url);
+      return new Promise((_resolve, reject) => {
+        const signal = request && request.signal;
+        if (!signal || typeof signal.addEventListener !== "function") return;
+        signal.addEventListener("abort", function () {
+          if (url === nPlusOneUrl && fetchUrls.filter((entry) => entry === nPlusOneUrl).length === 2) {
+            bufferedEnd = 10;
+          }
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        }, { once: true });
+      });
+    }
+  });
+  loadScript(sandbox, RADIO_PATH);
+
+  const playlist = makeTracks(7);
+  nPlusOneUrl = playlist[1].src;
+  const audio = makeAudio();
+  audio.paused = false;
+  audio.src = playlist[0].src;
+  audio.currentSrc = playlist[0].src;
+  audio.currentTime = 10;
+  audio.duration = 180;
+  audio.buffered = { length: 1, start: () => 0, end: () => bufferedEnd };
   const state = {
     audio,
     playlist,
@@ -1229,6 +1905,8 @@ async function testPrefetchTimeoutRetriesOnce() {
     PREFETCH_NEXT_ENABLED: true,
     PREFETCH_REQUEST_TIMEOUT_MS: 5,
     PREFETCH_MAX_ATTEMPTS: 2,
+    PREFETCH_RETRY_BASE_MS: 5,
+    PREFETCH_RETRY_MAX_MS: 10,
     prefetchApi: {
       isSupported: () => true,
       createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-1048575" } }),
@@ -1248,14 +1926,22 @@ async function testPrefetchTimeoutRetriesOnce() {
   });
 
   radio.maybePrefetchNextTrack("timeout_test");
-  await new Promise((resolve) => setTimeout(resolve, 360));
-  await flushAsyncWork();
+  await new Promise((resolve) => setTimeout(resolve, 50));
   assert.strictEqual(
     fetchUrls.filter((url) => url === playlist[1].src).length,
     2,
-    "A timed-out N+1 segment must retry exactly once"
+    "The bounded third N+1 attempt must wait while the current buffer is unstable"
   );
-  assert.strictEqual(state.nextPrefetchAttemptCounts.get(playlist[1].src), 2);
+  bufferedEnd = 30;
+  radio.maybePrefetchNextTrack("buffer_recovered");
+  await new Promise((resolve) => setTimeout(resolve, 35));
+  await flushAsyncWork();
+  assert.strictEqual(
+    fetchUrls.filter((url) => url === playlist[1].src).length,
+    3,
+    "N+1 must receive one bounded recovery attempt after two transient timeouts"
+  );
+  assert.strictEqual(state.nextPrefetchAttemptCounts.get(playlist[1].src), 3);
   assert.strictEqual(state.nextPrefetchFailureReason, "timeout");
   assert(
     fetchUrls.includes(playlist[2].src) && fetchUrls.includes(playlist[3].src),
@@ -1347,15 +2033,61 @@ function testPersistentAlbumAndFullscreenContracts() {
   const coreStartBody = extractFunctionBody(coreSource, "startTrack");
   assert(coreStartBody.includes("bindMediaSessionActions();"));
   assert(!coreStartBody.includes("bindMediaSessionActions({ force: true })"));
+  const playResolvedBody = extractFunctionBody(coreSource, "handlePlayResolved");
+  assert(!playResolvedBody.includes("clearTrackFailure("));
+  const ensureCurrentIndexBody = extractFunctionBody(coreSource, "ensureCurrentIndexFromAudio");
+  assert(!ensureCurrentIndexBody.includes("extractFilenameFromSrc"));
   const queuePreviewBody = extractFunctionBody(coreSource, "getQueuePreviewIndices");
   const resolveIndexBody = extractFunctionBody(coreSource, "resolveIndex");
-  assert(!queuePreviewBody.includes("extendAlbumPlaylistToNextAlbum"));
-  assert(!resolveIndexBody.includes("extendAlbumPlaylistToNextAlbum"));
+  assert(queuePreviewBody.includes("extendAlbumPlaylistToNextAlbum"));
+  assert(resolveIndexBody.includes("extendAlbumPlaylistToNextAlbum"));
+
+  assert(albumUiSource.includes("immediatePlay: true"));
+  assert(albumUiSource.includes("userGesture: true"));
+  assert(!albumUiSource.includes("resetAudioElementForSource(audio, track.src)"));
+
+  assert(transportSource.includes('root.dataset.controlsBound === "1"'));
+  assert(transportSource.includes('root.dataset.controlsBound = "1"'));
 
   const scriptsSource = fs.readFileSync(path.join(ROOT, "public/assets/js/scripts.js"), "utf8");
+  const srcMatchesBody = extractFunctionBody(scriptsSource, "srcMatches");
+  assert(srcMatchesBody.includes("getAudioAssetPathKey"));
+  assert(!srcMatchesBody.includes("endsWith("));
+  assert(!srcMatchesBody.includes("extractFilenameFromSrc"));
   const coverNormalizeBody = extractFunctionBody(scriptsSource, "normalizeCoverElementsForBase");
   assert(coverNormalizeBody.includes('getAttribute("onerror")'));
   assert(coverNormalizeBody.includes("normalizeUrlAgainstBase(fallbackMatch[2], baseUrl)"));
+  const nextAlbumBody = extractFunctionBody(scriptsSource, "findNextAlbumForContinuity");
+  const previousAlbumBody = extractFunctionBody(scriptsSource, "findPreviousAlbumForContinuity");
+  assert(!nextAlbumBody.includes("% catalogAlbums.length"));
+  assert(!nextAlbumBody.includes("% tracksAlbums.length"));
+  assert(!previousAlbumBody.includes("% catalogAlbums.length"));
+  assert(!previousAlbumBody.includes("% tracksAlbums.length"));
+  const stallRecoveryBody = extractFunctionBody(scriptsSource, "recoverPlaybackFromStall");
+  assert(
+    stallRecoveryBody.indexOf('audio.addEventListener("canplay", resume') < stallRecoveryBody.indexOf("audio.load()"),
+    "Stall recovery must bind its guarded listener before reloading the source"
+  );
+  const failureRecoveryBody = extractFunctionBody(scriptsSource, "failAudioRecovery");
+  assert(failureRecoveryBody.includes("clearWaitingRecovery()"));
+  const continuityRetryBody = extractFunctionBody(scriptsSource, "scheduleAlbumContinuityNavigationRetry");
+  assert(continuityRetryBody.includes("startRequestToken"));
+  assert(continuityRetryBody.includes("modeTransitionToken"));
+  assert(continuityRetryBody.includes("activeRequest.commands.length < 8"));
+  assert(continuityRetryBody.includes("request.commands.splice"));
+  assert(continuityRetryBody.includes("playNext(command.options)"));
+  const coverSessionWarmupBody = extractFunctionBody(scriptsSource, "prepareAlbumCoversForSession");
+  const coverFallbackWarmupBody = extractFunctionBody(scriptsSource, "warmAlbumCoverCache");
+  const coverScheduleBody = extractFunctionBody(scriptsSource, "scheduleAlbumCoverCacheWarmup");
+  assert(
+    !coverSessionWarmupBody.includes("scheduleAlbumCoverCacheWarmup") &&
+      !coverFallbackWarmupBody.includes("scheduleAlbumCoverCacheWarmup") &&
+      !coverScheduleBody.includes("scheduleAlbumCoverCacheWarmup("),
+    "A paused cover warmup must record pending work instead of recursively scheduling idle callbacks"
+  );
+  assert(coverSessionWarmupBody.includes("albumCoverWarmupResumePending = true"));
+  assert(coverFallbackWarmupBody.includes("albumCoverWarmupResumePending = true"));
+  assert(coverScheduleBody.includes("albumCoverWarmupResumePending = false"));
 
   const stylesSource = fs.readFileSync(STYLES_PATH, "utf8");
   const coverWrapBlock = stylesSource.match(/\.now-playing-cover-wrap\s*\{([^}]*)\}/);
@@ -1369,14 +2101,20 @@ function testPersistentAlbumAndFullscreenContracts() {
 }
 
 (async function run() {
+  testSameOriginRootArtworkRepair();
   testPreparedColdPlayIsSynchronous();
+  testInMemoryColdPlayIsSynchronous();
+  testRadioIdlePlayUsesSynchronousPreparedQueueAndDedupesPendingPlay();
+  await testQueuedRadioNavigationReplaysInOrderAndInvalidatesOnModeChange();
   await testCachedTrackIsPromotedBeforeColdTap();
   testAuthoritativeRollingWindow();
-  testAlbumNeverExtendsPastItsLastTrack();
+  testAlbumContinuesChronologicallyPastItsLastTrack();
   await testTransportMediaSessionActionsAreNotForcedPerTrack();
   testSameSourceRetryKeepsMetadataPending();
   testRestoredNonRadioQueueIsScopedToCurrentAlbum();
+  testLargeRadioQueuePersistenceRetainsActiveTrack();
   testShuffleScopesTheCurrentAlbumWhenRadioIsOff();
+  testShuffleFromRadioSwitchesToCurrentAlbumWithoutRestart();
   testPendingSourceShowsZeroTimeInMiniAndOverlay();
   await testIntegratedFivePreparedTransportSkips();
   testMaterializedShuffleOrder();
@@ -1384,10 +2122,13 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchCacheRehydrationRejectsStaleSnapshots();
   await testPrefetchCacheRehydrationSkipsSourceThatBecameCurrent();
   await testPrefetchGatePriorityAndConcurrency();
-  await testPrefetchTimeoutRetriesOnce();
+  await testPrefetchReorderPreemptsWeakestLaneForNewNPlusOne();
+  testServedMarkerCannotAuthorizeFutureGenerationReadiness();
+  await testCacheTimeoutInspectsSerializedPutBeforeNetworkRetry();
+  await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix335 runtime checks passed.");
+  console.log("audiofix336 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

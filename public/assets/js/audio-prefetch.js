@@ -79,17 +79,32 @@
     return Number(response.headers.get("Content-Length") || response.headers.get("content-length") || 0);
   }
 
+  function cancelResponseBody(response) {
+    if (!response || !response.body || typeof response.body.cancel !== "function") return;
+    try {
+      const cancellation = response.body.cancel();
+      if (cancellation && typeof cancellation.catch === "function") {
+        cancellation.catch(function () {});
+      }
+    } catch (_err) {
+      // The response is already unusable; cancellation is best-effort only.
+    }
+  }
+
   function normalizeAudioResponseForCache(response) {
     const range = parseContentRange(response);
     if (!response || response.status !== 206 || !range || range.start !== 0) {
+      cancelResponseBody(response);
       return Promise.reject(new Error("prefetch_requires_valid_206"));
     }
     if (range.length > constants.PREFETCH_SEGMENT_SIZE) {
+      cancelResponseBody(response);
       return Promise.reject(new Error("prefetch_segment_too_large"));
     }
 
     const declaredLength = Number(response.headers.get("Content-Length") || response.headers.get("content-length") || 0);
     if (declaredLength && declaredLength !== range.length) {
+      cancelResponseBody(response);
       return Promise.reject(new Error("prefetch_content_length_mismatch"));
     }
 
@@ -261,6 +276,37 @@
     return result;
   }
 
+  function waitForMutationIdle() {
+    // Snapshot the serialized queue. In particular, a caller timeout from
+    // putSingle() must not cause a duplicate network fetch while its original
+    // CacheStorage write is still the queue owner.
+    return mutationQueue.then(function () { return true; });
+  }
+
+  function mutationAllowed(options) {
+    const opts = options || {};
+    if (typeof opts.shouldStore !== "function") return true;
+    try {
+      return opts.shouldStore() !== false;
+    } catch (_err) {
+      return false;
+    }
+  }
+
+  function withMutationTimeout(promise, timeoutMs) {
+    const delay = Math.max(0, Number(timeoutMs) || 0);
+    if (!delay) return promise;
+    let timeout = 0;
+    const guard = new Promise(function (_resolve, reject) {
+      timeout = globalObject.setTimeout(function () {
+        reject(new Error("prefetch_cache_timeout"));
+      }, delay);
+    });
+    return Promise.race([promise, guard]).finally(function () {
+      if (timeout) globalObject.clearTimeout(timeout);
+    });
+  }
+
   function sourceUrl(value) {
     try {
       return new URL(String(value || ""), globalObject.location && globalObject.location.href).href;
@@ -314,22 +360,35 @@
       }
       const queuedAt = Date.now();
       let cacheStartedAt = queuedAt;
-      return enqueueMutation(function () {
+      const storedPromise = enqueueMutation(function () {
         cacheStartedAt = Date.now();
+        if (!mutationAllowed(opts)) return false;
         return openCache().then(function (cache) {
           if (!cache) return false;
+          if (!mutationAllowed(opts)) return false;
           // Cache.put replaces the matching entry atomically; avoid a delete gap
           // during which WebKit could miss a segment that is being refreshed.
           return cache.put(request, cacheResponse)
             .then(function () {
+              if (!mutationAllowed(opts)) {
+                return cache.delete(request).then(function () { return false; });
+              }
+              const keepSources = typeof opts.getKeepSources === "function"
+                ? opts.getKeepSources()
+                : (opts.keepSources || []);
               return pruneCacheEntries(cache, {
                 maxEntries: opts.maxEntries || constants.MAX_ENTRIES,
-                keepSources: opts.keepSources || []
+                keepSources
               });
             })
-            .then(function () { return true; });
+            .then(function (stored) { return stored !== false; });
         });
-      }).then(function (stored) {
+      });
+      // The caller gets a bounded result, but the underlying CacheStorage
+      // operation remains the mutation queue's owner until it really settles.
+      // This prevents a timed-out stale delete/prune from overlapping a newer
+      // write for the same segment.
+      return withMutationTimeout(storedPromise, opts.timeoutMs).then(function (stored) {
         if (typeof opts.onTimings === "function") {
           try {
             opts.onTimings({
@@ -354,6 +413,7 @@
     normalizeAudioResponseForCache,
     inspectCachedSegment,
     findFirstValidCachedSegment,
+    waitForMutationIdle,
     pruneCache,
     putSingle
   });

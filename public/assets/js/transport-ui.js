@@ -640,6 +640,7 @@
     persistRoot.appendChild(overlay);
 
     const alreadyBound = root.dataset.bound === "1" && !overlayNeedsRefresh;
+    const rootControlsAlreadyBound = root.dataset.controlsBound === "1";
     const modeBtn = root.querySelector("[data-transport-mode]");
     const prevBtn = root.querySelector("[data-transport-prev]");
     const toggleBtn = root.querySelector("[data-transport-toggle]");
@@ -686,57 +687,59 @@
     bindNowPlayingMetaIdle(overlayPanel);
 
     if (!alreadyBound) {
-      if (modeBtn) {
-        modeBtn.addEventListener("click", function () {
-          toggleRadioModeFromTransport();
-        });
-      }
-      if (prevBtn) {
-        prevBtn.addEventListener("click", function () {
-          playPrevious({ seamless: true, fromTransportControl: true, surface: "mini" });
-        });
-      }
-      if (nextBtn) {
-        nextBtn.addEventListener("click", function () {
-          playNext({ seamless: true, fromTransportControl: true, surface: "mini" });
-        });
-      }
-      if (toggleBtn) toggleBtn.addEventListener("click", handleGlobalTransportToggle);
-      if (shuffleBtn) {
-        shuffleBtn.addEventListener("click", function () {
-          toggleAlbumShuffleMode();
-        });
-      }
-      if (favoriteBtn) {
-        favoriteBtn.addEventListener("click", function (event) {
-          event.preventDefault();
-          event.stopPropagation();
-          toggleCurrentFavorite("mini", favoriteBtn, event);
-        });
-      }
-      if (nowWrap) {
-        nowWrap.addEventListener("click", function (event) {
-          const target = event.target;
-          if (target && target instanceof Element) {
-            if (
-              target.closest("[data-transport-now-album]") ||
-              target.closest("[data-transport-mini-progress]") ||
-              target.closest("[data-transport-favorite]")
-            ) return;
-          }
-          openNowPlayingOverlay();
-          setTimeout(scheduleNowPlayingMetaIdle, 0);
-        });
-      }
-      if (nowAlbum) {
-        nowAlbum.addEventListener("click", function (event) {
-          const href = String(nowAlbum.getAttribute("href") || "").trim();
-          if (!href || href === "#") {
+      if (!rootControlsAlreadyBound) {
+        if (modeBtn) {
+          modeBtn.addEventListener("click", function () {
+            toggleRadioModeFromTransport();
+          });
+        }
+        if (prevBtn) {
+          prevBtn.addEventListener("click", function () {
+            playPrevious({ seamless: true, fromTransportControl: true, surface: "mini" });
+          });
+        }
+        if (nextBtn) {
+          nextBtn.addEventListener("click", function () {
+            playNext({ seamless: true, fromTransportControl: true, surface: "mini" });
+          });
+        }
+        if (toggleBtn) toggleBtn.addEventListener("click", handleGlobalTransportToggle);
+        if (shuffleBtn) {
+          shuffleBtn.addEventListener("click", function () {
+            toggleAlbumShuffleMode();
+          });
+        }
+        if (favoriteBtn) {
+          favoriteBtn.addEventListener("click", function (event) {
             event.preventDefault();
-            return;
-          }
-          event.stopPropagation();
-        });
+            event.stopPropagation();
+            toggleCurrentFavorite("mini", favoriteBtn, event);
+          });
+        }
+        if (nowWrap) {
+          nowWrap.addEventListener("click", function (event) {
+            const target = event.target;
+            if (target && target instanceof Element) {
+              if (
+                target.closest("[data-transport-now-album]") ||
+                target.closest("[data-transport-mini-progress]") ||
+                target.closest("[data-transport-favorite]")
+              ) return;
+            }
+            openNowPlayingOverlay();
+            setTimeout(scheduleNowPlayingMetaIdle, 0);
+          });
+        }
+        if (nowAlbum) {
+          nowAlbum.addEventListener("click", function (event) {
+            const href = String(nowAlbum.getAttribute("href") || "").trim();
+            if (!href || href === "#") {
+              event.preventDefault();
+              return;
+            }
+            event.stopPropagation();
+          });
+        }
       }
       if (overlayAlbum) {
         overlayAlbum.addEventListener("click", function (event) {
@@ -1210,7 +1213,12 @@
           const index = Number(item.getAttribute("data-now-playing-queue-index"));
           if (!Number.isInteger(index) || index < 0 || index >= audioState.playlist.length) return;
           if (index === audioState.currentIndex) return;
-          startTrack(index, { seamless: true });
+          startTrack(index, {
+            seamless: true,
+            immediatePlay: true,
+            userGesture: true,
+            surface: "fullscreen_queue"
+          });
         });
       }
       if (overlayVolumeToggle) overlayVolumeToggle.addEventListener("click", toggleNowPlayingVolumeVisible);
@@ -1312,7 +1320,7 @@
           syncNowPlayingOverlay();
         });
       }
-      if (miniProgress) {
+      if (miniProgress && !rootControlsAlreadyBound) {
         function seekFromMiniProgress(clientX) {
           const audio = audioState.audio;
           if (!audio) return;
@@ -1378,6 +1386,7 @@
           seekFromMiniProgress(event.clientX);
         });
       }
+      root.dataset.controlsBound = "1";
       if (!audioState.transportResizeBound) {
         const syncOnViewportChange = function () {
           syncTransportUi();
@@ -1565,7 +1574,13 @@
       );
     }
 
-    const canToggle = Boolean(audio) && (hasPlaybackSessionActive || hasPlaylist || (isHome && isRadioMode) || canStartInitialRandom);
+    const radioIdleReady = !isRadioMode ||
+      hasPlaybackSessionActive ||
+      canStartInitialRandom ||
+      Boolean(Array.isArray(audioState.radioQueue) && audioState.radioQueue.length);
+    const canToggle = Boolean(audio) &&
+      radioIdleReady &&
+      (hasPlaybackSessionActive || hasPlaylist || canStartInitialRandom);
     if (transport.toggleBtn) {
       transport.toggleBtn.disabled = !canToggle || Boolean(audioState.globalRandomStartInFlight);
       transport.toggleBtn.setAttribute("aria-label", audio && !audio.paused ? "Pause" : "Lecture");
@@ -1578,12 +1593,12 @@
       const shuffleActive = Boolean(audioState.shuffleOn && !isRadioMode);
       transport.shuffleBtn.disabled = !canSkip;
       transport.shuffleBtn.classList.toggle("is-on", shuffleActive);
-      transport.shuffleBtn.classList.toggle("is-muted-active", Boolean(audioState.shuffleOn && isRadioMode));
+      transport.shuffleBtn.classList.remove("is-muted-active");
       transport.shuffleBtn.setAttribute("aria-pressed", shuffleActive ? "true" : "false");
       transport.shuffleBtn.setAttribute(
         "aria-label",
         isRadioMode
-          ? (audioState.shuffleOn ? "Shuffle memorise, ignore pendant la radio" : "Memoriser le shuffle album")
+          ? "Activer le shuffle album et desactiver la radio"
           : (shuffleActive ? "Desactiver le shuffle album" : "Activer le shuffle album")
       );
     }

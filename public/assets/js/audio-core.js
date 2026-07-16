@@ -18,7 +18,6 @@
     const savePlaybackQueueContext = method(ctx, "savePlaybackQueueContext");
     const getCurrentLogicalAudioSrc = method(ctx, "getCurrentLogicalAudioSrc", function () { return ""; });
     const srcMatches = method(ctx, "srcMatches", function () { return false; });
-    const extractFilenameFromSrc = method(ctx, "extractFilenameFromSrc", function () { return ""; });
     const hashString = method(ctx, "hashString", function () { return 0; });
     const ensureRadioQueue = method(ctx, "ensureRadioQueue", function () { return false; });
     const normalizeAudioSourceUrl = method(ctx, "normalizeAudioSourceUrl", function (value) { return String(value || ""); });
@@ -62,6 +61,8 @@
     const updateProgressUi = method(ctx, "updateProgressUi");
     const saveResumeState = method(ctx, "saveResumeState");
     const markAudioPauseIntent = method(ctx, "markAudioPauseIntent");
+    const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () { return -1; });
+    const extendAlbumPlaylistToPreviousAlbum = method(ctx, "extendAlbumPlaylistToPreviousAlbum", function () { return -1; });
     const beginAudioRecovery = method(ctx, "beginAudioRecovery");
     const failAudioRecovery = method(ctx, "failAudioRecovery");
     const maybePrefetchNextTrack = method(ctx, "maybePrefetchNextTrack");
@@ -95,8 +96,9 @@
       savePlaybackQueueContext();
     }
 
-    function rememberPlayedIndex(index) {
+    function rememberPlayedIndex(index, options) {
       if (!Number.isInteger(index) || index < 0) return;
+      const opts = options || {};
       const list = audioState.recentPlayed;
       const existingAt = list.indexOf(index);
       if (existingAt >= 0) list.splice(existingAt, 1);
@@ -106,6 +108,27 @@
       while (list.length > dynamicLimit) {
         list.shift();
       }
+
+      if (audioState.homeMode === "radio" || !audioState.shuffleOn) return;
+      if (!Array.isArray(audioState.shuffleHistory)) audioState.shuffleHistory = [];
+      if (!Number.isInteger(audioState.shuffleHistoryCursor)) {
+        audioState.shuffleHistoryCursor = audioState.shuffleHistory.length - 1;
+      }
+      if (Number.isInteger(opts.shuffleHistoryCursor)) {
+        audioState.shuffleHistoryCursor = Math.max(
+          0,
+          Math.min(opts.shuffleHistoryCursor, audioState.shuffleHistory.length - 1)
+        );
+        return;
+      }
+      const src = String(audioState.playlist[index] && audioState.playlist[index].src || "");
+      if (!src) return;
+      const currentHistorySrc = audioState.shuffleHistory[audioState.shuffleHistoryCursor] || "";
+      if (currentHistorySrc && srcMatches(currentHistorySrc, src)) return;
+      audioState.shuffleHistory = audioState.shuffleHistory.slice(0, audioState.shuffleHistoryCursor + 1);
+      audioState.shuffleHistory.push(src);
+      while (audioState.shuffleHistory.length > 40) audioState.shuffleHistory.shift();
+      audioState.shuffleHistoryCursor = audioState.shuffleHistory.length - 1;
     }
 
     function ensureCurrentIndexFromAudio() {
@@ -117,15 +140,6 @@
       if (matchIndex >= 0) {
         audioState.currentIndex = matchIndex;
         return matchIndex;
-      }
-
-      const srcFile = extractFilenameFromSrc(src);
-      if (srcFile) {
-        const byFile = audioState.playlist.findIndex((track) => extractFilenameFromSrc(track && track.src) === srcFile);
-        if (byFile >= 0) {
-          audioState.currentIndex = byFile;
-          return byFile;
-        }
       }
 
       return -1;
@@ -181,13 +195,23 @@
 
       if (!audioState.shuffleOn) {
         const ordered = [];
-        for (
-          let nextIndex = currentIndex + 1;
-          nextIndex < list.length && ordered.length < planDepth;
-          nextIndex += 1
-        ) {
-          ordered.push(nextIndex);
+        let extensionGuard = 0;
+        while (ordered.length < planDepth) {
+          list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
+          const nextIndex = currentIndex + ordered.length + 1;
+          if (nextIndex < list.length) {
+            ordered.push(nextIndex);
+            continue;
+          }
+          if (extensionGuard >= planDepth) break;
+          extensionGuard += 1;
+          const extendedIndex = extendAlbumPlaylistToNextAlbum({
+            reason: "queue_preview",
+            fromIndex: list.length - 1
+          });
+          if (!Number.isInteger(extendedIndex) || extendedIndex < 0) break;
         }
+        list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
         audioState.upcomingTrackPlan = {
           mode: "linear",
           baseSrc: String(list[currentIndex] && list[currentIndex].src ? list[currentIndex].src : ""),
@@ -203,13 +227,22 @@
         ? audioState.upcomingTrackPlan
         : null;
       let retained = [];
+      if (
+        Array.isArray(audioState.shuffleHistory) &&
+        Number.isInteger(audioState.shuffleHistoryCursor) &&
+        audioState.shuffleHistoryCursor >= 0
+      ) {
+        retained = audioState.shuffleHistory.slice(audioState.shuffleHistoryCursor + 1).map((src) => ({ src }));
+      }
       if (existing) {
+        let existingRetained = [];
         if (srcMatches(existing.baseSrc, currentSrc)) {
-          retained = existing.entries.slice();
+          existingRetained = existing.entries.slice();
         } else {
           const consumedAt = existing.entries.findIndex((entry) => entry && srcMatches(entry.src, currentSrc));
-          if (consumedAt >= 0) retained = existing.entries.slice(consumedAt + 1);
+          if (consumedAt >= 0) existingRetained = existing.entries.slice(consumedAt + 1);
         }
+        retained = retained.concat(existingRetained);
       }
 
       const seen = new Set([currentSrc]);
@@ -222,7 +255,7 @@
         return true;
       });
 
-      const seed = hashString(`${currentSrc || currentIndex}|${audioState.playlistToken}|shuffle-materialized`);
+      const seed = hashString(`${currentSrc || currentIndex}|${audioState.playlistToken}|${audioState.shuffleSessionSeed || "shuffle-session"}|shuffle-materialized`);
       const recentSet = new Set((audioState.recentPlayed || []).map((index) => {
         const track = list[index];
         return String(track && track.src ? track.src : "");
@@ -332,17 +365,25 @@
     }
 
     function recoverFromTrackFailure(index, srcLike, requestToken) {
-      if (Number.isInteger(requestToken) && requestToken !== audioState.startRequestToken) return;
+      const activeRequestToken = Number.isInteger(requestToken) ? requestToken : audioState.startRequestToken;
+      if (activeRequestToken !== audioState.startRequestToken) return;
       if (!Number.isInteger(index) || index < 0) return;
       const audio = audioState.audio;
       if (!audio) return;
       const src = toAbsoluteUrlOrEmpty(srcLike || "") || getCurrentLogicalAudioSrc() || getCurrentPlayableAudioSrc(audio);
+      const recoveryKey = `${activeRequestToken}|${src}`;
+      const activeRecovery = audioState.trackFailureRecovery;
+      if (activeRecovery && activeRecovery.key === recoveryKey) return;
+      if (activeRecovery && activeRecovery.timer) clearTimeout(activeRecovery.timer);
+      const recoveryRecord = { key: recoveryKey, timer: 0 };
+      audioState.trackFailureRecovery = recoveryRecord;
       const failures = registerTrackFailure(src);
       const track = getTrackByIndex(index);
       const maxRetries = 1;
       if (failures > maxRetries) {
+        audioState.trackFailureRecovery = null;
         failAudioRecovery({
-          request_token: requestToken,
+          request_token: activeRequestToken,
           reason: "retry_limit",
           strategy: "reset_source"
         });
@@ -354,19 +395,21 @@
 
       setTrackStatus(track, "Chargement du fichier audio...");
       beginAudioRecovery({
-        request_token: requestToken,
+        request_token: activeRequestToken,
         reason: "playback_failure",
         strategy: "reset_source"
       });
-      setTimeout(function () {
-        if (Number.isInteger(requestToken) && requestToken !== audioState.startRequestToken) return;
+      recoveryRecord.timer = setTimeout(function () {
+        if (audioState.trackFailureRecovery !== recoveryRecord) return;
+        audioState.trackFailureRecovery = null;
+        if (activeRequestToken !== audioState.startRequestToken) return;
         if (audioState.currentIndex !== index) return;
         if (!audio.paused) return;
         resetAudioElementForSource(audio, src);
         audio.play().catch(function () {
-          if (Number.isInteger(requestToken) && requestToken !== audioState.startRequestToken) return;
+          if (activeRequestToken !== audioState.startRequestToken) return;
           failAudioRecovery({
-            request_token: requestToken,
+            request_token: activeRequestToken,
             reason: "reset_play_rejected",
             strategy: "reset_source"
           });
@@ -386,6 +429,7 @@
       const nextSrc = normalizeAudioSourceUrl(target.src);
       const currentLogicalSrc = getCurrentLogicalAudioSrc();
       const sameTrack = srcMatches(currentLogicalSrc, nextSrc || target.src);
+      const forceReloadSameTrack = Boolean(opts.forceReload && sameTrack);
       const rowTrack = getTrackByIndex(index);
       const isAutoAdvance = Boolean(opts.auto);
       const isFromMediaSession = Boolean(opts.fromMediaSession);
@@ -395,6 +439,12 @@
       const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index;
       const isFastSkip = isAutoAdvance || isFromMediaSession || isFromTransportControl || hasPreparedTransportTarget || isImmediateUserGesture;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
+
+      if (audioState.trackFailureRecovery && audioState.trackFailureRecovery.timer) {
+        clearTimeout(audioState.trackFailureRecovery.timer);
+      }
+      audioState.trackFailureRecovery = null;
+      audioState.playAbortRetryToken = 0;
 
       if (!isFastSkip && !isPreparedInitialRandom && PREFETCH_NEXT_ENABLED) {
         clearNextTrackPrefetch("manual_start");
@@ -414,8 +464,8 @@
       // metadata instead of exposing stale duration/progress.
       audioState.sourceMetadataPending = Boolean(audioState.sourceMetadataPending || !sameTrack);
       audioState.trackStartInFlight = true;
-      maybePrefetchNextTrack("track_change");
-      rememberPlayedIndex(index);
+      rememberPlayedIndex(index, { shuffleHistoryCursor: opts.shuffleHistoryCursor });
+      maybePrefetchNextTrack("track_change", { consumedPrepared: preparedNextIndex === index });
       audioState.pendingSeekRatio = Number.isFinite(opts.seekRatio) ? opts.seekRatio : null;
       audioState.pendingStartTime = Number.isFinite(opts.startTime) ? opts.startTime : null;
       clearWaitingRecovery();
@@ -492,13 +542,16 @@
         try {
           audioState.activeLogicalSrc = nextSrc;
           audioState.mediaSessionAudioPlaying = false;
-          if (!sameTrack) {
+          if (forceReloadSameTrack) {
+            if (!resetAudioElementForSource(audio, nextSrc)) return false;
+          } else if (!sameTrack) {
             audio.crossOrigin = "anonymous";
             audio.src = nextSrc;
           }
           logAudioAuditEvent("source_assigned", target, index, nextSrc, {
             request_token: requestToken,
             same_track: sameTrack,
+            force_reload: forceReloadSameTrack,
             reused_current_source: sameTrack,
             ready_state: audio.readyState,
             network_state: audio.networkState,
@@ -512,6 +565,7 @@
 
       function handlePlayResolved(playMeta) {
         if (requestToken !== audioState.startRequestToken) return;
+        if (audioState.playAbortRetryToken === requestToken) audioState.playAbortRetryToken = 0;
         logAudioAuditEvent("play_resolved", target, index, nextSrc || target.src, {
           request_token: requestToken,
           retry: Boolean(playMeta && playMeta.retry),
@@ -523,7 +577,6 @@
           network_state: audio.networkState,
           click_perf_ms: audioState.audioClickPerfTs
         });
-        clearTrackFailure(target.src);
         clearTrackStatus(rowTrack);
         if (!sameTrack && !(isFastSkip || shouldSeamless)) {
           fadeInAudio(audio, 100);
@@ -559,6 +612,7 @@
           user_activation_seen: Boolean(typeof navigator !== "undefined" && navigator.userActivation && navigator.userActivation.hasBeenActive)
         });
         if (playErr && playErr.name === "AbortError" && !isRetry) {
+          audioState.playAbortRetryToken = requestToken;
           beginAudioRecovery({
             request_token: requestToken,
             reason: "AbortError",
@@ -566,11 +620,15 @@
           });
           waitForAudioReadiness(audio, requestToken, isIosDevice() ? 900 : 700).then(function () {
             if (requestToken !== audioState.startRequestToken) return;
+            if (audioState.playAbortRetryToken !== requestToken) return;
+            if (audioState.trackFailureRecovery) return;
+            audioState.playAbortRetryToken = 0;
             attemptPlay({ retry: true, sync: isFastSkip });
           });
           return;
         }
         audioState.trackStartInFlight = false;
+        if (audioState.playAbortRetryToken === requestToken) audioState.playAbortRetryToken = 0;
         clearWaitingRecovery();
         clearFadeTimer();
         setTrackStatus(rowTrack, "Chargement du fichier audio...");
@@ -717,7 +775,7 @@
       return audioState.radioQueueCursor;
     }
 
-    function resolveIndex(direction) {
+    function resolveIndex(direction, navigationOptions) {
       const list = audioState.playlist;
       if (!list.length) return -1;
 
@@ -726,16 +784,27 @@
       }
 
       if (audioState.shuffleOn) {
-        return getRandomIndex(audioState.currentIndex);
+        return direction > 0 ? getRandomIndex(audioState.currentIndex) : -1;
       }
 
       if (audioState.currentIndex < 0) return 0;
 
       if (direction > 0) {
         if (audioState.currentIndex < list.length - 1) return audioState.currentIndex + 1;
-        return -1;
+        const extendedIndex = extendAlbumPlaylistToNextAlbum({
+          reason: "next",
+          fromIndex: audioState.currentIndex,
+          navigationOptions: navigationOptions || {}
+        });
+        return Number.isInteger(extendedIndex) && extendedIndex >= 0 ? extendedIndex : -1;
       }
-      return audioState.currentIndex > 0 ? audioState.currentIndex - 1 : -1;
+      if (audioState.currentIndex > 0) return audioState.currentIndex - 1;
+      const previousIndex = extendAlbumPlaylistToPreviousAlbum({
+        reason: "previous",
+        fromIndex: audioState.currentIndex,
+        navigationOptions: navigationOptions || {}
+      });
+      return Number.isInteger(previousIndex) && previousIndex >= 0 ? previousIndex : -1;
     }
 
     function playNext(options) {
@@ -768,8 +837,22 @@
       const plannedNextIndex = plannedNextIndices.length ? plannedNextIndices[0] : -1;
       const readyNextIndex = getAutoPrefetchedNextIndex();
       const prefetchedNextIndex = readyNextIndex === plannedNextIndex ? readyNextIndex : -1;
-      const nextIndex = plannedNextIndex >= 0 ? plannedNextIndex : resolveIndex(1);
+      const nextIndex = plannedNextIndex >= 0 ? plannedNextIndex : resolveIndex(1, opts);
       if (nextIndex >= 0) {
+        let shuffleHistoryCursor = null;
+        if (
+          audioState.homeMode !== "radio" &&
+          audioState.shuffleOn &&
+          Array.isArray(audioState.shuffleHistory) &&
+          Number.isInteger(audioState.shuffleHistoryCursor)
+        ) {
+          const forwardCursor = audioState.shuffleHistoryCursor + 1;
+          const forwardSrc = audioState.shuffleHistory[forwardCursor] || "";
+          const nextTrack = audioState.playlist[nextIndex];
+          if (forwardSrc && nextTrack && srcMatches(forwardSrc, nextTrack.src)) {
+            shuffleHistoryCursor = forwardCursor;
+          }
+        }
         if (opts.auto) {
           const nextTrack = audioState.playlist[nextIndex];
           trackAudioRuntimeEvent("auto_advance_attempt", Object.assign(
@@ -814,7 +897,8 @@
           auto: Boolean(opts.auto),
           fromMediaSession,
           fromTransportControl,
-          surface: opts.surface || ""
+          surface: opts.surface || "",
+          shuffleHistoryCursor
         });
       } else {
         syncAudioUi();
@@ -846,7 +930,34 @@
         }
         if (audioState.radioQueueCursor <= 0) return;
       }
-      const prevIndex = resolveIndex(-1);
+      if (
+        audioState.homeMode !== "radio" &&
+        audioState.shuffleOn &&
+        (!Number.isInteger(audioState.shuffleHistoryCursor) || audioState.shuffleHistoryCursor <= 0)
+      ) {
+        const audio = audioState.audio;
+        if (audio && Number.isFinite(audio.currentTime) && audio.currentTime > 0) {
+          try { audio.currentTime = 0; } catch (_err) {}
+          updateProgressUi();
+          syncMediaSessionMetadata({ forcePosition: true });
+        }
+        return;
+      }
+      let shuffleHistoryCursor = null;
+      let prevIndex = -1;
+      if (
+        audioState.homeMode !== "radio" &&
+        audioState.shuffleOn &&
+        Array.isArray(audioState.shuffleHistory) &&
+        Number.isInteger(audioState.shuffleHistoryCursor) &&
+        audioState.shuffleHistoryCursor > 0
+      ) {
+        shuffleHistoryCursor = audioState.shuffleHistoryCursor - 1;
+        const previousSrc = audioState.shuffleHistory[shuffleHistoryCursor] || "";
+        prevIndex = audioState.playlist.findIndex((track) => track && srcMatches(track.src, previousSrc));
+      } else {
+        prevIndex = resolveIndex(-1, opts);
+      }
       if (prevIndex >= 0) {
         if (opts.fromMediaSession) {
           const prevTrack = audioState.playlist[prevIndex];
@@ -879,7 +990,8 @@
           seamless: useSeamless,
           fromMediaSession: Boolean(opts.fromMediaSession),
           fromTransportControl: Boolean(opts.fromTransportControl),
-          surface: opts.surface || ""
+          surface: opts.surface || "",
+          shuffleHistoryCursor
         });
       }
     }
@@ -941,23 +1053,58 @@
     }
 
     function startRadioPlaybackFromIdle() {
+      if (
+        (!Array.isArray(audioState.radioQueue) || !audioState.radioQueue.length) &&
+        Array.isArray(audioState.radioPlaylist) &&
+        audioState.radioPlaylist.length
+      ) {
+        ensureRadioQueue(audioState.radioQueueMinRemaining);
+      }
+      if (
+        audioState.homeMode === "radio" &&
+        Array.isArray(audioState.radioQueue) &&
+        audioState.radioQueue.length
+      ) {
+        if (!Number.isInteger(audioState.radioQueueCursor) || audioState.radioQueueCursor < 0) {
+          audioState.radioQueueCursor = 0;
+        }
+        syncRadioQueueToPlaylist({ preserveRecent: true });
+        startTrack(audioState.radioQueueCursor, {
+          seamless: true,
+          immediatePlay: true,
+          userGesture: true,
+          surface: "radio_idle_sync"
+        });
+        return true;
+      }
+      const requestToken = audioState.startRequestToken;
+      const transitionToken = Number(audioState.modeTransitionToken || 0);
       ensureRadioPlaylistLoaded()
         .then(function (radioList) {
           if (!Array.isArray(radioList) || !radioList.length) return;
           if (audioState.homeMode !== "radio") return;
+          if (requestToken !== audioState.startRequestToken) return;
+          if (transitionToken !== Number(audioState.modeTransitionToken || 0)) return;
+          if (getCurrentLogicalAudioSrc() || getCurrentPlayableAudioSrc(audioState.audio)) return;
           if (!ensureRadioQueue(audioState.radioQueueMinRemaining) || !audioState.radioQueue.length) return;
           audioState.radioQueueCursor = 0;
           syncRadioQueueToPlaylist({ preserveRecent: true });
-          startTrack(0, { seamless: true });
+          syncAudioUi();
         })
         .catch(function () {
           // Ignore radio loading failures.
         });
+      return false;
     }
 
     function togglePlayPause() {
       const audio = audioState.audio;
       if (!audio) return;
+
+      if (audio.paused && audioState.trackStartInFlight) {
+        const requestAt = Number(audioState.playRequestTs || 0);
+        if (!requestAt || Date.now() - requestAt < 450) return;
+      }
 
       if (audio.paused) {
         if (!getCurrentPlayableAudioSrc(audio)) {

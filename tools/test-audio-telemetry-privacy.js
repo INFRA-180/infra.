@@ -7,7 +7,10 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const posted = [];
+const requests = [];
 let uuidCounter = 0;
+let fetchOk = true;
+let sendBeaconCalls = 0;
 const audioState = {
   playRequestToken: 0,
   startRequestToken: 0,
@@ -38,7 +41,11 @@ const sandbox = {
   navigator: {
     userAgent: "SECRET FULL USER AGENT",
     onLine: true,
-    connection: { effectiveType: "4g" }
+    connection: { effectiveType: "4g" },
+    sendBeacon() {
+      sendBeaconCalls += 1;
+      return true;
+    }
   },
   document: {
     visibilityState: "visible",
@@ -49,9 +56,10 @@ const sandbox = {
   clearTimeout() {},
   setInterval() { return 1; },
   clearInterval() {},
-  fetch(_url, options) {
+  fetch(url, options) {
     posted.push(JSON.parse(String(options && options.body || "[]")));
-    return Promise.resolve({ ok: true });
+    requests.push({ url, options: Object.assign({}, options) });
+    return Promise.resolve({ ok: fetchOk });
   }
 };
 sandbox.window = sandbox;
@@ -113,6 +121,8 @@ const telemetry = sandbox.InfraAudioTelemetry.createTelemetry({
   assert.strictEqual(posted[0].length, 100, "Only the 100 newest events may leave the device");
   assert.strictEqual(posted[0][0].track, "Track 20");
   assert.strictEqual(posted[0][99].track, "Track 119");
+  assert.strictEqual(requests[0].options.credentials, "omit");
+  assert.strictEqual(requests[0].options.keepalive, false);
 
   const forbidden = [
     "browser", "local_time", "ts_client", "session_id", "track_path", "src",
@@ -191,14 +201,23 @@ const telemetry = sandbox.InfraAudioTelemetry.createTelemetry({
   });
   assert.strictEqual(await telemetry.flushQueue(), true);
   assert.deepStrictEqual(posted[4].map((event) => event.event), [
-    "prefetch_cancel",
-    "prefetch_suspended",
-    "prefetch_cache_rehydrated"
+    "prefetch_suspended"
   ]);
-  assert.strictEqual(posted[4][0].response_ms, 41);
-  assert.strictEqual(posted[4][1].cancelled_count, 1);
-  assert.strictEqual(posted[4][2].restored_count, 5);
-  assert.strictEqual(Object.prototype.hasOwnProperty.call(posted[4][2], "sources"), false, "Prefetch source URLs leaked");
+  assert.strictEqual(posted[4][0].cancelled_count, 1);
+
+  telemetry.enqueue({ event: "pagehide_flush", timestamp_ms: Date.now() });
+  assert.strictEqual(await telemetry.flushQueue({ beacon: true }), true);
+  const keepaliveRequest = requests[requests.length - 1];
+  assert.strictEqual(keepaliveRequest.options.credentials, "omit");
+  assert.strictEqual(keepaliveRequest.options.keepalive, true);
+  assert.strictEqual(sendBeaconCalls, 0, "Cross-origin telemetry must never use navigator.sendBeacon");
+
+  fetchOk = false;
+  telemetry.enqueue({ event: "network_retry", timestamp_ms: Date.now() });
+  assert.strictEqual(await telemetry.flushQueue({ beacon: true }), false);
+  assert.strictEqual(telemetry.hasPendingEvents(), true, "A failed keepalive delivery must remain queued for retry");
+  fetchOk = true;
+  assert.strictEqual(await telemetry.flushQueue(), true);
 
   console.log("Audio telemetry privacy checks passed.");
 })().catch((error) => {

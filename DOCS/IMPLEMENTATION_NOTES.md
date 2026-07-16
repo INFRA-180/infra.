@@ -1,5 +1,15 @@
 # Implementation Notes
 
+## 2026-07-16 — audiofix335 strict album context, immediate time and lifecycle telemetry
+
+- The supplied iPhone HAR (805 requests) confirms that the Service Worker already handles the bounded startup cache correctly: 21 of 23 Safari full-range requests were clipped to the cached 1 MiB `206` segment. The two R2 full-body responses had no ready segment beforehand. No speculative Range-routing change is therefore warranted.
+- Linear album playback now stops at the last track instead of extending into the next album. Any restored non-Radio queue, including historical `album`, `global` and `favorites` payloads, is re-scoped to the active album (current page first, catalogue album fallback) before it can navigate or prefetch. With Radio off, toggling Shuffle reconstructs the current album context first; Radio itself remains the global playlist. These mode changes preserve the current source and position.
+- A source-metadata-pending state makes the mini-player and fullscreen show `0:00` and zero progress immediately on a source change, then releases actual duration/progress on `loadedmetadata` or `durationchange`. Media Session handler binding is no longer needlessly forced on each track, and asynchronous artwork commits are ignored if their track is no longer current.
+- Page lifecycle telemetry now uses anonymous `fetch(..., { credentials: "omit", keepalive: true })`, retaining the IndexedDB batch on failure instead of using cross-origin `sendBeacon`. Normal high-volume prefetch trace events are no longer sent remotely; diagnostic errors, suspension and ready-window signals remain.
+- SPA cover fallback URLs in inline `onerror` handlers are rebased with the swapped document, fixing the real `/assets/music/v-23pi56-cover.jpg` root-path 404 without changing visual CSS.
+- Release identifiers prepared across all 35 player documents are `audiofix335-20260716` and `infra-shell-20260716-audio335`. The frozen `styles.css` asset remains byte-identical (`2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb`): no viewport, fullscreen geometry, safe area, bottom anchor or `100lvh` modification is included.
+- Regression coverage covers strict album ending/migration, Radio and scoped Shuffle, immediate time state, stale Media Session artwork, explicit Safari full-range cache clipping, telemetry lifecycle privacy, cache migration, prefetch ordering and release boundaries. The unrelated Antique Olive font 404 remains documented separately because correcting its relative CSS path would change the frozen stylesheet; the HAR contains no source-map request.
+
 ## 2026-07-16 — audiofix334 measured mobile prefetch window
 
 - Safari Web Inspector plus privacy-safe production telemetry measured nine iPhone transport taps in the audiofix333 session. Five 4 MiB prefetches started, only one completed (in 6186 ms), and no track was served from prefetch; taps arrived only 901–2201 ms after each fetch began. First bytes still arrived in 39–65 ms, proving that the dominant failure was segment readiness and WebKit buffering rather than the cached `206` reconstruction or CORS path.

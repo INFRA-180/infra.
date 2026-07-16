@@ -143,6 +143,7 @@ function createCoreHarness(options) {
   const sandbox = createSandbox();
   loadScript(sandbox, CORE_PATH);
   let playCalls = 0;
+  const bindCalls = [];
   const playlist = opts.playlist || makeTracks(11);
   const audio = makeAudio(() => { playCalls += 1; });
   const state = {
@@ -190,7 +191,7 @@ function createCoreHarness(options) {
     syncAudioUi() {},
     syncMediaSessionMetadata() {},
     scheduleMediaSessionResync() {},
-    bindMediaSessionActions() {},
+    bindMediaSessionActions(options) { bindCalls.push(options); },
     startAudioRaf() {},
     clearTrackFailure() {},
     forceAudioFullVolume() {},
@@ -198,10 +199,10 @@ function createCoreHarness(options) {
     buildAudioMonitorPayload: () => ({}),
     trackAudioRuntimeEvent() {},
     logAudioAuditEvent() {},
-    extendAlbumPlaylistToNextAlbum: () => -1
+    extendAlbumPlaylistToNextAlbum: opts.extendAlbumPlaylistToNextAlbum || (() => -1)
   });
 
-  return { api, audio, state, sandbox, getPlayCalls: () => playCalls };
+  return { api, audio, state, sandbox, getPlayCalls: () => playCalls, getBindCalls: () => bindCalls.slice() };
 }
 
 function testPreparedColdPlayIsSynchronous() {
@@ -390,6 +391,237 @@ function testAuthoritativeRollingWindow() {
     [6, 7, 8, 9, 10],
     "After five changes the window must roll to N+6 through N+10"
   );
+}
+
+function testAlbumNeverExtendsPastItsLastTrack() {
+  const playlist = makeTracks(3);
+  let extensionCalls = 0;
+  const harness = createCoreHarness({
+    playlist,
+    currentIndex: playlist.length - 1,
+    extendAlbumPlaylistToNextAlbum() {
+      extensionCalls += 1;
+      playlist.push({
+        src: "https://media.test/foreign-album.m4a",
+        name: "Foreign",
+        album: "Other album"
+      });
+      return playlist.length - 1;
+    }
+  });
+
+  assert.deepStrictEqual(
+    Array.from(harness.api.getQueuePreviewIndices(5)),
+    [],
+    "The final album track must not create an N+1 from another album"
+  );
+  harness.api.playNext({ fromMediaSession: true, seamless: true });
+  assert.strictEqual(harness.state.currentIndex, 2, "Next at the end of an album must leave the current track unchanged");
+  assert.strictEqual(extensionCalls, 0, "Album navigation must never invoke the cross-album extension hook");
+  assert.strictEqual(playlist.length, 3, "The album playlist must remain immutable at its boundary");
+}
+
+async function testTransportMediaSessionActionsAreNotForcedPerTrack() {
+  const harness = createCoreHarness({ playlist: makeTracks(3), currentIndex: 0 });
+  harness.api.playNext({ fromMediaSession: true, seamless: true });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert(
+    harness.getBindCalls().some((options) => options === undefined),
+    "A normal track change must reuse Media Session handlers instead of forcing a rebind"
+  );
+  assert(
+    harness.getBindCalls().every((options) => !options || options.force !== true),
+    "Only lifecycle resync paths may force Media Session handlers"
+  );
+}
+
+function testSameSourceRetryKeepsMetadataPending() {
+  const harness = createCoreHarness({ playlist: makeTracks(2), currentIndex: 0 });
+  harness.state.sourceMetadataPending = true;
+  harness.api.startTrack(0, { seamless: true });
+  assert.strictEqual(
+    harness.state.sourceMetadataPending,
+    true,
+    "A same-source retry after reset must keep 0:00 until new metadata arrives"
+  );
+}
+
+function testRestoredNonRadioQueueIsScopedToCurrentAlbum() {
+  for (const persistedKind of ["album", "global", "favorites"]) {
+    const sandbox = createSandbox();
+    loadScript(sandbox, RADIO_PATH);
+    const albumA = [
+      { src: "https://media.test/a-1.m4a", name: "A1", album: "Album A", page: "https://site.test/music/a.html" },
+      { src: "https://media.test/a-2.m4a", name: "A2", album: "Album A", page: "https://site.test/music/a.html" }
+    ];
+    const albumB = [
+      { src: "https://media.test/b-1.m4a", name: "B1", album: "Album B", page: "https://site.test/music/b.html" },
+      { src: "https://media.test/b-2.m4a", name: "B2", album: "Album B", page: "https://site.test/music/b.html" }
+    ];
+    const state = {
+      audio: makeAudio(),
+      playlist: [],
+      playlistKind: "album",
+      currentIndex: -1,
+      activeLogicalSrc: albumA[1].src,
+      homeMode: "album",
+      homeModeStorageKey: "infra_home_mode_test",
+      queueStorageKey: "infra_queue_test",
+      resumeStorageKey: "infra_resume_test",
+      radioQueue: [],
+      radioQueueCursor: -1,
+      radioQueueMinRemaining: 5
+    };
+    sandbox.sessionStorage.setItem(state.queueStorageKey, JSON.stringify({
+      playlist: albumA.concat(albumB),
+      currentIndex: 3,
+      currentSrc: albumA[1].src,
+      homeMode: "album",
+      playlistKind: persistedKind,
+      shuffleOn: persistedKind !== "album"
+    }));
+    const radio = sandbox.InfraAudioRadio.createAudioRadio({
+      audioState: state,
+      runtime: { baseUrl: new URL("https://site.test/") },
+      getCurrentLogicalAudioSrc: () => state.activeLogicalSrc,
+      toAbsoluteUrlOrEmpty: (value) => String(value || ""),
+      toAbsoluteUrl: (value) => String(value || ""),
+      normalizeAudioSourceUrl: (value) => String(value || ""),
+      normalizeTrackTitle: (value) => String(value || ""),
+      normalizeAlbumTitle: (value) => String(value || ""),
+      srcMatches: (left, right) => String(left || "") === String(right || ""),
+      syncPlaylistContext() {},
+      syncMediaSessionMetadata() {},
+      syncAudioUi() {}
+    });
+
+    assert.strictEqual(radio.restorePlaybackQueueContext(), true);
+    assert.deepStrictEqual(
+      Array.from(state.playlist, (track) => track.src),
+      albumA.map((track) => track.src),
+      `A persisted ${persistedKind} queue with Radio off must be migrated to the active album only`
+    );
+    assert.strictEqual(state.playlistKind, "album", "A non-Radio restore must persist as an album queue");
+    assert.strictEqual(state.currentIndex, 1, "The restored current index must be recalculated inside the scoped album");
+  }
+}
+
+function testShuffleScopesTheCurrentAlbumWhenRadioIsOff() {
+  const sandbox = createSandbox();
+  loadScript(sandbox, RADIO_PATH);
+  const globalPlaylist = [
+    { src: "https://media.test/a-1.m4a", name: "A1", album: "Album A", page: "https://site.test/music/a.html" },
+    { src: "https://media.test/a-2.m4a", name: "A2", album: "Album A", page: "https://site.test/music/a.html" },
+    { src: "https://media.test/b-1.m4a", name: "B1", album: "Album B", page: "https://site.test/music/b.html" },
+    { src: "https://media.test/b-2.m4a", name: "B2", album: "Album B", page: "https://site.test/music/b.html" }
+  ];
+  const state = {
+    audio: makeAudio(),
+    playlist: globalPlaylist.slice(),
+    playlistKind: "global",
+    currentIndex: 1,
+    activeLogicalSrc: globalPlaylist[1].src,
+    homeMode: "album",
+    shuffleOn: false,
+    homeModeStorageKey: "infra_home_mode_test",
+    queueStorageKey: "infra_queue_test",
+    resumeStorageKey: "infra_resume_test",
+    radioQueue: [],
+    radioQueueCursor: -1,
+    radioPlaylist: []
+  };
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    runtime: { baseUrl: new URL("https://site.test/") },
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc,
+    getCurrentPlaylistTrack: () => state.playlist[state.currentIndex] || null,
+    buildPreservedTrack: (track, src) => Object.assign({}, track || { src }),
+    toAbsoluteUrlOrEmpty: (value) => String(value || ""),
+    toAbsoluteUrl: (value) => String(value || ""),
+    normalizeAudioSourceUrl: (value) => String(value || ""),
+    normalizeTrackTitle: (value) => String(value || ""),
+    normalizeAlbumTitle: (value) => String(value || ""),
+    srcMatches: (left, right) => String(left || "") === String(right || ""),
+    syncPlaylistContext() {},
+    syncMediaSessionMetadata() {},
+    syncAudioUi() {}
+  });
+
+  radio.toggleAlbumShuffleMode();
+  assert.strictEqual(state.shuffleOn, true);
+  assert.strictEqual(state.playlistKind, "album");
+  assert.deepStrictEqual(
+    Array.from(state.playlist, (track) => track.src),
+    globalPlaylist.slice(0, 2).map((track) => track.src),
+    "Shuffle with Radio off must be restricted to the selected track's album"
+  );
+  assert.strictEqual(state.currentIndex, 1);
+  assert.strictEqual(state.activeLogicalSrc, globalPlaylist[1].src, "Mode changes must not replace the current source");
+
+  radio.toggleAlbumShuffleMode();
+  assert.strictEqual(state.shuffleOn, false);
+  assert.deepStrictEqual(Array.from(state.playlist, (track) => track.src), globalPlaylist.slice(0, 2).map((track) => track.src));
+}
+
+function testPendingSourceShowsZeroTimeInMiniAndOverlay() {
+  const sandbox = createSandbox();
+  loadScript(sandbox, NOW_PLAYING_PATH);
+  loadScript(sandbox, TRANSPORT_UI_PATH);
+  const audio = makeAudio();
+  audio.src = "https://media.test/new-track.m4a";
+  audio.currentSrc = audio.src;
+  audio.currentTime = 37;
+  audio.duration = 180;
+  const state = {
+    audio,
+    sourceMetadataPending: true,
+    nowPlayingSeeking: false,
+    transport: {
+      nowMini: { hidden: true },
+      miniCurrent: { textContent: "" },
+      miniDuration: { textContent: "" },
+      miniFill: { style: {} },
+      miniProgress: { disabled: false },
+      overlay: {},
+      overlayCurrent: { textContent: "" },
+      overlayDuration: { textContent: "" },
+      overlayFill: { style: {} },
+      overlayProgress: { disabled: false }
+    }
+  };
+  const format = function (seconds) {
+    const total = Math.max(0, Math.round(Number(seconds) || 0));
+    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+  };
+  const nowPlaying = sandbox.InfraNowPlaying.createNowPlaying({
+    audioState: state,
+    getCurrentPlayableAudioSrc: () => audio.src,
+    formatTrackDuration: format
+  });
+  const transport = sandbox.InfraTransportUi.createTransportUi({
+    audioState: state,
+    getCurrentPlayableAudioSrc: () => audio.src,
+    formatTrackDuration: format,
+    syncNowPlayingOverlayProgress: nowPlaying.syncNowPlayingOverlayProgress
+  });
+
+  transport.syncTransportMiniUi();
+  assert.strictEqual(state.transport.miniCurrent.textContent, "0:00");
+  assert.strictEqual(state.transport.miniDuration.textContent, "0:00");
+  assert.strictEqual(state.transport.miniFill.style.width, "0%");
+  assert.strictEqual(state.transport.miniProgress.disabled, true);
+  assert.strictEqual(state.transport.overlayCurrent.textContent, "0:00");
+  assert.strictEqual(state.transport.overlayDuration.textContent, "-0:00");
+  assert.strictEqual(state.transport.overlayFill.style.width, "0%");
+  assert.strictEqual(state.transport.overlayProgress.disabled, true);
+
+  state.sourceMetadataPending = false;
+  transport.syncTransportMiniUi();
+  assert.strictEqual(state.transport.miniCurrent.textContent, "0:37");
+  assert.strictEqual(state.transport.miniDuration.textContent, "3:00");
+  assert.strictEqual(state.transport.overlayDuration.textContent, "-2:23");
+  assert.strictEqual(state.transport.miniProgress.disabled, false);
 }
 
 async function testIntegratedFivePreparedTransportSkips() {
@@ -1106,6 +1338,24 @@ function testPersistentAlbumAndFullscreenContracts() {
       miniSyncBody.includes("audio.currentTime > 0"),
     "The mini-player duration placeholder must be 0:00 while metadata is unavailable"
   );
+  assert(miniSyncBody.includes("audioState.sourceMetadataPending"));
+  const nowPlayingProgressBody = extractFunctionBody(nowPlayingSource, "syncNowPlayingOverlayProgress");
+  assert(nowPlayingProgressBody.includes("audioState.sourceMetadataPending"));
+  assert(nowPlayingProgressBody.includes("formatPlaybackTime"));
+
+  const coreSource = fs.readFileSync(CORE_PATH, "utf8");
+  const coreStartBody = extractFunctionBody(coreSource, "startTrack");
+  assert(coreStartBody.includes("bindMediaSessionActions();"));
+  assert(!coreStartBody.includes("bindMediaSessionActions({ force: true })"));
+  const queuePreviewBody = extractFunctionBody(coreSource, "getQueuePreviewIndices");
+  const resolveIndexBody = extractFunctionBody(coreSource, "resolveIndex");
+  assert(!queuePreviewBody.includes("extendAlbumPlaylistToNextAlbum"));
+  assert(!resolveIndexBody.includes("extendAlbumPlaylistToNextAlbum"));
+
+  const scriptsSource = fs.readFileSync(path.join(ROOT, "public/assets/js/scripts.js"), "utf8");
+  const coverNormalizeBody = extractFunctionBody(scriptsSource, "normalizeCoverElementsForBase");
+  assert(coverNormalizeBody.includes('getAttribute("onerror")'));
+  assert(coverNormalizeBody.includes("normalizeUrlAgainstBase(fallbackMatch[2], baseUrl)"));
 
   const stylesSource = fs.readFileSync(STYLES_PATH, "utf8");
   const coverWrapBlock = stylesSource.match(/\.now-playing-cover-wrap\s*\{([^}]*)\}/);
@@ -1122,6 +1372,12 @@ function testPersistentAlbumAndFullscreenContracts() {
   testPreparedColdPlayIsSynchronous();
   await testCachedTrackIsPromotedBeforeColdTap();
   testAuthoritativeRollingWindow();
+  testAlbumNeverExtendsPastItsLastTrack();
+  await testTransportMediaSessionActionsAreNotForcedPerTrack();
+  testSameSourceRetryKeepsMetadataPending();
+  testRestoredNonRadioQueueIsScopedToCurrentAlbum();
+  testShuffleScopesTheCurrentAlbumWhenRadioIsOff();
+  testPendingSourceShowsZeroTimeInMiniAndOverlay();
   await testIntegratedFivePreparedTransportSkips();
   testMaterializedShuffleOrder();
   await testPrefetchCacheRehydrationAndCorruptFallback();
@@ -1131,7 +1387,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchTimeoutRetriesOnce();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix334 runtime checks passed.");
+  console.log("audiofix335 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

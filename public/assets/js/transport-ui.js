@@ -1455,7 +1455,13 @@
 
     const audio = audioState.audio;
     const hasSource = Boolean(audio && getCurrentPlayableAudioSrc(audio));
-    const hasDuration = Boolean(audio && audio.duration && Number.isFinite(audio.duration) && audio.duration > 0);
+    const hasDuration = Boolean(
+      !audioState.sourceMetadataPending &&
+      audio &&
+      audio.duration &&
+      Number.isFinite(audio.duration) &&
+      audio.duration > 0
+    );
 
     transport.nowMini.hidden = !hasSource;
     if (!hasSource) {

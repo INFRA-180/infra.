@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix334-20260716";
-const shellRelease = "infra-shell-20260716-audio334";
+const release = "audiofix335-20260716";
+const shellRelease = "infra-shell-20260716-audio335";
 const coverCssRelease = "audiofix332-20260716";
 const frozenCssSha256 = "2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb";
 const scripts = read("public/assets/js/scripts.js");
@@ -41,9 +41,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix334");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix334");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio334");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix335");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix335");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio335");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v8"'), "Service Worker does not use segment cache v8");
 
 const coldPreparation = functionBody(radio, "prepareInitialGlobalRandomPlayback", "scheduleInitialGlobalRandomPreparation");
@@ -121,6 +121,12 @@ const playNext = functionBody(core, "playNext", "playPrevious");
 expect(playNext.includes("getQueuePreviewIndices(1)"), "Next does not consume the authoritative lookahead order");
 expect(core.includes("const planDepth = Math.max(requested, 5)"), "authoritative lookahead is not materialized to five tracks");
 expect(core.includes('mode: "shuffle"'), "Shuffle lookahead is not materialized");
+const queuePreview = functionBody(core, "getQueuePreviewIndices", "resetAudioElementForSource");
+const resolveIndex = functionBody(core, "resolveIndex", "playNext");
+expect(!queuePreview.includes("extendAlbumPlaylistToNextAlbum"), "album lookahead still extends into another album");
+expect(!resolveIndex.includes("extendAlbumPlaylistToNextAlbum"), "album Next still extends into another album");
+expect(radio.includes("scopeAlbumPlaylistToCurrentTrack"), "legacy album queues are not scoped during restoration");
+expect(radio.includes('maybePrefetchNextTrack("shuffle_mode_change")'), "Shuffle changes still discard the rolling prefetch window");
 
 expect(!albumUi.includes('className = "track-controls"'), "album top transport controls are still injected");
 expect(!albumUi.includes("data-track-prev"), "album Previous control is still present");
@@ -128,6 +134,11 @@ expect(!albumUi.includes("data-track-next"), "album Next control is still presen
 expect(!radio.includes("cleanupForeignAlbumAudioWhenIdle"), "foreign-album cleanup can still destroy the active player");
 expect(!radio.includes("cleanupIdleAudioContext"), "route lifecycle can still clear a paused player session");
 expect(nowPlaying.includes("animation.oncancel = finalize"), "fullscreen cancellation does not finalize mini-player restoration");
+expect(nowPlaying.includes("audioState.sourceMetadataPending"), "fullscreen time does not reset while new metadata is pending");
+expect(read("public/assets/js/transport-ui.js").includes("audioState.sourceMetadataPending"), "mini-player time does not reset while new metadata is pending");
+expect(startTrack.includes("bindMediaSessionActions();"), "track changes no longer bind Media Session actions");
+expect(!startTrack.includes("bindMediaSessionActions({ force: true })"), "track changes still force-bind Media Session actions");
+expect(scripts.includes('getAttribute("onerror")'), "SPA cover fallbacks are not rebased with their source document");
 
 expect(sw.includes("buildRangeResponseFromCachedAudio"), "Service Worker Range reconstruction is missing");
 expect(sw.includes("responseEnd = Math.min(range.end, metadata.cachedEnd)"), "open-ended Range is not bounded to the cached segment");
@@ -149,7 +160,9 @@ expect(core.includes('audio.crossOrigin = "anonymous"'), "source assignment does
 expect(telemetry.includes("const QUEUE_CAP = 100"), "telemetry queue is not capped at 100 events");
 expect(telemetry.includes("const QUEUE_TTL_MS = 24 * 60 * 60 * 1000"), "telemetry queue lacks the 24-hour TTL");
 expect(telemetry.includes('"response_ms", "body_ms", "queue_ms", "cache_ms"'), "prefetch stage timings are not retained by telemetry sanitation");
-expect(telemetry.includes('"prefetch_cancel"') && telemetry.includes('"prefetch_suspended"'), "prefetch cancellation telemetry is not retained");
+expect(telemetry.includes('"prefetch_suspended"') && telemetry.includes('"prefetch_window_ready"'), "useful prefetch health telemetry is not retained");
+expect(telemetry.includes('credentials: "omit"'), "telemetry requests may still carry credentials");
+expect(!telemetry.includes("navigator.sendBeacon"), "cross-origin telemetry still uses sendBeacon");
 expect(!telemetry.includes("navigator.userAgent"), "full user-agent is still transmitted");
 expect(!telemetry.includes("local_time:"), "local time is still transmitted");
 expect(!telemetry.includes("session_id:"), "global session identifier is still transmitted");
@@ -186,4 +199,4 @@ for (const relativePath of htmlFiles) {
   expect(!source.includes("audiofix326-20260715"), `${relativePath} still references audiofix326 JavaScript`);
 }
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix334.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix335.");

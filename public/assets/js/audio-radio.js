@@ -87,7 +87,6 @@
     const recoverFromTrackFailure = method(ctx, "recoverFromTrackFailure", function () {});
     const updateProgressUi = method(ctx, "updateProgressUi", function () {});
     const isBlobObjectUrl = method(ctx, "isBlobObjectUrl", function () { return false; });
-    const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () { return -1; });
     const getQueuePreviewIndices = method(ctx, "getQueuePreviewIndices", function () { return []; });
 
   function resyncMediaSessionControls() {
@@ -997,8 +996,13 @@
 
     if (nextMode === "radio") {
       if (audioState.playlist.length && prevMode !== "radio") {
-        audioState.albumPlaylistSnapshot = audioState.playlist.slice();
-        audioState.albumIndexSnapshot = Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1;
+        const scopedSnapshot = scopeAlbumPlaylistToCurrentTrack(
+          audioState.playlist,
+          preservedTrack || currentTrack,
+          audioState.currentIndex
+        );
+        audioState.albumPlaylistSnapshot = scopedSnapshot.playlist;
+        audioState.albumIndexSnapshot = scopedSnapshot.currentIndex;
       }
       ensureRadioPlaylistLoaded()
         .then(function (radioList) {
@@ -1027,6 +1031,7 @@
           savePlaybackQueueContext();
           syncMediaSessionMetadata({ forcePosition: true });
           syncAudioUi();
+          maybePrefetchNextTrack("mode_change");
         })
         .catch(function () {
           savePlaybackQueueContext();
@@ -1041,6 +1046,7 @@
         savePlaybackQueueContext();
         syncMediaSessionMetadata({ forcePosition: true });
         syncAudioUi();
+        maybePrefetchNextTrack("mode_change");
         return;
       }
       audioState.playlistKind = "album";
@@ -1059,62 +1065,48 @@
         savePlaybackQueueContext();
         syncMediaSessionMetadata({ forcePosition: true });
         syncAudioUi();
+        maybePrefetchNextTrack("mode_change");
         return;
       }
-      const snapshot = Array.isArray(audioState.albumPlaylistSnapshot)
-        ? audioState.albumPlaylistSnapshot.filter((track) => track && track.src)
-        : [];
-      const uiPlaylist = audioState.ui && Array.isArray(audioState.ui.playlist)
-        ? audioState.ui.playlist.filter((track) => track && track.src)
-        : [];
+      const albumAnchor = preservedTrack || currentTrack;
+      const snapshotScope = scopeAlbumPlaylistToCurrentTrack(
+        audioState.albumPlaylistSnapshot,
+        albumAnchor,
+        audioState.albumIndexSnapshot
+      );
+      const uiScope = scopeAlbumPlaylistToCurrentTrack(
+        audioState.ui && audioState.ui.playlist,
+        albumAnchor,
+        audioState.currentIndex
+      );
+      const snapshot = snapshotScope.playlist;
+      const uiPlaylist = uiScope.playlist;
 
       if (snapshot.length) {
         audioState.playlist = snapshot.slice();
         syncPlaylistContext(audioState.playlist);
-        const currentMatch = currentTrack && currentTrack.src
-          ? audioState.playlist.findIndex((track) => srcMatches(track.src, currentTrack.src))
-          : -1;
+        const currentMatch = albumAnchor && albumAnchor.src
+          ? audioState.playlist.findIndex((track) => srcMatches(track.src, albumAnchor.src))
+          : snapshotScope.currentIndex;
         if (currentMatch >= 0) {
           audioState.currentIndex = currentMatch;
-        } else if (preservedTrack) {
-          audioState.playlist = [preservedTrack].concat(
-            audioState.playlist.filter(function (track) {
-              return track && track.src && !srcMatches(track.src, preservedTrack.src);
-            })
-          );
-          audioState.currentIndex = 0;
-          syncPlaylistContext(audioState.playlist);
-        } else if (
-          Number.isInteger(audioState.albumIndexSnapshot) &&
-          audioState.albumIndexSnapshot >= 0 &&
-          audioState.albumIndexSnapshot < audioState.playlist.length
-        ) {
-          audioState.currentIndex = audioState.albumIndexSnapshot;
         } else {
           audioState.currentIndex = Math.min(
-            Math.max(0, Number(audioState.currentIndex) || 0),
+            Math.max(0, Number(snapshotScope.currentIndex) || 0),
             audioState.playlist.length - 1
           );
         }
       } else if (uiPlaylist.length) {
         audioState.playlist = uiPlaylist.slice();
         syncPlaylistContext(audioState.playlist);
-        const currentMatch = currentTrack && currentTrack.src
-          ? audioState.playlist.findIndex((track) => srcMatches(track.src, currentTrack.src))
-          : -1;
+        const currentMatch = albumAnchor && albumAnchor.src
+          ? audioState.playlist.findIndex((track) => srcMatches(track.src, albumAnchor.src))
+          : uiScope.currentIndex;
         if (currentMatch >= 0) {
           audioState.currentIndex = currentMatch;
-        } else if (preservedTrack) {
-          audioState.playlist = [preservedTrack].concat(
-            audioState.playlist.filter(function (track) {
-              return track && track.src && !srcMatches(track.src, preservedTrack.src);
-            })
-          );
-          audioState.currentIndex = 0;
-          syncPlaylistContext(audioState.playlist);
         } else {
           audioState.currentIndex = Math.min(
-            Math.max(0, Number(audioState.currentIndex) || 0),
+            Math.max(0, Number(uiScope.currentIndex) || 0),
             audioState.playlist.length - 1
           );
         }
@@ -1127,14 +1119,12 @@
         audioState.currentIndex = -1;
         syncPlaylistContext(audioState.playlist);
       }
-      savePlaybackQueueContext();
-      syncMediaSessionMetadata({ forcePosition: true });
-      syncAudioUi();
     }
 
     savePlaybackQueueContext();
     syncMediaSessionMetadata({ forcePosition: true });
     syncAudioUi();
+    if (nextMode !== "radio") maybePrefetchNextTrack("mode_change");
   }
 
 
@@ -1206,11 +1196,14 @@
 
 
   function toggleAlbumShuffleMode() {
+    if (audioState.homeMode !== "radio") constrainPlaybackToCurrentAlbum();
     audioState.shuffleOn = !audioState.shuffleOn;
-    clearNextTrackPrefetch("shuffle_mode_change");
     savePlaybackQueueContext();
     syncMediaSessionMetadata({ forcePosition: true });
     syncAudioUi();
+    // Reconcile retains the useful part of the rolling window and cancels only
+    // targets made improbable by the new order.
+    maybePrefetchNextTrack("shuffle_mode_change");
   }
 
 
@@ -1293,6 +1286,95 @@
 
 
 
+  function scopeAlbumPlaylistToCurrentTrack(playlist, anchorTrack, preferredIndex) {
+    const list = Array.isArray(playlist)
+      ? playlist.filter(function (track) { return track && track.src; })
+      : [];
+    if (!list.length && !(anchorTrack && anchorTrack.src)) {
+      return { playlist: [], currentIndex: -1 };
+    }
+
+    const anchorSrc = toAbsoluteUrlOrEmpty(anchorTrack && anchorTrack.src ? anchorTrack.src : "");
+    let anchorIndex = anchorSrc
+      ? list.findIndex(function (track) { return srcMatches(track.src, anchorSrc); })
+      : -1;
+    if (!anchorSrc && anchorIndex < 0 && Number.isInteger(preferredIndex) && preferredIndex >= 0 && preferredIndex < list.length) {
+      anchorIndex = preferredIndex;
+    }
+    const anchor = anchorIndex >= 0 ? list[anchorIndex] : (anchorTrack && anchorTrack.src ? anchorTrack : list[0]);
+    if (!anchor || !anchor.src) return { playlist: [], currentIndex: -1 };
+
+    const anchorPage = toAbsoluteUrlOrEmpty(anchor.page || "");
+    const anchorAlbum = normalizeAlbumTitle(anchor.album || "");
+    let scoped = [];
+    if (anchorPage) {
+      scoped = list.filter(function (track) {
+        return toAbsoluteUrlOrEmpty(track && track.page ? track.page : "") === anchorPage;
+      });
+    }
+    if (!scoped.length && anchorAlbum) {
+      scoped = list.filter(function (track) {
+        return normalizeAlbumTitle(track && track.album ? track.album : "") === anchorAlbum;
+      });
+    }
+    if (!scoped.length) scoped = [anchor];
+    if (!scoped.some(function (track) { return srcMatches(track.src, anchor.src); })) {
+      scoped.unshift(anchor);
+    }
+
+    const seen = new Set();
+    const normalized = scoped.filter(function (track) {
+      const src = toAbsoluteUrlOrEmpty(track && track.src ? track.src : "");
+      if (!src || seen.has(src)) return false;
+      seen.add(src);
+      return true;
+    });
+    const currentIndex = normalized.findIndex(function (track) { return srcMatches(track.src, anchor.src); });
+    return {
+      playlist: normalized,
+      currentIndex: currentIndex >= 0 ? currentIndex : 0
+    };
+  }
+
+
+
+  function constrainPlaybackToCurrentAlbum() {
+    const currentTrack = getCurrentPlaylistTrack();
+    const currentSrc = getCurrentLogicalAudioSrc();
+    const preservedTrack = buildPreservedTrack(currentTrack, currentSrc);
+    const anchor = preservedTrack || currentTrack;
+    if (!anchor || !anchor.src) return false;
+
+    const candidates = [
+      buildAlbumPlaylistFromRadioCache(anchor),
+      scopeAlbumPlaylistToCurrentTrack(audioState.playlist, anchor, audioState.currentIndex).playlist,
+      scopeAlbumPlaylistToCurrentTrack(
+        audioState.ui && audioState.ui.playlist,
+        anchor,
+        audioState.currentIndex
+      ).playlist
+    ].filter(function (playlist) {
+      return Array.isArray(playlist) && playlist.length;
+    });
+    const albumPlaylist = candidates.reduce(function (best, candidate) {
+      return candidate.length > best.length ? candidate : best;
+    }, []);
+    if (!albumPlaylist.length) return false;
+
+    audioState.playlist = albumPlaylist.slice();
+    audioState.playlistKind = "album";
+    syncPlaylistContext(audioState.playlist);
+    const currentIndex = audioState.playlist.findIndex(function (track) {
+      return srcMatches(track.src, anchor.src);
+    });
+    audioState.currentIndex = currentIndex >= 0 ? currentIndex : 0;
+    audioState.albumPlaylistSnapshot = audioState.playlist.slice();
+    audioState.albumIndexSnapshot = audioState.currentIndex;
+    return true;
+  }
+
+
+
   function savePlaybackQueueContext() {
     try {
       let list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
@@ -1361,7 +1443,7 @@
     }
 
     if (!payload || !Array.isArray(payload.playlist) || !payload.playlist.length) return false;
-    const restoredPlaylist = payload.playlist.map(sanitizeQueueTrack).filter(Boolean);
+    let restoredPlaylist = payload.playlist.map(sanitizeQueueTrack).filter(Boolean);
     if (!restoredPlaylist.length) return false;
 
     const restoredMode = payload.homeMode === "radio" ? "radio" : "album";
@@ -1370,18 +1452,33 @@
       return false;
     }
 
+    let restoredKind = payload.playlistKind === "global" || payload.playlistKind === "favorites"
+      ? payload.playlistKind
+      : (restoredMode === "radio" ? "radio" : "album");
+    const activeSrc = toAbsoluteUrlOrEmpty(getCurrentLogicalAudioSrc() || payload.currentSrc || "");
+    let currentIndex = Number.isInteger(payload.currentIndex) ? payload.currentIndex : -1;
+    if (restoredMode !== "radio") {
+      const scoped = scopeAlbumPlaylistToCurrentTrack(
+        restoredPlaylist,
+        activeSrc ? { src: activeSrc } : null,
+        currentIndex
+      );
+      restoredPlaylist = scoped.playlist;
+      currentIndex = scoped.currentIndex;
+      // Radio is the only global queue. Historical global/favorites payloads
+      // must not escape the current album after Radio has been turned off.
+      restoredKind = "album";
+    }
+    if (!restoredPlaylist.length) return false;
+
     audioState.homeMode = restoredMode;
     persistHomePlayMode(restoredMode);
     audioState.shuffleOn = Boolean(payload.shuffleOn);
 
     audioState.playlist = restoredPlaylist.slice();
-    audioState.playlistKind = payload.playlistKind === "global" || payload.playlistKind === "favorites"
-      ? payload.playlistKind
-      : (restoredMode === "radio" ? "radio" : "album");
+    audioState.playlistKind = restoredKind;
     syncPlaylistContext(audioState.playlist);
 
-    const activeSrc = toAbsoluteUrlOrEmpty(getCurrentLogicalAudioSrc() || payload.currentSrc || "");
-    let currentIndex = Number.isInteger(payload.currentIndex) ? payload.currentIndex : -1;
     if (activeSrc) {
       const bySrc = audioState.playlist.findIndex((track) => track && srcMatches(track.src, activeSrc));
       if (bySrc >= 0) currentIndex = bySrc;
@@ -1491,6 +1588,7 @@
     if (!restoredSrc || isBlobObjectUrl(restoredSrc)) return;
     revokeActiveBlobUrl();
     audioState.activeLogicalSrc = restoredSrc;
+    audioState.sourceMetadataPending = true;
     audio.crossOrigin = "anonymous";
     audio.src = restoredSrc;
     audioState.pendingStartTime = Number.isFinite(payload.time) ? payload.time : 0;
@@ -1854,6 +1952,7 @@
     });
 
     audio.addEventListener("loadstart", function () {
+      syncAudioUi();
       const track = getCurrentPlaylistTrack();
       trackAudioRuntimeEvent("first_byte", Object.assign(
         buildAudioMonitorPayload(track, audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
@@ -1895,6 +1994,7 @@
     });
 
     audio.addEventListener("loadedmetadata", function () {
+      audioState.sourceMetadataPending = false;
       if (Number.isFinite(audioState.pendingStartTime) && audioState.pendingStartTime !== null) {
         try {
           audio.currentTime = audioState.pendingStartTime;
@@ -1920,6 +2020,7 @@
     });
 
     audio.addEventListener("durationchange", function () {
+      audioState.sourceMetadataPending = false;
       syncCurrentTrackDurationFromAudio(audio);
       syncMediaSessionMetadata({ forcePosition: true });
       syncAudioUi();

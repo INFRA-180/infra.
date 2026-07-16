@@ -62,7 +62,6 @@
     const updateProgressUi = method(ctx, "updateProgressUi");
     const saveResumeState = method(ctx, "saveResumeState");
     const markAudioPauseIntent = method(ctx, "markAudioPauseIntent");
-    const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () { return -1; });
     const beginAudioRecovery = method(ctx, "beginAudioRecovery");
     const failAudioRecovery = method(ctx, "failAudioRecovery");
     const maybePrefetchNextTrack = method(ctx, "maybePrefetchNextTrack");
@@ -182,23 +181,13 @@
 
       if (!audioState.shuffleOn) {
         const ordered = [];
-        let extensionGuard = 0;
-        while (ordered.length < planDepth) {
-          list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
-          const nextIndex = currentIndex + ordered.length + 1;
-          if (nextIndex < list.length) {
-            ordered.push(nextIndex);
-            continue;
-          }
-          if (extensionGuard >= planDepth) break;
-          extensionGuard += 1;
-          const extendedIndex = extendAlbumPlaylistToNextAlbum({
-            reason: "queue_preview",
-            fromIndex: list.length - 1
-          });
-          if (!Number.isInteger(extendedIndex) || extendedIndex < 0) break;
+        for (
+          let nextIndex = currentIndex + 1;
+          nextIndex < list.length && ordered.length < planDepth;
+          nextIndex += 1
+        ) {
+          ordered.push(nextIndex);
         }
-        list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
         audioState.upcomingTrackPlan = {
           mode: "linear",
           baseSrc: String(list[currentIndex] && list[currentIndex].src ? list[currentIndex].src : ""),
@@ -287,6 +276,10 @@
       }
       try {
         audioState.activeLogicalSrc = src;
+        audioState.sourceMetadataPending = true;
+        // Render the neutral clock before WebKit dispatches loadstart so a
+        // retry cannot briefly retain the previous track's duration.
+        syncAudioUi();
         audio.crossOrigin = "anonymous";
         audio.src = src;
         loadMediaElementForPlayback(audio);
@@ -416,6 +409,10 @@
         audioState.playlistKind = "album";
       }
       if (nextSrc) audioState.activeLogicalSrc = nextSrc;
+      // A retry may have reset the same logical URL immediately before this
+      // call. Keep its pending state until that new element load has emitted
+      // metadata instead of exposing stale duration/progress.
+      audioState.sourceMetadataPending = Boolean(audioState.sourceMetadataPending || !sameTrack);
       audioState.trackStartInFlight = true;
       maybePrefetchNextTrack("track_change");
       rememberPlayedIndex(index);
@@ -535,7 +532,7 @@
         } else {
           forceAudioFullVolume(audio);
         }
-        bindMediaSessionActions({ force: true });
+        bindMediaSessionActions();
         syncMediaSessionMetadata({ forcePosition: true });
         scheduleMediaSessionResync(requestToken);
         syncAudioUi();
@@ -657,7 +654,9 @@
           recoverFromTrackFailure(index, target.src, requestToken);
           return;
         }
-        if (!shouldFastSourceSwitch) syncAudioUi();
+        // A fast transport tap used to leave the previous duration rendered
+        // until the next media event. Publish the source reset immediately.
+        syncAudioUi();
         beginPlayback();
       }
 
@@ -734,11 +733,7 @@
 
       if (direction > 0) {
         if (audioState.currentIndex < list.length - 1) return audioState.currentIndex + 1;
-        const extendedIndex = extendAlbumPlaylistToNextAlbum({
-          reason: "next",
-          fromIndex: audioState.currentIndex
-        });
-        return Number.isInteger(extendedIndex) && extendedIndex >= 0 ? extendedIndex : -1;
+        return -1;
       }
       return audioState.currentIndex > 0 ? audioState.currentIndex - 1 : -1;
     }

@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix334-20260716";
+window.INFRA_BUILD_TAG = "audiofix335-20260716";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -262,6 +262,7 @@ function openAppDownloadGatekeeper(appName, url) {
     trackStartInFlight: false,
     lastTrackChangeTs: 0,
     activeLogicalSrc: "",
+    sourceMetadataPending: false,
     activeBlobUrl: "",
     trackDurationCache: new Map(),
     activeStatusTrack: null,
@@ -420,7 +421,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix334-20260716";
+  const runtimeVersion = "audiofix335-20260716";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -3439,6 +3440,12 @@ function openAppDownloadGatekeeper(appName, url) {
       if (src) cover.setAttribute("src", normalizeUrlAgainstBase(src, baseUrl));
       const srcset = cover.getAttribute("srcset");
       if (srcset) cover.setAttribute("srcset", absolutizeSrcsetForBase(srcset, baseUrl));
+      const onerror = cover.getAttribute("onerror");
+      const fallbackMatch = onerror && onerror.match(/this\.src\s*=\s*(['"])([^'"]+)\1/);
+      if (fallbackMatch) {
+        const fallback = normalizeUrlAgainstBase(fallbackMatch[2], baseUrl);
+        cover.setAttribute("onerror", onerror.replace(fallbackMatch[0], `this.src=${JSON.stringify(fallback)}`));
+      }
     });
   }
 
@@ -4561,8 +4568,14 @@ function openAppDownloadGatekeeper(appName, url) {
   function buildArtworkBlobAndSetMetadata(track, metadataArgs) {
     const artworkEntries = buildMediaSessionArtwork(track);
     const firstSrc = artworkEntries[0] && artworkEntries[0].src ? artworkEntries[0].src : "";
+    const metadataKey = String(metadataArgs && metadataArgs.key ? metadataArgs.key : "");
+
+    function isCurrentMetadataRequest() {
+      return !metadataKey || audioState.lastMediaSessionKey === metadataKey;
+    }
 
     function commitMetadata(artworkSrc, artworkType) {
+      if (!isCurrentMetadataRequest()) return;
       if (mediaSessionApi && typeof mediaSessionApi.setMetadata === "function") {
         mediaSessionApi.setMetadata({
           title: metadataArgs.title,
@@ -4599,17 +4612,27 @@ function openAppDownloadGatekeeper(appName, url) {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = function () {
+      if (!isCurrentMetadataRequest()) return;
       try {
         const canvas = document.createElement("canvas");
         canvas.width = 512;
         canvas.height = 512;
         canvas.getContext("2d").drawImage(img, 0, 0, 512, 512);
         canvas.toBlob(function (blob) {
+          if (!isCurrentMetadataRequest()) return;
           if (!blob) {
             commitMetadata(firstSrc, "image/jpeg");
             return;
           }
           const blobUrl = URL.createObjectURL(blob);
+          if (!isCurrentMetadataRequest()) {
+            try {
+              URL.revokeObjectURL(blobUrl);
+            } catch (_err) {
+              // Ignore cleanup failures for an obsolete artwork request.
+            }
+            return;
+          }
           if (window._infraArtworkBlobUrl) {
             try {
               URL.revokeObjectURL(window._infraArtworkBlobUrl);
@@ -4943,7 +4966,7 @@ function openAppDownloadGatekeeper(appName, url) {
         `artwork=${artworkEntries[0] && artworkEntries[0].src ? artworkEntries[0].src : ""}`
       );
       try {
-        buildArtworkBlobAndSetMetadata(track, { title, artist, album });
+        buildArtworkBlobAndSetMetadata(track, { title, artist, album, key });
       } catch (_err) {
         // Ignore metadata errors.
       }
@@ -4954,7 +4977,9 @@ function openAppDownloadGatekeeper(appName, url) {
       const shouldSyncPosition = Boolean(opts.forcePosition) || !audioState.mediaSessionPositionTs || (now - audioState.mediaSessionPositionTs >= 900);
       if (!shouldSyncPosition) return;
 
-      const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+      const duration = !audioState.sourceMetadataPending && Number.isFinite(audio.duration) && audio.duration > 0
+        ? audio.duration
+        : 0;
       const position = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
       const playbackRate = mediaSessionActuallyPlaying && Number.isFinite(audio.playbackRate) ? audio.playbackRate : 1;
       try {

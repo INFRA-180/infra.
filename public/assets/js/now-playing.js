@@ -585,10 +585,18 @@
 
     const audio = audioState.audio;
     const hasSource = Boolean(audio && getCurrentPlayableAudioSrc(audio));
-    const hasDuration = Boolean(audio && Number.isFinite(audio.duration) && audio.duration > 0);
-    const currentValue = hasDuration ? formatTrackDuration(audio.currentTime) : "0:00";
+    const hasDuration = Boolean(
+      !audioState.sourceMetadataPending &&
+      audio &&
+      Number.isFinite(audio.duration) &&
+      audio.duration > 0
+    );
+    const formatPlaybackTime = function (seconds) {
+      return Number.isFinite(seconds) && seconds > 0 ? formatTrackDuration(seconds) : "0:00";
+    };
+    const currentValue = hasDuration ? formatPlaybackTime(audio.currentTime) : "0:00";
     const remainingValue = hasDuration
-      ? `-${formatTrackDuration(Math.max(0, audio.duration - audio.currentTime))}`
+      ? `-${formatPlaybackTime(Math.max(0, audio.duration - audio.currentTime))}`
       : "-0:00";
     const percent = hasDuration ? Math.max(0, Math.min(100, (audio.currentTime / audio.duration) * 100)) : 0;
 

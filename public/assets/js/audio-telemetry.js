@@ -9,7 +9,6 @@
     "cache_hit",
     "click_track",
     "error",
-    "album_continuity_extend",
     "album_open_done",
     "album_open_fail",
     "album_open_tap",
@@ -40,12 +39,7 @@
     "play_request",
     "play_complete",
     "playable",
-    "prefetch_done",
-    "prefetch_cache_rehydrated",
-    "prefetch_cancel",
     "prefetch_error",
-    "prefetch_plan",
-    "prefetch_start",
     "prefetch_suspended",
     "prefetch_window_ready",
     "ready_wait_start",
@@ -54,7 +48,6 @@
     "recovery_resolved",
     "recovery_failed",
     "resume_probe",
-    "served_from_prefetch",
     "silent_check",
     "ended",
     "auto_advance_attempt",
@@ -411,7 +404,8 @@
       deleteEvents(Array.from(ids));
     }
 
-    function postBatch(batch) {
+    function postBatch(batch, options) {
+      const opts = options || {};
       const workerUrl = getWorkerUrl();
       if (!batch.length || typeof fetch !== "function" || !workerUrl) return Promise.resolve(false);
       const payload = batch.map(sanitizeTelemetryEvent).filter(Boolean);
@@ -420,7 +414,8 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-        keepalive: false
+        credentials: "omit",
+        keepalive: Boolean(opts.keepalive)
       }).then(function (response) {
         return response && response.ok;
       }).catch(function () {
@@ -436,21 +431,10 @@
         pruneQueue();
         if (!queue.length) return false;
         const batch = queue.slice(0, QUEUE_CAP);
-        const workerUrl = getWorkerUrl();
-        if (opts.beacon && navigator.sendBeacon && workerUrl) {
-          try {
-            const payload = batch.map(sanitizeTelemetryEvent).filter(Boolean);
-            const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
-            const queued = navigator.sendBeacon(`${workerUrl.replace(/\/+$/, "")}/log`, blob);
-            if (queued) {
-              removeBatch(batch);
-              return true;
-            }
-          } catch (_err) {
-            // Fall through to fetch below when possible.
-          }
-        }
-        return postBatch(batch).then(function (ok) {
+        // Cross-origin sendBeacon carries credentials in WebKit and triggered
+        // Safari's CORS rejection. Keep the batch in IndexedDB until an
+        // anonymous keepalive fetch is actually acknowledged.
+        return postBatch(batch, { keepalive: Boolean(opts.beacon) }).then(function (ok) {
           if (ok) removeBatch(batch);
           return ok;
         });

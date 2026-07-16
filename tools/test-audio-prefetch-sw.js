@@ -74,7 +74,9 @@ const sandbox = {
       "infra-shell-20260716-audio333-shell",
       "infra-shell-20260716-audio333-runtime",
       "infra-shell-20260716-audio334-shell",
-      "infra-shell-20260716-audio334-runtime"
+      "infra-shell-20260716-audio334-runtime",
+      "infra-shell-20260716-audio335-shell",
+      "infra-shell-20260716-audio335-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -196,12 +198,14 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260716-audio332-runtime",
     "infra-shell-20260716-audio332-shell",
     "infra-shell-20260716-audio333-runtime",
-    "infra-shell-20260716-audio333-shell"
+    "infra-shell-20260716-audio333-shell",
+    "infra-shell-20260716-audio334-runtime",
+    "infra-shell-20260716-audio334-shell"
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v8"));
   assert(!deletedCaches.includes("infra-covers"));
-  assert(!deletedCaches.includes("infra-shell-20260716-audio334-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260716-audio334-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260716-audio335-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260716-audio335-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;
@@ -263,6 +267,20 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(response.headers.get("Content-Length"), String(1024 * 1024));
   assert.strictEqual((await response.arrayBuffer()).byteLength, 1024 * 1024);
   assert.strictEqual(cachedAudioArrayBufferCalls, 0, "The real 1 MiB segment must use the zero-copy 206 path");
+
+  cachedAudio = validCachedSegment({
+    bodyLength: 1024 * 1024,
+    trackArrayBuffer: true,
+    headers: {
+      "Content-Length": String(1024 * 1024),
+      "X-Infra-Range-End": String(1024 * 1024 - 1),
+      "X-Infra-Total-Length": String(8 * 1024 * 1024)
+    }
+  });
+  response = await dispatchAudioFetch({ Range: "bytes=0-8388607" }, "client-safari-full-range");
+  assert.strictEqual(response.status, 206);
+  assert.strictEqual(response.headers.get("Content-Range"), "bytes 0-1048575/8388608");
+  assert.strictEqual((await response.arrayBuffer()).byteLength, 1024 * 1024);
 
   cachedAudio = validCachedSegment();
   response = await dispatchAudioFetch({ Range: "bytes=512-1535" });

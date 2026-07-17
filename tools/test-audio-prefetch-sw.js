@@ -63,6 +63,7 @@ const sandbox = {
       "infra-next-track-segments-v8",
       "infra-next-track-segments-v9",
       "infra-covers",
+      "infra-covers-v2",
       "infra-shell-20260714-audio320-shell",
       "infra-shell-20260715-audio329-shell",
       "infra-shell-20260715-audio329-runtime",
@@ -78,8 +79,8 @@ const sandbox = {
       "infra-shell-20260716-audio334-runtime",
       "infra-shell-20260716-audio336-shell",
       "infra-shell-20260716-audio336-runtime",
-      "infra-shell-20260717-audio337-shell",
-      "infra-shell-20260717-audio337-runtime"
+      "infra-shell-20260717-audio338-shell",
+      "infra-shell-20260717-audio338-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -179,13 +180,14 @@ async function dispatchSiteFetch(request) {
   let installPromise = null;
   installHandler({ waitUntil: (promise) => { installPromise = promise; } });
   await installPromise;
-  assert.strictEqual(skipWaitingCalls, 1);
+  assert.strictEqual(skipWaitingCalls, 0, "install must not replace the active controller during playback");
 
   assert(activateHandler, "Service Worker activate handler missing");
   let activatePromise = null;
   activateHandler({ waitUntil: (promise) => { activatePromise = promise; } });
   await activatePromise;
   assert.deepStrictEqual(deletedCaches.sort(), [
+    "infra-covers",
     "infra-next-track",
     "infra-next-track-full-v3",
     "infra-next-track-segments-v6",
@@ -209,9 +211,9 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260716-audio336-shell"
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v9"));
-  assert(!deletedCaches.includes("infra-covers"));
-  assert(!deletedCaches.includes("infra-shell-20260717-audio337-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260717-audio337-runtime"));
+  assert(!deletedCaches.includes("infra-covers-v2"));
+  assert(!deletedCaches.includes("infra-shell-20260717-audio338-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260717-audio338-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;

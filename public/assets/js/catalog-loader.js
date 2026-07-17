@@ -57,12 +57,16 @@
 
     function normalizeCatalogCard(raw, type) {
       const fallbackSize = type === "app" ? 500 : 800;
+      const rawThumb = String(raw && raw.thumb ? raw.thumb : "").trim();
+      const canonicalThumb = type === "album"
+        ? (call(ctx, "normalizeCoverUrl", rawThumb, { width: 1200 }) || rawThumb)
+        : rawThumb;
       const card = {
         id: String(raw && raw.id ? raw.id : "").trim(),
         title: String(raw && raw.title ? raw.title : "").trim(),
         editKey: String(raw && raw.editKey ? raw.editKey : "").trim(),
         page: String(raw && raw.page ? raw.page : "").trim(),
-        thumb: String(raw && raw.thumb ? raw.thumb : "").trim(),
+        thumb: canonicalThumb,
         thumbAlt: String(raw && raw.thumbAlt ? raw.thumbAlt : "").trim(),
         thumbSrcset: String(raw && raw.thumbSrcset ? raw.thumbSrcset : "").trim(),
         thumbSizes: String(raw && raw.thumbSizes ? raw.thumbSizes : "").trim(),

@@ -627,6 +627,24 @@
           });
           return;
         }
+        if (playErr && playErr.name === "NotSupportedError" && !isRetry && nextSrc) {
+          audioState.playAbortRetryToken = requestToken;
+          beginAudioRecovery({
+            request_token: requestToken,
+            reason: "NotSupportedError",
+            strategy: "single_source_reset"
+          });
+          const reset = resetAudioElementForSource(audio, nextSrc);
+          if (reset) {
+            waitForAudioReadiness(audio, requestToken, isIosDevice() ? 650 : 450).then(function () {
+              if (requestToken !== audioState.startRequestToken) return;
+              if (audioState.playAbortRetryToken !== requestToken) return;
+              audioState.playAbortRetryToken = 0;
+              attemptPlay({ retry: true, sync: isFastSkip, recovery: "not_supported_reset" });
+            });
+            return;
+          }
+        }
         audioState.trackStartInFlight = false;
         if (audioState.playAbortRetryToken === requestToken) audioState.playAbortRetryToken = 0;
         clearWaitingRecovery();

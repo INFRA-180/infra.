@@ -15,7 +15,7 @@
     const spaState = ctx.spaState || {};
     const audioState = ctx.audioState || {};
     const spaRouterApi = ctx.spaRouterApi || null;
-    const COVERS_CACHE_NAME = ctx.COVERS_CACHE_NAME || "infra-covers";
+    const COVERS_CACHE_NAME = ctx.COVERS_CACHE_NAME || "infra-covers-v2";
     const setSpaCachedHtml = method(ctx, "setSpaCachedHtml");
     const getSpaCachedHtml = method(ctx, "getSpaCachedHtml", function () { return ""; });
     const getSpaPersistRoot = method(ctx, "getSpaPersistRoot", function () { return document.body; });
@@ -25,6 +25,7 @@
     const trackAudioRuntimeEvent = method(ctx, "trackAudioRuntimeEvent");
     const parseSrcsetCandidates = method(ctx, "parseSrcsetCandidates", function () { return []; });
     const normalizeUrlAgainstBase = method(ctx, "normalizeUrlAgainstBase", function (value) { return String(value || ""); });
+    const normalizeCoverUrl = method(ctx, "normalizeCoverUrl", function (value) { return String(value || ""); });
     const rememberAlbumCoverImage = method(ctx, "rememberAlbumCoverImage");
     const saveCurrentScrollPositionInHistory = method(ctx, "saveCurrentScrollPositionInHistory");
     const buildSpaHistoryState = method(ctx, "buildSpaHistoryState", function (urlLike) { return { __infraSpa: 1, url: String(urlLike || "") }; });
@@ -253,12 +254,9 @@
   function lockLiveHomeCover(image, state) {
     if (!image || !state || !state.source) return;
     const source = String(state.source);
-    let width = Number(image.naturalWidth) || 900;
-    const match = source.match(/-cover-(\d+)\.webp(?:$|\?)/i);
-    if (match) width = Number(match[1]) || width;
     image.setAttribute("src", source);
-    image.setAttribute("srcset", `${source} ${width}w`);
-    image.setAttribute("sizes", `${Math.max(1, Number(state.displayWidth) || width)}px`);
+    image.removeAttribute("srcset");
+    image.removeAttribute("sizes");
     image.setAttribute("loading", "eager");
     image.setAttribute("decoding", "async");
     image.setAttribute("fetchpriority", "high");
@@ -422,44 +420,34 @@
 
   function getImagePreferredSrc(img, sourceUrl, options) {
     if (!img) return "";
-    const opts = options || {};
-    const preferSmall = Number(opts.preferredWidth || 0) <= 480 && Number(opts.preferredWidth || 0) > 0;
+    const canonicalWidth = 1200;
     const srcset = String(img.getAttribute("srcset") || "").trim();
     if (srcset) {
-      const candidates = parseSrcsetCandidates(srcset).filter(function (candidate) {
-        if (!candidate || !candidate.src) return false;
-        return preferSmall
-          ? /-cover-480\.webp(?:$|\?)/i.test(candidate.src)
-          : /-cover-900\.webp(?:$|\?)/i.test(candidate.src);
-      });
+      const candidates = parseSrcsetCandidates(srcset).filter(function (candidate) { return Boolean(candidate && candidate.src); });
       if (candidates.length) {
-        return normalizeUrlAgainstBase(candidates[preferSmall ? 0 : candidates.length - 1].src, sourceUrl || window.location.href);
+        return normalizeCoverUrl(
+          normalizeUrlAgainstBase(candidates[candidates.length - 1].src, sourceUrl || window.location.href),
+          { width: canonicalWidth }
+        );
       }
     }
     const src = String(img.getAttribute("src") || "").trim();
-    return src ? normalizeUrlAgainstBase(src, sourceUrl || window.location.href) : "";
+    return src ? normalizeCoverUrl(normalizeUrlAgainstBase(src, sourceUrl || window.location.href), { width: canonicalWidth }) : "";
   }
 
   function preferPwaCoverSource(source) {
     const value = String(source || "").trim();
-    if (!value || !isMobilePwaCoverNavigation()) return value;
-    return value
-      .replace(/(\/assets\/music\/responsive\/[^/?#]+-cover-)900(\.webp)(?=$|[?#])/i, function (_match, prefix, suffix) {
-        return `${prefix}480${suffix}`;
-      })
-      .replace(/(\/assets\/music\/)([^/?#]+-cover)\.(?:jpe?g|png)(?=$|[?#])/i, function (_match, prefix, stem) {
-        return `${prefix}responsive/${stem}-480.webp`;
-      });
+    return value ? normalizeCoverUrl(value, { width: 1200 }) : "";
   }
 
   function lockSpaCoverSource(image, sourceUrl, preferredWidth) {
     if (!image) return "";
-    const width = Number(preferredWidth) <= 480 ? 480 : 900;
+    const width = 1200;
     const target = getImagePreferredSrc(image, sourceUrl, { preferredWidth: width });
     if (!target) return "";
     image.setAttribute("src", target);
-    image.setAttribute("srcset", `${target} ${width}w`);
-    image.setAttribute("sizes", width <= 480 ? "480px" : "900px");
+    image.removeAttribute("srcset");
+    image.removeAttribute("sizes");
     image.setAttribute("loading", "eager");
     image.setAttribute("decoding", "async");
     image.setAttribute("fetchpriority", "high");
@@ -470,7 +458,7 @@
   function lockSpaHomeCoverSources(fragment, sourceUrl, limit) {
     if (!fragment || typeof fragment.querySelectorAll !== "function") return 0;
     const maxImages = Math.max(1, Number(limit) || 4);
-    const width = isMobilePwaCoverNavigation() ? 480 : 900;
+    const width = 1200;
     return Array.from(fragment.querySelectorAll("img.album-cover"))
       .slice(0, maxImages)
       .reduce(function (count, image) {
@@ -493,7 +481,7 @@
     }
 
     const pwaCoverMode = isMobilePwaCoverNavigation();
-    const coverWidth = pwaCoverMode ? 480 : 900;
+    const coverWidth = 1200;
     const target = getImagePreferredSrc(image, sourceUrl, {
       preferredWidth: coverWidth
     });
@@ -518,6 +506,13 @@
     }
 
     function finish(decoded, timedOut, cacheHint) {
+      let displayPixels = 0;
+      try {
+        const rect = image.getBoundingClientRect();
+        displayPixels = Math.round(Math.max(rect.width, rect.height) * Math.max(1, window.devicePixelRatio || 1));
+      } catch (_err) {
+        displayPixels = 0;
+      }
       trackAudioRuntimeEvent("cover_decode_duration", Object.assign({}, telemetry || {}, {
         image_count: 1,
         decoded_count: decoded ? 1 : 0,
@@ -525,6 +520,8 @@
         album_cover_only: true,
         pwa_cover_mode: Boolean(pwaCoverMode),
         target_width: coverWidth,
+        cover_natural_width: Number(image.naturalWidth) || (decoded ? coverWidth : 0),
+        cover_display_px: displayPixels,
         cache_hint: cacheHint || "unknown",
         duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
       }));
@@ -620,8 +617,8 @@
       const temporaryCoverSrc = linkedCoverSrc || (currentCoverSrc === target ? currentCoverSrc : "");
       function applyTargetCover() {
         image.setAttribute("src", target);
-        image.setAttribute("srcset", `${target} ${coverWidth}w`);
-        image.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), 290px");
+        image.removeAttribute("srcset");
+        image.removeAttribute("sizes");
         image.setAttribute("loading", "eager");
         image.setAttribute("decoding", "async");
         image.setAttribute("fetchpriority", "high");
@@ -641,7 +638,7 @@
         }
         image.setAttribute("src", temporaryCoverSrc);
         image.removeAttribute("srcset");
-        image.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), 290px");
+        image.removeAttribute("sizes");
         image.setAttribute("loading", "eager");
         image.setAttribute("decoding", "async");
         image.setAttribute("fetchpriority", "high");
@@ -666,7 +663,7 @@
         };
         probe.src = target;
       }
-      image.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), 290px");
+      image.removeAttribute("sizes");
       image.setAttribute("loading", "eager");
       image.setAttribute("decoding", "async");
       image.setAttribute("fetchpriority", "high");
@@ -1057,15 +1054,15 @@
     const liveHomeCapture = captureLiveHomeRoute(url, rendered);
 
     const navNow = getAudioTelemetryNow();
+    if (spaState.navigationActive && spaState.activeNavigationHref === url.href) {
+      // Reuse the in-flight route. Starting a second render for the same album
+      // creates competing history/snapshot work and was the source of several
+      // long "aborted on close" telemetry records.
+      return;
+    }
     const sameRecentTarget = spaState.lastNavHref === url.href && spaState.lastNavTs && navNow - spaState.lastNavTs < 650;
     if (sameRecentTarget && opts.history === "push") {
       releasePwaCoverHold("duplicate_tap");
-      trackAudioRuntimeEvent("nav:album_abort", {
-        track: "album_open",
-        album: getAlbumNameFromUrlLike(url.href),
-        reason: "duplicate_tap",
-        to_url: url.href
-      });
       return;
     }
     spaState.lastNavHref = url.href;
@@ -1073,11 +1070,13 @@
     const navToken = spaState.navToken + 1;
     spaState.navToken = navToken;
     spaState.navigationActive = true;
+    spaState.activeNavigationHref = url.href;
     trackAudioRuntimeEvent("nav:album_start", {
       track: "album_open",
       album: getAlbumNameFromUrlLike(url.href),
       from_url: rendered.href,
-      to_url: url.href
+      to_url: url.href,
+      navigation_token: navToken
     });
 
     const audioSwitchContext = {
@@ -1086,11 +1085,14 @@
       fromUrl: rendered.href,
       toUrl: url.href
     };
-    const albumOpenContext = createAlbumOpenTelemetryContext(url, rendered, opts);
+    const albumOpenContext = createAlbumOpenTelemetryContext(url, rendered, Object.assign({}, opts, {
+      navigationToken: navToken
+    }));
 
     function finishSpaNavigation() {
       if (spaState.navToken === navToken) {
         spaState.navigationActive = false;
+        spaState.activeNavigationHref = "";
       }
     }
 
@@ -1133,7 +1135,8 @@
         from_url: rendered.href,
         to_url: url.href,
         cached: true,
-        live_dom: true
+        live_dom: true,
+        navigation_token: navToken
       };
       trackAudioRuntimeEvent("spa_render_start", liveSpaTelemetry);
       trackAudioRuntimeEvent("spa_swap_start", liveSpaTelemetry);
@@ -1163,7 +1166,8 @@
           album: "home",
           cached: true,
           live_dom: true,
-          to_url: url.href
+          to_url: url.href,
+          navigation_token: navToken
         });
         logAudioRuntimeAlbumSwitch(audioSwitchContext, true);
         prefetchSpaPage(url.href, { force: true, cacheMode: "default" });
@@ -1199,7 +1203,8 @@
           to_album: getAlbumNameFromUrlLike(url.href),
           from_url: rendered.href,
           to_url: url.href,
-          cached: true
+          cached: true,
+          navigation_token: navToken
         };
         trackAudioRuntimeEvent("spa_render_start", cachedSpaTelemetry);
         try {
@@ -1219,7 +1224,8 @@
             track: "album_open",
             album: getAlbumNameFromUrlLike(url.href),
             reason: "stale_cached_render",
-            to_url: url.href
+            to_url: url.href,
+            navigation_token: navToken
           });
           return;
         }
@@ -1240,7 +1246,8 @@
           track: "album_open",
           album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
           cached: true,
-          to_url: url.href
+          to_url: url.href,
+          navigation_token: navToken
         });
         logAudioRuntimeAlbumSwitch(audioSwitchContext, true);
 
@@ -1265,6 +1272,11 @@
 
     const controller = new AbortController();
     spaState.controller = controller;
+    let fetchTimedOut = false;
+    const fetchTimeoutId = window.setTimeout(function () {
+      fetchTimedOut = true;
+      try { controller.abort(); } catch (_err) {}
+    }, 8000);
 
     let response = null;
     try {
@@ -1277,14 +1289,24 @@
         }
       });
     } catch (_err) {
-      if (!controller.signal.aborted) fallbackToDocumentNavigation("fetch_error");
+      window.clearTimeout(fetchTimeoutId);
+      if (fetchTimedOut) fallbackToDocumentNavigation("fetch_timeout");
+      else if (!controller.signal.aborted) fallbackToDocumentNavigation("fetch_error");
       else {
         finishSpaNavigation();
         releasePwaCoverHold("fetch_aborted");
         finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "fetch_aborted" });
+        trackAudioRuntimeEvent("nav:album_abort", {
+          track: "album_open",
+          album: getAlbumNameFromUrlLike(url.href),
+          reason: "fetch_aborted",
+          to_url: url.href,
+          navigation_token: navToken
+        });
       }
       return;
     }
+    window.clearTimeout(fetchTimeoutId);
 
     if (!response || !response.ok) {
       fallbackToDocumentNavigation("bad_response", {
@@ -1309,7 +1331,8 @@
         track: "album_open",
         album: getAlbumNameFromUrlLike(url.href),
         reason: "render_aborted",
-        to_url: url.href
+        to_url: url.href,
+        navigation_token: navToken
       });
       return;
     }
@@ -1336,7 +1359,8 @@
       to_album: getAlbumNameFromUrlLike(url.href),
       from_url: rendered.href,
       to_url: url.href,
-      cached: false
+      cached: false,
+      navigation_token: navToken
     };
     trackAudioRuntimeEvent("spa_render_start", spaTelemetry);
     try {
@@ -1356,7 +1380,8 @@
         track: "album_open",
         album: getAlbumNameFromUrlLike(url.href),
         reason: "stale_render",
-        to_url: url.href
+        to_url: url.href,
+        navigation_token: navToken
       });
       return;
     }
@@ -1377,7 +1402,8 @@
       track: "album_open",
       album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
       cached: false,
-      to_url: url.href
+      to_url: url.href,
+      navigation_token: navToken
     });
     logAudioRuntimeAlbumSwitch(audioSwitchContext, false);
 

@@ -382,7 +382,7 @@
     const title = normalizeTrackTitle(track && track.name ? track.name : "") || (hasTrack ? "INFRA." : "Aucune lecture");
     const album = normalizeAlbumTitle(track && track.album ? track.album : getCurrentAlbumTitle()) || "INFRA.";
     const albumHref = hasTrack ? getCurrentTrackAlbumPage(track) : "";
-    const artwork = resolveCoverUrl(track, { width: 900 });
+    const artwork = resolveCoverUrl(track, { width: 1200 });
     const isRadioMode = audioState.homeMode === "radio";
     const canSkip = Boolean(audioState.playlist && audioState.playlist.length > 1);
     const shuffleActive = Boolean(audioState.shuffleOn && !isRadioMode);
@@ -534,7 +534,7 @@
       const album = normalizeAlbumTitle(track && track.album ? track.album : "");
       const meta = getTrackMetaByAssetPath(track && track.src ? track.src : "");
       const duration = String((track && track.duration) || getCachedTrackDuration(track && track.src ? track.src : "") || (meta && meta.duration) || "").trim() || "--:--";
-      const artwork = resolveCoverUrl(track, { width: 480 }) || normalizeArtworkUrl(
+      const artwork = resolveCoverUrl(track, { width: 1200 }) || normalizeArtworkUrl(
         (track && track.artwork) ||
         (meta && meta.artwork) ||
         getCurrentTrackArtwork(track) ||

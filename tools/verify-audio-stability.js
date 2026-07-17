@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix337-20260717";
-const shellRelease = "infra-shell-20260717-audio337";
+const release = "audiofix338-20260717";
+const shellRelease = "infra-shell-20260717-audio338";
 const coverCssRelease = "audiofix332-20260716";
 const frozenCssSha256 = "2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb";
 const scripts = read("public/assets/js/scripts.js");
@@ -27,6 +27,8 @@ const albumUi = read("public/assets/js/album-player-ui.js");
 const nowPlaying = read("public/assets/js/now-playing.js");
 const transport = read("public/assets/js/transport-ui.js");
 const telemetry = read("public/assets/js/audio-telemetry.js");
+const covers = read("public/assets/js/covers.js");
+const spa = read("public/assets/js/spa-renderer.js");
 const sphragis = read("public/assets/js/sphragis.js");
 const sphragisPage = read("public/sphragis/index.html");
 const sw = read("public/sw.js");
@@ -42,10 +44,16 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix337");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix337");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio337");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix338");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix338");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio338");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
+expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
+expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
+expect(catalogLoader.includes('normalizeCoverUrl", rawThumb, { width: 1200 }'), "live catalogue can reintroduce a non-canonical album cover");
+expect(sw.includes('const COVERS_CACHE = "infra-covers-v2"'), "Service Worker does not share the canonical cover cache");
+expect(sw.includes("cover-1200\\.webp"), "Service Worker does not cache the canonical cover URL");
+expect(!sw.slice(sw.indexOf('self.addEventListener("install"'), sw.indexOf('self.addEventListener("activate"')).includes("skipWaiting"), "Service Worker still activates during a live audio session");
 
 const coldPreparation = functionBody(radio, "prepareInitialGlobalRandomPlayback", "scheduleInitialGlobalRandomPreparation");
 expect(coldPreparation.includes("buildRadioQueue"), "cold startup does not materialize the Radio queue");
@@ -72,6 +80,7 @@ expect(!coldStart.includes("setTimeout"), "cold Play must not wait on a timer be
 
 const startTrack = functionBody(core, "startTrack", "getRandomIndex");
 expect(startTrack.includes("opts.immediatePlay && opts.userGesture"), "startTrack lacks the guarded immediate user-gesture path");
+expect(startTrack.includes('playErr.name === "NotSupportedError"') && startTrack.includes('strategy: "single_source_reset"'), "immediate NotSupportedError lacks its single guarded source reset");
 expect(startTrack.includes("isFromTransportControl || hasPreparedTransportTarget"), "transport skips are not always on the synchronous path");
 expect(startTrack.includes("attemptPlay({ sync: true, immediate: isImmediateUserGesture })"), "immediate Play does not call audio.play() directly");
 const beginPlaybackStart = startTrack.indexOf("function beginPlayback");
@@ -174,6 +183,11 @@ expect(telemetry.includes("const SESSION_TTL_MS = 72 * 60 * 60 * 1000"), "pendin
 expect(telemetry.includes('"response_ms", "body_ms", "queue_ms", "cache_ms"'), "prefetch stage timings are not retained by telemetry sanitation");
 expect(telemetry.includes('"prefetch_suspended"') && telemetry.includes('"prefetch_window_ready"'), "useful prefetch health telemetry is not retained");
 expect(telemetry.includes('credentials: "omit"'), "telemetry requests may still carry credentials");
+expect(telemetry.includes('"navigation_token"'), "SPA telemetry cannot correlate repeated navigation targets");
+expect(telemetry.includes('reason: transition.reason || ""'), "SPA terminal reasons are not preserved");
+expect(telemetry.includes("cover_natural_width: transition.cover_natural_width"), "SPA telemetry does not retain decoded cover resolution");
+expect(spa.includes('spaState.activeNavigationHref === url.href'), "duplicate SPA album navigation is not coalesced");
+expect(spa.includes('fallbackToDocumentNavigation("fetch_timeout")'), "stuck SPA fetches have no bounded fallback");
 expect(!telemetry.includes("navigator.sendBeacon"), "cross-origin telemetry still uses sendBeacon");
 expect(!telemetry.includes("navigator.userAgent"), "full user-agent is still transmitted");
 expect(!telemetry.includes("local_time:"), "local time is still transmitted");
@@ -211,4 +225,22 @@ for (const relativePath of htmlFiles) {
   expect(!source.includes("audiofix326-20260715"), `${relativePath} still references audiofix326 JavaScript`);
 }
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix337.");
+const albumCoverUrls = new Set();
+for (const relativePath of ["public/index.html"].concat(
+  fs.readdirSync(path.join(root, "public/music"))
+    .filter((name) => name.endsWith(".html"))
+    .map((name) => `public/music/${name}`)
+)) {
+  const source = read(relativePath);
+  expect(!/cover-(?:480|900)\.webp/i.test(source), `${relativePath} still references a legacy cover variant`);
+  expect(!/class="[^"]*(?:album-cover|\bcover\b)[^"]*"[^>]*\bsrcset=/i.test(source), `${relativePath} still selects multiple album cover files`);
+  for (const match of source.matchAll(/assets\/music\/responsive\/([a-z0-9-]+-cover-1200\.webp)/gi)) {
+    albumCoverUrls.add(match[1]);
+  }
+}
+for (const fileName of albumCoverUrls) {
+  expect(fs.existsSync(path.join(root, "public/assets/music/responsive", fileName)), `missing canonical cover ${fileName}`);
+}
+expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
+
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix338.");

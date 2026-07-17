@@ -223,7 +223,7 @@
       setTransportCoverVisible(root, cover, false);
       return;
     }
-    const artwork = resolveCoverUrl(track, { width: 900 });
+    const artwork = resolveCoverUrl(track, { width: 1200 });
     setTransportCoverVisible(root, cover, true);
     cover.alt = `Pochette ${normalizeAlbumTitle(track.album || getCurrentAlbumTitle()) || "INFRA."}`;
     setCoverWhenReady(cover, artwork, getMediaSessionFallbackArtwork());

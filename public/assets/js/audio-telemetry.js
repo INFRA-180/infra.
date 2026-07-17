@@ -129,7 +129,8 @@
     "total_play_to_playing_ms", "prefetch_start_count", "prefetch_done_count",
     "prefetch_error_count", "prefetch_cache_ready_count", "spa_navigation_count",
     "spa_abort_count", "spa_slow_count", "max_spa_navigation_ms",
-    "mini_visibility_change_count", "mini_hidden_count", "mini_unexpected_hidden_count"
+    "mini_visibility_change_count", "mini_hidden_count", "mini_unexpected_hidden_count",
+    "navigation_token", "cover_natural_width", "cover_display_px"
   ]);
   const TELEMETRY_BOOLEAN_FIELDS = new Set([
     "fine_event", "navigator_on_line", "auto", "error", "health_session_active",
@@ -366,6 +367,7 @@
     const prefetchBySource = new Map();
     const spaTransitions = new Map();
     const spaKeyByTarget = new Map();
+    const spaKeyByNavigation = new Map();
     const compactEvents = new Map();
     let activeTrackToken = 0;
     let activeSpaKey = "";
@@ -1064,8 +1066,11 @@
 
     function getOrCreateSpaTransition(eventType, payload, source, timestampMs) {
       const targetIdentity = getSpaTargetIdentity(source);
+      const navigationToken = Math.max(0, Math.round(Number(source.navigation_token || payload.navigation_token) || 0));
       if (eventType === "nav:album_start") {
-        const key = `${targetIdentity || "nav"}|${++spaSequence}`;
+        const key = navigationToken
+          ? `${targetIdentity || "nav"}|nav:${navigationToken}`
+          : `${targetIdentity || "nav"}|${++spaSequence}`;
         const transition = {
           key,
           target_identity: targetIdentity,
@@ -1080,17 +1085,23 @@
           finalized: false,
           result: "pending"
         };
+        transition.navigation_token = navigationToken;
         spaTransitions.set(key, transition);
         if (targetIdentity) spaKeyByTarget.set(targetIdentity, key);
+        if (navigationToken) spaKeyByNavigation.set(navigationToken, key);
         activeSpaKey = key;
         pruneLocalMap(spaTransitions, LOCAL_CORRELATION_CAP);
         pruneLocalMap(spaKeyByTarget, LOCAL_CORRELATION_CAP);
+        pruneLocalMap(spaKeyByNavigation, LOCAL_CORRELATION_CAP);
         return transition;
       }
-      const knownKey = targetIdentity ? spaKeyByTarget.get(targetIdentity) : "";
+      const knownKey = (navigationToken ? spaKeyByNavigation.get(navigationToken) : "") ||
+        (targetIdentity ? spaKeyByTarget.get(targetIdentity) : "");
       let transition = spaTransitions.get(knownKey || activeSpaKey);
       if (!transition && ["album_open_tap", "spa_render_start", "spa_swap_start"].includes(eventType)) {
-        const key = `${targetIdentity || "nav"}|${++spaSequence}`;
+        const key = navigationToken
+          ? `${targetIdentity || "nav"}|nav:${navigationToken}`
+          : `${targetIdentity || "nav"}|${++spaSequence}`;
         transition = {
           key,
           target_identity: targetIdentity,
@@ -1105,9 +1116,14 @@
           finalized: false,
           result: "pending"
         };
+        transition.navigation_token = navigationToken;
         spaTransitions.set(key, transition);
         if (targetIdentity) spaKeyByTarget.set(targetIdentity, key);
+        if (navigationToken) spaKeyByNavigation.set(navigationToken, key);
         activeSpaKey = key;
+        pruneLocalMap(spaTransitions, LOCAL_CORRELATION_CAP);
+        pruneLocalMap(spaKeyByTarget, LOCAL_CORRELATION_CAP);
+        pruneLocalMap(spaKeyByNavigation, LOCAL_CORRELATION_CAP);
       }
       if (!transition) return null;
       if (payload.from_album) transition.from_album = String(payload.from_album);
@@ -1130,6 +1146,8 @@
         from_album: transition.from_album || "",
         to_album: transition.to_album || "",
         result: transition.result || "done",
+        reason: transition.reason || "",
+        navigation_token: transition.navigation_token || 0,
         cached: Boolean(transition.cached),
         error: transition.result !== "done",
         delta_ms: Math.max(0, Math.round(endedAt - transition.started_at_ms)),
@@ -1138,6 +1156,8 @@
         cover_timed_out: Boolean(transition.cover_timed_out),
         render_ms: transition.render_ms || 0,
         swap_ms: transition.swap_ms || 0,
+        cover_natural_width: transition.cover_natural_width || 0,
+        cover_display_px: transition.cover_display_px || 0,
         controllerchange: Boolean(transition.controllerchange),
         sw_reload_between: Boolean(transition.sw_reload_between)
       });
@@ -1177,9 +1197,18 @@
       ) {
         transition.cover_wait_ms = Math.max(transition.cover_wait_ms, Math.round(Number(source.duration_ms) || 0));
         transition.cover_timed_out = Boolean(transition.cover_timed_out || source.timed_out);
+        transition.cover_natural_width = Math.max(
+          Number(transition.cover_natural_width) || 0,
+          Math.round(Number(source.cover_natural_width) || 0)
+        );
+        transition.cover_display_px = Math.max(
+          Number(transition.cover_display_px) || 0,
+          Math.round(Number(source.cover_display_px) || 0)
+        );
       }
       if (eventType === "spa_render_done") transition.render_ms = Math.round(Number(source.duration_ms) || 0);
       if (eventType === "spa_swap_done") transition.swap_ms = Math.round(Number(source.duration_ms) || 0);
+      if (source.reason) transition.reason = String(source.reason);
       if (typeof source.controllerchange === "boolean") transition.controllerchange = source.controllerchange;
       if (typeof source.sw_reload_between === "boolean") transition.sw_reload_between = source.sw_reload_between;
       if (transition.finalized) return;
@@ -1250,6 +1279,7 @@
       trackTransitions.clear();
       spaTransitions.clear();
       spaKeyByTarget.clear();
+      spaKeyByNavigation.clear();
       compactEvents.clear();
       activeTrackToken = 0;
       activeSpaKey = "";

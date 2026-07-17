@@ -1135,7 +1135,7 @@
   }
 
   function createFavoriteRowCover(track) {
-    const url = resolveCoverUrl(track || null, { width: 900 });
+    const url = resolveCoverUrl(track || null, { width: 1200 });
     if (!url || srcMatches(url, getMediaSessionFallbackArtwork())) return "";
     return `<img class="infra-track-cover" src="${escapeAttribute(url)}" alt="" loading="lazy" decoding="async">`;
   }

@@ -1,7 +1,7 @@
-const VERSION = "infra-shell-20260717-audio337";
+const VERSION = "infra-shell-20260717-audio338";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
-const COVERS_CACHE = "infra-covers";
+const COVERS_CACHE = "infra-covers-v2";
 const NEXT_TRACK_CACHE = "infra-next-track-segments-v9";
 const MAX_COVER_CACHE_ENTRIES = 80;
 const R2_AUDIO_HOST = "pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev";
@@ -13,27 +13,27 @@ const SHELL_ASSETS = [
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
   "./assets/css/styles.css?v=audiofix332-20260716",
-  "./assets/js/covers.js?v=audiofix337-20260717",
-  "./assets/js/favorites.js?v=audiofix337-20260717",
-  "./assets/js/favorites-ui.js?v=audiofix337-20260717",
-  "./assets/js/transport-ui.js?v=audiofix337-20260717",
-  "./assets/js/now-playing.js?v=audiofix337-20260717",
-  "./assets/js/album-player-ui.js?v=audiofix337-20260717",
-  "./assets/js/spa-renderer.js?v=audiofix337-20260717",
-  "./assets/js/audio-radio.js?v=audiofix337-20260717",
-  "./assets/js/media-session.js?v=audiofix337-20260717",
-  "./assets/js/audio-prefetch.js?v=audiofix337-20260717",
-  "./assets/js/spa-router.js?v=audiofix337-20260717",
-  "./assets/js/catalog-fallback.js?v=audiofix337-20260717",
-  "./assets/js/catalog-loader.js?v=audiofix337-20260717",
-  "./assets/js/audio-telemetry.js?v=audiofix337-20260717",
-  "./assets/js/downloads.js?v=audiofix337-20260717",
-  "./assets/js/home-catalog.js?v=audiofix337-20260717",
-  "./assets/js/audio-core.js?v=audiofix337-20260717",
-  "./assets/js/pwa-install.js?v=audiofix337-20260717",
-  "./assets/js/share-qr.js?v=audiofix337-20260717",
-  "./assets/js/scripts.js?v=audiofix337-20260717",
-  "./assets/js/scripts.admin.js?v=audiofix337-20260717",
+  "./assets/js/covers.js?v=audiofix338-20260717",
+  "./assets/js/favorites.js?v=audiofix338-20260717",
+  "./assets/js/favorites-ui.js?v=audiofix338-20260717",
+  "./assets/js/transport-ui.js?v=audiofix338-20260717",
+  "./assets/js/now-playing.js?v=audiofix338-20260717",
+  "./assets/js/album-player-ui.js?v=audiofix338-20260717",
+  "./assets/js/spa-renderer.js?v=audiofix338-20260717",
+  "./assets/js/audio-radio.js?v=audiofix338-20260717",
+  "./assets/js/media-session.js?v=audiofix338-20260717",
+  "./assets/js/audio-prefetch.js?v=audiofix338-20260717",
+  "./assets/js/spa-router.js?v=audiofix338-20260717",
+  "./assets/js/catalog-fallback.js?v=audiofix338-20260717",
+  "./assets/js/catalog-loader.js?v=audiofix338-20260717",
+  "./assets/js/audio-telemetry.js?v=audiofix338-20260717",
+  "./assets/js/downloads.js?v=audiofix338-20260717",
+  "./assets/js/home-catalog.js?v=audiofix338-20260717",
+  "./assets/js/audio-core.js?v=audiofix338-20260717",
+  "./assets/js/pwa-install.js?v=audiofix338-20260717",
+  "./assets/js/share-qr.js?v=audiofix338-20260717",
+  "./assets/js/scripts.js?v=audiofix338-20260717",
+  "./assets/js/scripts.admin.js?v=audiofix338-20260717",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./assets/js/sphragis.js?v=sphragis20260716",
   "./assets/fonts/antique-olive-nord.woff2",
@@ -55,7 +55,6 @@ self.addEventListener("install", (event) => {
     caches
       .open(SHELL_CACHE)
       .then((cache) => cache.addAll(SHELL_ASSETS))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -67,7 +66,8 @@ self.addEventListener("activate", (event) => {
         keys
           .filter((key) => (
             (isVersionedSiteCache(key) && key !== SHELL_CACHE && key !== RUNTIME_CACHE) ||
-            (isAudioPrefetchCache(key) && key !== NEXT_TRACK_CACHE)
+            (isAudioPrefetchCache(key) && key !== NEXT_TRACK_CACHE) ||
+            key === "infra-covers"
           ))
           .map((key) => caches.delete(key))
       );
@@ -122,7 +122,7 @@ function isAudioPrefetchCache(key) {
 
 function isResponsiveCoverAsset(url) {
   const path = String((url && url.pathname) || "");
-  return /\/assets\/music\/responsive\/[^/]+-cover-(?:480|900)\.webp$/i.test(path);
+  return /\/assets\/music\/responsive\/[^/]+-cover-1200\.webp$/i.test(path);
 }
 
 async function networkFirst(request, cacheName, fallbackUrl) {

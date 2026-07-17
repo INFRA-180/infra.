@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix337-20260717";
+window.INFRA_BUILD_TAG = "audiofix338-20260717";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -175,6 +175,7 @@ function openAppDownloadGatekeeper(appName, url) {
     lastNavTs: 0,
     navToken: 0,
     navigationActive: false,
+    activeNavigationHref: "",
     prepaintSyncActive: false,
     albumCoverPlaceholderByUrl: new Map(),
     pwaCoverHold: null,
@@ -388,7 +389,7 @@ function openAppDownloadGatekeeper(appName, url) {
     : true;
   // ROLLBACK: passer a false pour ne plus attendre les covers avant ouverture album.
   const ALBUM_COVER_IMAGE_CACHE_LIMIT = isStandaloneDisplayMode() ? 12 : 24;
-  const PWA_COVER_PREPARE_LIMIT = 8;
+  const PWA_COVER_PREPARE_LIMIT = 4;
   const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(prefetchConstants.MAX_BYTES))
     ? Number(prefetchConstants.MAX_BYTES)
     : 2 * 1024 * 1024;
@@ -435,7 +436,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix337-20260717";
+  const runtimeVersion = "audiofix338-20260717";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -882,6 +883,7 @@ function openAppDownloadGatekeeper(appName, url) {
       trackAudioRuntimeEvent,
       parseSrcsetCandidates,
       normalizeUrlAgainstBase,
+      normalizeCoverUrl,
       prepareAlbumCoversForSession,
       rememberAlbumCoverImage,
       saveCurrentScrollPositionInHistory,
@@ -1845,7 +1847,8 @@ function openAppDownloadGatekeeper(appName, url) {
       formatTrackDuration,
       rememberTrackDuration,
       resolveManagedAudioSrc,
-      getCurrentLogicalAudioSrc
+      getCurrentLogicalAudioSrc,
+      normalizeCoverUrl
     });
   }
 
@@ -2098,20 +2101,13 @@ function openAppDownloadGatekeeper(appName, url) {
     const seen = new Set();
     albums.forEach(function (album) {
       const raw = album && album.cover ? String(album.cover).trim() : "";
-      if (!raw || !/(?:^|\/)assets\/music\/responsive\/[^/]+-cover-900\.webp(?:$|\?)/i.test(raw)) return;
-      const variants = [
-        raw.replace(/-cover-900\.webp(?:$|\?)/i, "-cover-480.webp"),
-        raw
-      ];
-      variants.forEach(function (variant) {
-        const url = toRuntimeAbsoluteUrl(variant);
-        if (!url || seen.has(url)) return;
-        seen.add(url);
-        urls.push({
-          url,
-          album: normalizeAlbumTitle(album.title || album.slug || ""),
-          width: /-cover-480\.webp(?:$|\?)/i.test(url) ? 480 : 900
-        });
+      const canonical = normalizeCoverUrl(raw, { width: 1200 });
+      if (!canonical || seen.has(canonical)) return;
+      seen.add(canonical);
+      urls.push({
+        url: canonical,
+        album: normalizeAlbumTitle(album.title || album.slug || ""),
+        width: 1200
       });
     });
     // The catalogue now has 31 albums. Keep every responsive cover eligible so
@@ -2122,7 +2118,7 @@ function openAppDownloadGatekeeper(appName, url) {
   function getVisibleHomeCoverUrls() {
     const urls = [];
     const seen = new Set();
-    const preferredWidth = isMobilePwaCoverNavigation() ? 480 : 900;
+    const preferredWidth = 1200;
     Array.from(document.querySelectorAll("img.album-cover")).forEach(function (img) {
       const url = getImagePreferredSrc(img, window.location.href, { preferredWidth });
       if (!url || seen.has(url)) return;
@@ -2142,10 +2138,10 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!img) return "";
 
     const srcset = img.getAttribute("srcset") || "";
-    const preferred = choosePreferredSrcsetSource(srcset, 480)
+    const preferred = choosePreferredSrcsetSource(srcset, 1200)
       || img.currentSrc
       || String(img.getAttribute("src") || "").trim();
-    const url = preferred ? normalizeCoverUrl(preferred, { width: 480 }) : "";
+    const url = preferred ? normalizeCoverUrl(preferred, { width: 1200 }) : "";
     if (!url) return "";
 
     spaState.albumCoverPlaceholderByUrl.set(new URL(targetUrl, window.location.href).href, url);
@@ -2220,8 +2216,8 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!rect || rect.width < 8 || rect.height < 8) return false;
 
     const url = normalizeCoverUrl(
-      coverSrc || choosePreferredSrcsetSource(image.getAttribute("srcset") || "", 480) || image.currentSrc || image.src || "",
-      { width: 480 }
+      coverSrc || choosePreferredSrcsetSource(image.getAttribute("srcset") || "", 1200) || image.currentSrc || image.src || "",
+      { width: 1200 }
     );
     if (!url) return false;
 
@@ -2348,7 +2344,7 @@ function openAppDownloadGatekeeper(appName, url) {
       }
     }
 
-    const src = normalizeCoverUrl(state && state.source, { width: 480 });
+    const src = normalizeCoverUrl(state && state.source, { width: 1200 });
     if (!src) return null;
     const image = new Image();
     image.decoding = "async";
@@ -2384,14 +2380,14 @@ function openAppDownloadGatekeeper(appName, url) {
       const srcset = image.getAttribute("srcset") || "";
       const preferred = image.classList && image.classList.contains("album-cover")
         ? normalizeCoverUrl(
-            choosePreferredSrcsetSource(srcset, 480) || image.getAttribute("src") || image.src || "",
-            { width: 480 }
+            choosePreferredSrcsetSource(srcset, 1200) || image.getAttribute("src") || image.src || "",
+            { width: 1200 }
           )
         : normalizeUrlAgainstBase(image.getAttribute("src") || image.src || "", route && route.url);
       if (preferred) image.setAttribute("src", preferred);
       if (image.classList && image.classList.contains("album-cover")) {
-        image.setAttribute("srcset", preferred ? `${preferred} 480w` : "");
-        image.setAttribute("sizes", "480px");
+        image.removeAttribute("srcset");
+        image.removeAttribute("sizes");
       }
       image.setAttribute("loading", "eager");
       image.setAttribute("decoding", "async");
@@ -2553,11 +2549,7 @@ function openAppDownloadGatekeeper(appName, url) {
   function limitAlbumCoverWarmupUrls(covers) {
     if (!Array.isArray(covers) || !covers.length) return [];
     if (!isMobilePwaCoverNavigation()) return covers;
-    const pwaCovers = covers.filter(function (entry) {
-      return entry && Number(entry.width) === 480;
-    });
-    const selected = pwaCovers.length ? pwaCovers : covers;
-    return selected.slice(0, Math.min(PWA_COVER_PREPARE_LIMIT, selected.length));
+    return covers.slice(0, Math.min(PWA_COVER_PREPARE_LIMIT, covers.length));
   }
 
   function shouldPauseAlbumCoverWarmup() {
@@ -2923,15 +2915,8 @@ function openAppDownloadGatekeeper(appName, url) {
 
     const rawSrc = String(cover.getAttribute("src") || "").trim();
     if (!rawSrc) return;
-    const cleanSrc = rawSrc.split("?")[0];
-    const match = cleanSrc.match(/^(.*\/assets\/music\/)([^/]+-cover)\.(?:jpg|jpeg|png)$/i);
-    if (!match) return;
-
-    const prefix = match[1];
-    const base = match[2];
-    const small = `${prefix}responsive/${base}-480.webp`;
-    const large = `${prefix}responsive/${base}-900.webp`;
-    const pwaCoverMode = isMobilePwaCoverNavigation();
+    const canonical = normalizeCoverUrl(rawSrc, { width: 1200 });
+    if (!canonical) return;
     const coverStartedAt = getAudioTelemetryNow();
     logCoverRuntimeEvent("cover_request", {
       album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(window.location.href),
@@ -2958,14 +2943,9 @@ function openAppDownloadGatekeeper(appName, url) {
       }, { once: true });
     }
 
-    if (pwaCoverMode) {
-      cover.setAttribute("src", small);
-      cover.setAttribute("srcset", `${small} 480w`);
-      cover.setAttribute("sizes", "min(76vw, 290px)");
-    } else {
-      cover.setAttribute("srcset", `${small} 480w, ${large} 900w, ${rawSrc} 3333w`);
-      cover.setAttribute("sizes", "(max-width: 980px) min(76vw, 290px), min(34vw, 430px)");
-    }
+    cover.setAttribute("src", canonical);
+    cover.removeAttribute("srcset");
+    cover.removeAttribute("sizes");
     cover.setAttribute("decoding", "async");
     cover.setAttribute("fetchpriority", "high");
     cover.setAttribute("loading", "eager");
@@ -3325,18 +3305,14 @@ function openAppDownloadGatekeeper(appName, url) {
       .register(swUrl, { scope: runtime.baseUrl.pathname, updateViaCache: "none" })
       .then(function (registration) {
         serviceWorkerRegistrationRef = registration;
-        if (registration.waiting) {
-          registration.waiting.postMessage({ type: "SKIP_WAITING" });
-        }
         requestServiceWorkerUpdateCheck("registered");
 
         registration.addEventListener("updatefound", function () {
           const worker = registration.installing;
           if (!worker) return;
           worker.addEventListener("statechange", function () {
-            if (worker.state === "installed" && navigator.serviceWorker.controller && registration.waiting) {
-              registration.waiting.postMessage({ type: "SKIP_WAITING" });
-            }
+            // Keep the installed update waiting until every current client has
+            // closed. This prevents a controller swap during audio startup.
           });
         });
       })
@@ -4029,7 +4005,7 @@ function openAppDownloadGatekeeper(appName, url) {
   }
 
   function getCurrentTrackArtwork(track) {
-    return resolveCoverUrl(track || null, { width: 900 }) || getMediaSessionFallbackArtwork();
+    return resolveCoverUrl(track || null, { width: 1200 }) || getMediaSessionFallbackArtwork();
   }
 
   function preloadImage(src, options) {
@@ -4133,7 +4109,7 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!imgElement) return Promise.resolve(false);
 
     const fallback = normalizeCoverUrl(fallbackSrc || "", { responsive: false }) || getCurrentTrackArtwork(null);
-    const target = normalizeCoverUrl(nextSrc || "", { width: 900 }) || fallback;
+    const target = normalizeCoverUrl(nextSrc || "", { width: 1200 }) || fallback;
     if (!target) return Promise.resolve(false);
 
     const current = toAbsoluteUrlOrEmpty(imgElement.currentSrc || imgElement.src || "");
@@ -4215,7 +4191,7 @@ function openAppDownloadGatekeeper(appName, url) {
   function setCoverBackgroundStable(element, nextSrc, fallbackSrc, token) {
     if (!element) return Promise.resolve(false);
     const fallback = normalizeCoverUrl(fallbackSrc || "", { responsive: false }) || getMediaSessionFallbackArtwork();
-    const target = normalizeCoverUrl(nextSrc || "", { width: 900 }) || fallback;
+    const target = normalizeCoverUrl(nextSrc || "", { width: 1200 }) || fallback;
     if (!target) return Promise.resolve(false);
 
     const current = String(element.dataset.coverBgUrl || "").trim();
@@ -4881,7 +4857,7 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function buildMediaSessionArtwork(track) {
     const fallbackArtwork = getMediaSessionFallbackArtwork();
-    const canonicalArtwork = resolveCoverUrl(track || null, { width: 900 }) || fallbackArtwork;
+    const canonicalArtwork = resolveCoverUrl(track || null, { width: 1200 }) || fallbackArtwork;
     const normalizedSrc = normalizeArtworkUrl(canonicalArtwork || fallbackArtwork);
     return [{
       src: withMediaSessionArtworkVersion(normalizedSrc, track),
@@ -5765,6 +5741,7 @@ function openAppDownloadGatekeeper(appName, url) {
       toUrl: url.href,
       fromAlbum: getCurrentAlbumTitle() || document.title || "",
       toAlbum: getAlbumNameFromUrlLike(url.href),
+      navigationToken: Number(opts.navigationToken || 0),
       controllerchangeAtStart: serviceWorkerControllerChangeAt,
       reloadExecutedAtStart: serviceWorkerReloadExecutedAt
     };
@@ -5776,7 +5753,8 @@ function openAppDownloadGatekeeper(appName, url) {
       from_url: context.fromUrl,
       to_url: context.toUrl,
       controllerchange: false,
-      sw_reload_between: false
+      sw_reload_between: false,
+      navigation_token: context.navigationToken
     });
     return context;
   }
@@ -5796,7 +5774,8 @@ function openAppDownloadGatekeeper(appName, url) {
       delta_ms: Math.max(0, Math.round(endedAt - context.startedAt)),
       controllerchange: controllerBetween,
       sw_reload_between: Boolean(controllerBetween || reloadBetween),
-      reload_executed: reloadBetween
+      reload_executed: reloadBetween,
+      navigation_token: context.navigationToken
     }, extra || {}));
   }
 

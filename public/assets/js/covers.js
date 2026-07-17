@@ -6,7 +6,8 @@
     : (typeof self !== "undefined" ? self : {});
 
   const constants = Object.freeze({
-    CACHE_NAME: "infra-covers",
+    CACHE_NAME: "infra-covers-v2",
+    CANONICAL_WIDTH: 1200,
     SESSION_PREPARE_ENABLED: true,
     SESSION_PREPARE_CONCURRENCY: 3,
     SESSION_NAVIGATION_GATE_ENABLED: true
@@ -98,6 +99,7 @@
 
   function inferArtworkSizeHint(urlValue) {
     const normalized = String(urlValue || "").toLowerCase();
+    if (normalized.includes("-1200.webp")) return "1200x1200";
     if (normalized.includes("-480.webp")) return "480x480";
     if (normalized.includes("-900.webp")) return "900x900";
     if (normalized.includes("icon-192")) return "192x192";
@@ -150,7 +152,10 @@
 
     const path = String(parsed.pathname || "");
     if (!/\/assets\/music\//i.test(path)) return "";
-    const width = Math.max(320, Number(targetWidth) || 900);
+    // One immutable artwork URL per album keeps every surface and cache entry
+    // coherent. Callers may still pass a historical width, but album artwork
+    // always resolves to the canonical 1200 px WebP.
+    const width = constants.CANONICAL_WIDTH;
 
     if (/\/assets\/music\/responsive\//i.test(path)) {
       const replaced = path
@@ -194,8 +199,7 @@
     }
     if (opts.responsive === false) return normalized;
 
-    const width = Math.max(320, Number(opts.width) || 900);
-    const responsive = buildResponsiveCoverCandidate(normalized, width, opts);
+    const responsive = buildResponsiveCoverCandidate(normalized, constants.CANONICAL_WIDTH, opts);
     return responsive || normalized;
   }
 

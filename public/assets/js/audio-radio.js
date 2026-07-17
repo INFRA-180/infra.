@@ -2320,6 +2320,7 @@
         : fallbackIndex;
       const currentSrc = getCurrentLogicalAudioSrc();
       if (index >= 0) {
+        if (audioState.playAbortRetryToken === audioState.startRequestToken) return;
         audioState.playAbortRetryToken = 0;
         setTrackStatus(getTrackByIndex(index), "Chargement du fichier audio...");
         recoverFromTrackFailure(index, currentSrc, audioState.startRequestToken);

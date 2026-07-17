@@ -68,8 +68,10 @@
         page: String(raw && raw.page ? raw.page : "").trim(),
         thumb: canonicalThumb,
         thumbAlt: String(raw && raw.thumbAlt ? raw.thumbAlt : "").trim(),
-        thumbSrcset: String(raw && raw.thumbSrcset ? raw.thumbSrcset : "").trim(),
-        thumbSizes: String(raw && raw.thumbSizes ? raw.thumbSizes : "").trim(),
+        // Album artwork has one canonical runtime resource. In particular,
+        // never let an older live catalogue reattach its JPEG/WebP srcset.
+        thumbSrcset: type === "album" ? "" : String(raw && raw.thumbSrcset ? raw.thumbSrcset : "").trim(),
+        thumbSizes: type === "album" ? "" : String(raw && raw.thumbSizes ? raw.thumbSizes : "").trim(),
         width: Math.max(1, Number(raw && raw.width) || fallbackSize),
         height: Math.max(1, Number(raw && raw.height) || fallbackSize),
         download: null
@@ -90,7 +92,7 @@
         }
       }
 
-      if (!card.thumbSrcset || !card.thumbSizes) {
+      if (type !== "album" && (!card.thumbSrcset || !card.thumbSizes)) {
         const responsive = deriveCatalogThumbSet(card.thumb, type);
         if (responsive.srcset && !card.thumbSrcset) card.thumbSrcset = responsive.srcset;
         if (responsive.sizes && !card.thumbSizes) card.thumbSizes = responsive.sizes;

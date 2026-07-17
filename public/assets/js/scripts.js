@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix341-20260717";
+window.INFRA_BUILD_TAG = "audiofix342-20260717";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -163,8 +163,11 @@ function openAppDownloadGatekeeper(appName, url) {
     bound: false,
     controller: null,
     currentUrl: window.location.href,
-    scrollSaveRaf: 0,
+    scrollSaveTimer: 0,
     scrollBound: false,
+    lastHistoryUrl: "",
+    lastHistoryScrollX: -1,
+    lastHistoryScrollY: -1,
     pageCache: new Map(),
     pageCacheOrder: [],
     pageCacheLimit: Number.isFinite(Number(spaRouterConstants.PAGE_CACHE_LIMIT))
@@ -417,9 +420,12 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260717-audio341";
+  const SPA_SHELL_VERSION = "infra-shell-20260717-audio342";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
+  const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
+    ? Math.max(100, Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
+    : 240;
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
   const LOCAL_CATALOG_VERSION = "audiofix255-20260627";
@@ -443,7 +449,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix341-20260717";
+  const runtimeVersion = "audiofix342-20260717";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -894,6 +900,7 @@ function openAppDownloadGatekeeper(appName, url) {
       prepareAlbumCoversForSession,
       rememberAlbumCoverImage,
       saveCurrentScrollPositionInHistory,
+      commitSpaHistoryState,
       buildSpaHistoryState,
       getAlbumNameFromUrlLike,
       getCurrentAlbumTitle,
@@ -3458,7 +3465,35 @@ function openAppDownloadGatekeeper(appName, url) {
       window.location.href = href;
       return;
     }
-    spaNavigate(href, options);
+    cancelPendingSpaScrollSave();
+    let navigation = null;
+    try {
+      navigation = spaNavigate(href, options);
+    } catch (error) {
+      handleUnhandledSpaNavigationError(href, error);
+      return;
+    }
+    if (navigation && typeof navigation.catch === "function") {
+      navigation.catch(function (error) {
+        handleUnhandledSpaNavigationError(href, error);
+      });
+    }
+  }
+
+  function handleUnhandledSpaNavigationError(href, error) {
+    const errorName = String(error && error.name ? error.name : "NavigationError");
+    trackAudioRuntimeEvent("nav:album_abort", {
+      track: "album_open",
+      album: getAlbumNameFromUrlLike(href),
+      reason: `unhandled_spa_${errorName}`,
+      error_name: errorName,
+      to_url: String(href || ""),
+      navigation_token: Number(spaState.navToken || 0)
+    });
+    spaState.navigationActive = false;
+    spaState.activeNavigationHref = "";
+    releasePwaCoverHold("unhandled_spa_error");
+    window.location.href = href;
   }
 
   function buildSpaHistoryState(urlLike, scrollX, scrollY) {
@@ -3479,13 +3514,62 @@ function openAppDownloadGatekeeper(appName, url) {
   }
 
   function saveCurrentScrollPositionInHistory() {
-    try {
-      const x = window.scrollX || window.pageXOffset || 0;
-      const y = window.scrollY || window.pageYOffset || 0;
-      history.replaceState(buildSpaHistoryState(window.location.href, x, y), "", window.location.href);
-    } catch (_err) {
-      // Ignore history write failures.
+    const x = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
+    const y = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
+    const href = String(window.location.href || "");
+    if (
+      spaState.lastHistoryUrl === href &&
+      spaState.lastHistoryScrollX === x &&
+      spaState.lastHistoryScrollY === y
+    ) {
+      return { ok: true, mode: "replace", skipped: true, errorName: "" };
     }
+    return commitSpaHistoryState("replace", href, x, y);
+  }
+
+  function commitSpaHistoryState(mode, urlLike, scrollX, scrollY) {
+    const href = String(urlLike || window.location.href);
+    const x = Math.max(0, Math.round(Number(scrollX) || 0));
+    const y = Math.max(0, Math.round(Number(scrollY) || 0));
+    let result = null;
+    if (spaRouterApi && typeof spaRouterApi.writeHistoryState === "function") {
+      result = spaRouterApi.writeHistoryState({
+        historyRef: history,
+        baseState: history.state,
+        mode,
+        url: href,
+        scrollX: x,
+        scrollY: y
+      });
+    } else {
+      try {
+        if (mode === "push") {
+          history.pushState(buildSpaHistoryState(href, x, y), "", href);
+        } else if (mode === "replace") {
+          history.replaceState(buildSpaHistoryState(href, x, y), "", href);
+        }
+        result = { ok: true, mode, skipped: mode !== "push" && mode !== "replace", errorName: "" };
+      } catch (error) {
+        result = {
+          ok: false,
+          mode,
+          skipped: false,
+          errorName: String(error && error.name ? error.name : "HistoryError")
+        };
+      }
+    }
+    if (result && result.ok) {
+      spaState.lastHistoryUrl = href;
+      spaState.lastHistoryScrollX = x;
+      spaState.lastHistoryScrollY = y;
+    }
+    return result || { ok: false, mode, skipped: false, errorName: "HistoryError" };
+  }
+
+  function cancelPendingSpaScrollSave() {
+    if (!spaState.scrollSaveTimer) return;
+    window.clearTimeout(spaState.scrollSaveTimer);
+    spaState.scrollSaveTimer = 0;
   }
 
   function getScrollFromHistoryState(stateLike) {
@@ -5928,11 +6012,13 @@ function openAppDownloadGatekeeper(appName, url) {
       window.addEventListener(
         "scroll",
         function () {
-          if (spaState.scrollSaveRaf) return;
-          spaState.scrollSaveRaf = requestAnimationFrame(function () {
-            spaState.scrollSaveRaf = 0;
+          // WebKit throttles pushState/replaceState. Coalesce a full gesture
+          // into one trailing write instead of writing at display-frame rate.
+          cancelPendingSpaScrollSave();
+          spaState.scrollSaveTimer = window.setTimeout(function () {
+            spaState.scrollSaveTimer = 0;
             saveCurrentScrollPositionInHistory();
-          });
+          }, SPA_SCROLL_HISTORY_DEBOUNCE_MS);
         },
         { passive: true }
       );
@@ -6016,14 +6102,14 @@ function openAppDownloadGatekeeper(appName, url) {
       // until the destination document is ready. The former foreground cover
       // clone made a slow first visit look like a frozen application.
       releasePwaCoverHold("replace");
-      spaNavigate(url.href, {
+      navigateTo(url.href, {
         history: "push",
         coverPlaceholderSrc
       });
     }, true);
 
     window.addEventListener("popstate", function (event) {
-      spaNavigate(window.location.href, {
+      navigateTo(window.location.href, {
         history: "none",
         scroll: false,
         captureScroll: false,

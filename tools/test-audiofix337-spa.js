@@ -187,12 +187,30 @@ function testVisibilityTelemetryIsTransitionOnly() {
   );
 }
 
+function testWebKitHistoryQuotaGuard() {
+  assert.ok(
+    scriptsSource.includes("SPA_SCROLL_HISTORY_DEBOUNCE_MS"),
+    "scroll history writes must be debounced"
+  );
+  const scrollListenerStart = scriptsSource.indexOf('window.addEventListener(\n        "scroll"');
+  const scrollListenerEnd = scriptsSource.indexOf("spaState.scrollBound = true", scrollListenerStart);
+  const scrollListener = scriptsSource.slice(scrollListenerStart, scrollListenerEnd);
+  assert.ok(scrollListenerStart >= 0, "scroll history listener is missing");
+  assert.ok(scrollListener.includes("window.setTimeout"), "scroll history must use one trailing timer");
+  assert.ok(!scrollListener.includes("requestAnimationFrame"), "scroll history must not write at display-frame rate");
+  assert.ok(spaSource.includes('commitNavigationHistory("client_cache")'), "cached album navigation lacks the safe history gate");
+  assert.ok(spaSource.includes('fallbackToDocumentNavigation(`history_write_'), "history failures must fall back to a real document navigation");
+  assert.ok(!spaSource.includes("history.pushState("), "SPA renderer still calls pushState without the safe writer");
+  assert.ok(!spaSource.includes("history.replaceState("), "SPA renderer still calls replaceState without the safe writer");
+}
+
 async function main() {
   await testRuntimeClassSanitizer();
   await testIosSwapIsAtomicWithoutNativeTransition();
   testFullscreenFinalizationAndSnapshotDedup();
   testVisibilityTelemetryIsTransitionOnly();
-  console.log("audiofix341 SPA/transport tests: ok");
+  testWebKitHistoryQuotaGuard();
+  console.log("audiofix342 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

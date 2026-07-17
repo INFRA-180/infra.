@@ -28,7 +28,9 @@
     const normalizeCoverUrl = method(ctx, "normalizeCoverUrl", function (value) { return String(value || ""); });
     const rememberAlbumCoverImage = method(ctx, "rememberAlbumCoverImage");
     const saveCurrentScrollPositionInHistory = method(ctx, "saveCurrentScrollPositionInHistory");
-    const buildSpaHistoryState = method(ctx, "buildSpaHistoryState", function (urlLike) { return { __infraSpa: 1, url: String(urlLike || "") }; });
+    const commitSpaHistoryState = method(ctx, "commitSpaHistoryState", function () {
+      return { ok: true, mode: "none", skipped: true, errorName: "" };
+    });
     const getAlbumNameFromUrlLike = method(ctx, "getAlbumNameFromUrlLike", function () { return ""; });
     const getCurrentAlbumTitle = method(ctx, "getCurrentAlbumTitle", function () { return ""; });
     const createAlbumOpenTelemetryContext = method(ctx, "createAlbumOpenTelemetryContext", function () { return null; });
@@ -1106,6 +1108,20 @@
       window.location.href = url.href;
     }
 
+    function commitNavigationHistory(stage) {
+      const mode = String(opts.history || "none");
+      if (mode !== "push" && mode !== "replace") return true;
+      const result = commitSpaHistoryState(mode, url.href, 0, 0);
+      if (!result || result.ok !== false) return true;
+      const errorName = String(result.errorName || "HistoryError")
+        .replace(/[^a-z0-9_-]+/gi, "_")
+        .slice(0, 48);
+      fallbackToDocumentNavigation(`history_write_${stage}_${errorName}`, {
+        error_name: errorName
+      });
+      return false;
+    }
+
     if (opts.captureScroll !== false) {
       saveCurrentScrollPositionInHistory();
     }
@@ -1121,11 +1137,7 @@
         spaState.controller = null;
       }
 
-      if (opts.history === "push") {
-        history.pushState(buildSpaHistoryState(url.href, 0, 0), "", url.href);
-      } else if (opts.history === "replace") {
-        history.replaceState(buildSpaHistoryState(url.href, 0, 0), "", url.href);
-      }
+      if (!commitNavigationHistory("live_home")) return;
 
       spaState.currentUrl = url.href;
       const liveRenderStartedAt = getAudioTelemetryNow();
@@ -1199,11 +1211,7 @@
           spaState.controller = null;
         }
 
-        if (opts.history === "push") {
-          history.pushState(buildSpaHistoryState(url.href, 0, 0), "", url.href);
-        } else if (opts.history === "replace") {
-          history.replaceState(buildSpaHistoryState(url.href, 0, 0), "", url.href);
-        }
+        if (!commitNavigationHistory("client_cache")) return;
 
         spaState.currentUrl = url.href;
         const cachedRenderStartedAt = getAudioTelemetryNow();
@@ -1347,11 +1355,7 @@
     }
 
     // Update history before rendering so relative URLs resolve correctly.
-    if (opts.history === "push") {
-      history.pushState(buildSpaHistoryState(url.href, 0, 0), "", url.href);
-    } else if (opts.history === "replace") {
-      history.replaceState(buildSpaHistoryState(url.href, 0, 0), "", url.href);
-    }
+    if (!commitNavigationHistory("loaded_document")) return;
 
     spaState.currentUrl = url.href;
     const renderStartedAt = getAudioTelemetryNow();

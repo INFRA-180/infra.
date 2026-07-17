@@ -71,8 +71,8 @@
       const shouldEager = index < eagerCount;
       image.loading = shouldEager ? "eager" : "lazy";
       image.setAttribute("fetchpriority", shouldEager ? "high" : "low");
-      if (item.thumbSrcset) image.setAttribute("srcset", item.thumbSrcset);
-      if (item.thumbSizes) image.setAttribute("sizes", item.thumbSizes);
+      if (isApp && item.thumbSrcset) image.setAttribute("srcset", item.thumbSrcset);
+      if (isApp && item.thumbSizes) image.setAttribute("sizes", item.thumbSizes);
 
       const label = document.createElement("span");
       if (item.editKey) label.setAttribute("data-edit-key", item.editKey);
@@ -204,15 +204,10 @@
       return clean.slice(clean.lastIndexOf("/") + 1);
     }
 
-    function lockedCoverMatchesCatalog(image, expectedSrcset) {
+    function lockedCoverMatchesCatalog(image, expectedThumb) {
       if (!image || image.dataset.spaCoverLocked !== "1") return false;
       const fileName = getAssetFileName(image.getAttribute("src"));
-      if (!fileName) return false;
-      return String(expectedSrcset || "")
-        .split(",")
-        .some(function (entry) {
-          return getAssetFileName(String(entry || "").trim().split(/\s+/)[0]) === fileName;
-        });
+      return Boolean(fileName && fileName === getAssetFileName(expectedThumb));
     }
 
     function homeAlbumGridMatchesCatalog(grid, albums) {
@@ -233,9 +228,7 @@
 
         const displayTitle = displayAlbumCardTitle(item.title);
         const shouldEager = index < 4;
-        const expectedSrcset = String(item.thumbSrcset || "").trim();
-        const expectedSizes = String(item.thumbSizes || "").trim();
-        const lockedCover = lockedCoverMatchesCatalog(image, expectedSrcset);
+        const lockedCover = lockedCoverMatchesCatalog(image, item.thumb);
 
         if (getCardAttribute(card, "href") !== String(item.page || "").trim()) return false;
         if (!lockedCover && getCardAttribute(image, "src") !== String(item.thumb || "").trim()) return false;
@@ -244,8 +237,8 @@
         if (getCardAttribute(image, "height") !== String(item.height || "")) return false;
         if (getCardAttribute(image, "loading") !== (shouldEager ? "eager" : "lazy")) return false;
         if (getCardAttribute(image, "fetchpriority") !== (shouldEager ? "high" : "low")) return false;
-        if (!lockedCover && expectedSrcset && getCardAttribute(image, "srcset") !== expectedSrcset) return false;
-        if (!lockedCover && expectedSizes && getCardAttribute(image, "sizes") !== expectedSizes) return false;
+        if (getCardAttribute(image, "srcset")) return false;
+        if (getCardAttribute(image, "sizes")) return false;
         if (String(label.textContent || "").trim() !== displayTitle) return false;
         return true;
       });

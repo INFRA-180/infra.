@@ -13,7 +13,8 @@
     PAGE_CACHE_LIMIT: 40,
     PAGE_CACHE_LOOKUP_TIMEOUT_MS: 450,
     PAGE_FETCH_TIMEOUT_MS: 2500,
-    PAGE_CACHE_WARM_CONCURRENCY: 4
+    PAGE_CACHE_WARM_CONCURRENCY: 4,
+    SCROLL_HISTORY_DEBOUNCE_MS: 240
   });
 
   const staticAssetPattern = /\.(?:mp3|m4a|aac|wav|flac|ogg|png|jpe?g|webp|gif|svg|ico|pdf|zip|json|js|css|woff2?)$/i;
@@ -43,6 +44,42 @@
       x: Number.isFinite(x) ? Math.max(0, x) : 0,
       y: Number.isFinite(y) ? Math.max(0, y) : 0
     };
+  }
+
+  function writeHistoryState(options) {
+    const opts = options || {};
+    const mode = String(opts.mode || "none").toLowerCase();
+    if (mode !== "push" && mode !== "replace") {
+      return { ok: true, mode: "none", skipped: true, errorName: "" };
+    }
+
+    const historyRef = opts.historyRef || globalObject.history;
+    const methodName = mode === "push" ? "pushState" : "replaceState";
+    if (!historyRef || typeof historyRef[methodName] !== "function") {
+      return { ok: false, mode, skipped: false, errorName: "HistoryUnavailable" };
+    }
+
+    const url = String(opts.url || (globalObject.location && globalObject.location.href) || "");
+    const state = buildHistoryState({
+      baseState: Object.prototype.hasOwnProperty.call(opts, "baseState")
+        ? opts.baseState
+        : historyRef.state,
+      url,
+      scrollX: opts.scrollX,
+      scrollY: opts.scrollY
+    });
+
+    try {
+      historyRef[methodName](state, "", url);
+      return { ok: true, mode, skipped: false, errorName: "" };
+    } catch (error) {
+      return {
+        ok: false,
+        mode,
+        skipped: false,
+        errorName: String(error && error.name ? error.name : "HistoryError")
+      };
+    }
   }
 
   function isNavigableUrl(urlLike, options) {
@@ -367,6 +404,7 @@
     constants,
     isEnabled,
     buildHistoryState,
+    writeHistoryState,
     getScrollFromHistoryState,
     isNavigableUrl,
     getPageCacheKey,

@@ -26,6 +26,8 @@ function createDocuments(label) {
       title: `ALBUM ${suffix}`,
       page: `music/${suffix}.html`,
       thumb: `assets/music/${suffix}-cover.jpg`,
+      thumbSrcset: `assets/music/responsive/${suffix}-cover-480.webp 480w, assets/music/${suffix}-cover.jpg 1600w`,
+      thumbSizes: "50vw",
       width: 800,
       height: 800
     }],
@@ -151,7 +153,12 @@ function createHarness(options) {
     formatTrackDuration: () => "1:00",
     rememberTrackDuration() {},
     resolveManagedAudioSrc: (value) => new URL(String(value || ""), runtime.baseUrl).href,
-    getCurrentLogicalAudioSrc: () => ""
+    getCurrentLogicalAudioSrc: () => "",
+    normalizeCoverUrl: (value, options) => {
+      const source = String(value || "");
+      if (!options || Number(options.width) !== 1200) return source;
+      return source.replace(/^assets\/music\/(.+)-cover\.jpg$/i, "assets/music/responsive/$1-cover-1200.webp");
+    }
   });
 
   return {
@@ -181,6 +188,9 @@ async function flushTasks() {
   assert.strictEqual(startup.catalogState.catalogBundleSource, "local");
   assert.strictEqual(startup.catalogState.catalogBundleReleaseId, "local-startup-test");
   assert.strictEqual(catalog.albums[0].title, "ALBUM local");
+  assert.strictEqual(catalog.albums[0].thumb, "assets/music/responsive/local-cover-1200.webp");
+  assert.strictEqual(catalog.albums[0].thumbSrcset, "", "album cards must expose one canonical cover source");
+  assert.strictEqual(catalog.albums[0].thumbSizes, "", "album cards must not restore legacy responsive candidates");
   assert.strictEqual(tracks.albums[0].slug, "local");
   assert.strictEqual(startup.audioState.tracksData, tracks);
   assert.strictEqual(

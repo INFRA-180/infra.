@@ -2138,7 +2138,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix341 runtime checks passed.");
+  console.log("audiofix342 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

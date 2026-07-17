@@ -9,7 +9,7 @@ const vm = require("node:vm");
 const ROOT = path.resolve(__dirname, "..");
 const ROUTER_PATH = path.join(ROOT, "public/assets/js/spa-router.js");
 const routerSource = fs.readFileSync(ROUTER_PATH, "utf8");
-const SHELL_CACHE = "infra-shell-20260717-audio341-shell";
+const SHELL_CACHE = "infra-shell-20260717-audio342-shell";
 
 function loadRouter(overrides) {
   const sandbox = Object.assign({
@@ -74,7 +74,7 @@ async function testInstalledShellWinsWithoutNetwork() {
   const result = await cache.load("music/salam-infra.html", { cacheName: SHELL_CACHE });
   assert.equal(result.cached, true);
   assert.equal(result.strategy, "window_shell_cache");
-  assert.equal(result.workerVersion, "infra-shell-20260717-audio341");
+  assert.equal(result.workerVersion, "infra-shell-20260717-audio342");
   assert.match(result.html, /Salam/);
   assert.equal(cacheMatchCalls, 1);
   assert.equal(fetchCalls, 0);
@@ -204,13 +204,52 @@ async function testHungCacheLookupFallsBackBoundedly() {
   assert.ok(Date.now() - startedAt < 500, "a hung CacheStorage lookup must not freeze album navigation");
 }
 
+function testHistoryWritesAreBoundedAndNonThrowing() {
+  const router = loadRouter();
+  const writes = [];
+  const historyRef = {
+    state: { existing: true },
+    pushState(state, _title, url) {
+      writes.push({ state, url });
+    }
+  };
+  const success = router.writeHistoryState({
+    historyRef,
+    mode: "push",
+    url: "https://site.test/music/adc-13-infra.html",
+    scrollX: 0,
+    scrollY: 0
+  });
+  assert.equal(success.ok, true);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].state.__infraSpa, 1);
+  assert.equal(writes[0].state.existing, true);
+
+  const quotaFailure = router.writeHistoryState({
+    historyRef: {
+      state: {},
+      replaceState() {
+        const error = new Error("WebKit history quota");
+        error.name = "QuotaExceededError";
+        throw error;
+      }
+    },
+    mode: "replace",
+    url: "https://site.test/index.html",
+    scrollY: 1200
+  });
+  assert.equal(quotaFailure.ok, false, "a WebKit quota error must be returned, not thrown");
+  assert.equal(quotaFailure.errorName, "QuotaExceededError");
+}
+
 async function main() {
   await testInstalledShellWinsWithoutNetwork();
   await testIntentAndClickShareOneRequest();
   await testAllAlbumDocumentsWarmCacheOnly();
   await testNavigationUpgradesCacheOnlyWarmup();
   await testHungCacheLookupFallsBackBoundedly();
-  console.log("audiofix341 SPA page-cache tests: ok");
+  testHistoryWritesAreBoundedAndNonThrowing();
+  console.log("audiofix342 SPA page-cache tests: ok");
 }
 
 main().catch(function (error) {

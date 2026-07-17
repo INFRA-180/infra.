@@ -696,18 +696,14 @@ function testAlbumContinuesChronologicallyPastItsLastTrack() {
   assert.strictEqual(playlist.length, 8, "The existing album queue must be extended without replacing the current track");
 }
 
-async function testTransportMediaSessionActionsAreNotForcedPerTrack() {
+async function testTransportMediaSessionActionsAreReassertedPerTrack() {
   const harness = createCoreHarness({ playlist: makeTracks(3), currentIndex: 0 });
   harness.api.playNext({ fromMediaSession: true, seamless: true });
   await Promise.resolve();
   await Promise.resolve();
   assert(
-    harness.getBindCalls().some((options) => options === undefined),
-    "A normal track change must reuse Media Session handlers instead of forcing a rebind"
-  );
-  assert(
-    harness.getBindCalls().every((options) => !options || options.force !== true),
-    "Only lifecycle resync paths may force Media Session handlers"
+    harness.getBindCalls().some((options) => options && options.force === true && options.quiet === true),
+    "A successful track change must quietly reassert Media Session handlers for WebKit"
   );
 }
 
@@ -2041,8 +2037,7 @@ function testPersistentAlbumAndFullscreenContracts() {
 
   const coreSource = fs.readFileSync(CORE_PATH, "utf8");
   const coreStartBody = extractFunctionBody(coreSource, "startTrack");
-  assert(coreStartBody.includes("bindMediaSessionActions();"));
-  assert(!coreStartBody.includes("bindMediaSessionActions({ force: true })"));
+  assert(coreStartBody.includes("bindMediaSessionActions({ force: true, quiet: true })"));
   const playResolvedBody = extractFunctionBody(coreSource, "handlePlayResolved");
   assert(!playResolvedBody.includes("clearTrackFailure("));
   const ensureCurrentIndexBody = extractFunctionBody(coreSource, "ensureCurrentIndexFromAudio");
@@ -2119,7 +2114,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testCachedTrackIsPromotedBeforeColdTap();
   testAuthoritativeRollingWindow();
   testAlbumContinuesChronologicallyPastItsLastTrack();
-  await testTransportMediaSessionActionsAreNotForcedPerTrack();
+  await testTransportMediaSessionActionsAreReassertedPerTrack();
   testSameSourceRetryKeepsMetadataPending();
   testRestoredNonRadioQueueIsScopedToCurrentAlbum();
   testLargeRadioQueuePersistenceRetainsActiveTrack();
@@ -2138,7 +2133,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix342 runtime checks passed.");
+  console.log("audiofix343 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

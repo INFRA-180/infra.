@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix342-20260717";
+window.INFRA_BUILD_TAG = "audiofix343-20260717";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -420,7 +420,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260717-audio342";
+  const SPA_SHELL_VERSION = "infra-shell-20260717-audio343";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -449,7 +449,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix342-20260717";
+  const runtimeVersion = "audiofix343-20260717";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -5213,18 +5213,19 @@ function openAppDownloadGatekeeper(appName, url) {
 
     function safeSet(action, handler) {
       if (mediaSessionApi && typeof mediaSessionApi.setActionHandler === "function") {
-        mediaSessionApi.setActionHandler(action, handler);
-        return;
+        return mediaSessionApi.setActionHandler(action, handler);
       }
       try {
         navigator.mediaSession.setActionHandler(action, handler);
+        return true;
       } catch (_err) {
         // Ignore unsupported action handlers.
+        return false;
       }
     }
 
     const iosStandalone = isIOSStandaloneMediaSession();
-    const registeredActions = ["play", "pause", "previoustrack", "nexttrack"];
+    const registeredActions = ["play", "pause"];
 
     safeSet("play", function () {
       playFromExternalControl("media_session");
@@ -5246,15 +5247,6 @@ function openAppDownloadGatekeeper(appName, url) {
         markAudioPauseIntent("media_session", "media_session");
         audio.pause();
       }
-    });
-
-    safeSet("previoustrack", function () {
-      console.info("[INFRA] mediaSession previoustrack");
-      playPrevious({ seamless: true, fromMediaSession: true });
-    });
-    safeSet("nexttrack", function () {
-      console.info("[INFRA] mediaSession nexttrack");
-      playNext({ seamless: true, fromMediaSession: true });
     });
 
     function applyMediaSessionSeek(nextTime, actionName) {
@@ -5280,13 +5272,19 @@ function openAppDownloadGatekeeper(appName, url) {
       }
     }
 
-    registeredActions.push("seekto");
-    safeSet("seekto", function (event) {
-      if (!event || !Number.isFinite(event.seekTime)) return;
-      applyMediaSessionSeek(event.seekTime, "seekto");
-    });
-    if (!iosStandalone) {
-      registeredActions.push("seekbackward", "seekforward");
+    if (iosStandalone) {
+      // WebKit may rebuild its remote-command set when an audio source changes
+      // or when the PWA is handed to the lock screen. Remove every seek action
+      // explicitly so iOS exposes playlist Previous/Next rather than +/- 10 s.
+      safeSet("seekto", null);
+      safeSet("seekbackward", null);
+      safeSet("seekforward", null);
+    } else {
+      registeredActions.push("seekto", "seekbackward", "seekforward");
+      safeSet("seekto", function (event) {
+        if (!event || !Number.isFinite(event.seekTime)) return;
+        applyMediaSessionSeek(event.seekTime, "seekto");
+      });
       safeSet("seekbackward", function (event) {
         const audio = audioState.audio;
         if (!audio) return;
@@ -5300,6 +5298,16 @@ function openAppDownloadGatekeeper(appName, url) {
         applyMediaSessionSeek((audio.currentTime || 0) + offset, "seekforward");
       });
     }
+
+    registeredActions.push("previoustrack", "nexttrack");
+    safeSet("previoustrack", function () {
+      console.info("[INFRA] mediaSession previoustrack");
+      playPrevious({ seamless: true, fromMediaSession: true });
+    });
+    safeSet("nexttrack", function () {
+      console.info("[INFRA] mediaSession nexttrack");
+      playNext({ seamless: true, fromMediaSession: true });
+    });
 
     if (!opts.quiet) {
       console.info(

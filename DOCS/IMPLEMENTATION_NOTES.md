@@ -1,5 +1,12 @@
 # Implementation Notes
 
+## 2026-07-17 — audiofix343 iOS lock-screen track controls
+
+- The regression was introduced in `audiofix335`: a successful source change stopped forcing the Media Session action binding. WebKit can rebuild its remote-command set when the active media source changes or when a standalone PWA moves to the lock screen, allowing the default ±10-second seek commands to replace the intended playlist controls.
+- Standalone iOS now explicitly removes `seekto`, `seekbackward` and `seekforward` with null handlers before registering `previoustrack` and `nexttrack`. The same four-action contract (`play`, `pause`, `previoustrack`, `nexttrack`) is reasserted after every successful track start and immediately before a visibility-hidden handoff. Other browsers retain the existing seek controls.
+- This single Media Session contract serves both the iOS lock screen and Notification Center. Playback source, Radio/Album/Shuffle navigation, Media Session metadata/artwork, position reporting, prefetch, Worker/R2 and audio recovery are unchanged.
+- Atomic public identifiers are `audiofix343-20260717` and `infra-shell-20260717-audio343`. The stylesheet is byte-identical (SHA-256 `54beb11ab3d8c755749cce3c9e2fd8ce4e0bd092b0a0af48168b1cff252bd688`): no visual, viewport, fullscreen, safe-area, Home Indicator or mini-player geometry change. Validation is code-only; final lock-screen and Notification Center validation remains the user's installed-iPhone test.
+
 ## 2026-07-17 — audiofix342 WebKit history quota and single album artwork source
 
 - Backup before change: `bfef82c41905b6769b390a8fbbb361e330853105` is preserved by the verified bundle `SITE_backup/SITE_history_bfef82c_audiofix341_2026-07-17.bundle` and the annotated tag `backup-audiofix341-20260717`.

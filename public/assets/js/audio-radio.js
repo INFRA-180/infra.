@@ -2346,6 +2346,9 @@
           if (currentAudio && !currentAudio.paused && getCurrentPlayableAudioSrc(currentAudio)) {
             audioState.resumeOnVisible = true;
           }
+          // Reassert the exact iOS remote-control contract before WebKit hands
+          // the active session to the lock screen / Notification Center.
+          resyncMediaSessionControls();
           saveResumeState();
           return;
         }

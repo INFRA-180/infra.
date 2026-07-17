@@ -585,7 +585,9 @@
         } else {
           forceAudioFullVolume(audio);
         }
-        bindMediaSessionActions();
+        // WebKit can replace its remote commands when the media source changes.
+        // Reassert the playlist controls for every successfully started track.
+        bindMediaSessionActions({ force: true, quiet: true });
         syncMediaSessionMetadata({ forcePosition: true });
         scheduleMediaSessionResync(requestToken);
         syncAudioUi();

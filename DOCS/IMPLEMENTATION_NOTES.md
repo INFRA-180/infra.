@@ -1,5 +1,12 @@
 # Implementation Notes
 
+## 2026-07-17 — audiofix344 iOS lock-screen timeline scrubbing
+
+- The accepted `audiofix343` restored Previous/Next on the iOS lock screen and in Notification Center, but it also removed `seekto`; WebKit could still display position from `setPositionState()` while having no action handler capable of applying a direct timeline change.
+- Standalone iOS now registers `seekto` through the existing bounded `applyMediaSessionSeek()` path while continuing to remove `seekbackward` and `seekforward` explicitly. Previous/Next remain registered after those actions and are still reasserted after every successful track start and before the hidden-state handoff.
+- The intended iOS action contract is therefore `play`, `pause`, `seekto`, `previoustrack`, `nexttrack`, without ±10-second commands. Other browser behavior is unchanged.
+- Atomic public identifiers are `audiofix344-20260717` and `infra-shell-20260717-audio344`. The stylesheet remains byte-identical (SHA-256 `54beb11ab3d8c755749cce3c9e2fd8ce4e0bd092b0a0af48168b1cff252bd688`); audio source selection, prefetch, Worker/R2, playback modes and visual geometry are unchanged. Final lock-screen timeline validation remains the user's installed-iPhone test.
+
 ## 2026-07-17 — audiofix343 iOS lock-screen track controls
 
 - The regression was introduced in `audiofix335`: a successful source change stopped forcing the Media Session action binding. WebKit can rebuild its remote-command set when the active media source changes or when a standalone PWA moves to the lock screen, allowing the default ±10-second seek commands to replace the intended playlist controls.

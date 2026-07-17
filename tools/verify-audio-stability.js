@@ -14,9 +14,9 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix343-20260717";
-const shellRelease = "infra-shell-20260717-audio343";
-const coverCssRelease = "audiofix343-20260717";
+const release = "audiofix344-20260717";
+const shellRelease = "infra-shell-20260717-audio344";
+const coverCssRelease = "audiofix344-20260717";
 const frozenCssSha256 = "54beb11ab3d8c755749cce3c9e2fd8ce4e0bd092b0a0af48168b1cff252bd688";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
@@ -45,9 +45,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix343");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix343");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio343");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix344");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix344");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio344");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -90,12 +90,17 @@ const beginPlayback = startTrack.slice(beginPlaybackStart, beginPlaybackEnd);
 expect(beginPlayback.indexOf("attemptPlay({ sync: true, immediate: isImmediateUserGesture })") < beginPlayback.indexOf("waitForAudioReadiness(audio"), "immediate Play is ordered after the readiness wait");
 
 const mediaSessionActions = functionBody(scripts, "bindMediaSessionActions", "syncMediaSessionMetadata");
-for (const action of ["seekto", "seekbackward", "seekforward"]) {
+for (const action of ["seekbackward", "seekforward"]) {
   expect(
     mediaSessionActions.includes(`safeSet("${action}", null)`),
     `iOS Media Session does not explicitly remove ${action}`
   );
 }
+expect(
+  !mediaSessionActions.includes('safeSet("seekto", null)') &&
+    mediaSessionActions.includes('safeSet("seekto", function (event)'),
+  "iOS Media Session timeline scrubbing is not enabled through seekto"
+);
 expect(
   mediaSessionActions.indexOf('safeSet("seekforward", null)') < mediaSessionActions.indexOf('safeSet("previoustrack"'),
   "iOS seek actions are not removed before playlist controls are registered"
@@ -300,4 +305,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix343.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix344.");

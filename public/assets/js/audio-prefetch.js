@@ -258,35 +258,58 @@
       candidates.push(normalizedSrc);
     });
 
-    function inspectList(list, index) {
-      if (index >= list.length) return Promise.resolve(null);
-      return inspectCachedSegment(list[index]).then(function (result) {
+    function inspectAt(index) {
+      if (index >= candidates.length) return Promise.resolve(null);
+      return inspectCachedSegment(candidates[index]).then(function (result) {
         return result && result.valid && result.probeReady !== false
           ? result
-          : inspectList(list, index + 1);
+          : inspectAt(index + 1);
       });
     }
 
-    if (!candidates.length) return Promise.resolve(null);
+    return inspectAt(0);
+  }
+
+  function findValidCachedSegments(sources, maxResults) {
+    const candidates = [];
+    const seen = new Set();
+    (Array.isArray(sources) ? sources : []).forEach(function (src) {
+      const normalizedSrc = sourceUrl(src);
+      if (!normalizedSrc || seen.has(normalizedSrc)) return;
+      seen.add(normalizedSrc);
+      candidates.push(normalizedSrc);
+    });
+    const limit = Math.floor(Math.max(
+      1,
+      Math.min(constants.MAX_ENTRIES, Number(maxResults) || constants.MAX_ENTRIES)
+    ));
+    if (!candidates.length) return Promise.resolve([]);
+
+    function fallbackToFirst() {
+      return findFirstValidCachedSegment(candidates).then(function (result) {
+        return result ? [result] : [];
+      });
+    }
+
     return openCache().then(function (cache) {
-      if (!cache || typeof cache.keys !== "function") {
-        return inspectList(candidates, 0);
-      }
+      if (!cache || typeof cache.keys !== "function") return fallbackToFirst();
       return cache.keys().then(function (keys) {
         const storedUrls = new Set((keys || []).map(function (key) {
           return sourceUrl(key && key.url ? key.url : key);
         }).filter(Boolean));
-        // Preserve the caller's authoritative order while reducing validation
-        // to the at-most-six entries which can actually exist in cache v9.
         const storedCandidates = candidates.filter(function (src) {
           return storedUrls.has(src);
         });
-        return inspectList(storedCandidates, 0);
+        return Promise.all(storedCandidates.map(inspectCachedSegment)).then(function (results) {
+          return results.filter(function (result) {
+            return result && result.valid && result.probeReady !== false;
+          }).slice(0, limit);
+        });
       });
     }).catch(function () {
-      // Cache.keys() is an optimization only. Older WebKit implementations can
-      // still use the original ordered lookup without touching the network.
-      return inspectList(candidates, 0);
+      // Cache.keys() is an optimization. Keep the previously validated
+      // single-entry path as a safe fallback for older WebKit builds.
+      return fallbackToFirst();
     });
   }
 
@@ -433,6 +456,7 @@
     normalizeAudioResponseForCache,
     inspectCachedSegment,
     findFirstValidCachedSegment,
+    findValidCachedSegments,
     waitForMutationIdle,
     pruneCache,
     putSingle

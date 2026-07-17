@@ -242,6 +242,27 @@ function segmentResponse(seed) {
   ]);
   assert(firstCached && firstCached.valid, "The ordered helper must find the first valid cached source");
   assert.strictEqual(firstCached.src, "https://media.test/track-0.m4a");
+  const cachedGroup = await api.findValidCachedSegments([
+    "https://media.test/missing.m4a",
+    legacyProbeUrl,
+    corruptUrl,
+    "https://media.test/track-0.m4a"
+  ]);
+  assert.deepStrictEqual(
+    Array.from(cachedGroup, (result) => result.src),
+    ["https://media.test/track-0.m4a"],
+    "The grouped helper must return only valid, probe-ready v9 entries"
+  );
+  const firstValidGroup = await api.findValidCachedSegments([
+    legacyProbeUrl,
+    corruptUrl,
+    "https://media.test/track-0.m4a"
+  ], 1);
+  assert.deepStrictEqual(
+    Array.from(firstValidGroup, (result) => result.src),
+    ["https://media.test/track-0.m4a"],
+    "Invalid stored entries must not consume the bounded valid-result quota"
+  );
   assert.strictEqual(fetchCalls, 0, "Cache inspection helpers must never trigger a network fetch");
 
   entries.delete(corruptUrl);
@@ -252,6 +273,21 @@ function segmentResponse(seed) {
   )));
   assert.strictEqual(entries.size, 6, "Serialized put/prune mutations enforce the six-entry bound");
   assert(!entries.has("https://media.test/track-0.m4a"), "The oldest unprotected segment is pruned");
+  const orderedGroup = await api.findValidCachedSegments([
+    "https://media.test/track-7.m4a",
+    "https://media.test/missing.m4a",
+    "https://media.test/track-3.m4a",
+    "https://media.test/track-4.m4a"
+  ], 3);
+  assert.deepStrictEqual(
+    Array.from(orderedGroup, (result) => result.src),
+    [
+      "https://media.test/track-7.m4a",
+      "https://media.test/track-3.m4a",
+      "https://media.test/track-4.m4a"
+    ],
+    "The grouped helper must preserve Radio order and respect its result cap"
+  );
 
   await api.pruneCache({
     maxEntries: 2,

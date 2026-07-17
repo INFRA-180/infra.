@@ -14,9 +14,9 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix346-20260717";
-const shellRelease = "infra-shell-20260717-audio346";
-const coverCssRelease = "audiofix346-20260717";
+const release = "audiofix347-20260717";
+const shellRelease = "infra-shell-20260717-audio347";
+const coverCssRelease = "audiofix347-20260717";
 const frozenCssSha256 = "8d72c713e4176f91ee508327cad73a64e79ee7dd6e0129f94d2a6026d949f3ad";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
@@ -45,9 +45,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix346");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix346");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio346");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix347");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix347");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio347");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -66,6 +66,11 @@ expect(!/\bfetch\s*\(/.test(coldPreparation), "cold metadata preparation must no
 expect(!coldPreparation.includes("startNextTrackPrefetch"), "cold metadata preparation must not prefetch a media segment");
 expect(coldPreparation.includes("promoteCachedPreparedInitialTrack"), "cold Radio preparation does not reuse an existing v9 segment");
 expect(prefetch.includes("findFirstValidCachedSegment"), "v9 cache does not expose ordered cached-source lookup");
+expect(prefetch.includes("findValidCachedSegments"), "v9 cache does not expose bounded grouped restoration");
+const coldCachePrefix = functionBody(radio, "promoteCachedPreparedInitialTrack", "prepareInitialGlobalRandomPlayback");
+expect(coldCachePrefix.includes("cachedTracks.concat(remainingTracks)"), "cold Radio does not materialize a contiguous cached prefix");
+expect(coldCachePrefix.includes("restored_count: cachedTracks.length"), "cold Radio cache restoration is not measurable");
+expect(!/\bfetch\s*\(/.test(coldCachePrefix), "cold cached-prefix restoration must not download audio");
 
 const coldActivation = functionBody(radio, "activatePreparedInitialRadioPlayback", "startGlobalRandomPlayback");
 for (const invariant of [
@@ -308,4 +313,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix346.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix347.");

@@ -1,5 +1,14 @@
 # Implementation Notes
 
+## 2026-07-17 — audiofix347 préfixe Radio cohérent depuis cache v9
+
+- Gel préalable : commit `c8628a441c512c0c3a24edbcf958077b3e9ed479`, tag annoté `backup-audiofix346-20260717` et bundle complet vérifié `SITE_backup/SITE_history_c8628a4_audiofix346_2026-07-17.bundle` (SHA-256 `b260b5e490d69a2430c970490182981991f4cd296671df0a379be9c51ad86a35`).
+- Les deux dernières sessions audiofix346 confirment le diagnostic : premiers morceaux servis par le cache en 87 et 95 ms, mais pistes Suivant marquées `prepared=false`/`served_from_prefetch=false`. Chaque session avait lancé un prefetch sans en terminer un avant le tap ; aucun `prefetch_error` n’était présent.
+- Le cache froid inspecte maintenant uniquement les six clés v9 réellement stockées, valide leurs métadonnées sans lire les corps et matérialise toutes les pistes valides en un préfixe Radio continu, aléatoire et sans doublon. Le premier Play et les Suivants immédiats partagent ainsi le même groupe préparé au lieu de ne réutiliser qu’une piste isolée.
+- Cette restauration reste sans téléchargement audio avant Play. Une fois le préfixe consommé, le scheduler existant reprend la même fenêtre N+1…N+5, les segments 2 MiB, les deux lanes et le cycle roulant. La réhydratation existante rend le nombre de pistes reprises visible dans `prefetch_cache_ready_count`.
+- Le catalogue 283 pistes, les 31 covers canoniques, la reprise des covers, les corrections 404 et l’installation robuste du Worker d’audiofix346 sont conservés. Aucun CSS, viewport, fullscreen, mini-player, safe area ou ancrage n’est modifié.
+- Identifiants atomiques : `audiofix347-20260717` et `infra-shell-20260717-audio347`. Validation UX finale réservée à l’utilisateur sur l’iPhone.
+
 ## 2026-07-17 — audiofix346 catalogue de secours et reprise PWA
 
 - Gel préalable : commit `c7d52ce95f607b85de82e39f133269862d684b48`, tag annoté `backup-audiofix345-20260717` et bundle complet vérifié `SITE_backup/SITE_history_c7d52ce_audiofix345_2026-07-17.bundle` (SHA-256 `cae2bd5f5e318b0a0a7d058caeb7a8248e589ecd731e90c371a70828289c6a07`).

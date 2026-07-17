@@ -565,13 +565,13 @@ async function testQueuedRadioNavigationReplaysInOrderAndInvalidatesOnModeChange
   );
 }
 
-async function testCachedTrackIsPromotedBeforeColdTap() {
+async function testCachedPrefixIsMaterializedBeforeColdTap() {
   const sandbox = createSandbox();
   loadScript(sandbox, RADIO_PATH);
   const sourceTracks = makeTracks(12);
   const inspectedWindows = [];
+  let cachedPrefix = [];
   const startCalls = [];
-  let cachedSrc = "";
   const state = {
     audio: makeAudio(),
     homeModeInitialized: true,
@@ -599,11 +599,18 @@ async function testCachedTrackIsPromotedBeforeColdTap() {
     audioState: state,
     runtime: { baseUrl: new URL("https://site.test/") },
     prefetchApi: {
-      findFirstValidCachedSegment(sources) {
+      findFirstValidCachedSegment() {
+        throw new Error("The grouped v9 helper must own cold Radio restoration");
+      },
+      findValidCachedSegments(sources, limit) {
         inspectedWindows.push(sources.slice());
-        const queuedSources = new Set(state.initialRandomPlaylist.map((track) => track.src));
-        cachedSrc = sources.find((src) => !queuedSources.has(src)) || sources[0];
-        return Promise.resolve({ src: cachedSrc, valid: true, bytes: 1024 });
+        assert.strictEqual(limit, 6);
+        cachedPrefix = [sources[8], sources[2], sources[10]];
+        return Promise.resolve(cachedPrefix.map((src) => ({
+          src,
+          valid: true,
+          bytes: 1024
+        })));
       }
     },
     loadTracksData: () => Promise.resolve({
@@ -634,19 +641,33 @@ async function testCachedTrackIsPromotedBeforeColdTap() {
   assert.strictEqual(
     inspectedWindows[0].length,
     sourceTracks.length,
-    "Cold Radio must consider every catalogue track already present in cache v9"
+    "Cold Radio must inspect the complete global catalogue without fetching audio"
   );
   assert.strictEqual(
     state.initialRandomFirstSrc,
-    cachedSrc,
-    "A valid existing v9 segment outside the initial batch must seed the prepared Radio head"
+    cachedPrefix[0],
+    "The first valid v9 segment must remain the synchronous cold-play target"
   );
-  assert.strictEqual(state.initialRandomPlaylist[0].src, cachedSrc);
+  assert.deepStrictEqual(
+    Array.from(state.initialRandomPlaylist.slice(0, cachedPrefix.length), (track) => track.src),
+    cachedPrefix,
+    "Every valid v9 segment must form one contiguous Radio prefix"
+  );
+  assert.strictEqual(state.initialRandomPlaylist.length, 6, "Cached prefix insertion must preserve queue length");
+  assert.strictEqual(
+    new Set(state.initialRandomPlaylist.map((track) => track.src)).size,
+    state.initialRandomPlaylist.length,
+    "Cached prefix insertion must not duplicate tracks"
+  );
 
   const timersBeforeTap = sandbox.__timerCalls.length;
   assert.strictEqual(radio.startGlobalRandomPlayback(), true);
   assert.strictEqual(startCalls.length, 1);
-  assert.strictEqual(state.playlist[0].src, cachedSrc, "The synchronous tap must consume the promoted cached head");
+  assert.deepStrictEqual(
+    Array.from(state.playlist.slice(0, cachedPrefix.length), (track) => track.src),
+    cachedPrefix,
+    "The synchronous tap must consume the complete cached Radio prefix"
+  );
   assert.strictEqual(
     sandbox.__timerCalls.length,
     timersBeforeTap,
@@ -2118,7 +2139,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   testInMemoryColdPlayIsSynchronous();
   testRadioIdlePlayUsesSynchronousPreparedQueueAndDedupesPendingPlay();
   await testQueuedRadioNavigationReplaysInOrderAndInvalidatesOnModeChange();
-  await testCachedTrackIsPromotedBeforeColdTap();
+  await testCachedPrefixIsMaterializedBeforeColdTap();
   testAuthoritativeRollingWindow();
   testAlbumContinuesChronologicallyPastItsLastTrack();
   await testTransportMediaSessionActionsAreReassertedPerTrack();
@@ -2140,7 +2161,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix346 runtime checks passed.");
+  console.log("audiofix347 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

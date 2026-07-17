@@ -665,44 +665,59 @@
     }).filter(Boolean);
     if (!sources.length) return;
 
-    Promise.resolve(prefetchApi.findFirstValidCachedSegment(sources)).then(function (result) {
+    const lookup = typeof prefetchApi.findValidCachedSegments === "function"
+      ? prefetchApi.findValidCachedSegments(sources, PREFETCH_NEXT_MAX_ENTRIES)
+      : Promise.resolve(prefetchApi.findFirstValidCachedSegment(sources)).then(function (result) {
+        return result ? [result] : [];
+      });
+
+    Promise.resolve(lookup).then(function (results) {
       if (
-        !result ||
-        !result.valid ||
+        !Array.isArray(results) ||
+        !results.length ||
         token !== audioState.initialRandomPrepareToken ||
         !audioState.initialRandomReady ||
         !shouldPrepareInitialGlobalRandomPlayback()
       ) {
         return;
       }
-      const cachedSrc = normalizeAudioSourceUrl(result.src || "");
-      const cachedIndex = audioState.initialRandomPlaylist.findIndex(function (track) {
-        return srcMatches(normalizeAudioSourceUrl(track && track.src ? track.src : ""), cachedSrc);
+      const queueLength = audioState.initialRandomPlaylist.length;
+      const catalogBySrc = new Map();
+      catalogSnapshot.forEach(function (track) {
+        const src = normalizeAudioSourceUrl(track && track.src ? track.src : "");
+        if (src && !catalogBySrc.has(src)) catalogBySrc.set(src, track);
       });
-      let catalogSeeded = false;
-      if (cachedIndex > 0) {
-        const cachedTrack = audioState.initialRandomPlaylist.splice(cachedIndex, 1)[0];
-        audioState.initialRandomPlaylist.unshift(cachedTrack);
-      } else if (cachedIndex < 0) {
-        const cachedTrack = catalogSnapshot.find(function (track) {
-          return srcMatches(normalizeAudioSourceUrl(track && track.src ? track.src : ""), cachedSrc);
+      const cachedTracks = [];
+      const cachedSources = [];
+      const cachedSourceSet = new Set();
+      let restoredBytes = 0;
+      results.forEach(function (result) {
+        if (!result || !result.valid) return;
+        const src = normalizeAudioSourceUrl(result.src || "");
+        if (!src || cachedSourceSet.has(src)) return;
+        const track = catalogBySrc.get(src) || catalogSnapshot.find(function (candidate) {
+          return srcMatches(normalizeAudioSourceUrl(candidate && candidate.src ? candidate.src : ""), src);
         });
-        if (!cachedTrack) return;
-        const queueLength = audioState.initialRandomPlaylist.length;
-        audioState.initialRandomPlaylist.unshift(cachedTrack);
-        if (audioState.initialRandomPlaylist.length > queueLength) {
-          audioState.initialRandomPlaylist.pop();
-        }
-        catalogSeeded = true;
-      }
-      audioState.initialRandomFirstSrc = cachedSrc;
+        if (!track) return;
+        cachedSourceSet.add(src);
+        cachedSources.push(src);
+        cachedTracks.push(track);
+        restoredBytes += Number(result.bytes) || 0;
+      });
+      if (!cachedTracks.length) return;
+      const remainingTracks = audioState.initialRandomPlaylist.filter(function (track) {
+        const src = normalizeAudioSourceUrl(track && track.src ? track.src : "");
+        return !cachedSourceSet.has(src);
+      });
+      audioState.initialRandomPlaylist = cachedTracks.concat(remainingTracks).slice(0, queueLength);
+      audioState.initialRandomFirstSrc = cachedSources[0];
       trackAudioRuntimeEvent("radio_cached_first_ready", {
         track: "radio-cold-start",
         album: "radio",
         reason: reason || "home_init",
-        queue_index: cachedIndex,
-        catalog_seeded: catalogSeeded,
-        bytes: Number(result.bytes) || 0,
+        queue_index: 0,
+        restored_count: cachedTracks.length,
+        bytes: restoredBytes,
         audio_fetch: false
       });
       syncAudioUi();

@@ -1092,9 +1092,9 @@ async function testIntegratedFivePreparedTransportSkips() {
         found: true,
         valid: true,
         probeReady: true,
-        bytes: 1024 * 1024
+        bytes: 2 * 1024 * 1024
       }),
-      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-1048575" } }),
+      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-2097151" } }),
       getContentLength: (response) => Number(response.headers.get("Content-Length") || 0),
       putSingle: () => Promise.resolve(true),
       pruneCache: () => Promise.resolve(true)
@@ -1287,7 +1287,7 @@ function createPrefetchRehydrationHarness(inspectCachedSegment) {
   };
   const prefetchApi = {
     isSupported: () => true,
-    createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-1048575" } }),
+    createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-2097151" } }),
     getContentLength: (response) => Number(response.headers.get("Content-Length") || 0),
     inspectCachedSegment,
     putSingle(src) {
@@ -1330,7 +1330,7 @@ async function testPrefetchCacheRehydrationAndCorruptFallback() {
     return Promise.resolve({ src, found: true, valid: true, bytes: 1024 });
   });
   cachedHarness.radio.maybePrefetchNextTrack("cache_rehydration_test");
-  assert.strictEqual(cachedHarness.fetchUrls.length, 0, "Network must wait for v8 cache inspection");
+  assert.strictEqual(cachedHarness.fetchUrls.length, 0, "Network must wait for v9 cache inspection");
   await flushAsyncWork();
   assert.deepStrictEqual(
     inspected,
@@ -1340,7 +1340,7 @@ async function testPrefetchCacheRehydrationAndCorruptFallback() {
   assert.deepStrictEqual(
     Array.from(cachedHarness.state.nextPrefetchReadySrcs),
     cachedHarness.playlist.slice(1, 6).map((track) => track.src),
-    "Valid cached v8 segments must rehydrate the ready window"
+    "Valid cached v9 segments must rehydrate the ready window"
   );
   assert.strictEqual(cachedHarness.fetchUrls.length, 0, "A valid rehydrated window must not be refetched");
   assert.strictEqual(cachedHarness.putSources.length, 0, "A valid rehydrated window must not be rewritten");
@@ -1369,7 +1369,7 @@ async function testPrefetchCacheRehydrationAndCorruptFallback() {
   assert.deepStrictEqual(
     corruptHarness.putSources,
     [corruptHarness.playlist[1].src],
-    "Only the corrupt segment must be normalized back into v8"
+    "Only the corrupt segment must be normalized back into v9"
   );
 
   const legacyProbeHarness = createPrefetchRehydrationHarness(function (src) {
@@ -1388,7 +1388,7 @@ async function testPrefetchCacheRehydrationAndCorruptFallback() {
   assert.deepStrictEqual(
     legacyProbeHarness.fetchUrls,
     [legacyProbeHarness.playlist[1].src],
-    "An older v8 N+1 entry must be refreshed once to gain the WebKit probe fast path"
+    "An older v9 N+1 entry must be refreshed once to gain the WebKit probe fast path"
   );
   assert.deepStrictEqual(legacyProbeHarness.putSources, [legacyProbeHarness.playlist[1].src]);
 }
@@ -1472,6 +1472,7 @@ async function testPrefetchGatePriorityAndConcurrency() {
       return new Promise((resolve, reject) => {
         const pending = {
           url: request && request.url ? request.url : String(request || ""),
+          range: request && request.headers ? request.headers.get("Range") : "",
           resolve,
           reject
         };
@@ -1517,7 +1518,7 @@ async function testPrefetchGatePriorityAndConcurrency() {
   const prefetchApi = {
     isSupported: () => true,
     createRequest: (src) => new Request(src, {
-      headers: { Range: "bytes=0-1048575" }
+      headers: { Range: "bytes=0-2097151" }
     }),
     getContentLength: (response) => Number(response.headers.get("Content-Length") || 0),
     putSingle: () => Promise.resolve(true),
@@ -1563,6 +1564,11 @@ async function testPrefetchGatePriorityAndConcurrency() {
     "A stable mobile buffer must reserve the first request for N+1"
   );
   assert.strictEqual(state.nextPrefetchInFlightSrcs.size, 1);
+  assert.strictEqual(
+    pendingFetches[0].range,
+    "bytes=0-2097151",
+    "Every runtime prefetch target must request the bounded 2 MiB v9 segment"
+  );
 
   pendingFetches[0].resolve(validSegmentResponse());
   await flushAsyncWork();
@@ -1575,6 +1581,10 @@ async function testPrefetchGatePriorityAndConcurrency() {
     state.nextPrefetchInFlightSrcs.size,
     2,
     "No more than two segment downloads may be active"
+  );
+  assert(
+    pendingFetches.slice(1, 3).every((entry) => entry.range === "bytes=0-2097151"),
+    "The N+2/N+3 lanes must use the same bounded 2 MiB segment"
   );
   assert.strictEqual(
     state.nextPrefetchPlan.length,
@@ -1689,7 +1699,7 @@ async function testPrefetchReorderPreemptsWeakestLaneForNewNPlusOne() {
     PREFETCH_NEXT_ENABLED: true,
     prefetchApi: {
       isSupported: () => true,
-      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-1048575" } }),
+      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-2097151" } }),
       getContentLength: (response) => Number(response.headers.get("Content-Length") || 0),
       putSingle: () => Promise.resolve(true),
       pruneCache: () => Promise.resolve(true)
@@ -1792,7 +1802,7 @@ async function testCacheTimeoutInspectsSerializedPutBeforeNetworkRetry() {
     PREFETCH_RETRY_MAX_MS: 20,
     prefetchApi: {
       isSupported: () => true,
-      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-1048575" } }),
+      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-2097151" } }),
       getContentLength: (response) => Number(response.headers.get("Content-Length") || 0),
       inspectCachedSegment(src) {
         inspections.push(src);
@@ -1909,7 +1919,7 @@ async function testPrefetchNPlusOneRetriesAfterTwoTransientFailures() {
     PREFETCH_RETRY_MAX_MS: 10,
     prefetchApi: {
       isSupported: () => true,
-      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-1048575" } }),
+      createRequest: (src) => new Request(src, { headers: { Range: "bytes=0-2097151" } }),
       getContentLength: () => 0,
       putSingle: () => Promise.resolve(true),
       pruneCache: () => Promise.resolve(true)
@@ -1979,7 +1989,7 @@ function testNoGlobalPrefetchClear() {
   assert.strictEqual(
     sandbox.InfraAudioPrefetch.clearCache,
     undefined,
-    "The v8 prefetch API must not expose a global clear operation"
+    "The v9 prefetch API must not expose a global clear operation"
   );
 }
 
@@ -2128,7 +2138,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix336 runtime checks passed.");
+  console.log("audiofix337 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

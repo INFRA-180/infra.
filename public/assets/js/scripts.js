@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix336-20260716";
+window.INFRA_BUILD_TAG = "audiofix337-20260717";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -175,6 +175,7 @@ function openAppDownloadGatekeeper(appName, url) {
     lastNavTs: 0,
     navToken: 0,
     navigationActive: false,
+    prepaintSyncActive: false,
     albumCoverPlaceholderByUrl: new Map(),
     pwaCoverHold: null,
     liveHomeRoute: null,
@@ -390,13 +391,13 @@ function openAppDownloadGatekeeper(appName, url) {
   const PWA_COVER_PREPARE_LIMIT = 8;
   const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(prefetchConstants.MAX_BYTES))
     ? Number(prefetchConstants.MAX_BYTES)
-    : 1 * 1024 * 1024;
+    : 2 * 1024 * 1024;
   const PREFETCH_NEXT_THRESHOLD_SECONDS = Number.isFinite(Number(prefetchConstants.THRESHOLD_SECONDS))
     ? Number(prefetchConstants.THRESHOLD_SECONDS)
     : 30;
   const PREFETCH_NEXT_SEGMENT_BYTES = Number.isFinite(Number(prefetchConstants.PREFETCH_SEGMENT_SIZE))
     ? Math.max(1, Number(prefetchConstants.PREFETCH_SEGMENT_SIZE))
-    : 1 * 1024 * 1024;
+    : 2 * 1024 * 1024;
   const PREFETCH_NEXT_QUEUE_DEPTH = Number.isFinite(Number(prefetchConstants.QUEUE_DEPTH))
     ? Math.max(1, Number(prefetchConstants.QUEUE_DEPTH))
     : 5;
@@ -434,7 +435,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix336-20260716";
+  const runtimeVersion = "audiofix337-20260717";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -896,6 +897,8 @@ function openAppDownloadGatekeeper(appName, url) {
       prefetchSpaPage,
       releasePwaCoverHold,
       showPwaHomeReturnHold,
+      disableNowPlayingOverlayUi,
+      syncPersistentUiAfterSpaSwap,
       isStandaloneDisplayMode,
       isIosDevice,
       isAndroidDevice
@@ -1216,6 +1219,7 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!factory) return createNoopTransportUiApi();
     return factory({
       audioState,
+      spaState,
       DESKTOP_TRANSPORT_STORAGE_KEY,
       DESKTOP_TRANSPORT_LEGACY_STORAGE_KEY,
       DESKTOP_TRANSPORT_MIN_WIDTH,
@@ -1261,7 +1265,8 @@ function openAppDownloadGatekeeper(appName, url) {
       normalizeAlbumTitle,
       getCurrentAlbumTitle,
       getCurrentTrackAlbumPage,
-      syncCurrentFavoriteButtons
+      syncCurrentFavoriteButtons,
+      trackAudioRuntimeEvent
     });
   }
 
@@ -1342,6 +1347,21 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function syncTransportUi() {
     return callTransportUi("syncTransportUi", arguments);
+  }
+
+  function syncPersistentUiAfterSpaSwap() {
+    if (!document.body) return;
+    document.body.classList.toggle("ios-device", isIosDevice());
+    // The status-bar/root colour depends on the destination route class.
+    // Update it in the same DOM turn so iOS never paints the previous route's
+    // background while the SPA waits for its first-paint RAF pair.
+    syncPwaStatusColor();
+    // The audio element and transport live in #infraSpaPersist. Reconcile the
+    // existing nodes before the first destination paint; never create a new
+    // transport or media element from the SPA swap itself.
+    if (audioState.transport && audioState.transport.root) {
+      syncTransportUi();
+    }
   }
 
 
@@ -5425,7 +5445,7 @@ function openAppDownloadGatekeeper(appName, url) {
           range_end: Number.isFinite(Number(data.range_end)) ? Number(data.range_end) : null,
           bytes: Number.isFinite(Number(data.bytes)) ? Number(data.bytes) : null,
           status: Number.isFinite(Number(data.status)) ? Number(data.status) : 200,
-          strategy: data.strategy || "segment_v8",
+          strategy: data.strategy || "segment_v9",
           client_id: data.client_id || ""
         }
       ));

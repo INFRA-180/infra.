@@ -39,9 +39,58 @@
     const prefetchSpaPage = method(ctx, "prefetchSpaPage");
     const releasePwaCoverHold = method(ctx, "releasePwaCoverHold");
     const showPwaHomeReturnHold = method(ctx, "showPwaHomeReturnHold", function () { return false; });
+    const disableNowPlayingOverlayUi = method(ctx, "disableNowPlayingOverlayUi");
+    const syncPersistentUiAfterSpaSwap = method(ctx, "syncPersistentUiAfterSpaSwap");
     const isStandaloneDisplayMode = method(ctx, "isStandaloneDisplayMode", function () { return false; });
     const isIosDevice = method(ctx, "isIosDevice", function () { return false; });
     const isAndroidDevice = method(ctx, "isAndroidDevice", function () { return false; });
+
+  const SPA_RUNTIME_BODY_CLASSES = new Set([
+    "has-mobile-player",
+    "now-playing-open",
+    "is-transport-interacting",
+    "ios-device",
+    "favorites-view-open"
+  ]);
+
+  function sanitizeSpaBodyClassName(value) {
+    return String(value || "")
+      .split(/\s+/)
+      .filter(function (name) {
+        return Boolean(name && !SPA_RUNTIME_BODY_CLASSES.has(name));
+      })
+      .join(" ");
+  }
+
+  function sanitizeSpaSnapshotRuntimeState(clone) {
+    if (!clone || typeof clone.querySelector !== "function") return;
+    const body = clone.querySelector("body");
+    if (body) body.className = sanitizeSpaBodyClassName(body.className);
+    clone.querySelectorAll(".favorites-view").forEach(function (node) {
+      node.remove();
+    });
+    clone.querySelectorAll(".favorites-selecting, .album-favorite-selecting, .is-dragging, .is-drop-before, .is-drop-after").forEach(function (node) {
+      node.classList.remove(
+        "favorites-selecting",
+        "album-favorite-selecting",
+        "is-dragging",
+        "is-drop-before",
+        "is-drop-after"
+      );
+    });
+    if (clone.classList) {
+      clone.classList.remove("now-playing-open", "pwa-native-swap", "pwa-home-restore-active");
+    }
+  }
+
+  function runPersistentUiPrepaintSync() {
+    spaState.prepaintSyncActive = true;
+    try {
+      syncPersistentUiAfterSpaSwap({ reason: "spa_prepaint" });
+    } finally {
+      spaState.prepaintSyncActive = false;
+    }
+  }
 
   function isMobilePwaCoverNavigation() {
     const standalone = Boolean(isStandaloneDisplayMode());
@@ -64,6 +113,7 @@
     if (persistRoot) persistRoot.remove();
     const installModal = clone.querySelector("#infraPwaInstallModal");
     if (installModal) installModal.remove();
+    sanitizeSpaSnapshotRuntimeState(clone);
 
     return `<!DOCTYPE html>\n${clone.outerHTML}`;
   }
@@ -157,7 +207,7 @@
     return {
       url: getComparableSpaUrl(renderedUrl && renderedUrl.href),
       title: document.title,
-      bodyClassName: document.body.className,
+      bodyClassName: sanitizeSpaBodyClassName(document.body.className),
       scrollX: Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0)),
       scrollY: Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0)),
       documentHeight: Math.max(0, Math.round(documentHeight)),
@@ -760,6 +810,8 @@
         document.body.insertBefore(persistRoot, document.body.firstChild);
       }
 
+      runPersistentUiPrepaintSync();
+
       if (requestedScroll) {
         window.scrollTo(requestedScroll.x, requestedScroll.y);
         appliedScrollX = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
@@ -790,11 +842,13 @@
       });
     }
 
-    if (
+    const canUseNativeViewTransition = Boolean(
       instantPwaSwap &&
       !opts.avoidViewTransition &&
+      !(isIosDevice() && isStandaloneDisplayMode()) &&
       typeof document.startViewTransition === "function"
-    ) {
+    );
+    if (canUseNativeViewTransition) {
       document.documentElement.classList.add("pwa-native-swap");
       try {
         const transition = document.startViewTransition(function () {
@@ -866,11 +920,12 @@
     Array.from(document.body.childNodes).forEach(function (node) {
       if (node !== persistRoot) node.remove();
     });
-    document.body.className = route.bodyClassName || "home-screen";
+    document.body.className = sanitizeSpaBodyClassName(route.bodyClassName || "home-screen");
     document.body.appendChild(route.fragment);
     if (document.body.firstChild !== persistRoot) {
       document.body.insertBefore(persistRoot, document.body.firstChild);
     }
+    runPersistentUiPrepaintSync();
     if (route.title) document.title = route.title;
 
     window.scrollTo(requested.x, requested.y);
@@ -919,7 +974,9 @@
     normalizeCoverElementsForBase(doc, sourceUrl || window.location.href);
     if (doc.title) document.title = doc.title;
 
-    const bodyClassName = doc.body ? doc.body.className : document.body.className;
+    const bodyClassName = sanitizeSpaBodyClassName(
+      doc.body ? doc.body.className : document.body.className
+    );
     const fragment = buildSpaDocumentFragment(doc);
     const isAlbumPage = doc.body && doc.body.classList && doc.body.classList.contains("album-screen");
     const isHomePage = doc.body && doc.body.classList && doc.body.classList.contains("home-screen");
@@ -989,6 +1046,13 @@
     if (same) {
       releasePwaCoverHold("same_url");
       return;
+    }
+    if (audioState.nowPlayingOpen || audioState.nowPlayingClosing) {
+      // The document capture listener reaches spaNavigate before the overlay
+      // album link's bubble listener. Finalize the overlay synchronously so
+      // route snapshots never retain the fixed fullscreen body or a hidden
+      // persistent mini-player.
+      disableNowPlayingOverlayUi();
     }
     const liveHomeCapture = captureLiveHomeRoute(url, rendered);
 
@@ -1102,7 +1166,6 @@
           to_url: url.href
         });
         logAudioRuntimeAlbumSwitch(audioSwitchContext, true);
-        snapshotCurrentSpaPage(url.href);
         prefetchSpaPage(url.href, { force: true, cacheMode: "default" });
         finishSpaNavigation();
         return;
@@ -1184,8 +1247,6 @@
         if (opts.scroll !== false) {
           window.scrollTo(0, 0);
         }
-
-        snapshotCurrentSpaPage(url.href);
 
         // Refresh the cached document in background.
         prefetchSpaPage(url.href, { force: true, cacheMode: "default" });
@@ -1324,8 +1385,6 @@
       window.scrollTo(0, 0);
     }
 
-    snapshotCurrentSpaPage(url.href);
-
     if (spaState.controller === controller) {
       spaState.controller = null;
     }
@@ -1335,6 +1394,7 @@
     return {
       buildSpaSnapshotHtml: buildSpaSnapshotHtml,
       snapshotCurrentSpaPage: snapshotCurrentSpaPage,
+      sanitizeSpaBodyClassName: sanitizeSpaBodyClassName,
       parseSpaDocument: parseSpaDocument,
       buildSpaDocumentFragment: buildSpaDocumentFragment,
       getSpaCriticalImages: getSpaCriticalImages,

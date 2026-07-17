@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix336-20260716";
-const shellRelease = "infra-shell-20260716-audio336";
+const release = "audiofix337-20260717";
+const shellRelease = "infra-shell-20260717-audio337";
 const coverCssRelease = "audiofix332-20260716";
 const frozenCssSha256 = "2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb";
 const scripts = read("public/assets/js/scripts.js");
@@ -42,18 +42,18 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix336");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix336");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio336");
-expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v8"'), "Service Worker does not use segment cache v8");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix337");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix337");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio337");
+expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 
 const coldPreparation = functionBody(radio, "prepareInitialGlobalRandomPlayback", "scheduleInitialGlobalRandomPreparation");
 expect(coldPreparation.includes("buildRadioQueue"), "cold startup does not materialize the Radio queue");
 expect(coldPreparation.includes("audio_fetch: false"), "cold metadata preparation is not explicitly audio-free");
 expect(!/\bfetch\s*\(/.test(coldPreparation), "cold metadata preparation must not download audio");
 expect(!coldPreparation.includes("startNextTrackPrefetch"), "cold metadata preparation must not prefetch a media segment");
-expect(coldPreparation.includes("promoteCachedPreparedInitialTrack"), "cold Radio preparation does not reuse an existing v8 segment");
-expect(prefetch.includes("findFirstValidCachedSegment"), "v8 cache does not expose ordered cached-source lookup");
+expect(coldPreparation.includes("promoteCachedPreparedInitialTrack"), "cold Radio preparation does not reuse an existing v9 segment");
+expect(prefetch.includes("findFirstValidCachedSegment"), "v9 cache does not expose ordered cached-source lookup");
 
 const coldActivation = functionBody(radio, "activatePreparedInitialRadioPlayback", "startGlobalRandomPlayback");
 for (const invariant of [
@@ -96,9 +96,9 @@ for (const invariant of [
 ]) {
   expect(radio.includes(invariant) || scripts.includes(invariant), `rolling prefetch is missing ${invariant}`);
 }
-expect(prefetch.includes('CACHE_NAME: "infra-next-track-segments-v8"'), "prefetch cache is not v8");
-expect(prefetch.includes('headers.set("X-Infra-Body-Validated", "1")'), "v8 writes lack an integrity-at-write marker");
-expect(prefetch.includes("PREFETCH_SEGMENT_SIZE: 1 * 1024 * 1024"), "prefetch segment is not 1 MiB");
+expect(prefetch.includes('CACHE_NAME: "infra-next-track-segments-v9"'), "prefetch cache is not v9");
+expect(prefetch.includes('headers.set("X-Infra-Body-Validated", "1")'), "v9 writes lack an integrity-at-write marker");
+expect(prefetch.includes("PREFETCH_SEGMENT_SIZE: 2 * 1024 * 1024"), "prefetch segment is not 2 MiB");
 expect(prefetch.includes("QUEUE_DEPTH: 5"), "prefetch depth is not five");
 expect(prefetch.includes("CONCURRENCY: 2"), "prefetch concurrency is not two");
 expect(prefetch.includes("MAX_ENTRIES: 6"), "prefetch cache is not capped at six entries");
@@ -110,8 +110,8 @@ const putSingle = putSingleStart >= 0 && putSingleEnd > putSingleStart
 expect(putSingle.indexOf("normalizeAudioResponseForCache(response)") < putSingle.indexOf("enqueueMutation(function"), "response bodies are still serialized inside the cache mutation queue");
 expect(putSingle.includes("opts.onBodyReady"), "network timeout cannot end before serialized CacheStorage work");
 expect(prefetch.includes('"X-Infra-First-Two-Bytes"'), "cached segments lack the WebKit two-byte probe header");
-expect(prefetch.includes("result.probeReady !== false"), "cold playback can still promote an older v8 segment without the probe fast path");
-expect(radio.includes("result.probeReady === false"), "rolling hydration can still mark an older v8 segment ready");
+expect(prefetch.includes("result.probeReady !== false"), "cold playback can still promote an older v9 segment without the probe fast path");
+expect(radio.includes("result.probeReady === false"), "rolling hydration can still mark an older v9 segment ready");
 expect(radio.includes('reason === "track_change" && !opts.consumedPrepared'), "an unprepared transport skip can still compete with speculative requests");
 expect(radio.includes('suspendNextTrackPrefetch("waiting")') && radio.includes('suspendNextTrackPrefetch("stalled")'), "buffer events do not stop speculative network work");
 expect(radio.includes('suspendNextTrackPrefetch("media_error")'), "media errors do not stop speculative network work");
@@ -156,7 +156,7 @@ expect(sw.includes("responseEnd = Math.min(range.end, metadata.cachedEnd)"), "op
 expect(sw.includes("new Response(cached.body"), "full cached segments still require an arrayBuffer copy");
 expect(sw.includes("metadata.bodyValidated"), "zero-copy 206 is not restricted to bodies validated at write time");
 expect(sw.includes("cachedValidatorMatchesIfRange"), "If-Range compatibility guard is missing");
-expect(sw.includes('rangeHeader === "bytes=0-1" ? "startup_probe_v8"'), "WebKit two-byte probes are not served by the dedicated fast path");
+expect(sw.includes('rangeHeader === "bytes=0-1" ? "startup_probe_v9"'), "WebKit two-byte probes are not served by the dedicated fast path");
 expect(sw.includes("metadata.firstTwoBytes"), "Service Worker does not reuse the cached two-byte probe header");
 expect(sw.includes("isAudioPrefetchCache(key) && key !== NEXT_TRACK_CACHE"), "old audio caches are not migrated on activation");
 expect(sw.includes("event.clientId"), "prefetch-hit telemetry is not scoped to the requesting client");
@@ -211,4 +211,4 @@ for (const relativePath of htmlFiles) {
   expect(!source.includes("audiofix326-20260715"), `${relativePath} still references audiofix326 JavaScript`);
 }
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix336.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix337.");

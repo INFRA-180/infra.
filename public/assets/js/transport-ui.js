@@ -13,6 +13,7 @@
   function createTransportUi(context) {
     const ctx = context || {};
     const audioState = ctx.audioState || {};
+    const spaState = ctx.spaState || {};
     const DESKTOP_TRANSPORT_STORAGE_KEY = ctx.DESKTOP_TRANSPORT_STORAGE_KEY || "infra_desktop_transport_layout_v2";
     const DESKTOP_TRANSPORT_LEGACY_STORAGE_KEY = ctx.DESKTOP_TRANSPORT_LEGACY_STORAGE_KEY || "infra_desktop_transport_layout_v1";
     const DESKTOP_TRANSPORT_MIN_WIDTH = Number.isFinite(Number(ctx.DESKTOP_TRANSPORT_MIN_WIDTH)) ? Number(ctx.DESKTOP_TRANSPORT_MIN_WIDTH) : 254;
@@ -59,6 +60,7 @@
     const getCurrentAlbumTitle = method(ctx, "getCurrentAlbumTitle", function () { return ""; });
     const getCurrentTrackAlbumPage = method(ctx, "getCurrentTrackAlbumPage", function () { return ""; });
     const syncCurrentFavoriteButtons = method(ctx, "syncCurrentFavoriteButtons");
+    const trackAudioRuntimeEvent = method(ctx, "trackAudioRuntimeEvent");
 
   function isDesktopTransportViewport() {
     return typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 981px)").matches;
@@ -1517,6 +1519,46 @@
     rootEl.style.setProperty("--mobile-player-space", `${space}px`);
   }
 
+  function getMiniPlayerVisibilityReason(details) {
+    const state = details || {};
+    if (spaState.prepaintSyncActive) return "spa_prepaint";
+    if (audioState.nowPlayingOpen) return "fullscreen";
+    if (!state.isHome && !state.isAlbum) return "route_scope";
+    if (!state.hasPlaybackSessionActive) return "session_missing";
+    return "route_scope";
+  }
+
+  function setMiniPlayerVisibility(root, shouldShow, details) {
+    if (!root) return;
+    const wasHidden = Boolean(root.hidden);
+    const nextHidden = !Boolean(shouldShow);
+    root.hidden = nextHidden;
+    if (wasHidden === nextHidden) return;
+
+    const state = details || {};
+    const hasSource = Boolean(audioState.audio && getCurrentPlayableAudioSrc(audioState.audio));
+    const unexpected = Boolean(
+      nextHidden &&
+      !audioState.nowPlayingOpen &&
+      (state.isHome || state.isAlbum) &&
+      (state.hasPlaybackSessionActive || hasSource)
+    );
+    trackAudioRuntimeEvent("mini_player_visibility", {
+      state: nextHidden ? "hidden" : "visible",
+      reason: getMiniPlayerVisibilityReason(state),
+      mode: String(audioState.homeMode || ""),
+      route_kind: state.isHome ? "home" : (state.isAlbum ? "album" : "other"),
+      visible: !nextHidden,
+      unexpected,
+      navigation_active: Boolean(spaState.navigationActive),
+      fullscreen_open: Boolean(audioState.nowPlayingOpen),
+      has_playback_session: Boolean(state.hasPlaybackSessionActive),
+      has_source: hasSource,
+      is_home: Boolean(state.isHome),
+      is_album: Boolean(state.isAlbum)
+    });
+  }
+
   function syncTransportUi() {
     const transport = audioState.transport;
     if (!transport || !transport.root) return;
@@ -1538,7 +1580,11 @@
     const mobileDockVisible = Boolean(isMobileLayout && transportShouldShow);
     const canOpenNowPlaying = Boolean(hasPlaybackSessionActive);
 
-    transport.root.hidden = !transportShouldShow;
+    setMiniPlayerVisibility(transport.root, transportShouldShow, {
+      isHome,
+      isAlbum,
+      hasPlaybackSessionActive
+    });
     transport.root.classList.toggle("is-playing", Boolean(audio && !audio.paused));
     if (transport.overlayPanel) {
       transport.overlayPanel.classList.toggle("is-playing", Boolean(audio && !audio.paused));

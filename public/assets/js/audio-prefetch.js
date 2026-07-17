@@ -7,10 +7,10 @@
 
   const constants = Object.freeze({
     ENABLED: true,
-    CACHE_NAME: "infra-next-track-segments-v8",
-    MAX_BYTES: 1 * 1024 * 1024,
+    CACHE_NAME: "infra-next-track-segments-v9",
+    MAX_BYTES: 2 * 1024 * 1024,
     THRESHOLD_SECONDS: 30,
-    PREFETCH_SEGMENT_SIZE: 1 * 1024 * 1024,
+    PREFETCH_SEGMENT_SIZE: 2 * 1024 * 1024,
     QUEUE_DEPTH: 5,
     CONCURRENCY: 2,
     MAX_ENTRIES: 6
@@ -118,7 +118,7 @@
       headers.set("Content-Length", String(buffer.byteLength));
       headers.set("Accept-Ranges", "bytes");
       headers.set("X-Infra-Audio-Partial", "1");
-      headers.set("X-Infra-Audio-Cache-Version", "8");
+      headers.set("X-Infra-Audio-Cache-Version", "9");
       headers.set("X-Infra-Range-Start", String(range.start));
       headers.set("X-Infra-Range-End", String(range.end));
       headers.set("X-Infra-Total-Length", String(range.total));
@@ -163,7 +163,7 @@
     const firstTwoBytes = String(headers.get("X-Infra-First-Two-Bytes") || "").toLowerCase();
     if (
       headers.get("X-Infra-Audio-Partial") !== "1" ||
-      headers.get("X-Infra-Audio-Cache-Version") !== "8" ||
+      headers.get("X-Infra-Audio-Cache-Version") !== "9" ||
       storedLength === null ||
       rangeStart !== 0 ||
       rangeEnd === null ||

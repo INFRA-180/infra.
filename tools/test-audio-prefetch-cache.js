@@ -65,17 +65,17 @@ function segmentResponse(seed) {
 
 (async function () {
   const api = sandbox.InfraAudioPrefetch;
-  assert.strictEqual(api.constants.PREFETCH_SEGMENT_SIZE, 1 * 1024 * 1024);
-  assert.strictEqual(api.constants.MAX_BYTES, 1 * 1024 * 1024);
-  assert.strictEqual(api.constants.CACHE_NAME, "infra-next-track-segments-v8");
+  assert.strictEqual(api.constants.PREFETCH_SEGMENT_SIZE, 2 * 1024 * 1024);
+  assert.strictEqual(api.constants.MAX_BYTES, 2 * 1024 * 1024);
+  assert.strictEqual(api.constants.CACHE_NAME, "infra-next-track-segments-v9");
   assert.strictEqual(api.constants.QUEUE_DEPTH, 5);
   assert.strictEqual(api.constants.CONCURRENCY, 2);
   assert.strictEqual(api.constants.MAX_ENTRIES, 6);
-  assert.strictEqual(api.clearCache, undefined, "The v8 API must not expose a global cache clear");
+  assert.strictEqual(api.clearCache, undefined, "The v9 API must not expose a global cache clear");
   assert.strictEqual(typeof api.waitForMutationIdle, "function");
 
   const request = api.createRequest("https://media.test/next.m4a");
-  assert.strictEqual(request.headers.get("Range"), "bytes=0-1048575");
+  assert.strictEqual(request.headers.get("Range"), "bytes=0-2097151");
   assert.strictEqual(request.mode, "cors");
   assert.strictEqual(request.credentials, "omit");
 
@@ -129,6 +129,17 @@ function segmentResponse(seed) {
   assert.strictEqual(invalidRange.cancellations, 1, "An invalid Content-Range must cancel its unread response body");
   assert.strictEqual(invalidRange.bodyReads, 0);
 
+  const oversizedSegment = rejectedResponse(206, {
+    "Content-Length": String(2 * 1024 * 1024 + 1),
+    "Content-Range": `bytes 0-${2 * 1024 * 1024}/${8 * 1024 * 1024}`
+  });
+  await assert.rejects(
+    api.putSingle("https://media.test/oversized-segment.m4a", oversizedSegment.response),
+    /prefetch_segment_too_large/
+  );
+  assert.strictEqual(oversizedSegment.cancellations, 1, "A segment above the 2 MiB cap must cancel its unread body");
+  assert.strictEqual(oversizedSegment.bodyReads, 0, "An oversized segment body must never be buffered");
+
   const mismatchedLength = rejectedResponse(206, {
     "Content-Length": "512",
     "Content-Range": "bytes 0-1023/8192"
@@ -153,7 +164,7 @@ function segmentResponse(seed) {
   assert.strictEqual(stored.status, 200, "CacheStorage receives a normalized 200 response");
   assert.strictEqual(stored.headers.get("Content-Range"), null);
   assert.strictEqual(stored.headers.get("X-Infra-Audio-Partial"), "1");
-  assert.strictEqual(stored.headers.get("X-Infra-Audio-Cache-Version"), "8");
+  assert.strictEqual(stored.headers.get("X-Infra-Audio-Cache-Version"), "9");
   assert.strictEqual(stored.headers.get("X-Infra-Range-Start"), "0");
   assert.strictEqual(stored.headers.get("X-Infra-Range-End"), "1023");
   assert.strictEqual(stored.headers.get("X-Infra-Total-Length"), "8192");
@@ -167,7 +178,7 @@ function segmentResponse(seed) {
     throw new Error("Cached-segment inspection must not consume the body");
   };
   const storedInfo = await api.inspectCachedSegment("https://media.test/track-0.m4a");
-  assert.strictEqual(storedInfo.valid, true, "A normalized v8 segment must be rehydration-ready");
+  assert.strictEqual(storedInfo.valid, true, "A normalized v9 segment must be rehydration-ready");
   assert.strictEqual(storedInfo.bytes, 1024);
   assert.strictEqual(storedInfo.rangeStart, 0);
   assert.strictEqual(storedInfo.rangeEnd, 1023);
@@ -181,7 +192,7 @@ function segmentResponse(seed) {
     headers: {
       "Content-Length": "1024",
       "X-Infra-Audio-Partial": "1",
-      "X-Infra-Audio-Cache-Version": "6",
+      "X-Infra-Audio-Cache-Version": "8",
       "X-Infra-Range-Start": "0",
       "X-Infra-Range-End": "1023",
       "X-Infra-Total-Length": "8192"
@@ -198,7 +209,7 @@ function segmentResponse(seed) {
   });
   const corruptInfo = await api.inspectCachedSegment(corruptUrl);
   assert.strictEqual(corruptInfo.found, true);
-  assert.strictEqual(corruptInfo.valid, false, "A non-v8 segment must not be rehydrated");
+  assert.strictEqual(corruptInfo.valid, false, "An obsolete v8 segment must not be rehydrated as v9");
   assert.strictEqual(corruptInfo.reason, "cache_corrupt");
   assert.strictEqual(corruptBodyReads, 0);
 
@@ -208,7 +219,7 @@ function segmentResponse(seed) {
     headers: {
       "Content-Length": "1024",
       "X-Infra-Audio-Partial": "1",
-      "X-Infra-Audio-Cache-Version": "8",
+      "X-Infra-Audio-Cache-Version": "9",
       "X-Infra-Range-Start": "0",
       "X-Infra-Range-End": "1023",
       "X-Infra-Total-Length": "8192",
@@ -220,8 +231,8 @@ function segmentResponse(seed) {
     response: legacyProbeResponse
   });
   const legacyProbeInfo = await api.inspectCachedSegment(legacyProbeUrl);
-  assert.strictEqual(legacyProbeInfo.valid, true, "An additive v8 metadata change must not corrupt old entries");
-  assert.strictEqual(legacyProbeInfo.probeReady, false, "Older v8 entries must be refreshed before fast playback");
+  assert.strictEqual(legacyProbeInfo.valid, true, "An additive v9 metadata change must not corrupt old entries");
+  assert.strictEqual(legacyProbeInfo.probeReady, false, "Older v9 entries must be refreshed before fast playback");
 
   const firstCached = await api.findFirstValidCachedSegment([
     "https://media.test/missing.m4a",
@@ -328,9 +339,9 @@ function segmentResponse(seed) {
   assert.strictEqual(overlappedMutation, false, "Timed-out cache work must remain serialized until it settles");
   assert(entries.has("https://media.test/after-timeout.m4a"), "The queue must continue after timed-out cache work settles");
 
-  const realBytes = new Uint8Array(1024 * 1024);
+  const realBytes = new Uint8Array(2 * 1024 * 1024);
   realBytes.fill(10);
-  await api.putSingle("https://media.test/real-1mib.m4a", new Response(realBytes, {
+  await api.putSingle("https://media.test/real-2mib.m4a", new Response(realBytes, {
     status: 206,
     headers: {
       "Content-Type": "audio/mp4",
@@ -338,11 +349,11 @@ function segmentResponse(seed) {
       "Content-Range": `bytes 0-${realBytes.byteLength - 1}/${8 * 1024 * 1024}`
     }
   }));
-  const realInfo = await api.inspectCachedSegment("https://media.test/real-1mib.m4a");
-  assert.strictEqual(realInfo.valid, true, "A complete 1 MiB startup segment must be cache-ready");
-  assert.strictEqual(realInfo.bytes, 1024 * 1024);
-  assert.strictEqual(realInfo.rangeEnd, 1024 * 1024 - 1);
-  console.log("Audio startup-segment v8 cache checks passed.");
+  const realInfo = await api.inspectCachedSegment("https://media.test/real-2mib.m4a");
+  assert.strictEqual(realInfo.valid, true, "A complete 2 MiB startup segment must be cache-ready");
+  assert.strictEqual(realInfo.bytes, 2 * 1024 * 1024);
+  assert.strictEqual(realInfo.rangeEnd, 2 * 1024 * 1024 - 1);
+  console.log("Audio startup-segment v9 cache checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

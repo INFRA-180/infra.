@@ -1,5 +1,16 @@
 # Implementation Notes
 
+## 2026-07-17 — synchronisation Music/R2 événementielle et idempotente
+
+- La boucle `He 4.0026` venait de l’ordre `publication live → génération statique → snapshot SQLite` : la génération reconstruisait le plan contre le catalogue déjà publié, détectait la même URL versionnée et échouait avant le snapshot. Le watcher relançait alors indéfiniment MARSELHA, CDM et H2o.
+- Le LaunchAgent a été arrêté avant correction. La release live valide `catalog-20260717T112959Z-30b7200f03` a ensuite été adoptée dans SQLite depuis son manifeste local, sans conversion ni upload supplémentaire ; `diff-db` revient à zéro.
+- Le flux automatique ne modifie plus le site statique ni le build PWA : il convertit uniquement les masters changés, upload/contrôle R2, publie le catalogue dynamique utilisé par la PWA, puis snapshotte SQLite. La génération du fallback Git reste une opération manuelle explicite.
+- Une reprise compare d’abord SQLite au catalogue live. Si une publication a réussi avant un arrêt ou un échec tardif, son manifeste est adopté et le fichier n’est pas renvoyé. En l’absence d’un manifeste local strictement concordant, le lot est bloqué plutôt que dupliqué.
+- La surveillance reste fondée sur `fs.watch` récursif/FSEvents, avec debounce et contrôle de stabilité. Le scan de sécurité passe de 60 secondes à 6 heures ; un scan est conservé au lancement pour rattraper veille/redémarrage.
+- Un échec dispose d’une seule reprise après 30 minutes, puis le lot identique est mis en quarantaine jusqu’à un nouveau changement source. Le LaunchAgent et ses enfants tournent avec `Nice=10`.
+- `/Users/infra/Music/iTunes/Music/Infra_` est une source strictement en lecture seule. Les deux outils refusent de démarrer si le projet, le runtime, SQLite ou le staging sont configurés sous cette racine. La signature des métadonnées de ses 286 fichiers est restée identique avant/après l’intervention.
+- Validation locale : syntaxe Node/plist, adoption H2o, SQLite 11 pistes pour `He 4.0026`, `diff-db` 286/283/3 avec tous les compteurs à zéro, garde de frontière source et redémarrage LaunchAgent sans nouvelle synchronisation.
+
 ## 2026-07-17 — audiofix344 iOS lock-screen timeline scrubbing
 
 - The accepted `audiofix343` restored Previous/Next on the iOS lock screen and in Notification Center, but it also removed `seekto`; WebKit could still display position from `setPositionState()` while having no action handler capable of applying a direct timeline change.

@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-07-17 — audiofix348 cover canonique ADC13
+
+- La nouvelle source utilisateur `/Users/infra/Desktop/ADC13.jpg` est copiée sans modification sous `assets/music/sources/adc-13-original-6e983f31.jpg` (SHA-256 `6e983f31720bf24ae6888b3db37fea04804a02d50ba5077c239f43952432726a`). Elle est carrée, sRGB et mesure 2442 × 2442 px.
+- ADC13 utilise désormais la ressource canonique versionnée `assets/music/responsive/adc-13-6e983f31-cover-1200.webp` sur l’accueil, la page album, les catalogues, le fullscreen et Media Session. Les anciennes références ADC13 issues d’un catalogue live ou d’une session PWA en cache sont réécrites vers cette URL afin de ne jamais réafficher l’ancienne pochette.
+- L’override est enregistré dans le synchroniseur Music/R2 afin qu’une future génération ne restaure pas la pochette embarquée précédente. La bibliothèque Music reste strictement en lecture seule.
+- Le moteur audio, le prefetch v9, R2, les Range, Media Session, le mini-player et toute la géométrie CSS restent fonctionnellement inchangés. `styles.css?v=audiofix347-20260717` reste byte-identique.
+- Identifiants atomiques : `audiofix348-20260717` et `infra-shell-20260717-audio348`. La validation visuelle PWA finale reste effectuée par l’utilisateur sur iPhone.
+
 ## 2026-07-17 — audiofix347 préfixe Radio cohérent depuis cache v9
 
 - Gel préalable : commit `c8628a441c512c0c3a24edbcf958077b3e9ed479`, tag annoté `backup-audiofix346-20260717` et bundle complet vérifié `SITE_backup/SITE_history_c8628a4_audiofix346_2026-07-17.bundle` (SHA-256 `b260b5e490d69a2430c970490182981991f4cd296671df0a379be9c51ad86a35`).

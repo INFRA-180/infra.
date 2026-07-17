@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix347-20260717";
-const shellRelease = "infra-shell-20260717-audio347";
+const release = "audiofix348-20260717";
+const shellRelease = "infra-shell-20260717-audio348";
 const coverCssRelease = "audiofix347-20260717";
 const frozenCssSha256 = "8d72c713e4176f91ee508327cad73a64e79ee7dd6e0129f94d2a6026d949f3ad";
 const scripts = read("public/assets/js/scripts.js");
@@ -45,12 +45,13 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix347");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix347");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio347");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix348");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix348");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio348");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
+expect(covers.includes("adc-13-6e983f31-cover-1200.webp"), "stale ADC13 artwork is not rewritten to the new canonical cover");
 expect(catalogLoader.includes('normalizeCoverUrl", rawThumb, { width: 1200 }'), "live catalogue can reintroduce a non-canonical album cover");
 expect(sw.includes('const COVERS_CACHE = "infra-covers-v2"'), "Service Worker does not share the canonical cover cache");
 expect(sw.includes("cover-1200\\.webp"), "Service Worker does not cache the canonical cover URL");
@@ -313,4 +314,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix347.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix348.");

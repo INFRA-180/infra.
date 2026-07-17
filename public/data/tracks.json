@@ -1,5 +1,5 @@
 {
-  "version": "audiofix347-20260717",
+  "version": "audiofix348-20260717",
   "generatedAt": "2026-07-17",
   "source": "Music macOS masters AAC 320 R2",
   "audioPrefix": "mixed",
@@ -2021,7 +2021,7 @@
       "slug": "adc-13",
       "title": "ADC13",
       "page": "music/adc-13-infra.html",
-      "cover": "assets/music/responsive/adc-13-cover-1200.webp",
+      "cover": "assets/music/responsive/adc-13-6e983f31-cover-1200.webp",
       "tracks": [
         {
           "index": 1,

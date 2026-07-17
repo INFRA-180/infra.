@@ -418,7 +418,7 @@
       "title": "ADC13",
       "editKey": "album_adc_13",
       "page": "music/adc-13-infra.html",
-      "thumb": "assets/music/responsive/adc-13-cover-1200.webp",
+      "thumb": "assets/music/responsive/adc-13-6e983f31-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - ADC 13",
       "width": 800,
       "height": 800,

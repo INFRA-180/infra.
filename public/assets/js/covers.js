@@ -56,6 +56,15 @@
   function rewriteLegacyMusicAssetsPath(parsedUrl, options) {
     const currentOrigin = getLocationOrigin(options);
     if (!parsedUrl || parsedUrl.origin !== currentOrigin) return;
+    const adc13Path = parsedUrl.pathname.replace(
+      /\/adc-13-cover(?:-\d+)?\.(?:webp|jpe?g|png)$/i,
+      "/adc-13-6e983f31-cover-1200.webp"
+    );
+    if (adc13Path !== parsedUrl.pathname) {
+      parsedUrl.pathname = adc13Path;
+      parsedUrl.search = "";
+      parsedUrl.hash = "";
+    }
     if (/^\/music\/assets\//i.test(parsedUrl.pathname)) {
       parsedUrl.pathname = parsedUrl.pathname.replace(/^\/music\/assets\//i, "/assets/");
       parsedUrl.search = "";

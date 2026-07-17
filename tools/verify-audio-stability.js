@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix339-20260717";
-const shellRelease = "infra-shell-20260717-audio339";
+const release = "audiofix340-20260717";
+const shellRelease = "infra-shell-20260717-audio340";
 const coverCssRelease = "audiofix332-20260716";
 const frozenCssSha256 = "2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb";
 const scripts = read("public/assets/js/scripts.js");
@@ -44,9 +44,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix339");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix339");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio339");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix340");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix340");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio340");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -186,6 +186,9 @@ expect(telemetry.includes('credentials: "omit"'), "telemetry requests may still 
 expect(telemetry.includes('"navigation_token"'), "SPA telemetry cannot correlate repeated navigation targets");
 expect(telemetry.includes('reason: transition.reason || ""'), "SPA terminal reasons are not preserved");
 expect(telemetry.includes("cover_natural_width: transition.cover_natural_width"), "SPA telemetry does not retain decoded cover resolution");
+expect(telemetry.includes('"spa_html_response"'), "SPA telemetry does not retain the HTML response stage");
+expect(telemetry.includes("strategy: transition.strategy"), "SPA telemetry does not retain the active Worker strategy");
+expect(telemetry.includes("response_ms: transition.response_ms"), "SPA telemetry does not retain HTML response latency");
 expect(spa.includes('spaState.activeNavigationHref === url.href'), "duplicate SPA album navigation is not coalesced");
 expect(spa.includes('fallbackToDocumentNavigation("fetch_timeout")'), "stuck SPA fetches have no bounded fallback");
 expect(!telemetry.includes("navigator.sendBeacon"), "cross-origin telemetry still uses sendBeacon");
@@ -211,6 +214,10 @@ const installedAlbumPages = albumPageManifest
   : [];
 expect(installedAlbumPages.length === 31, `expected 31 installed album documents, found ${installedAlbumPages.length}`);
 expect(sw.includes("event.respondWith(htmlCacheFirst(request, SHELL_CACHE));"), "SPA HTML fetches remain network-first");
+expect(sw.includes('headers.set("X-Infra-SW-Version", VERSION)'), "HTML responses do not identify the active Service Worker");
+expect(sw.includes('headers.set("X-Infra-HTML-Cache"'), "HTML responses do not identify cache hits");
+expect(scripts.includes("maybeActivateWaitingServiceWorker(registration"), "a safe idle client cannot activate its waiting Service Worker");
+expect(scripts.includes("state.audioPlaying || state.trackStarting || state.overlayOpen || state.navigationActive"), "waiting Worker activation can interrupt playback or navigation");
 expect(!scripts.includes("showPwaCoverHold(link, coverPlaceholderSrc);"), "album taps still display a foreground cover clone before navigation is ready");
 expect(scripts.includes('releasePwaCoverHold("replace");'), "album taps do not clear a stale transition visual");
 expect(catalogLoader.includes("readCachedLiveCatalogLatest()"), "validated live CacheStorage is not consulted at startup");
@@ -255,4 +262,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix339.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix340.");

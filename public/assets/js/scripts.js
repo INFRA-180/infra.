@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix339-20260717";
+window.INFRA_BUILD_TAG = "audiofix340-20260717";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -436,7 +436,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix339-20260717";
+  const runtimeVersion = "audiofix340-20260717";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -903,7 +903,8 @@ function openAppDownloadGatekeeper(appName, url) {
       syncPersistentUiAfterSpaSwap,
       isStandaloneDisplayMode,
       isIosDevice,
-      isAndroidDevice
+      isAndroidDevice,
+      getServiceWorkerReportedVersion: function () { return serviceWorkerReportedVersion; }
     });
   }
 
@@ -1374,6 +1375,8 @@ function openAppDownloadGatekeeper(appName, url) {
   let serviceWorkerControllerReloadPending = false;
   let serviceWorkerControllerReloadTimer = 0;
   let serviceWorkerRegistrationRef = null;
+  let serviceWorkerReportedVersion = "";
+  let serviceWorkerWaitingActivationWorker = null;
   let serviceWorkerLastUpdateCheckAt = 0;
   const pageOpenedAt = getAudioTelemetryNow();
   let serviceWorkerControllerChangeAt = 0;
@@ -3146,6 +3149,7 @@ function openAppDownloadGatekeeper(appName, url) {
     const audioPlaying = Boolean(audio && !audio.paused && getCurrentPlayableAudioSrc(audio));
     const trackStarting = Boolean(audioState.trackStartInFlight);
     const overlayOpen = Boolean(audioState.nowPlayingOpen || audioState.nowPlayingClosing);
+    const navigationActive = Boolean(spaState.navigationActive);
     const visible = document.visibilityState === "visible";
     const idleForMs = Math.max(0, Math.round(now - lastUserInteractionAt));
     const visibleForMs = visible && documentVisibleSinceAt ? Math.max(0, Math.round(now - documentVisibleSinceAt)) : 0;
@@ -3153,6 +3157,7 @@ function openAppDownloadGatekeeper(appName, url) {
       audioPlaying,
       trackStarting,
       overlayOpen,
+      navigationActive,
       visible,
       idleForMs,
       visibleForMs,
@@ -3176,7 +3181,8 @@ function openAppDownloadGatekeeper(appName, url) {
       visible_for_ms: state.visibleForMs,
       audio_playing: state.audioPlaying,
       track_starting: state.trackStarting,
-      overlay_open: state.overlayOpen
+      overlay_open: state.overlayOpen,
+      navigation_active: state.navigationActive
     }, extra || {});
   }
 
@@ -3188,7 +3194,8 @@ function openAppDownloadGatekeeper(appName, url) {
       state.visibleSafe &&
       !state.audioPlaying &&
       !state.trackStarting &&
-      !state.overlayOpen
+      !state.overlayOpen &&
+      !state.navigationActive
     );
   }
 
@@ -3277,9 +3284,41 @@ function openAppDownloadGatekeeper(appName, url) {
       return;
     }
     serviceWorkerLastUpdateCheckAt = now;
-    serviceWorkerRegistrationRef.update().catch(function () {
+    serviceWorkerRegistrationRef.update().then(function () {
+      maybeActivateWaitingServiceWorker(serviceWorkerRegistrationRef, reason || "update");
+    }).catch(function () {
       // Ignore update probe failures; the app keeps using the active shell.
     });
+  }
+
+  function requestActiveServiceWorkerVersion() {
+    const controller = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (!controller || typeof controller.postMessage !== "function") return;
+    try {
+      controller.postMessage({ type: "INFRA_SW_VERSION_REQUEST" });
+    } catch (_err) {
+      // A controller swap can invalidate the old endpoint between reads.
+    }
+  }
+
+  function maybeActivateWaitingServiceWorker(registration, reason) {
+    const waiting = registration && registration.waiting;
+    if (!waiting || typeof waiting.postMessage !== "function") return false;
+    if (serviceWorkerWaitingActivationWorker === waiting) return false;
+    const state = getServiceWorkerReloadState();
+    if (state.audioPlaying || state.trackStarting || state.overlayOpen || state.navigationActive) return false;
+    serviceWorkerWaitingActivationWorker = waiting;
+    trackAudioRuntimeEvent("sw_waiting_activation", buildServiceWorkerReloadTelemetry({
+      reason: reason || "safe_idle",
+      strategy: "safe_idle_skip_waiting"
+    }));
+    try {
+      waiting.postMessage({ type: "SKIP_WAITING" });
+      return true;
+    } catch (_err) {
+      serviceWorkerWaitingActivationWorker = null;
+      return false;
+    }
   }
 
   function registerServiceWorker() {
@@ -3293,6 +3332,8 @@ function openAppDownloadGatekeeper(appName, url) {
       navigator.serviceWorker.addEventListener("controllerchange", function () {
         if (serviceWorkerControllerReloading) return;
         serviceWorkerControllerChangeAt = getAudioTelemetryNow();
+        serviceWorkerReportedVersion = "";
+        window.setTimeout(requestActiveServiceWorkerVersion, 0);
         trackAudioRuntimeEvent("sw_controllerchange", buildServiceWorkerReloadTelemetry());
         if (!markServiceWorkerReloadPendingForRuntime()) return;
         scheduleDeferredServiceWorkerReload();
@@ -3305,14 +3346,18 @@ function openAppDownloadGatekeeper(appName, url) {
       .register(swUrl, { scope: runtime.baseUrl.pathname, updateViaCache: "none" })
       .then(function (registration) {
         serviceWorkerRegistrationRef = registration;
+        requestActiveServiceWorkerVersion();
+        maybeActivateWaitingServiceWorker(registration, "registered_waiting");
         requestServiceWorkerUpdateCheck("registered");
 
         registration.addEventListener("updatefound", function () {
           const worker = registration.installing;
           if (!worker) return;
           worker.addEventListener("statechange", function () {
-            // Keep the installed update waiting until every current client has
-            // closed. This prevents a controller swap during audio startup.
+            if (worker.state === "installed") {
+              serviceWorkerWaitingActivationWorker = null;
+              maybeActivateWaitingServiceWorker(registration, "update_installed");
+            }
           });
         });
       })
@@ -5408,7 +5453,12 @@ function openAppDownloadGatekeeper(appName, url) {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.addEventListener("message", function (event) {
       const data = event && event.data ? event.data : null;
-      if (!data || data.type !== "INFRA_PREFETCH_HIT") return;
+      if (!data) return;
+      if (data.type === "INFRA_SW_VERSION") {
+        serviceWorkerReportedVersion = String(data.version || "").slice(0, 80);
+        return;
+      }
+      if (data.type !== "INFRA_PREFETCH_HIT") return;
       const src = normalizeAudioSourceUrl(data.url || "");
       if (!src) return;
       audioState.nextPrefetchServedSrc = src;

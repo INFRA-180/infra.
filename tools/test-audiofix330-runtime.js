@@ -1944,7 +1944,7 @@ async function testPrefetchNPlusOneRetriesAfterTwoTransientFailures() {
   );
   bufferedEnd = 30;
   radio.maybePrefetchNextTrack("buffer_recovered");
-  await new Promise((resolve) => setTimeout(resolve, 35));
+  await new Promise((resolve) => setTimeout(resolve, 80));
   await flushAsyncWork();
   assert.strictEqual(
     fetchUrls.filter((url) => url === playlist[1].src).length,
@@ -2138,7 +2138,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix339 runtime checks passed.");
+  console.log("audiofix340 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

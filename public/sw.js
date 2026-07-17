@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260717-audio339";
+const VERSION = "infra-shell-20260717-audio340";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers-v2";
@@ -13,27 +13,27 @@ const SHELL_ASSETS = [
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
   "./assets/css/styles.css?v=audiofix332-20260716",
-  "./assets/js/covers.js?v=audiofix339-20260717",
-  "./assets/js/favorites.js?v=audiofix339-20260717",
-  "./assets/js/favorites-ui.js?v=audiofix339-20260717",
-  "./assets/js/transport-ui.js?v=audiofix339-20260717",
-  "./assets/js/now-playing.js?v=audiofix339-20260717",
-  "./assets/js/album-player-ui.js?v=audiofix339-20260717",
-  "./assets/js/spa-renderer.js?v=audiofix339-20260717",
-  "./assets/js/audio-radio.js?v=audiofix339-20260717",
-  "./assets/js/media-session.js?v=audiofix339-20260717",
-  "./assets/js/audio-prefetch.js?v=audiofix339-20260717",
-  "./assets/js/spa-router.js?v=audiofix339-20260717",
-  "./assets/js/catalog-fallback.js?v=audiofix339-20260717",
-  "./assets/js/catalog-loader.js?v=audiofix339-20260717",
-  "./assets/js/audio-telemetry.js?v=audiofix339-20260717",
-  "./assets/js/downloads.js?v=audiofix339-20260717",
-  "./assets/js/home-catalog.js?v=audiofix339-20260717",
-  "./assets/js/audio-core.js?v=audiofix339-20260717",
-  "./assets/js/pwa-install.js?v=audiofix339-20260717",
-  "./assets/js/share-qr.js?v=audiofix339-20260717",
-  "./assets/js/scripts.js?v=audiofix339-20260717",
-  "./assets/js/scripts.admin.js?v=audiofix339-20260717",
+  "./assets/js/covers.js?v=audiofix340-20260717",
+  "./assets/js/favorites.js?v=audiofix340-20260717",
+  "./assets/js/favorites-ui.js?v=audiofix340-20260717",
+  "./assets/js/transport-ui.js?v=audiofix340-20260717",
+  "./assets/js/now-playing.js?v=audiofix340-20260717",
+  "./assets/js/album-player-ui.js?v=audiofix340-20260717",
+  "./assets/js/spa-renderer.js?v=audiofix340-20260717",
+  "./assets/js/audio-radio.js?v=audiofix340-20260717",
+  "./assets/js/media-session.js?v=audiofix340-20260717",
+  "./assets/js/audio-prefetch.js?v=audiofix340-20260717",
+  "./assets/js/spa-router.js?v=audiofix340-20260717",
+  "./assets/js/catalog-fallback.js?v=audiofix340-20260717",
+  "./assets/js/catalog-loader.js?v=audiofix340-20260717",
+  "./assets/js/audio-telemetry.js?v=audiofix340-20260717",
+  "./assets/js/downloads.js?v=audiofix340-20260717",
+  "./assets/js/home-catalog.js?v=audiofix340-20260717",
+  "./assets/js/audio-core.js?v=audiofix340-20260717",
+  "./assets/js/pwa-install.js?v=audiofix340-20260717",
+  "./assets/js/share-qr.js?v=audiofix340-20260717",
+  "./assets/js/scripts.js?v=audiofix340-20260717",
+  "./assets/js/scripts.admin.js?v=audiofix340-20260717",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./assets/js/sphragis.js?v=sphragis20260716",
   "./assets/fonts/antique-olive-nord.woff2",
@@ -141,6 +141,16 @@ self.addEventListener("message", (event) => {
     return;
   }
 
+  if (event && event.data && event.data.type === "INFRA_SW_VERSION_REQUEST") {
+    if (event.source && typeof event.source.postMessage === "function") {
+      event.source.postMessage({
+        type: "INFRA_SW_VERSION",
+        version: VERSION
+      });
+    }
+    return;
+  }
+
 });
 
 function isSameOrigin(url) {
@@ -203,7 +213,23 @@ async function networkFirst(request, cacheName, fallbackUrl) {
   }
 }
 
+function addHtmlResponseDiagnostics(response, details) {
+  if (!response) return response;
+  const info = details || {};
+  const headers = new Headers(response.headers);
+  headers.set("X-Infra-SW-Version", VERSION);
+  headers.set("X-Infra-HTML-Strategy", String(info.strategy || "unknown"));
+  headers.set("X-Infra-HTML-Cache", info.cacheHit ? "hit" : "miss");
+  headers.set("X-Infra-HTML-MS", String(Math.max(0, Number(info.responseMs) || 0)));
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
 async function htmlCacheFirst(request, cacheName, fallbackUrl) {
+  const startedAt = Date.now();
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
 
@@ -217,15 +243,30 @@ async function htmlCacheFirst(request, cacheName, fallbackUrl) {
 
   if (cached) {
     networkPromise.catch(() => undefined);
-    return cached;
+    return addHtmlResponseDiagnostics(cached, {
+      strategy: "shell_cache",
+      cacheHit: true,
+      responseMs: Date.now() - startedAt
+    });
   }
 
   try {
-    return await networkPromise;
+    const response = await networkPromise;
+    return addHtmlResponseDiagnostics(response, {
+      strategy: "network",
+      cacheHit: false,
+      responseMs: Date.now() - startedAt
+    });
   } catch (_err) {
     if (fallbackUrl) {
       const fallback = await cache.match(fallbackUrl);
-      if (fallback) return fallback;
+      if (fallback) {
+        return addHtmlResponseDiagnostics(fallback, {
+          strategy: "shell_fallback",
+          cacheHit: true,
+          responseMs: Date.now() - startedAt
+        });
+      }
     }
     throw _err;
   }

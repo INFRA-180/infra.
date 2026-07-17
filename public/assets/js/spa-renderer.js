@@ -45,6 +45,7 @@
     const isStandaloneDisplayMode = method(ctx, "isStandaloneDisplayMode", function () { return false; });
     const isIosDevice = method(ctx, "isIosDevice", function () { return false; });
     const isAndroidDevice = method(ctx, "isAndroidDevice", function () { return false; });
+    const getServiceWorkerReportedVersion = method(ctx, "getServiceWorkerReportedVersion", function () { return ""; });
 
   const SPA_RUNTIME_BODY_CLASSES = new Set([
     "has-mobile-player",
@@ -1279,6 +1280,7 @@
     }, 8000);
 
     let response = null;
+    const htmlFetchStartedAt = getAudioTelemetryNow();
     try {
       response = await fetch(url.href, {
         signal: controller.signal,
@@ -1307,6 +1309,32 @@
       return;
     }
     window.clearTimeout(fetchTimeoutId);
+
+    const responseHeaders = response && response.headers;
+    const reportedSwVersion = responseHeaders && typeof responseHeaders.get === "function"
+      ? String(responseHeaders.get("X-Infra-SW-Version") || "")
+      : "";
+    const htmlStrategy = responseHeaders && typeof responseHeaders.get === "function"
+      ? String(responseHeaders.get("X-Infra-HTML-Strategy") || "uncontrolled")
+      : "uncontrolled";
+    const htmlCacheHint = responseHeaders && typeof responseHeaders.get === "function"
+      ? String(responseHeaders.get("X-Infra-HTML-Cache") || "unknown")
+      : "unknown";
+    const workerResponseMs = responseHeaders && typeof responseHeaders.get === "function"
+      ? Number(responseHeaders.get("X-Infra-HTML-MS"))
+      : NaN;
+    trackAudioRuntimeEvent("spa_html_response", {
+      track: "album_open",
+      album: getAlbumNameFromUrlLike(url.href),
+      to_url: url.href,
+      navigation_token: navToken,
+      strategy: `${reportedSwVersion || getServiceWorkerReportedVersion() || "no-sw-version"}:${htmlStrategy}`,
+      cache_hint: htmlCacheHint,
+      cached: htmlCacheHint === "hit",
+      response_ms: Number.isFinite(workerResponseMs)
+        ? Math.max(0, Math.round(workerResponseMs))
+        : Math.max(0, Math.round(getAudioTelemetryNow() - htmlFetchStartedAt))
+    });
 
     if (!response || !response.ok) {
       fallbackToDocumentNavigation("bad_response", {

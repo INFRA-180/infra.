@@ -75,6 +75,7 @@
     "nav:album_abort",
     "nav:album_done",
     "nav:album_start",
+    "spa_html_response",
     "stalled",
     "sw_controllerchange",
     "sw_reload_executed",
@@ -1156,6 +1157,9 @@
         cover_timed_out: Boolean(transition.cover_timed_out),
         render_ms: transition.render_ms || 0,
         swap_ms: transition.swap_ms || 0,
+        response_ms: transition.response_ms || 0,
+        strategy: transition.strategy || "",
+        cache_hint: transition.cache_hint || "",
         cover_natural_width: transition.cover_natural_width || 0,
         cover_display_px: transition.cover_display_px || 0,
         controllerchange: Boolean(transition.controllerchange),
@@ -1185,7 +1189,7 @@
       const spaEvents = new Set([
         "album_open_tap", "album_open_done", "album_open_fail", "nav:album_start",
         "nav:album_done", "nav:album_abort", "spa_render_start", "spa_render_done",
-        "spa_swap_start", "spa_swap_done", "cover_decode_duration"
+        "spa_swap_start", "spa_swap_done", "cover_decode_duration", "spa_html_response"
       ]);
       if (!spaEvents.has(eventType)) return;
       const transition = getOrCreateSpaTransition(eventType, payload, source, timestampMs);
@@ -1208,6 +1212,11 @@
       }
       if (eventType === "spa_render_done") transition.render_ms = Math.round(Number(source.duration_ms) || 0);
       if (eventType === "spa_swap_done") transition.swap_ms = Math.round(Number(source.duration_ms) || 0);
+      if (eventType === "spa_html_response") {
+        transition.strategy = String(source.strategy || "");
+        transition.cache_hint = String(source.cache_hint || "");
+        transition.response_ms = Math.max(0, Math.round(Number(source.response_ms) || 0));
+      }
       if (source.reason) transition.reason = String(source.reason);
       if (typeof source.controllerchange === "boolean") transition.controllerchange = source.controllerchange;
       if (typeof source.sw_reload_between === "boolean") transition.sw_reload_between = source.sw_reload_between;

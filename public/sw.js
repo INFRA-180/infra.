@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260717-audio345";
+const VERSION = "infra-shell-20260717-audio346";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers-v2";
@@ -10,38 +10,32 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./sphragis/",
-  "./sphragis/index.html",
-  "./assets/css/sphragis.css?v=sphragis20260625",
-  "./assets/css/styles.css?v=audiofix345-20260717",
-  "./assets/js/covers.js?v=audiofix345-20260717",
-  "./assets/js/favorites.js?v=audiofix345-20260717",
-  "./assets/js/favorites-ui.js?v=audiofix345-20260717",
-  "./assets/js/transport-ui.js?v=audiofix345-20260717",
-  "./assets/js/now-playing.js?v=audiofix345-20260717",
-  "./assets/js/album-player-ui.js?v=audiofix345-20260717",
-  "./assets/js/spa-renderer.js?v=audiofix345-20260717",
-  "./assets/js/audio-radio.js?v=audiofix345-20260717",
-  "./assets/js/media-session.js?v=audiofix345-20260717",
-  "./assets/js/audio-prefetch.js?v=audiofix345-20260717",
-  "./assets/js/spa-router.js?v=audiofix345-20260717",
-  "./assets/js/catalog-fallback.js?v=audiofix345-20260717",
-  "./assets/js/catalog-loader.js?v=audiofix345-20260717",
-  "./assets/js/audio-telemetry.js?v=audiofix345-20260717",
-  "./assets/js/downloads.js?v=audiofix345-20260717",
-  "./assets/js/home-catalog.js?v=audiofix345-20260717",
-  "./assets/js/audio-core.js?v=audiofix345-20260717",
-  "./assets/js/pwa-install.js?v=audiofix345-20260717",
-  "./assets/js/share-qr.js?v=audiofix345-20260717",
-  "./assets/js/scripts.js?v=audiofix345-20260717",
-  "./assets/js/scripts.admin.js?v=audiofix345-20260717",
-  "./assets/vendor/qr-creator.min.js?v=1.0.0",
-  "./assets/js/sphragis.js?v=sphragis20260716",
+  "./assets/css/styles.css?v=audiofix346-20260717",
+  "./assets/js/covers.js?v=audiofix346-20260717",
+  "./assets/js/favorites.js?v=audiofix346-20260717",
+  "./assets/js/favorites-ui.js?v=audiofix346-20260717",
+  "./assets/js/transport-ui.js?v=audiofix346-20260717",
+  "./assets/js/now-playing.js?v=audiofix346-20260717",
+  "./assets/js/album-player-ui.js?v=audiofix346-20260717",
+  "./assets/js/spa-renderer.js?v=audiofix346-20260717",
+  "./assets/js/audio-radio.js?v=audiofix346-20260717",
+  "./assets/js/media-session.js?v=audiofix346-20260717",
+  "./assets/js/audio-prefetch.js?v=audiofix346-20260717",
+  "./assets/js/spa-router.js?v=audiofix346-20260717",
+  "./assets/js/catalog-fallback.js?v=audiofix346-20260717",
+  "./assets/js/catalog-loader.js?v=audiofix346-20260717",
+  "./assets/js/audio-telemetry.js?v=audiofix346-20260717",
+  "./assets/js/downloads.js?v=audiofix346-20260717",
+  "./assets/js/home-catalog.js?v=audiofix346-20260717",
+  "./assets/js/audio-core.js?v=audiofix346-20260717",
+  "./assets/js/pwa-install.js?v=audiofix346-20260717",
+  "./assets/js/share-qr.js?v=audiofix346-20260717",
+  "./assets/js/scripts.js?v=audiofix346-20260717",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json",
-  "./data/track-durations.json?v=audiofix255-20260627",
-  "./data/tracks.json?v=audiofix255-20260627",
+  "./data/catalog.json?v=audiofix346-20260717",
+  "./data/track-durations.json?v=audiofix346-20260717",
+  "./data/tracks.json?v=audiofix346-20260717",
   "./assets/branding/infra-logo-white-photoroom-title.png",
   "./assets/pwa/favicon-logo-white-64.png",
   "./assets/pwa/icon-192-logo-white.png",
@@ -49,6 +43,18 @@ const SHELL_ASSETS = [
   "./assets/pwa/icon-maskable-192-logo-white.png",
   "./assets/pwa/icon-maskable-512-logo-white.png",
   "./assets/pwa/apple-touch-icon-180-logo-white.png"
+];
+
+// These resources are useful, but none is required to start the PWA or play
+// audio. A missing admin/QR/Sphragis file must therefore never invalidate the
+// complete shell installation.
+const OPTIONAL_SHELL_ASSETS = [
+  "./assets/js/scripts.admin.js?v=audiofix346-20260717",
+  "./assets/vendor/qr-creator.min.js?v=1.0.0",
+  "./sphragis/",
+  "./sphragis/index.html",
+  "./assets/css/sphragis.css?v=sphragis20260625",
+  "./assets/js/sphragis.js?v=sphragis20260716"
 ];
 
 // Album documents are part of the installed application, not optional network
@@ -112,6 +118,11 @@ async function installShellCache() {
   const cache = await caches.open(SHELL_CACHE);
   await cache.addAll(SHELL_ASSETS);
   await precacheAlbumDocuments(cache);
+  await Promise.allSettled(
+    OPTIONAL_SHELL_ASSETS.map(function (asset) {
+      return cache.add(asset);
+    })
+  );
 }
 
 self.addEventListener("install", (event) => {

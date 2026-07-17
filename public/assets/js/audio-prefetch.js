@@ -258,16 +258,36 @@
       candidates.push(normalizedSrc);
     });
 
-    function inspectAt(index) {
-      if (index >= candidates.length) return Promise.resolve(null);
-      return inspectCachedSegment(candidates[index]).then(function (result) {
+    function inspectList(list, index) {
+      if (index >= list.length) return Promise.resolve(null);
+      return inspectCachedSegment(list[index]).then(function (result) {
         return result && result.valid && result.probeReady !== false
           ? result
-          : inspectAt(index + 1);
+          : inspectList(list, index + 1);
       });
     }
 
-    return inspectAt(0);
+    if (!candidates.length) return Promise.resolve(null);
+    return openCache().then(function (cache) {
+      if (!cache || typeof cache.keys !== "function") {
+        return inspectList(candidates, 0);
+      }
+      return cache.keys().then(function (keys) {
+        const storedUrls = new Set((keys || []).map(function (key) {
+          return sourceUrl(key && key.url ? key.url : key);
+        }).filter(Boolean));
+        // Preserve the caller's authoritative order while reducing validation
+        // to the at-most-six entries which can actually exist in cache v9.
+        const storedCandidates = candidates.filter(function (src) {
+          return storedUrls.has(src);
+        });
+        return inspectList(storedCandidates, 0);
+      });
+    }).catch(function () {
+      // Cache.keys() is an optimization only. Older WebKit implementations can
+      // still use the original ordered lookup without touching the network.
+      return inspectList(candidates, 0);
+    });
   }
 
   function enqueueMutation(operation) {

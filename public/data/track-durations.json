@@ -1,7 +1,7 @@
 {
-  "version": "audiofix255-20260627",
-  "generatedAt": "2026-06-27",
-  "trackCount": 280,
+  "version": "audiofix346-20260717",
+  "generatedAt": "2026-07-17",
+  "trackCount": 283,
   "tracks": [
     {
       "album": "V-23π56",
@@ -94,6 +94,15 @@
       "duration": "2:33"
     },
     {
+      "album": "V-23π56",
+      "albumPage": "music/v-23pi56-infra.html",
+      "index": 11,
+      "title": "MAGGIORE",
+      "src": "assets/music/streams/v20260709T225421Z-e03d7535fa/v-23pi56/11-maggiore.m4a",
+      "seconds": 134.839,
+      "duration": "2:15"
+    },
+    {
       "album": "He 4.0026",
       "albumPage": "music/he-4-0026-infra.html",
       "index": 1,
@@ -161,9 +170,9 @@
       "albumPage": "music/he-4-0026-infra.html",
       "index": 8,
       "title": "MARSELHA",
-      "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/08-marselha.m4a",
-      "seconds": 288.95,
-      "duration": "4:49"
+      "src": "assets/music/streams/v20260717T112959Z-30b7200f03/he-4-0026/08-marselha.m4a",
+      "seconds": 284.282,
+      "duration": "4:44"
     },
     {
       "album": "He 4.0026",
@@ -173,6 +182,24 @@
       "src": "assets/music/streams/v20260617-aac320-itunes/he-4-0026/09-phi.m4a",
       "seconds": 65.156,
       "duration": "1:05"
+    },
+    {
+      "album": "He 4.0026",
+      "albumPage": "music/he-4-0026-infra.html",
+      "index": 10,
+      "title": "CDM",
+      "src": "assets/music/streams/v20260717T112959Z-30b7200f03/he-4-0026/10-cdm.m4a",
+      "seconds": 157.199,
+      "duration": "2:37"
+    },
+    {
+      "album": "He 4.0026",
+      "albumPage": "music/he-4-0026-infra.html",
+      "index": 11,
+      "title": "H2o",
+      "src": "assets/music/streams/v20260717T112959Z-30b7200f03/he-4-0026/11-h2o.m4a",
+      "seconds": 177.238,
+      "duration": "2:57"
     },
     {
       "album": "H 1.008",

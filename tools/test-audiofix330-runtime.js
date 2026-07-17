@@ -568,9 +568,10 @@ async function testQueuedRadioNavigationReplaysInOrderAndInvalidatesOnModeChange
 async function testCachedTrackIsPromotedBeforeColdTap() {
   const sandbox = createSandbox();
   loadScript(sandbox, RADIO_PATH);
-  const sourceTracks = makeTracks(6);
+  const sourceTracks = makeTracks(12);
   const inspectedWindows = [];
   const startCalls = [];
+  let cachedSrc = "";
   const state = {
     audio: makeAudio(),
     homeModeInitialized: true,
@@ -600,7 +601,9 @@ async function testCachedTrackIsPromotedBeforeColdTap() {
     prefetchApi: {
       findFirstValidCachedSegment(sources) {
         inspectedWindows.push(sources.slice());
-        return Promise.resolve({ src: sources[2], valid: true, bytes: 1024 });
+        const queuedSources = new Set(state.initialRandomPlaylist.map((track) => track.src));
+        cachedSrc = sources.find((src) => !queuedSources.has(src)) || sources[0];
+        return Promise.resolve({ src: cachedSrc, valid: true, bytes: 1024 });
       }
     },
     loadTracksData: () => Promise.resolve({
@@ -627,12 +630,16 @@ async function testCachedTrackIsPromotedBeforeColdTap() {
 
   await radio.prepareInitialGlobalRandomPlayback("cached_first_test");
   await flushAsyncWork();
-  assert.strictEqual(inspectedWindows.length, 1, "Cold metadata preparation must inspect v7 once");
-  const cachedSrc = inspectedWindows[0][2];
+  assert.strictEqual(inspectedWindows.length, 1, "Cold metadata preparation must inspect v9 once");
+  assert.strictEqual(
+    inspectedWindows[0].length,
+    sourceTracks.length,
+    "Cold Radio must consider every catalogue track already present in cache v9"
+  );
   assert.strictEqual(
     state.initialRandomFirstSrc,
     cachedSrc,
-    "A valid existing v7 segment must be promoted to the prepared Radio head"
+    "A valid existing v9 segment outside the initial batch must seed the prepared Radio head"
   );
   assert.strictEqual(state.initialRandomPlaylist[0].src, cachedSrc);
 
@@ -2133,7 +2140,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix345 runtime checks passed.");
+  console.log("audiofix346 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

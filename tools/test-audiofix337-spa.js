@@ -210,7 +210,7 @@ async function main() {
   testFullscreenFinalizationAndSnapshotDedup();
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
-  console.log("audiofix345 SPA/transport tests: ok");
+  console.log("audiofix346 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

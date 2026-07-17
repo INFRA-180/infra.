@@ -657,10 +657,10 @@
 
   function promoteCachedPreparedInitialTrack(token, reason) {
     if (!prefetchApi || typeof prefetchApi.findFirstValidCachedSegment !== "function") return;
-    const preparedSnapshot = Array.isArray(audioState.initialRandomPlaylist)
-      ? audioState.initialRandomPlaylist.slice()
+    const catalogSnapshot = Array.isArray(audioState.radioPlaylist)
+      ? shuffledCopy(audioState.radioPlaylist)
       : [];
-    const sources = preparedSnapshot.map(function (track) {
+    const sources = catalogSnapshot.map(function (track) {
       return normalizeAudioSourceUrl(track && track.src ? track.src : "");
     }).filter(Boolean);
     if (!sources.length) return;
@@ -679,10 +679,21 @@
       const cachedIndex = audioState.initialRandomPlaylist.findIndex(function (track) {
         return srcMatches(normalizeAudioSourceUrl(track && track.src ? track.src : ""), cachedSrc);
       });
-      if (cachedIndex < 0) return;
+      let catalogSeeded = false;
       if (cachedIndex > 0) {
         const cachedTrack = audioState.initialRandomPlaylist.splice(cachedIndex, 1)[0];
         audioState.initialRandomPlaylist.unshift(cachedTrack);
+      } else if (cachedIndex < 0) {
+        const cachedTrack = catalogSnapshot.find(function (track) {
+          return srcMatches(normalizeAudioSourceUrl(track && track.src ? track.src : ""), cachedSrc);
+        });
+        if (!cachedTrack) return;
+        const queueLength = audioState.initialRandomPlaylist.length;
+        audioState.initialRandomPlaylist.unshift(cachedTrack);
+        if (audioState.initialRandomPlaylist.length > queueLength) {
+          audioState.initialRandomPlaylist.pop();
+        }
+        catalogSeeded = true;
       }
       audioState.initialRandomFirstSrc = cachedSrc;
       trackAudioRuntimeEvent("radio_cached_first_ready", {
@@ -690,6 +701,7 @@
         album: "radio",
         reason: reason || "home_init",
         queue_index: cachedIndex,
+        catalog_seeded: catalogSeeded,
         bytes: Number(result.bytes) || 0,
         audio_fetch: false
       });

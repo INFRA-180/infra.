@@ -1,5 +1,14 @@
 # Implementation Notes
 
+## 2026-07-17 — audiofix346 catalogue de secours et reprise PWA
+
+- Gel préalable : commit `c7d52ce95f607b85de82e39f133269862d684b48`, tag annoté `backup-audiofix345-20260717` et bundle complet vérifié `SITE_backup/SITE_history_c7d52ce_audiofix345_2026-07-17.bundle` (SHA-256 `cae2bd5f5e318b0a0a7d058caeb7a8248e589ecd731e90c371a70828289c6a07`).
+- Le fallback Git rejoint le catalogue R2 actif de 283 pistes : ajout de `MAGGIORE`, `CDM` et `H2o`, et remplacement de l’ancien master `MARSELHA`. Les 31 pages album, durées et clés de cache utilisent `audiofix346-20260717`.
+- Le premier Radio réutilise maintenant n’importe quel segment v9 valide encore présent dans le catalogue global, même s’il n’appartenait pas au premier lot aléatoire de 24 pistes. La recherche consulte d’abord les six clés réellement stockées, conserve l’ordre demandé et ne déclenche aucun accès réseau.
+- L’installation du Worker garde le cœur, les 31 documents album et les données comme ressources obligatoires, mais traite admin, QR et Sphragis avec `Promise.allSettled`. Leur indisponibilité ne peut plus invalider tout le shell. Un échec transitoire de préparation d’une cover redevient tentable au tap suivant.
+- Les deux 404 de police venaient d’URLs relatives à `assets/css/`; elles pointent désormais vers `../fonts/`. La référence à la source map QR absente est supprimée. Aucun média, aucune source iTunes et aucune géométrie n’est déplacé ou supprimé.
+- Identifiants atomiques : `audiofix346-20260717` et `infra-shell-20260717-audio346`. La seule modification CSS est la correction d’URL de police (SHA-256 `8d72c713e4176f91ee508327cad73a64e79ee7dd6e0129f94d2a6026d949f3ad`) : viewport, fullscreen, mini-player, safe areas et ancrage inférieur restent inchangés. Validation UX finale réservée à l’utilisateur sur l’iPhone.
+
 ## 2026-07-17 — audiofix345 mini-player au bord de la safe area
 
 - Sauvegarde préalable : commit `f6075aa`, tag annoté `backup-audiofix344-20260717` et bundle vérifié `SITE_backup/SITE_history_f6075aa_audiofix344_2026-07-17.bundle`.

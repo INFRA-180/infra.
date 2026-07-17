@@ -138,8 +138,8 @@ body[data-theme="jaune-fluo"] {
 @font-face {
   font-family: "Antique Olive Nord Bold";
   src:
-    url("assets/fonts/antique-olive-nord.woff2") format("woff2"),
-    url("assets/fonts/antique-olive-nord.ttf") format("truetype"),
+    url("../fonts/antique-olive-nord.woff2") format("woff2"),
+    url("../fonts/antique-olive-nord.ttf") format("truetype"),
     local("Antique Olive Nord Bold"),
     local("Antique-Olive-Std-Nord"),
     local("Antique Olive Std Nord");

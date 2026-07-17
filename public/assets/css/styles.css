@@ -2844,7 +2844,7 @@ audio {
     top: auto;
     right: 10px;
     left: 10px;
-    bottom: calc(16px + env(safe-area-inset-bottom));
+    bottom: env(safe-area-inset-bottom);
     align-items: stretch;
     border-radius: 16px;
     padding: 9px 10px;

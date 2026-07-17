@@ -1,5 +1,12 @@
 # Implementation Notes
 
+## 2026-07-17 — audiofix345 mini-player au bord de la safe area
+
+- Sauvegarde préalable : commit `f6075aa`, tag annoté `backup-audiofix344-20260717` et bundle vérifié `SITE_backup/SITE_history_f6075aa_audiofix344_2026-07-17.bundle`.
+- Le mini-player de navigation mobile descend de 16 px : son ancrage passe de `calc(16px + env(safe-area-inset-bottom))` à `env(safe-area-inset-bottom)`. Son bord inférieur reste donc exactement au-dessus de la zone Home Indicator.
+- Hauteur, largeur, padding, boutons tactiles, espace de contenu mesuré par `--mobile-player-space`, fullscreen, viewport, status bar et autres safe areas restent inchangés.
+- Identifiants atomiques : `audiofix345-20260717` et `infra-shell-20260717-audio345`. Validation UX finale sur la PWA iPhone réservée à l’utilisateur.
+
 ## 2026-07-17 — synchronisation Music/R2 événementielle et idempotente
 
 - La boucle `He 4.0026` venait de l’ordre `publication live → génération statique → snapshot SQLite` : la génération reconstruisait le plan contre le catalogue déjà publié, détectait la même URL versionnée et échouait avant le snapshot. Le watcher relançait alors indéfiniment MARSELHA, CDM et H2o.

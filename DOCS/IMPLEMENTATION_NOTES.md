@@ -1,5 +1,12 @@
 # Implementation Notes
 
+## 2026-07-17 — audiofix341 deterministic local album documents
+
+- Real `audiofix340` iPhone sessions separated the remaining album stalls from rendering: successful album opens completed in 48–67 ms, while `BALLADES`, `سَلام`, `TROU NOIR` and `SANGUIN` remained unfinished for 2.5–18.9 s. Every stalled record had `response_ms=0`, `render_ms=0` and `cover_wait_ms=0`; all 31 catalogue pages were present in the installed manifest and returned public HTTP 200. The wait was therefore before the HTML response, not in the cover, DOM swap, mini-player or album data.
+- SPA intent and click now share one URL-keyed request. Resolution order is completed client memory, the exact versioned shell through window `CacheStorage`, then one 2.5-second network fallback. A stale completion is rejected before history or DOM mutation. The page cache holds 40 documents and cache-only idle warmup reads all 31 album pages (about 263 KiB raw HTML) from the installed shell without starting network traffic.
+- Versioned album HTML is immutable for the lifetime of its Worker. A shell hit is now strictly cache-first and no longer starts background revalidation; a real cache miss is network-deduplicated inside the Worker. Pointer/touch intent no longer forces a refresh, and successful renders no longer schedule another HTML fetch. The current page and persistent mini-player remain visible until the existing atomic swap.
+- Atomic public identifiers are `audiofix341-20260717` and `infra-shell-20260717-audio341`. Audio playback, R2/Range `206`, prefetch cache v9, canonical 1200 WebP covers and telemetry delivery limits are unchanged. `styles.css?v=audiofix332-20260716` remains byte-identical (SHA-256 `2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb`): no design, viewport, fullscreen geometry, safe-area or bottom-anchor change. Validation is code-only; final installed-iPhone UX validation remains the user's test.
+
 ## 2026-07-17 — audiofix340 active Worker handoff and HTML telemetry
 
 - Real `audiofix339` sessions confirmed that successful album transitions were consistently fast (39–78 ms), while unfinished taps remained open on `سَلام` (18.1 s and 31.4 s), `ÉTOILES` (16.6 s) and `RUE DE PARIS` (7.3 s) until the PWA was hidden. All reported zero cover wait and no image timeout, locating the delay before render in the HTML response path. The public 339 JavaScript did not identify the controlling Worker, so a 339 page could still be controlled by an older network-first Worker without the telemetry proving it.

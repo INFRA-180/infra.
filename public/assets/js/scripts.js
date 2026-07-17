@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix340-20260717";
+window.INFRA_BUILD_TAG = "audiofix341-20260717";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -169,8 +169,9 @@ function openAppDownloadGatekeeper(appName, url) {
     pageCacheOrder: [],
     pageCacheLimit: Number.isFinite(Number(spaRouterConstants.PAGE_CACHE_LIMIT))
       ? Number(spaRouterConstants.PAGE_CACHE_LIMIT)
-      : 30,
+      : 40,
     prefetchingPages: new Set(),
+    inflightPages: new Map(),
     lastNavHref: "",
     lastNavTs: 0,
     navToken: 0,
@@ -180,7 +181,10 @@ function openAppDownloadGatekeeper(appName, url) {
     albumCoverPlaceholderByUrl: new Map(),
     pwaCoverHold: null,
     liveHomeRoute: null,
-    pageCacheApi: null
+    pageCacheApi: null,
+    shellWarmupScheduled: false,
+    shellWarmupDone: false,
+    shellWarmupAttempts: 0
   };
 
   const audioState = {
@@ -413,6 +417,9 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
+  const SPA_SHELL_VERSION = "infra-shell-20260717-audio341";
+  const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
+  const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
   const LOCAL_CATALOG_VERSION = "audiofix255-20260627";
@@ -436,7 +443,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix340-20260717";
+  const runtimeVersion = "audiofix341-20260717";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -897,6 +904,7 @@ function openAppDownloadGatekeeper(appName, url) {
       logAudioRuntimeAlbumSwitch,
       getScrollFromHistoryState,
       prefetchSpaPage,
+      loadSpaPageDocument,
       releasePwaCoverHold,
       showPwaHomeReturnHold,
       disableNowPlayingOverlayUi,
@@ -3334,6 +3342,8 @@ function openAppDownloadGatekeeper(appName, url) {
         serviceWorkerControllerChangeAt = getAudioTelemetryNow();
         serviceWorkerReportedVersion = "";
         window.setTimeout(requestActiveServiceWorkerVersion, 0);
+        spaState.shellWarmupAttempts = 0;
+        scheduleSpaAlbumShellWarmup("controllerchange");
         trackAudioRuntimeEvent("sw_controllerchange", buildServiceWorkerReloadTelemetry());
         if (!markServiceWorkerReloadPendingForRuntime()) return;
         scheduleDeferredServiceWorkerReload();
@@ -3347,6 +3357,10 @@ function openAppDownloadGatekeeper(appName, url) {
       .then(function (registration) {
         serviceWorkerRegistrationRef = registration;
         requestActiveServiceWorkerVersion();
+        if (registration.waiting) {
+          spaState.shellWarmupAttempts = 0;
+          scheduleSpaAlbumShellWarmup("registered_waiting");
+        }
         maybeActivateWaitingServiceWorker(registration, "registered_waiting");
         requestServiceWorkerUpdateCheck("registered");
 
@@ -3356,6 +3370,8 @@ function openAppDownloadGatekeeper(appName, url) {
           worker.addEventListener("statechange", function () {
             if (worker.state === "installed") {
               serviceWorkerWaitingActivationWorker = null;
+              spaState.shellWarmupAttempts = 0;
+              scheduleSpaAlbumShellWarmup("worker_installed");
               maybeActivateWaitingServiceWorker(registration, "update_installed");
             }
           });
@@ -3611,15 +3627,72 @@ function openAppDownloadGatekeeper(appName, url) {
   }
 
   function prefetchSpaPage(href, options) {
-    if (!spaState.enabled) return;
+    if (!spaState.enabled) return Promise.resolve(false);
 
     const opts = options || {};
-    if (!opts.force && isAggressivePrefetchPaused()) return;
+    if (!opts.force && isAggressivePrefetchPaused()) return Promise.resolve(false);
 
     if (spaState.pageCacheApi && typeof spaState.pageCacheApi.prefetch === "function") {
-      spaState.pageCacheApi.prefetch(href, opts);
+      return spaState.pageCacheApi.prefetch(href, Object.assign({}, opts, {
+        cacheName: SPA_SHELL_CACHE_NAME,
+        timeoutMs: SPA_PAGE_FETCH_TIMEOUT_MS
+      }));
+    }
+    return Promise.resolve(false);
+  }
+
+  function loadSpaPageDocument(href, options) {
+    if (!spaState.pageCacheApi || typeof spaState.pageCacheApi.load !== "function") {
+      return Promise.resolve(null);
+    }
+    return spaState.pageCacheApi.load(href, Object.assign({}, options || {}, {
+      cacheName: SPA_SHELL_CACHE_NAME,
+      timeoutMs: SPA_PAGE_FETCH_TIMEOUT_MS
+    }));
+  }
+
+  function scheduleSpaAlbumShellWarmup(reason) {
+    if (!spaState.enabled || spaState.shellWarmupDone || spaState.shellWarmupScheduled) return;
+    if (!spaState.pageCacheApi || typeof spaState.pageCacheApi.warm !== "function") return;
+    spaState.shellWarmupScheduled = true;
+
+    const run = function () {
+      spaState.shellWarmupAttempts += 1;
+      loadTracksData().then(function (tracksData) {
+        const albums = Array.isArray(tracksData && tracksData.albums) ? tracksData.albums : [];
+        const pages = Array.from(new Set(albums.map(function (album) {
+          const page = album && album.page
+            ? album.page
+            : (album && album.slug ? `music/${album.slug}.html` : "");
+          return page ? new URL(page, runtime.baseUrl).href : "";
+        }).filter(Boolean)));
+        if (!pages.length) return { requested: 0, warmed: 0 };
+        return spaState.pageCacheApi.warm(pages, {
+          cacheName: SPA_SHELL_CACHE_NAME,
+          concurrency: 4,
+          reason: reason || "shell_warmup"
+        });
+      }).then(function (result) {
+        const requested = Math.max(0, Number(result && result.requested) || 0);
+        const warmed = Math.max(0, Number(result && result.warmed) || 0);
+        spaState.shellWarmupDone = requested > 0 && warmed >= requested;
+      }).catch(function () {
+        spaState.shellWarmupDone = false;
+      }).finally(function () {
+        spaState.shellWarmupScheduled = false;
+        if (!spaState.shellWarmupDone && spaState.shellWarmupAttempts < 3) {
+          window.setTimeout(function () {
+            scheduleSpaAlbumShellWarmup("shell_retry");
+          }, 1200);
+        }
+      });
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(run, { timeout: 450 });
       return;
     }
+    window.setTimeout(run, 80);
   }
 
   function scheduleSpaPagePrefetch() {
@@ -3675,7 +3748,9 @@ function openAppDownloadGatekeeper(appName, url) {
       }
       queue.slice(0, limit).forEach(function (href, index) {
         setTimeout(function () {
-          prefetchSpaPage(href);
+          prefetchSpaPage(href, {
+            cacheOnly: isStandaloneDisplayMode()
+          });
         }, index * 90);
       });
     };
@@ -5840,6 +5915,7 @@ function openAppDownloadGatekeeper(appName, url) {
         pageCache: spaState.pageCache,
         pageCacheOrder: spaState.pageCacheOrder,
         prefetchingPages: spaState.prefetchingPages,
+        inflightPages: spaState.inflightPages,
         pageCacheLimit: spaState.pageCacheLimit,
         currentHref: window.location.href,
         currentOrigin: window.location.origin
@@ -5894,7 +5970,7 @@ function openAppDownloadGatekeeper(appName, url) {
       if (url.pathname === current.pathname && url.search === current.search && url.hash === current.hash) return;
 
       primeLinkedAlbumCoverForPwa(link, url.href);
-      prefetchSpaPage(url.href, { force: true, cacheMode: "default" });
+      prefetchSpaPage(url.href, { cacheMode: "default" });
     }
 
     document.addEventListener("pointerdown", prefetchFromLinkIntent, { capture: true, passive: true });
@@ -6006,6 +6082,7 @@ function openAppDownloadGatekeeper(appName, url) {
 
     scheduleFavoritesPreload("home_restore");
     scheduleSpaPagePrefetch();
+    scheduleSpaAlbumShellWarmup("home_restore");
     scheduleAlbumCoverCacheWarmup("home_restore");
     snapshotCurrentSpaPage(spaState.currentUrl || window.location.href);
     initPwaInstallPrompt(adminMode);
@@ -6083,6 +6160,7 @@ function openAppDownloadGatekeeper(appName, url) {
     }
 
     scheduleSpaPagePrefetch();
+    scheduleSpaAlbumShellWarmup(isHomeScreen ? "home_idle" : "page_idle");
     scheduleAlbumCoverCacheWarmup(isHomeScreen ? "home_idle" : "page_idle");
     snapshotCurrentSpaPage(spaState.currentUrl || window.location.href);
     initPwaInstallPrompt(adminMode);

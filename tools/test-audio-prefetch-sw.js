@@ -88,7 +88,9 @@ const sandbox = {
       "infra-shell-20260717-audio339-shell",
       "infra-shell-20260717-audio339-runtime",
       "infra-shell-20260717-audio340-shell",
-      "infra-shell-20260717-audio340-runtime"
+      "infra-shell-20260717-audio340-runtime",
+      "infra-shell-20260717-audio341-shell",
+      "infra-shell-20260717-audio341-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -193,7 +195,7 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(installedAlbumPages.length, 31, "all album documents must be installed with the PWA shell");
   assert(installedAlbumPages.includes("https://site.test/music/salam-infra.html"));
   assert(installedAlbumPages.includes("https://site.test/music/trou-noir-infra.html"));
-  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix340-20260717"));
+  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix341-20260717"));
 
   assert(activateHandler, "Service Worker activate handler missing");
   let activatePromise = null;
@@ -225,12 +227,14 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260717-audio338-runtime",
     "infra-shell-20260717-audio338-shell",
     "infra-shell-20260717-audio339-runtime",
-    "infra-shell-20260717-audio339-shell"
+    "infra-shell-20260717-audio339-shell",
+    "infra-shell-20260717-audio340-runtime",
+    "infra-shell-20260717-audio340-shell"
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v9"));
   assert(!deletedCaches.includes("infra-covers-v2"));
-  assert(!deletedCaches.includes("infra-shell-20260717-audio340-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260717-audio340-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260717-audio341-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260717-audio341-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;
@@ -346,12 +350,13 @@ async function dispatchSiteFetch(request) {
   );
   assert(deletedAudioEntries.length >= 1, "A corrupt cached body is evicted before network fallback");
 
-  let resolveNavigationRefresh = null;
   shellMatchResponse = new Response("cached-shell", {
     status: 200,
     headers: { "Content-Type": "text/html" }
   });
-  fetchOverride = () => new Promise((resolve) => { resolveNavigationRefresh = resolve; });
+  fetchOverride = () => {
+    throw new Error("a cached shell document must not revalidate on the network");
+  };
   const navigationFetchCalls = fetchCalls;
   response = await dispatchSiteFetch({
     url: "https://site.test/",
@@ -359,7 +364,7 @@ async function dispatchSiteFetch(request) {
     mode: "navigate",
     destination: "document"
   });
-  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260717-audio340");
+  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260717-audio341");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Strategy"), "shell_cache");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Cache"), "hit");
   assert.strictEqual(
@@ -367,14 +372,11 @@ async function dispatchSiteFetch(request) {
     "cached-shell",
     "A warm PWA navigation must return the installed shell without waiting for the network"
   );
-  assert.strictEqual(fetchCalls, navigationFetchCalls + 1, "The shell must still revalidate in the background");
-  resolveNavigationRefresh(new Response("fresh-shell", { status: 200 }));
-  await Promise.resolve();
-  await Promise.resolve();
-  assert(shellPutRequests.includes("https://site.test/"), "The background navigation refresh must update the shell");
+  assert.strictEqual(fetchCalls, navigationFetchCalls, "A shell hit must not create background network traffic");
 
-  let resolveSpaRefresh = null;
-  fetchOverride = () => new Promise((resolve) => { resolveSpaRefresh = resolve; });
+  fetchOverride = () => {
+    throw new Error("a cached album document must not revalidate on the network");
+  };
   const spaFetchCalls = fetchCalls;
   response = await dispatchSiteFetch({
     url: "https://site.test/music/salam-infra.html",
@@ -387,11 +389,7 @@ async function dispatchSiteFetch(request) {
     "cached-shell",
     "A SPA album fetch must use the installed document without waiting for mobile network"
   );
-  assert.strictEqual(fetchCalls, spaFetchCalls + 1, "The cached SPA document must revalidate in the background");
-  resolveSpaRefresh(new Response("fresh-album", { status: 200 }));
-  await Promise.resolve();
-  await Promise.resolve();
-  assert(shellPutRequests.includes("https://site.test/music/salam-infra.html"));
+  assert.strictEqual(fetchCalls, spaFetchCalls, "A cached SPA document must remain strictly local");
   fetchOverride = null;
   shellMatchResponse = null;
 

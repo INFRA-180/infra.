@@ -1,10 +1,11 @@
-const VERSION = "infra-shell-20260717-audio340";
+const VERSION = "infra-shell-20260717-audio341";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers-v2";
 const NEXT_TRACK_CACHE = "infra-next-track-segments-v9";
 const MAX_COVER_CACHE_ENTRIES = 80;
 const R2_AUDIO_HOST = "pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev";
+const HTML_NETWORK_INFLIGHT = new Map();
 
 const SHELL_ASSETS = [
   "./",
@@ -13,27 +14,27 @@ const SHELL_ASSETS = [
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
   "./assets/css/styles.css?v=audiofix332-20260716",
-  "./assets/js/covers.js?v=audiofix340-20260717",
-  "./assets/js/favorites.js?v=audiofix340-20260717",
-  "./assets/js/favorites-ui.js?v=audiofix340-20260717",
-  "./assets/js/transport-ui.js?v=audiofix340-20260717",
-  "./assets/js/now-playing.js?v=audiofix340-20260717",
-  "./assets/js/album-player-ui.js?v=audiofix340-20260717",
-  "./assets/js/spa-renderer.js?v=audiofix340-20260717",
-  "./assets/js/audio-radio.js?v=audiofix340-20260717",
-  "./assets/js/media-session.js?v=audiofix340-20260717",
-  "./assets/js/audio-prefetch.js?v=audiofix340-20260717",
-  "./assets/js/spa-router.js?v=audiofix340-20260717",
-  "./assets/js/catalog-fallback.js?v=audiofix340-20260717",
-  "./assets/js/catalog-loader.js?v=audiofix340-20260717",
-  "./assets/js/audio-telemetry.js?v=audiofix340-20260717",
-  "./assets/js/downloads.js?v=audiofix340-20260717",
-  "./assets/js/home-catalog.js?v=audiofix340-20260717",
-  "./assets/js/audio-core.js?v=audiofix340-20260717",
-  "./assets/js/pwa-install.js?v=audiofix340-20260717",
-  "./assets/js/share-qr.js?v=audiofix340-20260717",
-  "./assets/js/scripts.js?v=audiofix340-20260717",
-  "./assets/js/scripts.admin.js?v=audiofix340-20260717",
+  "./assets/js/covers.js?v=audiofix341-20260717",
+  "./assets/js/favorites.js?v=audiofix341-20260717",
+  "./assets/js/favorites-ui.js?v=audiofix341-20260717",
+  "./assets/js/transport-ui.js?v=audiofix341-20260717",
+  "./assets/js/now-playing.js?v=audiofix341-20260717",
+  "./assets/js/album-player-ui.js?v=audiofix341-20260717",
+  "./assets/js/spa-renderer.js?v=audiofix341-20260717",
+  "./assets/js/audio-radio.js?v=audiofix341-20260717",
+  "./assets/js/media-session.js?v=audiofix341-20260717",
+  "./assets/js/audio-prefetch.js?v=audiofix341-20260717",
+  "./assets/js/spa-router.js?v=audiofix341-20260717",
+  "./assets/js/catalog-fallback.js?v=audiofix341-20260717",
+  "./assets/js/catalog-loader.js?v=audiofix341-20260717",
+  "./assets/js/audio-telemetry.js?v=audiofix341-20260717",
+  "./assets/js/downloads.js?v=audiofix341-20260717",
+  "./assets/js/home-catalog.js?v=audiofix341-20260717",
+  "./assets/js/audio-core.js?v=audiofix341-20260717",
+  "./assets/js/pwa-install.js?v=audiofix341-20260717",
+  "./assets/js/share-qr.js?v=audiofix341-20260717",
+  "./assets/js/scripts.js?v=audiofix341-20260717",
+  "./assets/js/scripts.admin.js?v=audiofix341-20260717",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./assets/js/sphragis.js?v=sphragis20260716",
   "./assets/fonts/antique-olive-nord.woff2",
@@ -233,16 +234,7 @@ async function htmlCacheFirst(request, cacheName, fallbackUrl) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
 
-  const networkPromise = fetch(request)
-    .then((response) => {
-      if (response && response.ok) {
-        cache.put(request, response.clone()).catch(() => undefined);
-      }
-      return response;
-    });
-
   if (cached) {
-    networkPromise.catch(() => undefined);
     return addHtmlResponseDiagnostics(cached, {
       strategy: "shell_cache",
       cacheHit: true,
@@ -251,6 +243,23 @@ async function htmlCacheFirst(request, cacheName, fallbackUrl) {
   }
 
   try {
+    const key = request.url;
+    let networkPromise = HTML_NETWORK_INFLIGHT.get(key);
+    if (!networkPromise) {
+      networkPromise = fetch(request)
+        .then((response) => {
+          if (response && response.ok) {
+            cache.put(request, response.clone()).catch(() => undefined);
+          }
+          return response;
+        })
+        .finally(() => {
+          if (HTML_NETWORK_INFLIGHT.get(key) === networkPromise) {
+            HTML_NETWORK_INFLIGHT.delete(key);
+          }
+        });
+      HTML_NETWORK_INFLIGHT.set(key, networkPromise);
+    }
     const response = await networkPromise;
     return addHtmlResponseDiagnostics(response, {
       strategy: "network",

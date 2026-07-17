@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix340-20260717";
-const shellRelease = "infra-shell-20260717-audio340";
+const release = "audiofix341-20260717";
+const shellRelease = "infra-shell-20260717-audio341";
 const coverCssRelease = "audiofix332-20260716";
 const frozenCssSha256 = "2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb";
 const scripts = read("public/assets/js/scripts.js");
@@ -29,6 +29,7 @@ const transport = read("public/assets/js/transport-ui.js");
 const telemetry = read("public/assets/js/audio-telemetry.js");
 const covers = read("public/assets/js/covers.js");
 const spa = read("public/assets/js/spa-renderer.js");
+const spaRouter = read("public/assets/js/spa-router.js");
 const sphragis = read("public/assets/js/sphragis.js");
 const sphragisPage = read("public/sphragis/index.html");
 const sw = read("public/sw.js");
@@ -44,9 +45,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix340");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix340");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio340");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix341");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix341");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio341");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -190,7 +191,14 @@ expect(telemetry.includes('"spa_html_response"'), "SPA telemetry does not retain
 expect(telemetry.includes("strategy: transition.strategy"), "SPA telemetry does not retain the active Worker strategy");
 expect(telemetry.includes("response_ms: transition.response_ms"), "SPA telemetry does not retain HTML response latency");
 expect(spa.includes('spaState.activeNavigationHref === url.href'), "duplicate SPA album navigation is not coalesced");
-expect(spa.includes('fallbackToDocumentNavigation("fetch_timeout")'), "stuck SPA fetches have no bounded fallback");
+expect(spa.includes('error && error.code === "SPA_PAGE_FETCH_TIMEOUT"'), "stuck SPA fetches have no bounded fallback");
+expect(spa.includes("loadedPage = await loadSpaPageDocument"), "album navigation does not use the shared page loader");
+expect(spaRouter.includes("PAGE_CACHE_LIMIT: 40"), "the SPA cache cannot retain home plus all 31 albums");
+expect(spaRouter.includes("PAGE_CACHE_LOOKUP_TIMEOUT_MS: 450"), "a stuck CacheStorage lookup can still freeze album navigation");
+expect(spaRouter.includes('strategy: "window_shell_cache"'), "album navigation does not read the installed shell directly");
+expect(spaRouter.includes("inflightPages.has(key)"), "intent and click HTML requests are not deduplicated");
+expect(spaRouter.includes("Object.assign({}, options || {}, { cacheOnly: true })"), "album warmup can still start network requests");
+expect(!spa.includes('prefetchSpaPage(url.href, { force: true'), "rendered album pages still force a network refresh");
 expect(!telemetry.includes("navigator.sendBeacon"), "cross-origin telemetry still uses sendBeacon");
 expect(!telemetry.includes("navigator.userAgent"), "full user-agent is still transmitted");
 expect(!telemetry.includes("local_time:"), "local time is still transmitted");
@@ -214,6 +222,9 @@ const installedAlbumPages = albumPageManifest
   : [];
 expect(installedAlbumPages.length === 31, `expected 31 installed album documents, found ${installedAlbumPages.length}`);
 expect(sw.includes("event.respondWith(htmlCacheFirst(request, SHELL_CACHE));"), "SPA HTML fetches remain network-first");
+const htmlCacheFirstBody = functionBody(sw, "htmlCacheFirst", "staleWhileRevalidate");
+expect(htmlCacheFirstBody.indexOf("if (cached)") < htmlCacheFirstBody.indexOf("fetch(request)"), "a shell hit still starts a background HTML fetch");
+expect(sw.includes("HTML_NETWORK_INFLIGHT"), "Service Worker HTML cache misses are not deduplicated");
 expect(sw.includes('headers.set("X-Infra-SW-Version", VERSION)'), "HTML responses do not identify the active Service Worker");
 expect(sw.includes('headers.set("X-Infra-HTML-Cache"'), "HTML responses do not identify cache hits");
 expect(scripts.includes("maybeActivateWaitingServiceWorker(registration"), "a safe idle client cannot activate its waiting Service Worker");
@@ -262,4 +273,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix340.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix341.");

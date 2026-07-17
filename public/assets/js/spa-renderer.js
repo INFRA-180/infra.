@@ -37,7 +37,7 @@
     const resumeLiveHomeRoute = method(ctx, "resumeLiveHomeRoute");
     const logAudioRuntimeAlbumSwitch = method(ctx, "logAudioRuntimeAlbumSwitch");
     const getScrollFromHistoryState = method(ctx, "getScrollFromHistoryState", function () { return { x: 0, y: 0 }; });
-    const prefetchSpaPage = method(ctx, "prefetchSpaPage");
+    const loadSpaPageDocument = method(ctx, "loadSpaPageDocument", function () { return Promise.resolve(null); });
     const releasePwaCoverHold = method(ctx, "releasePwaCoverHold");
     const showPwaHomeReturnHold = method(ctx, "showPwaHomeReturnHold", function () { return false; });
     const disableNowPlayingOverlayUi = method(ctx, "disableNowPlayingOverlayUi");
@@ -1171,7 +1171,6 @@
           navigation_token: navToken
         });
         logAudioRuntimeAlbumSwitch(audioSwitchContext, true);
-        prefetchSpaPage(url.href, { force: true, cacheMode: "default" });
         finishSpaNavigation();
         return;
       }
@@ -1181,6 +1180,16 @@
     if (cachedHtml) {
       const cachedDoc = parseSpaDocument(cachedHtml);
       if (cachedDoc) {
+        trackAudioRuntimeEvent("spa_html_response", {
+          track: "album_open",
+          album: getAlbumNameFromUrlLike(url.href),
+          to_url: url.href,
+          navigation_token: navToken,
+          strategy: "client:client_memory",
+          cache_hint: "hit",
+          cached: true,
+          response_ms: 0
+        });
         if (spaState.controller) {
           try {
             spaState.controller.abort();
@@ -1256,8 +1265,6 @@
           window.scrollTo(0, 0);
         }
 
-        // Refresh the cached document in background.
-        prefetchSpaPage(url.href, { force: true, cacheMode: "default" });
         finishSpaNavigation();
         return;
       }
@@ -1269,102 +1276,69 @@
       } catch (_err) {
         // Ignore abort errors.
       }
+      spaState.controller = null;
     }
 
-    const controller = new AbortController();
-    spaState.controller = controller;
-    let fetchTimedOut = false;
-    const fetchTimeoutId = window.setTimeout(function () {
-      fetchTimedOut = true;
-      try { controller.abort(); } catch (_err) {}
-    }, 8000);
-
-    let response = null;
-    const htmlFetchStartedAt = getAudioTelemetryNow();
+    let loadedPage = null;
     try {
-      response = await fetch(url.href, {
-        signal: controller.signal,
-        cache: "default",
-        headers: {
-          "Accept": "text/html",
-          "X-Infra-Spa": "1"
-        }
-      });
-    } catch (_err) {
-      window.clearTimeout(fetchTimeoutId);
-      if (fetchTimedOut) fallbackToDocumentNavigation("fetch_timeout");
-      else if (!controller.signal.aborted) fallbackToDocumentNavigation("fetch_error");
-      else {
+      loadedPage = await loadSpaPageDocument(url.href, { cacheMode: "default" });
+    } catch (error) {
+      if (spaState.navToken !== navToken) {
         finishSpaNavigation();
-        releasePwaCoverHold("fetch_aborted");
-        finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "fetch_aborted" });
+        releasePwaCoverHold("stale_load_error");
+        finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "stale_load_error" });
         trackAudioRuntimeEvent("nav:album_abort", {
           track: "album_open",
           album: getAlbumNameFromUrlLike(url.href),
-          reason: "fetch_aborted",
+          reason: "stale_load_error",
           to_url: url.href,
           navigation_token: navToken
         });
+        return;
       }
-      return;
-    }
-    window.clearTimeout(fetchTimeoutId);
-
-    const responseHeaders = response && response.headers;
-    const reportedSwVersion = responseHeaders && typeof responseHeaders.get === "function"
-      ? String(responseHeaders.get("X-Infra-SW-Version") || "")
-      : "";
-    const htmlStrategy = responseHeaders && typeof responseHeaders.get === "function"
-      ? String(responseHeaders.get("X-Infra-HTML-Strategy") || "uncontrolled")
-      : "uncontrolled";
-    const htmlCacheHint = responseHeaders && typeof responseHeaders.get === "function"
-      ? String(responseHeaders.get("X-Infra-HTML-Cache") || "unknown")
-      : "unknown";
-    const workerResponseMs = responseHeaders && typeof responseHeaders.get === "function"
-      ? Number(responseHeaders.get("X-Infra-HTML-MS"))
-      : NaN;
-    trackAudioRuntimeEvent("spa_html_response", {
-      track: "album_open",
-      album: getAlbumNameFromUrlLike(url.href),
-      to_url: url.href,
-      navigation_token: navToken,
-      strategy: `${reportedSwVersion || getServiceWorkerReportedVersion() || "no-sw-version"}:${htmlStrategy}`,
-      cache_hint: htmlCacheHint,
-      cached: htmlCacheHint === "hit",
-      response_ms: Number.isFinite(workerResponseMs)
-        ? Math.max(0, Math.round(workerResponseMs))
-        : Math.max(0, Math.round(getAudioTelemetryNow() - htmlFetchStartedAt))
-    });
-
-    if (!response || !response.ok) {
-      fallbackToDocumentNavigation("bad_response", {
-        status: response ? response.status : 0
-      });
+      fallbackToDocumentNavigation(
+        error && error.code === "SPA_PAGE_FETCH_TIMEOUT" ? "fetch_timeout" : "fetch_error"
+      );
       return;
     }
 
-    let html = "";
-    try {
-      html = await response.text();
-    } catch (_err) {
-      fallbackToDocumentNavigation("read_response_error");
-      return;
-    }
-
-    if (controller.signal.aborted) {
+    if (spaState.navToken !== navToken) {
       finishSpaNavigation();
-      releasePwaCoverHold("render_aborted");
-      finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "render_aborted" });
+      releasePwaCoverHold("stale_load");
+      finishAlbumOpenTelemetry(albumOpenContext, "album_open_fail", { reason: "stale_load" });
       trackAudioRuntimeEvent("nav:album_abort", {
         track: "album_open",
         album: getAlbumNameFromUrlLike(url.href),
-        reason: "render_aborted",
+        reason: "stale_load",
         to_url: url.href,
         navigation_token: navToken
       });
       return;
     }
 
+    const htmlStrategy = String(loadedPage && loadedPage.strategy || "missing");
+    const htmlCacheHint = String(loadedPage && loadedPage.cacheHint || "miss");
+    const reportedWorkerVersion = String(loadedPage && loadedPage.workerVersion || "");
+    trackAudioRuntimeEvent("spa_html_response", {
+      track: "album_open",
+      album: getAlbumNameFromUrlLike(url.href),
+      to_url: url.href,
+      navigation_token: navToken,
+      strategy: `${reportedWorkerVersion || getServiceWorkerReportedVersion() || "client"}:${htmlStrategy}`,
+      cache_hint: htmlCacheHint,
+      cached: Boolean(loadedPage && loadedPage.cached),
+      response_ms: Math.max(0, Math.round(Number(loadedPage && loadedPage.responseMs) || 0))
+    });
+
+    if (!loadedPage || !loadedPage.html) {
+      fallbackToDocumentNavigation("bad_response", {
+        status: loadedPage ? Number(loadedPage.status) || 0 : 0
+      });
+      return;
+    }
+
+    const html = loadedPage.html;
+    const loadedFromCache = Boolean(loadedPage.cached);
     setSpaCachedHtml(url, html);
     const doc = parseSpaDocument(html);
     if (!doc || !doc.body) {
@@ -1387,7 +1361,7 @@
       to_album: getAlbumNameFromUrlLike(url.href),
       from_url: rendered.href,
       to_url: url.href,
-      cached: false,
+      cached: loadedFromCache,
       navigation_token: navToken
     };
     trackAudioRuntimeEvent("spa_render_start", spaTelemetry);
@@ -1420,28 +1394,25 @@
       to_album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
       from_url: rendered.href,
       to_url: url.href,
-      cached: false,
+      cached: loadedFromCache,
       duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - renderStartedAt))
     });
     finishAlbumOpenTelemetry(albumOpenContext, "album_open_done", {
-      cached: false
+      cached: loadedFromCache
     });
     trackAudioRuntimeEvent("nav:album_done", {
       track: "album_open",
       album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
-      cached: false,
+      cached: loadedFromCache,
       to_url: url.href,
       navigation_token: navToken
     });
-    logAudioRuntimeAlbumSwitch(audioSwitchContext, false);
+    logAudioRuntimeAlbumSwitch(audioSwitchContext, loadedFromCache);
 
     if (opts.scroll !== false) {
       window.scrollTo(0, 0);
     }
 
-    if (spaState.controller === controller) {
-      spaState.controller = null;
-    }
     finishSpaNavigation();
   }
 

@@ -21,9 +21,13 @@ const requestedClientIds = [];
 const clientMessages = [];
 const shellPutRequests = [];
 const networkRequestModes = [];
+let installedShellAssets = [];
 
 const shellCache = {
-  addAll: () => Promise.resolve(),
+  addAll: (assets) => {
+    installedShellAssets = Array.from(assets || []);
+    return Promise.resolve();
+  },
   match: () => Promise.resolve(shellMatchResponse ? shellMatchResponse.clone() : null),
   put: (request) => {
     shellPutRequests.push(typeof request === "string" ? request : request.url);
@@ -80,7 +84,9 @@ const sandbox = {
       "infra-shell-20260716-audio336-shell",
       "infra-shell-20260716-audio336-runtime",
       "infra-shell-20260717-audio338-shell",
-      "infra-shell-20260717-audio338-runtime"
+      "infra-shell-20260717-audio338-runtime",
+      "infra-shell-20260717-audio339-shell",
+      "infra-shell-20260717-audio339-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -88,7 +94,7 @@ const sandbox = {
     }
   },
   self: {
-    location: { origin: "https://site.test" },
+    location: { origin: "https://site.test", href: "https://site.test/sw.js" },
     addEventListener: (type, handler) => {
       if (type === "fetch") fetchHandler = handler;
       if (type === "install") installHandler = handler;
@@ -181,6 +187,11 @@ async function dispatchSiteFetch(request) {
   installHandler({ waitUntil: (promise) => { installPromise = promise; } });
   await installPromise;
   assert.strictEqual(skipWaitingCalls, 0, "install must not replace the active controller during playback");
+  const installedAlbumPages = shellPutRequests.filter((asset) => /\/music\/[^/]+-infra\.html$/.test(asset));
+  assert.strictEqual(installedAlbumPages.length, 31, "all album documents must be installed with the PWA shell");
+  assert(installedAlbumPages.includes("https://site.test/music/salam-infra.html"));
+  assert(installedAlbumPages.includes("https://site.test/music/trou-noir-infra.html"));
+  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix339-20260717"));
 
   assert(activateHandler, "Service Worker activate handler missing");
   let activatePromise = null;
@@ -208,12 +219,14 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260716-audio334-runtime",
     "infra-shell-20260716-audio334-shell",
     "infra-shell-20260716-audio336-runtime",
-    "infra-shell-20260716-audio336-shell"
+    "infra-shell-20260716-audio336-shell",
+    "infra-shell-20260717-audio338-runtime",
+    "infra-shell-20260717-audio338-shell"
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v9"));
   assert(!deletedCaches.includes("infra-covers-v2"));
-  assert(!deletedCaches.includes("infra-shell-20260717-audio338-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260717-audio338-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260717-audio339-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260717-audio339-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;
@@ -352,6 +365,26 @@ async function dispatchSiteFetch(request) {
   await Promise.resolve();
   await Promise.resolve();
   assert(shellPutRequests.includes("https://site.test/"), "The background navigation refresh must update the shell");
+
+  let resolveSpaRefresh = null;
+  fetchOverride = () => new Promise((resolve) => { resolveSpaRefresh = resolve; });
+  const spaFetchCalls = fetchCalls;
+  response = await dispatchSiteFetch({
+    url: "https://site.test/music/salam-infra.html",
+    method: "GET",
+    mode: "cors",
+    destination: ""
+  });
+  assert.strictEqual(
+    await response.text(),
+    "cached-shell",
+    "A SPA album fetch must use the installed document without waiting for mobile network"
+  );
+  assert.strictEqual(fetchCalls, spaFetchCalls + 1, "The cached SPA document must revalidate in the background");
+  resolveSpaRefresh(new Response("fresh-album", { status: 200 }));
+  await Promise.resolve();
+  await Promise.resolve();
+  assert(shellPutRequests.includes("https://site.test/music/salam-infra.html"));
   fetchOverride = null;
   shellMatchResponse = null;
 

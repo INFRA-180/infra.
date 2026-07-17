@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260717-audio338";
+const VERSION = "infra-shell-20260717-audio339";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers-v2";
@@ -13,27 +13,27 @@ const SHELL_ASSETS = [
   "./sphragis/index.html",
   "./assets/css/sphragis.css?v=sphragis20260625",
   "./assets/css/styles.css?v=audiofix332-20260716",
-  "./assets/js/covers.js?v=audiofix338-20260717",
-  "./assets/js/favorites.js?v=audiofix338-20260717",
-  "./assets/js/favorites-ui.js?v=audiofix338-20260717",
-  "./assets/js/transport-ui.js?v=audiofix338-20260717",
-  "./assets/js/now-playing.js?v=audiofix338-20260717",
-  "./assets/js/album-player-ui.js?v=audiofix338-20260717",
-  "./assets/js/spa-renderer.js?v=audiofix338-20260717",
-  "./assets/js/audio-radio.js?v=audiofix338-20260717",
-  "./assets/js/media-session.js?v=audiofix338-20260717",
-  "./assets/js/audio-prefetch.js?v=audiofix338-20260717",
-  "./assets/js/spa-router.js?v=audiofix338-20260717",
-  "./assets/js/catalog-fallback.js?v=audiofix338-20260717",
-  "./assets/js/catalog-loader.js?v=audiofix338-20260717",
-  "./assets/js/audio-telemetry.js?v=audiofix338-20260717",
-  "./assets/js/downloads.js?v=audiofix338-20260717",
-  "./assets/js/home-catalog.js?v=audiofix338-20260717",
-  "./assets/js/audio-core.js?v=audiofix338-20260717",
-  "./assets/js/pwa-install.js?v=audiofix338-20260717",
-  "./assets/js/share-qr.js?v=audiofix338-20260717",
-  "./assets/js/scripts.js?v=audiofix338-20260717",
-  "./assets/js/scripts.admin.js?v=audiofix338-20260717",
+  "./assets/js/covers.js?v=audiofix339-20260717",
+  "./assets/js/favorites.js?v=audiofix339-20260717",
+  "./assets/js/favorites-ui.js?v=audiofix339-20260717",
+  "./assets/js/transport-ui.js?v=audiofix339-20260717",
+  "./assets/js/now-playing.js?v=audiofix339-20260717",
+  "./assets/js/album-player-ui.js?v=audiofix339-20260717",
+  "./assets/js/spa-renderer.js?v=audiofix339-20260717",
+  "./assets/js/audio-radio.js?v=audiofix339-20260717",
+  "./assets/js/media-session.js?v=audiofix339-20260717",
+  "./assets/js/audio-prefetch.js?v=audiofix339-20260717",
+  "./assets/js/spa-router.js?v=audiofix339-20260717",
+  "./assets/js/catalog-fallback.js?v=audiofix339-20260717",
+  "./assets/js/catalog-loader.js?v=audiofix339-20260717",
+  "./assets/js/audio-telemetry.js?v=audiofix339-20260717",
+  "./assets/js/downloads.js?v=audiofix339-20260717",
+  "./assets/js/home-catalog.js?v=audiofix339-20260717",
+  "./assets/js/audio-core.js?v=audiofix339-20260717",
+  "./assets/js/pwa-install.js?v=audiofix339-20260717",
+  "./assets/js/share-qr.js?v=audiofix339-20260717",
+  "./assets/js/scripts.js?v=audiofix339-20260717",
+  "./assets/js/scripts.admin.js?v=audiofix339-20260717",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./assets/js/sphragis.js?v=sphragis20260716",
   "./assets/fonts/antique-olive-nord.woff2",
@@ -50,12 +50,71 @@ const SHELL_ASSETS = [
   "./assets/pwa/apple-touch-icon-180-logo-white.png"
 ];
 
+// Album documents are part of the installed application, not optional network
+// content. Keeping them in the shell makes the first tap as deterministic as a
+// revisit and leaves R2 audio loading independent from page navigation.
+const ALBUM_PAGES = [
+  "./music/abricot-infra.html",
+  "./music/adc-13-infra.html",
+  "./music/anunnaki-infra.html",
+  "./music/anunnaki-instru-infra.html",
+  "./music/asase-yaa-infra.html",
+  "./music/aspasie-infra.html",
+  "./music/ballades-infra.html",
+  "./music/black-stallion-infra.html",
+  "./music/cerises-infra.html",
+  "./music/cyberpunk-infra.html",
+  "./music/etoiles-infra.html",
+  "./music/fond-diffus-infra.html",
+  "./music/gaia-infra.html",
+  "./music/h-1-008-infra.html",
+  "./music/he-4-0026-infra.html",
+  "./music/impression-infra.html",
+  "./music/kali-infra.html",
+  "./music/ldc13-infra.html",
+  "./music/mami-wata-infra.html",
+  "./music/moremi-ajasoro-infra.html",
+  "./music/nahda-infra.html",
+  "./music/naviguer-infra.html",
+  "./music/osiris-infra.html",
+  "./music/pbb-infra.html",
+  "./music/peches-infra.html",
+  "./music/rue-de-paris-infra.html",
+  "./music/salam-infra.html",
+  "./music/sanguin-infra.html",
+  "./music/trou-noir-infra.html",
+  "./music/v-23pi56-infra.html",
+  "./music/voyager-infra.html"
+];
+
+async function precacheAlbumDocuments(cache) {
+  let cursor = 0;
+  async function cacheNext() {
+    while (cursor < ALBUM_PAGES.length) {
+      const page = ALBUM_PAGES[cursor];
+      cursor += 1;
+      const request = new Request(new URL(page, self.location.href).href, {
+        cache: "reload",
+        credentials: "same-origin"
+      });
+      const response = await fetch(request);
+      if (!response || !response.ok) {
+        throw new Error(`album_precache_${response ? response.status : "failed"}`);
+      }
+      await cache.put(request, response);
+    }
+  }
+  await Promise.all([cacheNext(), cacheNext(), cacheNext()]);
+}
+
+async function installShellCache() {
+  const cache = await caches.open(SHELL_CACHE);
+  await cache.addAll(SHELL_ASSETS);
+  await precacheAlbumDocuments(cache);
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
-  );
+  event.waitUntil(installShellCache());
 });
 
 self.addEventListener("activate", (event) => {
@@ -463,7 +522,10 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isHtmlAsset(url)) {
-    event.respondWith(networkFirst(request, RUNTIME_CACHE));
+    // SPA fetch() requests have no `document` destination, so they reach this
+    // branch instead of isHtmlRequest(). They must use the same shell-first
+    // policy as native navigations or a cold album tap remains network-bound.
+    event.respondWith(htmlCacheFirst(request, SHELL_CACHE));
     return;
   }
 

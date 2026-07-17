@@ -1,5 +1,12 @@
 # Implementation Notes
 
+## 2026-07-17 — audiofix339 deterministic album navigation
+
+- Real `audiofix338` iPhone telemetry isolated the apparent album freeze from audio and cover delivery. A cold `سَلام` navigation remained open for 7540 ms and a cold `TROU NOIR` navigation for 3040 ms before the PWA was hidden, both with `cached=false`; the next cached `سَلام` opening completed in 59 ms. Live checks returned `200` for every album page and canonical cover and `206` for all 283 catalogue audio sources. The fault was therefore the document path: SPA `fetch()` requests have no `document` destination, reached the Service Worker's network-first HTML branch, and displayed a foreground cover clone while waiting.
+- All 31 album documents are now installed in the versioned shell. Native document navigations and SPA HTML fetches share the same cache-first/background-revalidate policy, so a first album tap no longer depends on mobile network once the new Service Worker is installed. Audio, R2, Range `206`, cache v9 and the N+1…N+5 scheduler are unchanged.
+- Album taps no longer create the foreground cover clone. The current page and persistent mini-player remain visible and interactive until the already-cached destination is ready for the atomic DOM swap; a stale transition visual is cleared defensively. Home-return restoration keeps its separately bounded snapshot behavior. Session sealing now records `hidden`/`pagehide` as the reason for an unfinished SPA transition instead of exporting an unexplained abort.
+- Atomic public identifiers are `audiofix339-20260717` and `infra-shell-20260717-audio339` across all 35 player documents. `styles.css?v=audiofix332-20260716` remains byte-identical (SHA-256 `2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb`): no cover styling, design, viewport, fullscreen geometry, safe-area or bottom-anchor change. Validation is code-only; final installed-iPhone/mobile-network UX validation remains the user's test.
+
 ## 2026-07-17 — audiofix338 canonical covers and bounded PWA recovery
 
 - The validated `audiofix337` rolling audio window remains intact: cache v9, 2 MiB startup segments, N+1…N+5 order, two mobile lanes, Range `206`, current-track priority and selective cancellation are unchanged. The only playback recovery added is a source- and token-guarded retry for an immediate first `NotSupportedError`: the same source is reset once, readiness is bounded to 650 ms on iOS, and a second failure returns to the existing recovery path instead of looping.

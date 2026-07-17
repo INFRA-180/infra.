@@ -1256,7 +1256,10 @@
         if (!transition.finalized) finalizeTrackTransition(transition, reason || "sealed", timestampMs);
       });
       spaTransitions.forEach(function (transition) {
-        if (!transition.finalized) finalizeSpaTransition(transition, "aborted", timestampMs);
+        if (!transition.finalized) {
+          transition.reason = transition.reason || String(reason || "sealed");
+          finalizeSpaTransition(transition, "aborted", timestampMs);
+        }
       });
     }
 

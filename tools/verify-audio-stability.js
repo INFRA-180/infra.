@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix338-20260717";
-const shellRelease = "infra-shell-20260717-audio338";
+const release = "audiofix339-20260717";
+const shellRelease = "infra-shell-20260717-audio339";
 const coverCssRelease = "audiofix332-20260716";
 const frozenCssSha256 = "2e4be5a34461bb0107ef4d6c4cc2bb4737738f10e8743a2b0f2cd18b192bdcdb";
 const scripts = read("public/assets/js/scripts.js");
@@ -44,9 +44,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix338");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix338");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio338");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix339");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix339");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio339");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -201,6 +201,18 @@ expect(sw.includes('sphragis.js?v=sphragis20260716'), "Service Worker still cach
 expect(sphragisPage.includes('sphragis.js?v=sphragis20260716'), "Sphragis page still loads the pre-migration asset key");
 expect(!telemetry.includes('"cover_prepare_item"'), "cover loading still floods remote audio telemetry");
 expect(sw.includes("htmlCacheFirst(request, SHELL_CACHE"), "PWA navigation is not shell cache-first");
+expect(sw.includes("precacheAlbumDocuments(cache)"), "album documents are not installed with the PWA shell");
+expect(sw.includes('cache: "reload"'), "album installation may reuse stale HTTP documents");
+expect(sw.includes("Promise.all([cacheNext(), cacheNext(), cacheNext()])"), "album document installation is not bounded to three lanes");
+const albumPageManifest = sw.match(/const ALBUM_PAGES = \[([\s\S]*?)\];/);
+expect(Boolean(albumPageManifest), "Service Worker album document manifest is missing");
+const installedAlbumPages = albumPageManifest
+  ? Array.from(albumPageManifest[1].matchAll(/\.\/music\/[^"']+-infra\.html/g), (match) => match[0])
+  : [];
+expect(installedAlbumPages.length === 31, `expected 31 installed album documents, found ${installedAlbumPages.length}`);
+expect(sw.includes("event.respondWith(htmlCacheFirst(request, SHELL_CACHE));"), "SPA HTML fetches remain network-first");
+expect(!scripts.includes("showPwaCoverHold(link, coverPlaceholderSrc);"), "album taps still display a foreground cover clone before navigation is ready");
+expect(scripts.includes('releasePwaCoverHold("replace");'), "album taps do not clear a stale transition visual");
 expect(catalogLoader.includes("readCachedLiveCatalogLatest()"), "validated live CacheStorage is not consulted at startup");
 expect(catalogLoader.includes('catalogState.catalogBundleSource = cachedLive ? "live-cache" : "local"'), "catalogue startup does not preserve cached live releases");
 expect(catalogLoader.includes("fetchLiveCatalogLatest().catch(function () {})"), "live catalogue refresh is not detached from startup");
@@ -243,4 +255,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix338.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix339.");

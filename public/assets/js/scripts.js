@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix338-20260717";
+window.INFRA_BUILD_TAG = "audiofix339-20260717";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -436,7 +436,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix338-20260717";
+  const runtimeVersion = "audiofix339-20260717";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -5886,7 +5886,10 @@ function openAppDownloadGatekeeper(appName, url) {
 
       event.preventDefault();
       const coverPlaceholderSrc = primeLinkedAlbumCoverForPwa(link, url.href);
-      showPwaCoverHold(link, coverPlaceholderSrc);
+      // Keep the current interactive page and persistent mini-player visible
+      // until the destination document is ready. The former foreground cover
+      // clone made a slow first visit look like a frozen application.
+      releasePwaCoverHold("replace");
       spaNavigate(url.href, {
         history: "push",
         coverPlaceholderSrc

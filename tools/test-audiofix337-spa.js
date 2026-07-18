@@ -46,7 +46,7 @@ async function testRuntimeClassSanitizer() {
   );
 }
 
-async function testIosSwapIsAtomicWithoutNativeTransition() {
+async function testIosSwapUsesNativePaintedHandoff() {
   const order = [];
   let viewTransitionCalls = 0;
   const classNames = new Set();
@@ -86,9 +86,14 @@ async function testIosSwapIsAtomicWithoutNativeTransition() {
     },
     querySelector() { return null; },
     querySelectorAll() { return []; },
-    startViewTransition() {
+    startViewTransition(callback) {
       viewTransitionCalls += 1;
-      throw new Error("iOS standalone must not enter native View Transition");
+      callback();
+      return {
+        ready: Promise.resolve(),
+        finished: Promise.resolve(),
+        updateCallbackDone: Promise.resolve()
+      };
     }
   };
   const spaState = { prepaintSyncActive: false };
@@ -130,7 +135,7 @@ async function testIosSwapIsAtomicWithoutNativeTransition() {
   const fragment = { querySelector() { return null; } };
   await api.swapSpaFragment(fragment, "album-screen", persistRoot, {});
 
-  assert.equal(viewTransitionCalls, 0, "iOS standalone must use the RAF swap, not document.startViewTransition");
+  assert.equal(viewTransitionCalls, 1, "iOS standalone must use the feature-detected native painted handoff");
   assert.equal(spaState.prepaintSyncActive, false, "prepaint sync flag must be cleared after reconciliation");
   assert.ok(
     order.indexOf("append_fragment") < order.indexOf("sync_persistent_ui"),
@@ -156,6 +161,19 @@ function testCoverSwapHasNoSnapshotOrSecondDecode() {
   assert.ok(waitStart >= 0 && waitEnd > waitStart, "album cover readiness function is missing");
   assert.ok(!waitBody.includes("new Image()"), "destination cover must not be decoded through a detached duplicate");
   assert.ok(!waitBody.includes("swapTargetAfterDecode"), "destination cover must not be reassigned after the route swap");
+  assert.ok(
+    spaSource.includes('image.setAttribute("decoding", "sync")') &&
+      scriptsSource.includes('cover.setAttribute("decoding", "sync")'),
+    "the route-critical album hero must decode synchronously for the destination paint"
+  );
+  assert.ok(
+    spaSource.includes("function applySpaScrollOnNextFrame") &&
+      !spaSource.slice(
+        spaSource.indexOf("function applySwap()"),
+        spaSource.indexOf("function finish(mode)")
+      ).includes("window.scrollTo("),
+    "route scrolling must be separated from the DOM mutation by a frame"
+  );
   assert.ok(
     waitBody.includes('recordCacheObservation("cover", cached ? "hit" : "miss")'),
     "cover Cache Storage hit/miss must feed the compact session summary"
@@ -235,12 +253,12 @@ function testWebKitHistoryQuotaGuard() {
 
 async function main() {
   await testRuntimeClassSanitizer();
-  await testIosSwapIsAtomicWithoutNativeTransition();
+  await testIosSwapUsesNativePaintedHandoff();
   testFullscreenFinalizationAndSnapshotDedup();
   testCoverSwapHasNoSnapshotOrSecondDecode();
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
-  console.log("audiofix350 SPA/transport tests: ok");
+  console.log("audiofix351 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

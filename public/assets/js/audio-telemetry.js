@@ -133,7 +133,9 @@
     "mini_visibility_change_count", "mini_hidden_count", "mini_unexpected_hidden_count",
     "navigation_token", "cover_natural_width", "cover_display_px",
     "first_paint_ms", "visible_cover_count", "visible_cover_ready_count",
-    "spa_cover_not_ready_count", "max_first_paint_ms",
+    "second_paint_ms", "second_visible_cover_count", "second_visible_cover_ready_count",
+    "spa_cover_not_ready_count", "spa_second_cover_not_ready_count",
+    "max_first_paint_ms", "max_second_paint_ms",
     "html_cache_hit_count", "html_cache_miss_count",
     "cover_cache_hit_count", "cover_cache_miss_count",
     "storage_probe_count", "storage_persisted_state",
@@ -151,7 +153,7 @@
     "served_from_prefetch", "is_ios", "is_standalone", "prepared", "prefetch_ready",
     "cover_timed_out", "visible", "unexpected", "navigation_active", "fullscreen_open",
     "has_playback_session", "has_source", "is_home", "is_album",
-    "cover_ready_at_first_paint"
+    "cover_ready_at_first_paint", "cover_ready_at_second_paint"
   ]);
 
   function now() {
@@ -214,7 +216,9 @@
     "spa_slow_count",
     "max_spa_navigation_ms",
     "spa_cover_not_ready_count",
+    "spa_second_cover_not_ready_count",
     "max_first_paint_ms",
+    "max_second_paint_ms",
     "mini_visibility_change_count",
     "mini_hidden_count",
     "mini_unexpected_hidden_count",
@@ -1234,6 +1238,10 @@
         visible_cover_count: transition.visible_cover_count || 0,
         visible_cover_ready_count: transition.visible_cover_ready_count || 0,
         cover_ready_at_first_paint: transition.cover_ready_at_first_paint !== false,
+        second_paint_ms: transition.second_paint_ms || 0,
+        second_visible_cover_count: transition.second_visible_cover_count || 0,
+        second_visible_cover_ready_count: transition.second_visible_cover_ready_count || 0,
+        cover_ready_at_second_paint: transition.cover_ready_at_second_paint !== false,
         controllerchange: Boolean(transition.controllerchange),
         sw_reload_between: Boolean(transition.sw_reload_between)
       });
@@ -1255,8 +1263,12 @@
         if (event.visible_cover_count > 0 && event.cover_ready_at_first_paint === false) {
           incrementSummary("spa_cover_not_ready_count", 1, session);
         }
+        if (event.second_visible_cover_count > 0 && event.cover_ready_at_second_paint === false) {
+          incrementSummary("spa_second_cover_not_ready_count", 1, session);
+        }
         updateSummaryMax("max_spa_navigation_ms", event.delta_ms, session);
         updateSummaryMax("max_first_paint_ms", event.first_paint_ms, session);
+        updateSummaryMax("max_second_paint_ms", event.second_paint_ms, session);
       }
       return upsertCompactEvent(`spa:${transition.key}`, event, session);
     }
@@ -1293,6 +1305,10 @@
         transition.visible_cover_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_count) || 0));
         transition.visible_cover_ready_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_ready_count) || 0));
         transition.cover_ready_at_first_paint = source.paint_relevant_cover_ready !== false;
+        transition.second_paint_ms = Math.max(0, Math.round(Number(source.second_paint_wait_ms) || 0));
+        transition.second_visible_cover_count = Math.max(0, Math.round(Number(source.second_paint_relevant_cover_count) || 0));
+        transition.second_visible_cover_ready_count = Math.max(0, Math.round(Number(source.second_paint_relevant_cover_ready_count) || 0));
+        transition.cover_ready_at_second_paint = source.second_paint_relevant_cover_ready !== false;
       }
       if (eventType === "spa_html_response") {
         transition.strategy = String(source.strategy || "");

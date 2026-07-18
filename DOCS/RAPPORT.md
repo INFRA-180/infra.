@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 18 juillet 2026
-Baseline : `audiofix350-20260718`
-Service Worker : `infra-shell-20260718-audio350`
+Baseline : `audiofix351-20260718`
+Service Worker : `infra-shell-20260718-audio351`
 
 ## État
 
@@ -15,9 +15,11 @@ Service Worker : `infra-shell-20260718-audio350`
 - Fullscreen, mini-player et Media Session validés par l’utilisateur sur iPhone.
 - Page Favoris simplifiée : titre stable, sélection ronde, fermeture `×` et retrait par
   poubelle.
-- Navigation SPA atomique sans snapshot/canvas, retour Accueil par DOM conservé et covers
-  canoniques décodées une seule fois.
+- Navigation SPA avec handoff peint WebKit feature-détecté, sans snapshot/canvas, scroll
+  séparé de la mutation DOM, retour Accueil par DOM conservé et cover hero synchrone.
 - Cache local PWA observable dans le lot de session existant, sans nouvel envoi Worker/KV.
+- Export Worker paginé puis trié globalement : les sessions réellement récentes sont de
+  nouveau accessibles au diagnostic.
 - CSS `audiofix347-20260717` figé.
 - Frontière de publication limitée à `public/`.
 

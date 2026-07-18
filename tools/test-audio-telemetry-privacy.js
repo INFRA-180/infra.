@@ -448,7 +448,11 @@ async function settle(turns = 20) {
     first_paint_wait_ms: 18,
     paint_relevant_cover_count: 1,
     paint_relevant_cover_ready_count: 1,
-    paint_relevant_cover_ready: true
+    paint_relevant_cover_ready: true,
+    second_paint_wait_ms: 34,
+    second_paint_relevant_cover_count: 1,
+    second_paint_relevant_cover_ready_count: 1,
+    second_paint_relevant_cover_ready: true
   }));
   telemetry.trackRuntimeEvent("spa_render_done", Object.assign({}, navBase, { duration_ms: 90 }));
   telemetry.trackRuntimeEvent("album_open_done", navBase);
@@ -540,7 +544,9 @@ async function settle(turns = 20) {
   assert.strictEqual(compactSummary.stalled_count, 1);
   assert.strictEqual(compactSummary.spa_navigation_count, 1);
   assert.strictEqual(compactSummary.spa_cover_not_ready_count, 0);
+  assert.strictEqual(compactSummary.spa_second_cover_not_ready_count, 0);
   assert.strictEqual(compactSummary.max_first_paint_ms, 18);
+  assert.strictEqual(compactSummary.max_second_paint_ms, 34);
   assert.strictEqual(compactSummary.mini_visibility_change_count, 3);
   assert.strictEqual(compactSummary.mini_unexpected_hidden_count, 1);
   assert.strictEqual(compactSummary.html_cache_hit_count, 1);
@@ -561,6 +567,8 @@ async function settle(turns = 20) {
   const compactNavigation = compactEvents.find((event) => event.event === "spa_navigation");
   assert.strictEqual(compactNavigation.cover_ready_at_first_paint, true);
   assert.strictEqual(compactNavigation.first_paint_ms, 18);
+  assert.strictEqual(compactNavigation.cover_ready_at_second_paint, true);
+  assert.strictEqual(compactNavigation.second_paint_ms, 34);
   const playingLatencies = compactEvents
     .filter((event) => event.event === "track_transition" && event.result === "playing")
     .map((event) => Number(event.delta_ms));

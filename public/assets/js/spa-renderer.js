@@ -455,7 +455,9 @@
     image.removeAttribute("srcset");
     image.removeAttribute("sizes");
     image.setAttribute("loading", "eager");
-    image.setAttribute("decoding", "async");
+    // This is the single route-critical hero image. Present it in the same
+    // paint as the album content; async decoding is kept for Home-grid images.
+    image.setAttribute("decoding", "sync");
     image.setAttribute("fetchpriority", "high");
     image.dataset.spaCoverLocked = "1";
     return target;
@@ -684,18 +686,48 @@
   function waitForSpaFirstPaint() {
     const startedAt = getAudioTelemetryNow();
     if (typeof window.requestAnimationFrame !== "function") {
-      return Promise.resolve({
-        first_paint_wait_ms: 0
-      });
+      const paintState = captureSpaPaintState();
+      return Promise.resolve(Object.assign({
+        first_paint_wait_ms: 0,
+        second_paint_wait_ms: 0,
+        second_paint_relevant_cover_count: paintState.paint_relevant_cover_count,
+        second_paint_relevant_cover_ready_count: paintState.paint_relevant_cover_ready_count,
+        second_paint_relevant_cover_ready: paintState.paint_relevant_cover_ready
+      }, paintState));
     }
     return new Promise(function (resolve) {
       window.requestAnimationFrame(function () {
+        const firstPaintState = captureSpaPaintState();
+        const firstPaintWaitMs = Math.max(0, Math.round(getAudioTelemetryNow() - startedAt));
         window.requestAnimationFrame(function () {
+          const secondPaintState = captureSpaPaintState();
           resolve(Object.assign({
-            first_paint_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
-          }, captureSpaPaintState()));
+            first_paint_wait_ms: firstPaintWaitMs,
+            second_paint_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
+            second_paint_relevant_cover_count: secondPaintState.paint_relevant_cover_count,
+            second_paint_relevant_cover_ready_count: secondPaintState.paint_relevant_cover_ready_count,
+            second_paint_relevant_cover_ready: secondPaintState.paint_relevant_cover_ready
+          }, firstPaintState));
         });
       });
+    });
+  }
+
+  function applySpaScrollOnNextFrame(scrollState) {
+    if (!scrollState) return Promise.resolve(null);
+    return new Promise(function (resolve) {
+      const apply = function () {
+        window.scrollTo(scrollState.x, scrollState.y);
+        resolve({
+          x: Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0)),
+          y: Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0))
+        });
+      };
+      if (typeof window.requestAnimationFrame === "function") {
+        window.requestAnimationFrame(apply);
+      } else {
+        apply();
+      }
     });
   }
 
@@ -706,7 +738,7 @@
     const animateEntry = Boolean(entering && !instantPwaSwap);
     const requestedScroll = opts.restoreScroll
       ? getScrollFromHistoryState(opts.restoreScroll)
-      : null;
+      : (opts.resetScroll ? { x: 0, y: 0 } : null);
     const scheduledAt = getAudioTelemetryNow();
     if (entering) {
       entering.classList.toggle("spa-page-entering", animateEntry);
@@ -756,12 +788,6 @@
 
       runPersistentUiPrepaintSync();
 
-      if (requestedScroll) {
-        window.scrollTo(requestedScroll.x, requestedScroll.y);
-        appliedScrollX = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
-        appliedScrollY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
-      }
-
       if (animateEntry) {
         window.requestAnimationFrame(function () {
           entering.classList.remove("spa-page-entering");
@@ -771,25 +797,30 @@
     }
 
     function finish(mode) {
-      const base = {
-        swap_mode: mode,
-        swap_schedule_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - scheduledAt)),
-        swap_dom_mutation_ms: domMutationMs,
-        scroll_restore_requested_x: requestedScroll ? requestedScroll.x : null,
-        scroll_restore_requested_y: requestedScroll ? requestedScroll.y : null,
-        scroll_restore_applied_x: appliedScrollX,
-        scroll_restore_applied_y: appliedScrollY
-      };
-      if (!instantPwaSwap) return Promise.resolve(base);
-      return waitForSpaFirstPaint().then(function (paintState) {
-        return Object.assign(base, paintState || {});
+      return applySpaScrollOnNextFrame(requestedScroll).then(function (appliedScroll) {
+        if (appliedScroll) {
+          appliedScrollX = appliedScroll.x;
+          appliedScrollY = appliedScroll.y;
+        }
+        const base = {
+          swap_mode: mode,
+          swap_schedule_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - scheduledAt)),
+          swap_dom_mutation_ms: domMutationMs,
+          scroll_restore_requested_x: requestedScroll ? requestedScroll.x : null,
+          scroll_restore_requested_y: requestedScroll ? requestedScroll.y : null,
+          scroll_restore_applied_x: appliedScrollX,
+          scroll_restore_applied_y: appliedScrollY
+        };
+        if (!instantPwaSwap) return base;
+        return waitForSpaFirstPaint().then(function (paintState) {
+          return Object.assign(base, paintState || {});
+        });
       });
     }
 
     const canUseNativeViewTransition = Boolean(
       instantPwaSwap &&
       !opts.avoidViewTransition &&
-      !(isIosDevice() && isStandaloneDisplayMode()) &&
       typeof document.startViewTransition === "function"
     );
     if (canUseNativeViewTransition) {
@@ -855,20 +886,58 @@
     const previousNodes = Array.from(document.body.childNodes).filter(function (node) {
       return node !== persistRoot;
     });
-
-    document.documentElement.classList.remove("pwa-native-swap");
-    document.body.className = sanitizeSpaBodyClassName(route.bodyClassName || "home-screen");
-    document.body.appendChild(route.fragment);
-    previousNodes.forEach(function (node) {
-      node.remove();
-    });
-    if (document.body.firstChild !== persistRoot) {
-      document.body.insertBefore(persistRoot, document.body.firstChild);
+    let restoreApplied = false;
+    function applyRestore() {
+      if (restoreApplied) return;
+      restoreApplied = true;
+      document.body.className = sanitizeSpaBodyClassName(route.bodyClassName || "home-screen");
+      document.body.appendChild(route.fragment);
+      previousNodes.forEach(function (node) {
+        node.remove();
+      });
+      if (document.body.firstChild !== persistRoot) {
+        document.body.insertBefore(persistRoot, document.body.firstChild);
+      }
+      runPersistentUiPrepaintSync();
+      if (route.title) document.title = route.title;
     }
-    runPersistentUiPrepaintSync();
-    if (route.title) document.title = route.title;
 
-    window.scrollTo(requested.x, requested.y);
+    let swapMode = "live_dom_restore";
+    const canUseNativeViewTransition = Boolean(
+      isMobilePwaCoverNavigation() &&
+      typeof document.startViewTransition === "function"
+    );
+    if (canUseNativeViewTransition) {
+      document.documentElement.classList.add("pwa-native-swap");
+      try {
+        const transition = document.startViewTransition(applyRestore);
+        if (transition.ready && typeof transition.ready.catch === "function") {
+          transition.ready.catch(function () {});
+        }
+        if (transition.finished && typeof transition.finished.then === "function") {
+          transition.finished.then(
+            function () { document.documentElement.classList.remove("pwa-native-swap"); },
+            function () { document.documentElement.classList.remove("pwa-native-swap"); }
+          );
+        }
+        if (transition.updateCallbackDone && typeof transition.updateCallbackDone.then === "function") {
+          await transition.updateCallbackDone.catch(function () {
+            applyRestore();
+          });
+        } else {
+          applyRestore();
+        }
+        swapMode = "live_view_transition";
+      } catch (_err) {
+        document.documentElement.classList.remove("pwa-native-swap");
+        applyRestore();
+      }
+    } else {
+      document.documentElement.classList.remove("pwa-native-swap");
+      applyRestore();
+    }
+
+    const appliedScroll = await applySpaScrollOnNextFrame(requested);
     let anchorCorrection = 0;
     const anchor = findAlbumCardByUrl(document, route.anchorHref);
     if (anchor && Number.isFinite(route.anchorViewportTop)) {
@@ -879,12 +948,14 @@
     }
 
     spaState.liveHomeRoute = null;
-    resumeLiveHomeRoute();
-    const appliedX = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
+    const appliedX = appliedScroll ? appliedScroll.x : Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
     const appliedY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
     const paintState = await waitForSpaFirstPaint();
+    // Defer non-visual Home maintenance until the retained route has produced
+    // its first frames; cloning the whole route here previously delayed paint.
+    resumeLiveHomeRoute();
     const result = Object.assign({
-      swap_mode: "live_dom_restore",
+      swap_mode: swapMode,
       swap_schedule_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
       swap_dom_mutation_ms: 0,
       home_dom_reused: true,
@@ -942,7 +1013,8 @@
     const swapResult = await swapSpaFragment(fragment, bodyClassName, persistRoot, {
       liveHomeCapture: opts.liveHomeCapture,
       restoreScroll: opts.restoreScroll,
-      avoidViewTransition: Boolean(isHomePage && opts.restoreScroll && isIosDevice())
+      resetScroll: Boolean(opts.resetScroll),
+      avoidViewTransition: Boolean(opts.avoidViewTransition)
     });
     if (opts.restoreScroll) {
       trackAudioRuntimeEvent("spa_scroll_restore", Object.assign({}, telemetry || {}, swapResult || {}, {
@@ -1169,7 +1241,8 @@
         try {
           await renderSpaDocument(cachedDoc, url.href, cachedSpaTelemetry, {
             liveHomeCapture,
-            restoreScroll: opts.restoreScroll
+            restoreScroll: opts.restoreScroll,
+            resetScroll: opts.scroll !== false
           });
         } catch (_err) {
           fallbackToDocumentNavigation("cached_render_error");
@@ -1209,10 +1282,6 @@
           navigation_token: navToken
         });
         logAudioRuntimeAlbumSwitch(audioSwitchContext, true);
-
-        if (opts.scroll !== false) {
-          window.scrollTo(0, 0);
-        }
 
         finishSpaNavigation();
         return;
@@ -1314,7 +1383,8 @@
     try {
       await renderSpaDocument(doc, url.href, spaTelemetry, {
         liveHomeCapture,
-        restoreScroll: opts.restoreScroll
+        restoreScroll: opts.restoreScroll,
+        resetScroll: opts.scroll !== false
       });
     } catch (_err) {
       fallbackToDocumentNavigation("render_error");
@@ -1354,10 +1424,6 @@
       navigation_token: navToken
     });
     logAudioRuntimeAlbumSwitch(audioSwitchContext, loadedFromCache);
-
-    if (opts.scroll !== false) {
-      window.scrollTo(0, 0);
-    }
 
     finishSpaNavigation();
   }

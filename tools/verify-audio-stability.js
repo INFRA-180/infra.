@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix350-20260718";
-const shellRelease = "infra-shell-20260718-audio350";
+const release = "audiofix351-20260718";
+const shellRelease = "infra-shell-20260718-audio351";
 const coverCssRelease = "audiofix347-20260717";
 const frozenCssSha256 = "8d72c713e4176f91ee508327cad73a64e79ee7dd6e0129f94d2a6026d949f3ad";
 const scripts = read("public/assets/js/scripts.js");
@@ -45,9 +45,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix350");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix350");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio350");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix351");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix351");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio351");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -235,10 +235,13 @@ expect(telemetry.includes('"cover_cache_miss_count"'), "session telemetry does n
 expect(telemetry.includes('"storage_persisted_state"'), "session telemetry does not retain persistent-storage state");
 expect(telemetry.includes('"storage_cover_entries"'), "session telemetry does not retain local cover-cache inventory");
 expect(telemetry.includes('"cover_ready_at_first_paint"'), "session telemetry does not retain first-paint cover readiness");
+expect(telemetry.includes('"cover_ready_at_second_paint"'), "session telemetry does not retain second-paint cover readiness");
 expect(scripts.includes("storageManager.persist()"), "the installed PWA does not request persistent storage");
 expect(scripts.includes("recordStorageSnapshot"), "the installed PWA does not record its bounded local-storage snapshot");
 expect(!scripts.includes("pwa-home-return-hold"), "the removed Home-return visual snapshot is still present");
 expect(!scripts.includes('document.createElement("canvas")'), "the removed PWA canvas snapshot is still present");
+expect(spa.includes("function applySpaScrollOnNextFrame"), "SPA scrolling is not isolated from route DOM mutation");
+expect(spa.includes('image.setAttribute("decoding", "sync")'), "route-critical album covers are not decoded synchronously");
 expect(spa.includes('spaState.activeNavigationHref === url.href'), "duplicate SPA album navigation is not coalesced");
 expect(spa.includes('error && error.code === "SPA_PAGE_FETCH_TIMEOUT"'), "stuck SPA fetches have no bounded fallback");
 expect(spa.includes("loadedPage = await loadSpaPageDocument"), "album navigation does not use the shared page loader");
@@ -323,4 +326,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix350.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix351.");

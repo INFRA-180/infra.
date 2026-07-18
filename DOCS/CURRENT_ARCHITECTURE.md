@@ -7,13 +7,13 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix350-20260718`
-- Service Worker : `infra-shell-20260718-audio350`
+- Runtime : `audiofix351-20260718`
+- Service Worker : `infra-shell-20260718-audio351`
 - CSS figé : `audiofix347-20260717`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
-- Sauvegarde : tag `backup-audiofix349-20260718`
+- Sauvegarde : tag `backup-audiofix350-20260718`
 
 ## Publication
 
@@ -115,6 +115,11 @@ La géométrie iPhone validée est figée :
 
 Le lecteur et `#infraSpaPersist` survivent aux changements de page.
 
+Sur Safari compatible, le passage entre routes utilise le handoff peint natif des View
+Transitions sans animation visuelle. La mutation DOM et le repositionnement du scroll sont
+séparés d’une frame. La cover hero de l’album décode en mode synchrone ; les images de la
+grille Accueil restent paresseuses et asynchrones.
+
 ## Télémétrie
 
 Un seul lot compact est produit par session :
@@ -126,9 +131,10 @@ Un seul lot compact est produit par session :
 - reprise IndexedDB en cas d’échec ;
 - aucun heartbeat ou envoi continu.
 
-Ce même résumé contient un inventaire borné du stockage local, les hits/miss HTML et covers
-et l’état de la cover au premier paint. Cette observabilité n’ajoute ni requête Worker ni clé
-KV. La PWA demande le stockage persistant une seule fois, à la première interaction.
+Ce même résumé contient un inventaire borné du stockage local, les hits/miss HTML et covers,
+ainsi que l’état de la cover aux première et deuxième frames peintes. Cette observabilité
+n’ajoute ni requête Worker ni clé KV. La PWA demande le stockage persistant une seule fois,
+à la première interaction.
 
 Les URLs complètes, chemins privés et identifiants personnels ne quittent pas le navigateur.
 

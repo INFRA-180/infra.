@@ -67,11 +67,14 @@ Ordre recommandé :
 4. exécuter l’audit complet ;
 5. laisser l’utilisateur valider la PWA.
 
-## Navigation et covers — stabilisées par audiofix350
+## Navigation et covers — stabilisées par audiofix351
 
 - La destination SPA est insérée avant le retrait de l’ancienne route.
 - Le retour Accueil réutilise son DOM et réconcilie les cartes sans vider la grille.
-- La cover canonique de destination est décodée au maximum une fois.
+- La mutation DOM et le scroll sont séparés d’une frame.
+- Le handoff natif peint est utilisé seulement si WebKit expose `startViewTransition`.
+- La cover hero canonique est décodée au maximum une fois et en mode synchrone ; la grille
+  Accueil reste asynchrone.
 - Clone, snapshot, canvas, attente graphique fixe et variantes 480/900 restent interdits.
 - Les futurs diagnostics utilisent le résumé de session existant : cache HTML, cache cover
-  et état de la cover au premier paint, sans augmenter les appels Worker/KV.
+  et état de la cover aux deux premières frames, sans augmenter les appels Worker/KV.

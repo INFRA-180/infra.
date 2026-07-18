@@ -1,5 +1,35 @@
 # Implementation Notes
 
+## 2026-07-18 — audiofix351 handoff peint WebKit et export télémétrique récent
+
+- Gel préalable : commit `ed7b45b`, conservé par le tag annoté
+  `backup-audiofix350-20260718`.
+- Quatre sessions PWA `audiofix350` ont confirmé que le stockage persistant, le contrôle du
+  Service Worker et les caches étaient sains : 44 hits HTML, aucun miss, 32 covers et six
+  segments audio présents. Le clignotement résiduel était donc un problème de paint/composition,
+  pas un rechargement réseau.
+- Le correctif suit les causes documentées par WebKit : la mutation DOM et `scrollTo()` sont
+  séparés par une frame, la cover hero est décodée en `sync`, et le handoff natif
+  `document.startViewTransition()` est utilisé uniquement quand Safari le fournit. Aucun clone,
+  canvas, snapshot visuel ou délai arbitraire n’est réintroduit ; les covers de la grille
+  Accueil restent asynchrones et paresseuses.
+- Le retour Accueil diffère son travail non visuel après les deux premières frames. La
+  télémétrie compacte mesure désormais séparément la première et la deuxième frame dans le
+  même lot de session, sans nouvel envoi ni nouvelle clé KV.
+- L’export privé du Worker parcourt toutes les pages de clés avant de retenir les sessions les
+  plus récentes. Cette correction concerne uniquement les lectures manuelles `/status` et
+  `/export` ; elle n’augmente pas la télémétrie produite par la PWA. Worker déployé :
+  `44b223c8-8e50-432e-9676-627b511b9e35`.
+- Références : [WebKit Safari 27 — flash de calques lors d’un scroll synchrone avec mutation
+  DOM](https://webkit.org/blog/17967/news-from-wwdc26-webkit-in-safari-27-beta/),
+  [WebKit Safari 17.5 — décodage d’image et premier paint](https://webkit.org/blog/15383/webkit-features-in-safari-17-5/)
+  et [MDN `HTMLImageElement.decode()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement/decode).
+- Identifiants atomiques : `audiofix351-20260718` et
+  `infra-shell-20260718-audio351`. Le cache audio v9, le prefetch, la lecture, Media Session,
+  le fullscreen et le CSS `audiofix347-20260717` restent inchangés ; le CSS conserve le SHA-256
+  `8d72c713e4176f91ee508327cad73a64e79ee7dd6e0129f94d2a6026d949f3ad`.
+  Les tests restent code-only et la validation UX finale appartient à l’utilisateur sur iPhone.
+
 ## 2026-07-18 — audiofix350 navigation PWA atomique et cache local observable
 
 - Gel préalable : commit `9a2696f`, conservé par le tag annoté

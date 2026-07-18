@@ -1,5 +1,24 @@
 # Implementation Notes
 
+## 2026-07-19 — audiofix355 retour à la géométrie fullscreen stable
+
+- Le test utilisateur `audiofix354` sur l’iPhone 13 mini confirme que la compensation était bien
+  active : overlay de `-50` à `762`, bas à zéro et build correct. L’absence totale de changement
+  visuel démontre que le compositeur iOS 26.5 découpe la zone située derrière sa status bar avant
+  le rendu de la PWA.
+- La classe runtime, la variable CSS et le padding compensatoire expérimentaux sont supprimés.
+  `styles.css` retrouve exactement le SHA-256 de la géométrie stable `audiofix353` :
+  `b631067f1447cadbf6260a619a203aab312306635a3bbb2e811dad00d0f5d55e`.
+- La sonde `fullscreen_viewport` reste active pour observer les futures corrections d’iOS sans
+  modifier le layout. La croix QR rouge pure et tout le reste de `audiofix353` sont conservés.
+  Le filtre Cloudflare nettoyé est déployé sous la version
+  `8140f0e9-6e67-4140-be13-91fcdb08fdd6`.
+- Aucun `100lvh`, aucune hauteur ou ancrage inférieur supplémentaire, aucun remplissage sous la
+  Home Indicator. Le défaut visuel du 13 mini reste classé comme bug iOS/WebKit non corrigeable
+  de façon fiable côté CSS.
+- Identifiants atomiques : `audiofix355-20260719`, `infra-shell-20260719-audio355` et CSS
+  `audiofix355-20260719`.
+
 ## 2026-07-19 — audiofix354 compensation fullscreen iOS 26 mesurée
 
 - Deux sondes `audiofix353` isolent la divergence WebKit :

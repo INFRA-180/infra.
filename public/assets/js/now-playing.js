@@ -101,38 +101,6 @@
     return values;
   }
 
-  function clearIosStandaloneViewportCompensation() {
-    const root = document.documentElement;
-    root.classList.remove("ios-standalone-viewport-gap");
-    root.style.removeProperty("--ios-standalone-viewport-gap");
-    audioState.nowPlayingViewportCompensationPx = 0;
-  }
-
-  function syncIosStandaloneViewportCompensation() {
-    clearIosStandaloneViewportCompensation();
-    if (!isIosDevice() || !isStandaloneDisplayMode()) return 0;
-
-    const visualViewport = window.visualViewport || null;
-    const viewportWidth = visualViewport ? Number(visualViewport.width) : Number(window.innerWidth);
-    const viewportHeight = visualViewport ? Number(visualViewport.height) : Number(window.innerHeight);
-    const screenWidth = Number(window.screen && window.screen.width);
-    const screenHeight = Number(window.screen && window.screen.height);
-    const visualTop = visualViewport ? Number(visualViewport.offsetTop) || 0 : 0;
-    const cssEnvironment = readViewportCssEnvironment();
-    const gap = Math.round(screenHeight - viewportHeight);
-    const isPortrait = viewportHeight >= viewportWidth && screenHeight >= screenWidth;
-    const hasBrokenTopInset = cssEnvironment.safe_area_top < 1;
-    const hasStandaloneViewportGap = gap >= 20 && gap <= 80;
-
-    if (!isPortrait || visualTop !== 0 || !hasBrokenTopInset || !hasStandaloneViewportGap) return 0;
-
-    const root = document.documentElement;
-    root.style.setProperty("--ios-standalone-viewport-gap", `${gap}px`);
-    root.classList.add("ios-standalone-viewport-gap");
-    audioState.nowPlayingViewportCompensationPx = gap;
-    return gap;
-  }
-
   function readFullscreenViewportMetrics() {
     const transport = audioState.transport || {};
     const overlayRect = transport.overlay && typeof transport.overlay.getBoundingClientRect === "function"
@@ -150,7 +118,6 @@
     const root = document.documentElement;
     const standalone = isStandaloneDisplayMode();
     const cssEnvironment = readViewportCssEnvironment();
-    const compensationTop = roundedViewportMetric(audioState.nowPlayingViewportCompensationPx);
     const metrics = {
       trigger: "now_playing_open",
       surface: "fullscreen",
@@ -171,9 +138,7 @@
       visual_viewport_offset_top: roundedViewportMetric(visualTop),
       visual_viewport_offset_left: roundedViewportMetric(visualLeft),
       visual_viewport_scale: roundedViewportMetric(visualViewport ? visualViewport.scale : 1),
-      device_pixel_ratio: roundedViewportMetric(window.devicePixelRatio || 1),
-      fullscreen_compensation_top: compensationTop,
-      fullscreen_compensated: compensationTop > 0
+      device_pixel_ratio: roundedViewportMetric(window.devicePixelRatio || 1)
     };
 
     if (overlayRect) {
@@ -438,7 +403,6 @@
 
     document.body.classList.remove("now-playing-open");
     document.documentElement.classList.remove("now-playing-open");
-    clearIosStandaloneViewportCompensation();
     document.body.style.removeProperty("position");
     document.body.style.removeProperty("top");
     document.body.style.removeProperty("left");
@@ -463,7 +427,6 @@
       (audioState.playlist && audioState.playlist.length)
     );
     if (!canOpen) return;
-    syncIosStandaloneViewportCompensation();
     audioState.nowPlayingMiniRect = getNowPlayingMiniRect();
     audioState.nowPlayingScrollY = window.scrollY || window.pageYOffset || 0;
     audioState.nowPlayingOpen = true;

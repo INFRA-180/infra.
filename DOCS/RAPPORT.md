@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 19 juillet 2026
-Baseline : `audiofix354-20260719`
-Service Worker : `infra-shell-20260719-audio354`
+Baseline : `audiofix355-20260719`
+Service Worker : `infra-shell-20260719-audio355`
 
 ## État
 
@@ -12,8 +12,8 @@ Service Worker : `infra-shell-20260719-audio354`
 - Aucun ancien dérivé de cover 480/900, JPG ou PNG dans le périmètre public.
 - Prefetch v9 par segments de 2 MiB, N+1 à N+5.
 - Radio globale, Shuffle album et lecture chronologique consolidés.
-- Fullscreen compensé uniquement lorsque WebKit mesure une safe area haute nulle et un viewport
-  standalone raccourci ; mini-player et Media Session inchangés.
+- Géométrie fullscreen stable restaurée ; la sonde observe le bug de status bar iOS 26 sans
+  modifier le layout. Mini-player et Media Session restent inchangés.
 - Page Favoris simplifiée : titre stable, sélection ronde, fermeture `×` et retrait par
   poubelle.
 - Navigation SPA avec handoff peint WebKit feature-détecté, sans snapshot/canvas, scroll
@@ -23,7 +23,7 @@ Service Worker : `infra-shell-20260719-audio354`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix354-20260719` figé.
+- CSS `audiofix355-20260719` figé.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

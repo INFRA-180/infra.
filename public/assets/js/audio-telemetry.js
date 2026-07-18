@@ -134,7 +134,7 @@
     "css_vh_height", "css_dvh_height",
     "overlay_top", "overlay_bottom", "overlay_width", "overlay_height",
     "overlay_visual_top_gap", "overlay_visual_bottom_gap",
-    "panel_top", "panel_bottom", "panel_height",
+    "panel_top", "panel_bottom", "panel_height", "fullscreen_compensation_top",
     "cover_wait_ms", "track_transition_count", "track_playing_count",
     "track_rejected_count", "track_error_count", "prepared_count", "unprepared_count",
     "served_from_prefetch_count", "slow_transition_count", "max_play_to_playing_ms",
@@ -164,7 +164,7 @@
     "served_from_prefetch", "is_ios", "is_standalone", "prepared", "prefetch_ready",
     "cover_timed_out", "visible", "unexpected", "navigation_active", "fullscreen_open",
     "has_playback_session", "has_source", "is_home", "is_album",
-    "cover_ready_at_first_paint", "cover_ready_at_second_paint"
+    "cover_ready_at_first_paint", "cover_ready_at_second_paint", "fullscreen_compensated"
   ]);
 
   function now() {

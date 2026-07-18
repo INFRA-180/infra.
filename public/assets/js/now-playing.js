@@ -52,6 +52,87 @@
     return Number.isFinite(number) ? Math.round(number * 100) / 100 : 0;
   }
 
+  function isStandaloneDisplayMode() {
+    return Boolean(
+      (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches) ||
+      navigator.standalone === true
+    );
+  }
+
+  function readViewportCssEnvironment() {
+    const root = document.documentElement;
+    const values = {
+      safe_area_top: 0,
+      safe_area_right: 0,
+      safe_area_bottom: 0,
+      safe_area_left: 0,
+      css_vh_height: 0,
+      css_dvh_height: 0
+    };
+    const probe = document.createElement("div");
+    probe.setAttribute("aria-hidden", "true");
+    probe.style.cssText = [
+      "position:absolute",
+      "top:0",
+      "left:0",
+      "width:1px",
+      "visibility:hidden",
+      "pointer-events:none",
+      "box-sizing:border-box",
+      "padding-top:env(safe-area-inset-top, 0px)",
+      "padding-right:env(safe-area-inset-right, 0px)",
+      "padding-bottom:env(safe-area-inset-bottom, 0px)",
+      "padding-left:env(safe-area-inset-left, 0px)"
+    ].join(";");
+    try {
+      root.appendChild(probe);
+      const computed = window.getComputedStyle(probe);
+      values.safe_area_top = roundedViewportMetric(parseFloat(computed.paddingTop));
+      values.safe_area_right = roundedViewportMetric(parseFloat(computed.paddingRight));
+      values.safe_area_bottom = roundedViewportMetric(parseFloat(computed.paddingBottom));
+      values.safe_area_left = roundedViewportMetric(parseFloat(computed.paddingLeft));
+      probe.style.height = "100vh";
+      values.css_vh_height = roundedViewportMetric(probe.getBoundingClientRect().height);
+      probe.style.height = "100dvh";
+      values.css_dvh_height = roundedViewportMetric(probe.getBoundingClientRect().height);
+    } finally {
+      probe.remove();
+    }
+    return values;
+  }
+
+  function clearIosStandaloneViewportCompensation() {
+    const root = document.documentElement;
+    root.classList.remove("ios-standalone-viewport-gap");
+    root.style.removeProperty("--ios-standalone-viewport-gap");
+    audioState.nowPlayingViewportCompensationPx = 0;
+  }
+
+  function syncIosStandaloneViewportCompensation() {
+    clearIosStandaloneViewportCompensation();
+    if (!isIosDevice() || !isStandaloneDisplayMode()) return 0;
+
+    const visualViewport = window.visualViewport || null;
+    const viewportWidth = visualViewport ? Number(visualViewport.width) : Number(window.innerWidth);
+    const viewportHeight = visualViewport ? Number(visualViewport.height) : Number(window.innerHeight);
+    const screenWidth = Number(window.screen && window.screen.width);
+    const screenHeight = Number(window.screen && window.screen.height);
+    const visualTop = visualViewport ? Number(visualViewport.offsetTop) || 0 : 0;
+    const cssEnvironment = readViewportCssEnvironment();
+    const gap = Math.round(screenHeight - viewportHeight);
+    const isPortrait = viewportHeight >= viewportWidth && screenHeight >= screenWidth;
+    const hasBrokenTopInset = cssEnvironment.safe_area_top < 1;
+    const hasStandaloneViewportGap = gap >= 20 && gap <= 80;
+
+    if (!isPortrait || visualTop !== 0 || !hasBrokenTopInset || !hasStandaloneViewportGap) return 0;
+
+    const root = document.documentElement;
+    root.style.setProperty("--ios-standalone-viewport-gap", `${gap}px`);
+    root.classList.add("ios-standalone-viewport-gap");
+    audioState.nowPlayingViewportCompensationPx = gap;
+    return gap;
+  }
+
   function readFullscreenViewportMetrics() {
     const transport = audioState.transport || {};
     const overlayRect = transport.overlay && typeof transport.overlay.getBoundingClientRect === "function"
@@ -67,10 +148,9 @@
     const visualWidth = visualViewport ? Number(visualViewport.width) || 0 : Number(window.innerWidth) || 0;
     const screenValue = window.screen || {};
     const root = document.documentElement;
-    const standalone = Boolean(
-      (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches) ||
-      navigator.standalone === true
-    );
+    const standalone = isStandaloneDisplayMode();
+    const cssEnvironment = readViewportCssEnvironment();
+    const compensationTop = roundedViewportMetric(audioState.nowPlayingViewportCompensationPx);
     const metrics = {
       trigger: "now_playing_open",
       surface: "fullscreen",
@@ -91,7 +171,9 @@
       visual_viewport_offset_top: roundedViewportMetric(visualTop),
       visual_viewport_offset_left: roundedViewportMetric(visualLeft),
       visual_viewport_scale: roundedViewportMetric(visualViewport ? visualViewport.scale : 1),
-      device_pixel_ratio: roundedViewportMetric(window.devicePixelRatio || 1)
+      device_pixel_ratio: roundedViewportMetric(window.devicePixelRatio || 1),
+      fullscreen_compensation_top: compensationTop,
+      fullscreen_compensated: compensationTop > 0
     };
 
     if (overlayRect) {
@@ -110,36 +192,7 @@
       metrics.panel_height = roundedViewportMetric(panelRect.height);
     }
 
-    const probe = document.createElement("div");
-    probe.setAttribute("aria-hidden", "true");
-    probe.style.cssText = [
-      "position:absolute",
-      "top:0",
-      "left:0",
-      "width:1px",
-      "visibility:hidden",
-      "pointer-events:none",
-      "box-sizing:border-box",
-      "padding-top:env(safe-area-inset-top, 0px)",
-      "padding-right:env(safe-area-inset-right, 0px)",
-      "padding-bottom:env(safe-area-inset-bottom, 0px)",
-      "padding-left:env(safe-area-inset-left, 0px)"
-    ].join(";");
-    try {
-      root.appendChild(probe);
-      const computed = window.getComputedStyle(probe);
-      metrics.safe_area_top = roundedViewportMetric(parseFloat(computed.paddingTop));
-      metrics.safe_area_right = roundedViewportMetric(parseFloat(computed.paddingRight));
-      metrics.safe_area_bottom = roundedViewportMetric(parseFloat(computed.paddingBottom));
-      metrics.safe_area_left = roundedViewportMetric(parseFloat(computed.paddingLeft));
-      probe.style.height = "100vh";
-      metrics.css_vh_height = roundedViewportMetric(probe.getBoundingClientRect().height);
-      probe.style.height = "100dvh";
-      metrics.css_dvh_height = roundedViewportMetric(probe.getBoundingClientRect().height);
-    } finally {
-      probe.remove();
-    }
-    return metrics;
+    return Object.assign(metrics, cssEnvironment);
   }
 
   function scheduleFullscreenViewportProbe() {
@@ -385,6 +438,7 @@
 
     document.body.classList.remove("now-playing-open");
     document.documentElement.classList.remove("now-playing-open");
+    clearIosStandaloneViewportCompensation();
     document.body.style.removeProperty("position");
     document.body.style.removeProperty("top");
     document.body.style.removeProperty("left");
@@ -409,6 +463,7 @@
       (audioState.playlist && audioState.playlist.length)
     );
     if (!canOpen) return;
+    syncIosStandaloneViewportCompensation();
     audioState.nowPlayingMiniRect = getNowPlayingMiniRect();
     audioState.nowPlayingScrollY = window.scrollY || window.pageYOffset || 0;
     audioState.nowPlayingOpen = true;

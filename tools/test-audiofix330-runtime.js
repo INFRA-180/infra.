@@ -1070,6 +1070,165 @@ function testPendingSourceShowsZeroTimeInMiniAndOverlay() {
   assert.strictEqual(state.transport.miniProgress.disabled, false);
 }
 
+function runIosFullscreenViewportCase(options) {
+  const values = options || {};
+  const classes = new Set();
+  const customProperties = new Map();
+  const classList = {
+    add(name) { classes.add(String(name)); },
+    remove(name) { classes.delete(String(name)); },
+    contains(name) { return classes.has(String(name)); }
+  };
+  const rootStyle = {
+    setProperty(name, value) { customProperties.set(String(name), String(value)); },
+    removeProperty(name) { customProperties.delete(String(name)); }
+  };
+  const bodyStyle = {
+    removeProperty(name) { delete this[String(name)]; }
+  };
+  const root = {
+    clientWidth: values.screenWidth,
+    clientHeight: values.viewportHeight,
+    classList,
+    style: rootStyle,
+    appendChild() {}
+  };
+  const body = {
+    classList,
+    style: bodyStyle,
+    appendChild() {}
+  };
+  const sandbox = createSandbox({
+    navigator: {
+      standalone: true,
+      userActivation: { isActive: true, hasBeenActive: true },
+      mediaSession: null
+    },
+    screen: {
+      width: values.screenWidth,
+      height: values.screenHeight,
+      orientation: { type: "portrait-primary" }
+    },
+    innerWidth: values.screenWidth,
+    innerHeight: values.viewportHeight,
+    visualViewport: {
+      width: values.screenWidth,
+      height: values.viewportHeight,
+      offsetTop: 0,
+      offsetLeft: 0,
+      scale: 1
+    },
+    devicePixelRatio: 3,
+    matchMedia(query) {
+      return { matches: String(query).includes("display-mode: standalone") };
+    },
+    getComputedStyle() {
+      return {
+        paddingTop: `${values.safeAreaTop}px`,
+        paddingRight: "0px",
+        paddingBottom: "34px",
+        paddingLeft: "0px"
+      };
+    },
+    requestAnimationFrame(callback) {
+      callback();
+      return 1;
+    },
+    scrollTo() {},
+    document: {
+      visibilityState: "visible",
+      body,
+      documentElement: root,
+      getElementById() { return null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      addEventListener() {},
+      createElement() {
+        return {
+          style: {},
+          setAttribute() {},
+          remove() {},
+          getBoundingClientRect() {
+            const height = this.style.height === "100vh"
+              ? values.screenHeight
+              : (this.style.height === "100dvh" ? values.viewportHeight : 0);
+            return { top: 0, right: 1, bottom: height, left: 0, width: 1, height };
+          }
+        };
+      }
+    }
+  });
+  const telemetry = [];
+  const overlayStyle = { setProperty() {}, removeProperty() {} };
+  const overlay = {
+    hidden: true,
+    style: overlayStyle,
+    removeAttribute() {},
+    setAttribute() {},
+    getBoundingClientRect() {
+      const compensation = Number(values.screenHeight - values.viewportHeight);
+      const compensated = classes.has("ios-standalone-viewport-gap");
+      const top = compensated ? -compensation : 0;
+      const bottom = compensated ? values.viewportHeight : values.screenHeight;
+      return {
+        top,
+        right: values.screenWidth,
+        bottom,
+        left: 0,
+        width: values.screenWidth,
+        height: bottom - top
+      };
+    }
+  };
+  const state = {
+    audio: { src: "https://media.test/fullscreen.m4a", currentSrc: "https://media.test/fullscreen.m4a" },
+    playlist: [{ name: "Fullscreen", album: "Test", src: "https://media.test/fullscreen.m4a" }],
+    transport: { overlay }
+  };
+  loadScript(sandbox, NOW_PLAYING_PATH);
+  const nowPlaying = sandbox.InfraNowPlaying.createNowPlaying({
+    audioState: state,
+    isIosDevice: () => true,
+    getCurrentPlayableAudioSrc: () => state.audio.src,
+    getCurrentPlaylistTrack: () => state.playlist[0],
+    trackAudioRuntimeEvent(type, data) {
+      telemetry.push(Object.assign({ event: type }, data || {}));
+    }
+  });
+  nowPlaying.openNowPlayingOverlay();
+  return { nowPlaying, state, classes, customProperties, telemetry };
+}
+
+function testMeasuredIosStandaloneFullscreenCompensation() {
+  const mini = runIosFullscreenViewportCase({
+    screenWidth: 375,
+    screenHeight: 812,
+    viewportHeight: 762,
+    safeAreaTop: 0
+  });
+  assert(mini.classes.has("ios-standalone-viewport-gap"));
+  assert.strictEqual(mini.customProperties.get("--ios-standalone-viewport-gap"), "50px");
+  assert.strictEqual(mini.state.nowPlayingViewportCompensationPx, 50);
+  assert.strictEqual(mini.telemetry.length, 1);
+  assert.strictEqual(mini.telemetry[0].fullscreen_compensated, true);
+  assert.strictEqual(mini.telemetry[0].fullscreen_compensation_top, 50);
+  assert.strictEqual(mini.telemetry[0].overlay_visual_top_gap, -50);
+  assert.strictEqual(mini.telemetry[0].overlay_visual_bottom_gap, 0);
+  mini.nowPlaying.closeNowPlayingOverlay();
+  assert(!mini.classes.has("ios-standalone-viewport-gap"));
+
+  const healthy = runIosFullscreenViewportCase({
+    screenWidth: 390,
+    screenHeight: 844,
+    viewportHeight: 844,
+    safeAreaTop: 47
+  });
+  assert(!healthy.classes.has("ios-standalone-viewport-gap"));
+  assert.strictEqual(healthy.state.nowPlayingViewportCompensationPx, 0);
+  assert.strictEqual(healthy.telemetry[0].fullscreen_compensated, false);
+  assert.strictEqual(healthy.telemetry[0].fullscreen_compensation_top, 0);
+}
+
 async function testIntegratedFivePreparedTransportSkips() {
   const sandbox = createSandbox();
   loadScript(sandbox, RADIO_PATH);
@@ -2149,6 +2308,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   testShuffleScopesTheCurrentAlbumWhenRadioIsOff();
   testShuffleFromRadioSwitchesToCurrentAlbumWithoutRestart();
   testPendingSourceShowsZeroTimeInMiniAndOverlay();
+  testMeasuredIosStandaloneFullscreenCompensation();
   await testIntegratedFivePreparedTransportSkips();
   testMaterializedShuffleOrder();
   await testPrefetchCacheRehydrationAndCorruptFallback();
@@ -2161,7 +2321,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix353 runtime checks passed.");
+  console.log("audiofix354 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

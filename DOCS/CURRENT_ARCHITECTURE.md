@@ -1,15 +1,15 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 18 juillet 2026.
+État de référence : 19 juillet 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix353-20260718`
-- Service Worker : `infra-shell-20260718-audio353`
-- CSS figé : `audiofix353-20260718`
+- Runtime : `audiofix354-20260719`
+- Service Worker : `infra-shell-20260719-audio354`
+- CSS figé : `audiofix354-20260719`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album

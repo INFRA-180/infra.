@@ -1,5 +1,28 @@
 # Implementation Notes
 
+## 2026-07-19 — audiofix354 compensation fullscreen iOS 26 mesurée
+
+- Deux sondes `audiofix353` isolent la divergence WebKit :
+  - iPhone `390 × 844` : viewport `844`, safe area haute `47`, `100vh = 100dvh`,
+    aucun écart d’overlay ;
+  - iPhone 13 mini `375 × 812` : viewport visible `762`, safe area haute incorrectement
+    égale à `0`, `100vh = 812`, `100dvh = 762` et débordement inférieur de `50 px`.
+- Le correctif ne cible aucun modèle en dur. À chaque ouverture fullscreen, il s’active uniquement
+  en iOS standalone, portrait, lorsque la safe area haute vaut zéro et que
+  `screen.height - visualViewport.height` se situe entre 20 et 80 px.
+- Dans ce seul cas, la valeur mesurée devient `--ios-standalone-viewport-gap` : l’overlay remonte
+  de cet écart, sa hauteur physique rejoint exactement le bas visible, et le même écart est ajouté
+  au padding supérieur du panel afin que les contrôles restent à leur position précédente.
+  Le fond couvre ainsi la status bar sans déplacer le bas ni ajouter de remplissage sous la Home
+  Indicator.
+- La sonde différée indique désormais si la compensation a été appliquée et sa valeur. Elle reste
+  limitée à un événement par lancement et utilise le lot de session existant. Le filtre Cloudflare
+  compatible est déployé sous la version `20d0fb5b-f216-45c1-9455-07c405e3c791`.
+- Aucun `100lvh` n’est introduit. Le lecteur, la navigation, les covers, le prefetch v9,
+  Media Session et l’iPhone dont la safe area est correcte restent inchangés.
+- Identifiants atomiques : `audiofix354-20260719`, `infra-shell-20260719-audio354` et CSS
+  `audiofix354-20260719`. La validation visuelle finale reste celle de l’utilisateur sur iPhone.
+
 ## 2026-07-18 — audiofix353 sonde fullscreen iOS et croix QR pure
 
 - La fermeture de la modale QR reste à gauche avec une cible tactile invisible de `44 × 44 px`,

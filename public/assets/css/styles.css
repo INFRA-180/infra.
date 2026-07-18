@@ -4297,6 +4297,22 @@ body.now-playing-open {
     min-height: 100vh;
     max-height: 100vh;
   }
+
+  /* audiofix354: iOS 26 can reserve a top status-bar viewport on 375x812-class
+     devices while incorrectly reporting safe-area-inset-top as zero. The
+     runtime class is applied only when that mismatch is measured. */
+  html.ios-standalone-viewport-gap.now-playing-open .now-playing-overlay {
+    top: calc(0px - var(--ios-standalone-viewport-gap));
+    bottom: 0;
+    height: auto;
+    min-height: 0;
+  }
+
+  html.ios-standalone-viewport-gap.now-playing-open .now-playing-panel {
+    min-height: calc(100dvh + var(--ios-standalone-viewport-gap));
+    max-height: calc(100dvh + var(--ios-standalone-viewport-gap));
+    padding-top: calc(16px + var(--ios-standalone-viewport-gap));
+  }
 }
 
 @media (min-width: 860px) {

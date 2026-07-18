@@ -1,5 +1,27 @@
 # Implementation Notes
 
+## 2026-07-18 — audiofix353 sonde fullscreen iOS et croix QR pure
+
+- La fermeture de la modale QR reste à gauche avec une cible tactile invisible de `44 × 44 px`,
+  mais son état tactile/focus n’affiche plus de cercle : seule la croix rouge INFRA reste visible.
+  Le bouton de copie à droite et son retour `Lien copié` sont inchangés.
+- Le premier passage en lecteur fullscreen de chaque lancement iOS ajoute un unique événement
+  `fullscreen_viewport` au journal de session existant. Il mesure `screen`, `innerHeight`,
+  `visualViewport`, `100vh`, `100dvh`, les quatre safe areas et les rectangles overlay/panel.
+- Cette sonde est bornée à une mesure par lancement, ne crée aucun heartbeat, aucune requête
+  Worker supplémentaire et part dans le même résumé différé que la télémétrie audio. Le rapport
+  privé expose directement les écarts haut/bas pour comparer deux modèles d’iPhone. Le filtre
+  Cloudflare compatible a été déployé sous la version
+  `543f0baa-5ebf-48dc-a1b2-c462adad2ab8`.
+- Aucun correctif géométrique spéculatif n’est appliqué avant les mesures du second appareil :
+  viewport, safe areas, hauteur, ancrage inférieur, fullscreen, lecteur, prefetch et Media Session
+  restent inchangés.
+- Références : [Apple — transformer un site en app web](https://support.apple.com/fr-fr/guide/iphone/iphea86e5236/ios),
+  [WebKit — `viewport-fit=cover`](https://webkit.org/blog/7929/designing-websites-for-iphone-x/)
+  et [WebKit 301994 — régression fullscreen iOS 26](https://bugs.webkit.org/show_bug.cgi?id=301994).
+- Identifiants atomiques : `audiofix353-20260718`, `infra-shell-20260718-audio353` et CSS
+  `audiofix353-20260718`. La validation visuelle finale reste celle de l’utilisateur sur iPhone.
+
 ## 2026-07-18 — audiofix352 modale QR alignée sur le logo INFRA
 
 - Gel préalable : commit `12e2660`, conservé par le tag annoté

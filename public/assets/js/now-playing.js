@@ -43,7 +43,113 @@
     const getCurrentTrackArtwork = method(ctx, "getCurrentTrackArtwork", function () { return ""; });
     const normalizeArtworkUrl = method(ctx, "normalizeArtworkUrl", function (value) { return String(value || ""); });
     const formatTrackDuration = method(ctx, "formatTrackDuration", function () { return "0:00"; });
+    const trackAudioRuntimeEvent = method(ctx, "trackAudioRuntimeEvent");
     let nowPlayingQueueRenderKey = "";
+    let fullscreenViewportProbeSent = false;
+
+  function roundedViewportMetric(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.round(number * 100) / 100 : 0;
+  }
+
+  function readFullscreenViewportMetrics() {
+    const transport = audioState.transport || {};
+    const overlayRect = transport.overlay && typeof transport.overlay.getBoundingClientRect === "function"
+      ? transport.overlay.getBoundingClientRect()
+      : null;
+    const panelRect = transport.overlayPanel && typeof transport.overlayPanel.getBoundingClientRect === "function"
+      ? transport.overlayPanel.getBoundingClientRect()
+      : null;
+    const visualViewport = window.visualViewport || null;
+    const visualTop = visualViewport ? Number(visualViewport.offsetTop) || 0 : 0;
+    const visualLeft = visualViewport ? Number(visualViewport.offsetLeft) || 0 : 0;
+    const visualHeight = visualViewport ? Number(visualViewport.height) || 0 : Number(window.innerHeight) || 0;
+    const visualWidth = visualViewport ? Number(visualViewport.width) || 0 : Number(window.innerWidth) || 0;
+    const screenValue = window.screen || {};
+    const root = document.documentElement;
+    const standalone = Boolean(
+      (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches) ||
+      navigator.standalone === true
+    );
+    const metrics = {
+      trigger: "now_playing_open",
+      surface: "fullscreen",
+      display_mode: standalone ? "standalone" : "browser",
+      orientation: screenValue.orientation && screenValue.orientation.type
+        ? String(screenValue.orientation.type)
+        : (visualWidth > visualHeight ? "landscape" : "portrait"),
+      is_ios: true,
+      is_standalone: standalone,
+      screen_width: roundedViewportMetric(screenValue.width),
+      screen_height: roundedViewportMetric(screenValue.height),
+      inner_width: roundedViewportMetric(window.innerWidth),
+      inner_height: roundedViewportMetric(window.innerHeight),
+      root_client_width: roundedViewportMetric(root && root.clientWidth),
+      root_client_height: roundedViewportMetric(root && root.clientHeight),
+      visual_viewport_width: roundedViewportMetric(visualWidth),
+      visual_viewport_height: roundedViewportMetric(visualHeight),
+      visual_viewport_offset_top: roundedViewportMetric(visualTop),
+      visual_viewport_offset_left: roundedViewportMetric(visualLeft),
+      visual_viewport_scale: roundedViewportMetric(visualViewport ? visualViewport.scale : 1),
+      device_pixel_ratio: roundedViewportMetric(window.devicePixelRatio || 1)
+    };
+
+    if (overlayRect) {
+      metrics.overlay_top = roundedViewportMetric(overlayRect.top);
+      metrics.overlay_bottom = roundedViewportMetric(overlayRect.bottom);
+      metrics.overlay_width = roundedViewportMetric(overlayRect.width);
+      metrics.overlay_height = roundedViewportMetric(overlayRect.height);
+      metrics.overlay_visual_top_gap = roundedViewportMetric(overlayRect.top - visualTop);
+      metrics.overlay_visual_bottom_gap = roundedViewportMetric(
+        visualTop + visualHeight - overlayRect.bottom
+      );
+    }
+    if (panelRect) {
+      metrics.panel_top = roundedViewportMetric(panelRect.top);
+      metrics.panel_bottom = roundedViewportMetric(panelRect.bottom);
+      metrics.panel_height = roundedViewportMetric(panelRect.height);
+    }
+
+    const probe = document.createElement("div");
+    probe.setAttribute("aria-hidden", "true");
+    probe.style.cssText = [
+      "position:absolute",
+      "top:0",
+      "left:0",
+      "width:1px",
+      "visibility:hidden",
+      "pointer-events:none",
+      "box-sizing:border-box",
+      "padding-top:env(safe-area-inset-top, 0px)",
+      "padding-right:env(safe-area-inset-right, 0px)",
+      "padding-bottom:env(safe-area-inset-bottom, 0px)",
+      "padding-left:env(safe-area-inset-left, 0px)"
+    ].join(";");
+    try {
+      root.appendChild(probe);
+      const computed = window.getComputedStyle(probe);
+      metrics.safe_area_top = roundedViewportMetric(parseFloat(computed.paddingTop));
+      metrics.safe_area_right = roundedViewportMetric(parseFloat(computed.paddingRight));
+      metrics.safe_area_bottom = roundedViewportMetric(parseFloat(computed.paddingBottom));
+      metrics.safe_area_left = roundedViewportMetric(parseFloat(computed.paddingLeft));
+      probe.style.height = "100vh";
+      metrics.css_vh_height = roundedViewportMetric(probe.getBoundingClientRect().height);
+      probe.style.height = "100dvh";
+      metrics.css_dvh_height = roundedViewportMetric(probe.getBoundingClientRect().height);
+    } finally {
+      probe.remove();
+    }
+    return metrics;
+  }
+
+  function scheduleFullscreenViewportProbe() {
+    if (fullscreenViewportProbeSent || !isIosDevice()) return;
+    fullscreenViewportProbeSent = true;
+    requestAnimationFrame(function () {
+      if (!audioState.nowPlayingOpen) return;
+      trackAudioRuntimeEvent("fullscreen_viewport", readFullscreenViewportMetrics());
+    });
+  }
 
   function readNowPlayingVolumeVisible() {
     if (isIosDevice()) return false;
@@ -330,6 +436,7 @@
     requestAnimationFrame(function () {
       animateNowPlayingPanel("open");
     });
+    scheduleFullscreenViewportProbe();
   }
 
   function closeNowPlayingOverlay() {

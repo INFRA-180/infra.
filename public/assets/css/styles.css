@@ -1656,6 +1656,14 @@ body.home-screen {
 
 .share-dialog-close {
   grid-column: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.share-dialog-close:hover,
+.share-dialog-close:focus-visible,
+.share-dialog-close:active {
+  background: transparent;
+  outline: 0;
 }
 
 .share-copy {

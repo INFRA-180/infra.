@@ -22,6 +22,7 @@
     "external_resume_recovery_start",
     "external_resume_recovery_resolved",
     "external_resume_recovery_failed",
+    "fullscreen_viewport",
     "first_byte",
     "global_playlist_build_done",
     "global_playlist_build_start",
@@ -85,6 +86,7 @@
   ]);
   const DIRECT_EVENTS = new Set([
     "external_resume_recovery_failed",
+    "fullscreen_viewport",
     "mini_player_visibility",
     "prefetch_error",
     "recovery_failed",
@@ -110,7 +112,7 @@
     "reason", "error_name", "action", "strategy", "cache_hint", "state",
     "phase", "mode", "playlist_kind", "audio_session_state", "audio_session_type",
     "from_album", "to_album", "result", "recovery_reason", "intent_reason",
-    "route_kind"
+    "route_kind", "display_mode", "orientation"
   ]);
   const TELEMETRY_NUMBER_FIELDS = new Set([
     "timestamp_ms", "delta_ms", "duration_before_play_ms", "duration_ms", "delay_ms",
@@ -124,6 +126,15 @@
     "guard_age_ms", "guard_current_time", "progressed_seconds", "playback_rate",
     "play_call_ms", "loadstart_ms", "canplay_ms", "play_resolved_ms", "playing_ms",
     "waiting_count", "stalled_count", "prefetch_age_ms", "render_ms", "swap_ms",
+    "screen_width", "screen_height", "inner_width", "inner_height",
+    "root_client_width", "root_client_height",
+    "visual_viewport_width", "visual_viewport_height",
+    "visual_viewport_offset_top", "visual_viewport_offset_left", "visual_viewport_scale",
+    "device_pixel_ratio", "safe_area_top", "safe_area_right", "safe_area_bottom", "safe_area_left",
+    "css_vh_height", "css_dvh_height",
+    "overlay_top", "overlay_bottom", "overlay_width", "overlay_height",
+    "overlay_visual_top_gap", "overlay_visual_bottom_gap",
+    "panel_top", "panel_bottom", "panel_height",
     "cover_wait_ms", "track_transition_count", "track_playing_count",
     "track_rejected_count", "track_error_count", "prepared_count", "unprepared_count",
     "served_from_prefetch_count", "slow_transition_count", "max_play_to_playing_ms",

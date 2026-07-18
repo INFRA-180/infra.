@@ -14,10 +14,10 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix352-20260718";
-const shellRelease = "infra-shell-20260718-audio352";
-const cssRelease = "audiofix352-20260718";
-const frozenCssSha256 = "4b5a73305f5e8657adbb652dcf110da0b2fd9c0458a38d5beda5442fa18674bd";
+const release = "audiofix353-20260718";
+const shellRelease = "infra-shell-20260718-audio353";
+const cssRelease = "audiofix353-20260718";
+const frozenCssSha256 = "b631067f1447cadbf6260a619a203aab312306635a3bbb2e811dad00d0f5d55e";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");
@@ -45,9 +45,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix352");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix352");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio352");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix353");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix353");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio353");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -286,10 +286,14 @@ expect(scripts.includes('releasePwaCoverHold("replace");'), "album taps do not c
 expect(catalogLoader.includes("readCachedLiveCatalogLatest()"), "validated live CacheStorage is not consulted at startup");
 expect(catalogLoader.includes('catalogState.catalogBundleSource = cachedLive ? "live-cache" : "local"'), "catalogue startup does not preserve cached live releases");
 expect(catalogLoader.includes("fetchLiveCatalogLatest().catch(function () {})"), "live catalogue refresh is not detached from startup");
+expect(nowPlaying.includes('trackAudioRuntimeEvent("fullscreen_viewport"'), "iOS fullscreen viewport telemetry is missing");
+expect(nowPlaying.includes("fullscreenViewportProbeSent"), "fullscreen viewport telemetry is not bounded per launch");
+expect(telemetry.includes('"fullscreen_viewport"'), "fullscreen viewport telemetry is not journaled");
 
 const cssHash = crypto.createHash("sha256").update(styles).digest("hex");
-expect(cssHash === frozenCssSha256, "styles.css differs from the frozen geometry plus the isolated QR modal redesign");
+expect(cssHash === frozenCssSha256, "styles.css differs from the frozen geometry plus the isolated QR close-state change");
 expect(!styles.includes("100lvh"), "forbidden 100lvh geometry was introduced");
+expect(styles.includes(".share-dialog-close:focus-visible"), "QR close control does not keep the pure cross state");
 expect(styles.includes("transform: translateZ(0) scale(1.002)"), "WebKit cover seam guard is missing");
 expect(styles.includes("bottom: env(safe-area-inset-bottom);"), "mobile mini-player is not anchored exactly above the Home Indicator safe area");
 
@@ -326,4 +330,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix352.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix353.");

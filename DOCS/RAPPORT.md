@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 18 juillet 2026
-Baseline : `audiofix352-20260718`
-Service Worker : `infra-shell-20260718-audio352`
+Baseline : `audiofix353-20260718`
+Service Worker : `infra-shell-20260718-audio353`
 
 ## État
 
@@ -22,7 +22,7 @@ Service Worker : `infra-shell-20260718-audio352`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix352-20260718` figé.
+- CSS `audiofix353-20260718` figé.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

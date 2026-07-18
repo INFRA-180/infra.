@@ -24,8 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Verify public boundary
-        run: node tools/verify-public-boundary.js
+      - name: Audit release
+        run: node tools/release-audit.js
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload public site

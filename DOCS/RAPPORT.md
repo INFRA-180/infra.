@@ -1,25 +1,44 @@
-# RAPPORT — rollback public complet au 3 juillet 2026
+# Rapport courant — SITE INFRA
 
-Date : 2026-07-14
-Commit source : `760092e` — `fix: harden telemetry export and ios resume`
-Runtime restauré : `audiofix280-20260703`
-Service Worker restauré : `infra-shell-20260701-audio279`
+Date : 18 juillet 2026
+Baseline : `audiofix348-20260717`
+Commit : `f8a19aa`
+Service Worker : `infra-shell-20260717-audio348`
 
-## Périmètre restauré
+## État
 
-L'intégralité du dossier public a été restaurée depuis le dernier commit daté du 3 juillet : CSS, lecteur et modules audio, Service Worker, catalogue et durées, accueil, 31 pages album, 3 pages apps et interface publique Sphragis.
+- 31 albums, 283 pistes et 283 durées.
+- Catalogue live et fallback Git alignés.
+- Une pochette WebP 1200 canonique par album.
+- Prefetch v9 par segments de 2 MiB, N+1 à N+5.
+- Radio globale, Shuffle album et lecture chronologique consolidés.
+- Fullscreen, mini-player et Media Session validés par l’utilisateur sur iPhone.
+- CSS `audiofix347-20260717` figé.
+- Frontière de publication limitée à `public/`.
 
-Aucun correctif postérieur au 3 juillet n'a été conservé dans `public/`. Le rollback est porté par un nouveau commit réversible; l'historique Git n'a pas été réécrit.
+## Contrôles
 
-## Vérifications
+La commande de référence est :
 
-- Arbre `public/` identique au commit `760092e` : OK.
-- Syntaxe de tous les JavaScript publics et du Service Worker : OK.
-- Frontière publique : OK.
-- Catalogue : 31 albums, 280 pistes, 280 durées, aucune alerte.
-- Assets du shell présents : OK.
-- Chromium mobile 390 × 844 : accueil chargé, Play vers `COMETE`, Suivant vers `PIXEL`, lecteur plein écran et `À suivre` ouverts, zéro erreur console.
+```bash
+node tools/release-audit.js
+```
 
-## Validation restante
+Elle couvre la syntaxe JavaScript, le catalogue, les pochettes canoniques, le cache audio,
+le Service Worker, la navigation SPA, la télémétrie, la stabilité PWA et la frontière
+public/privé.
 
-La PWA iPhone doit être complètement fermée puis rouverte après le déploiement afin d'adopter le runtime et le Service Worker restaurés. Une suppression/réinstallation peut être nécessaire si iOS conserve l'ancien shell installé.
+## Décision
+
+Le runtime est en phase de maintenance. Aucun changement spéculatif de l’audio, du prefetch,
+du fullscreen, du CSS, de Media Session ou de la navigation ne doit être engagé sans
+régression reproductible.
+
+Les prochaines actions recommandées sont documentaires et opérationnelles :
+
+1. conserver une référence d’architecture courte ;
+2. appliquer une politique de rétention au staging Music/R2 ;
+3. nettoyer séparément les anciennes variantes de pochettes ;
+4. centraliser progressivement la génération des données et versions.
+
+La validation UX finale reste effectuée par l’utilisateur sur la PWA iPhone.

@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-07-18 — consolidation maintenance et audit de release
+
+- La baseline publique reste strictement `audiofix348-20260717` / `infra-shell-20260717-audio348` ; aucun fichier runtime, CSS, audio, prefetch, navigation, Media Session ou Service Worker n’est modifié.
+- `README.md`, `DOCS/CURRENT_ARCHITECTURE.md`, `DOCS/MAINTENANCE_PLAN.md` et `DOCS/RAPPORT.md` fournissent une référence courte, actuelle et distincte de l’historique détaillé.
+- `node tools/release-audit.js` devient la commande code-only unique : versions, syntaxe publique, catalogue 31/283, 31 covers 1200 uniques, absence de références runtime 480/900, neuf suites de régression, frontière publique et `git diff --check`.
+- Le workflow GitHub Pages exécute désormais cet audit complet avant de publier `public/`.
+- Les futurs nettoyages du staging Music/R2 et des pochettes historiques restent explicitement séparés : aucune suppression n’est effectuée par ce lot.
+
 ## 2026-07-17 — audiofix348 cover canonique ADC13
 
 - La nouvelle source utilisateur `/Users/infra/Desktop/ADC13.jpg` est copiée sans modification sous `assets/music/sources/adc-13-original-6e983f31.jpg` (SHA-256 `6e983f31720bf24ae6888b3db37fea04804a02d50ba5077c239f43952432726a`). Elle est carrée, sRGB et mesure 2442 × 2442 px.

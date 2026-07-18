@@ -131,7 +131,16 @@
     "prefetch_error_count", "prefetch_cache_ready_count", "spa_navigation_count",
     "spa_abort_count", "spa_slow_count", "max_spa_navigation_ms",
     "mini_visibility_change_count", "mini_hidden_count", "mini_unexpected_hidden_count",
-    "navigation_token", "cover_natural_width", "cover_display_px"
+    "navigation_token", "cover_natural_width", "cover_display_px",
+    "first_paint_ms", "visible_cover_count", "visible_cover_ready_count",
+    "spa_cover_not_ready_count", "max_first_paint_ms",
+    "html_cache_hit_count", "html_cache_miss_count",
+    "cover_cache_hit_count", "cover_cache_miss_count",
+    "storage_probe_count", "storage_persisted_state",
+    "storage_persist_request_count", "storage_persist_granted_count",
+    "storage_usage_mb", "storage_quota_mb", "storage_shell_present",
+    "storage_sw_controlled", "storage_cover_entries", "storage_audio_entries",
+    "storage_catalog_entries"
   ]);
   const TELEMETRY_BOOLEAN_FIELDS = new Set([
     "fine_event", "navigator_on_line", "auto", "error", "health_session_active",
@@ -141,7 +150,8 @@
     "controllerchange", "sw_reload_between", "reload_executed", "audio_fetch",
     "served_from_prefetch", "is_ios", "is_standalone", "prepared", "prefetch_ready",
     "cover_timed_out", "visible", "unexpected", "navigation_active", "fullscreen_open",
-    "has_playback_session", "has_source", "is_home", "is_album"
+    "has_playback_session", "has_source", "is_home", "is_album",
+    "cover_ready_at_first_paint"
   ]);
 
   function now() {
@@ -203,9 +213,26 @@
     "spa_abort_count",
     "spa_slow_count",
     "max_spa_navigation_ms",
+    "spa_cover_not_ready_count",
+    "max_first_paint_ms",
     "mini_visibility_change_count",
     "mini_hidden_count",
-    "mini_unexpected_hidden_count"
+    "mini_unexpected_hidden_count",
+    "html_cache_hit_count",
+    "html_cache_miss_count",
+    "cover_cache_hit_count",
+    "cover_cache_miss_count",
+    "storage_probe_count",
+    "storage_persisted_state",
+    "storage_persist_request_count",
+    "storage_persist_granted_count",
+    "storage_usage_mb",
+    "storage_quota_mb",
+    "storage_shell_present",
+    "storage_sw_controlled",
+    "storage_cover_entries",
+    "storage_audio_entries",
+    "storage_catalog_entries"
   ];
 
   function createSessionSummary() {
@@ -577,6 +604,47 @@
       const number = Number(value);
       if (!summary || !Object.prototype.hasOwnProperty.call(summary, field) || !Number.isFinite(number)) return;
       summary[field] = Math.max(Number(summary[field] || 0), Math.max(0, Math.round(number)));
+    }
+
+    function recordCacheObservation(kind, outcome, amount) {
+      const cacheKind = String(kind || "").trim().toLowerCase();
+      const cacheOutcome = String(outcome || "").trim().toLowerCase();
+      const field = cacheKind === "html"
+        ? (cacheOutcome === "hit" ? "html_cache_hit_count" : (cacheOutcome === "miss" ? "html_cache_miss_count" : ""))
+        : (cacheKind === "cover"
+            ? (cacheOutcome === "hit" ? "cover_cache_hit_count" : (cacheOutcome === "miss" ? "cover_cache_miss_count" : ""))
+            : "");
+      if (!field) return;
+      const session = ensureActiveSession();
+      if (!session) return;
+      incrementSummary(field, Math.max(1, Math.round(Number(amount) || 1)), session);
+      persistSession(session);
+    }
+
+    function recordStorageSnapshot(input) {
+      const source = input && typeof input === "object" ? input : {};
+      const session = ensureActiveSession();
+      const summary = getSessionSummary(session);
+      if (!session || !summary) return;
+      const fields = [
+        "storage_persisted_state",
+        "storage_persist_request_count",
+        "storage_persist_granted_count",
+        "storage_usage_mb",
+        "storage_quota_mb",
+        "storage_shell_present",
+        "storage_sw_controlled",
+        "storage_cover_entries",
+        "storage_audio_entries",
+        "storage_catalog_entries"
+      ];
+      summary.storage_probe_count = Math.max(1, Number(summary.storage_probe_count) || 0);
+      fields.forEach(function (field) {
+        const value = Number(source[field]);
+        if (!Number.isFinite(value) || value < 0) return;
+        summary[field] = Math.max(0, Math.round(value));
+      });
+      persistSession(session);
     }
 
     function refreshCompactEventReferences(session) {
@@ -1162,6 +1230,10 @@
         cache_hint: transition.cache_hint || "",
         cover_natural_width: transition.cover_natural_width || 0,
         cover_display_px: transition.cover_display_px || 0,
+        first_paint_ms: transition.first_paint_ms || 0,
+        visible_cover_count: transition.visible_cover_count || 0,
+        visible_cover_ready_count: transition.visible_cover_ready_count || 0,
+        cover_ready_at_first_paint: transition.cover_ready_at_first_paint !== false,
         controllerchange: Boolean(transition.controllerchange),
         sw_reload_between: Boolean(transition.sw_reload_between)
       });
@@ -1180,7 +1252,11 @@
         incrementSummary("spa_navigation_count", 1, session);
         if (transition.result !== "done") incrementSummary("spa_abort_count", 1, session);
         if (event.delta_ms >= SLOW_SPA_NAVIGATION_MS) incrementSummary("spa_slow_count", 1, session);
+        if (event.visible_cover_count > 0 && event.cover_ready_at_first_paint === false) {
+          incrementSummary("spa_cover_not_ready_count", 1, session);
+        }
         updateSummaryMax("max_spa_navigation_ms", event.delta_ms, session);
+        updateSummaryMax("max_first_paint_ms", event.first_paint_ms, session);
       }
       return upsertCompactEvent(`spa:${transition.key}`, event, session);
     }
@@ -1211,7 +1287,13 @@
         );
       }
       if (eventType === "spa_render_done") transition.render_ms = Math.round(Number(source.duration_ms) || 0);
-      if (eventType === "spa_swap_done") transition.swap_ms = Math.round(Number(source.duration_ms) || 0);
+      if (eventType === "spa_swap_done") {
+        transition.swap_ms = Math.round(Number(source.duration_ms) || 0);
+        transition.first_paint_ms = Math.max(0, Math.round(Number(source.first_paint_wait_ms) || 0));
+        transition.visible_cover_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_count) || 0));
+        transition.visible_cover_ready_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_ready_count) || 0));
+        transition.cover_ready_at_first_paint = source.paint_relevant_cover_ready !== false;
+      }
       if (eventType === "spa_html_response") {
         transition.strategy = String(source.strategy || "");
         transition.cache_hint = String(source.cache_hint || "");
@@ -1542,7 +1624,9 @@
       sendMonitoringLog,
       logAuditEvent,
       hasPendingEvents,
-      initLifecycle
+      initLifecycle,
+      recordCacheObservation,
+      recordStorageSnapshot
     };
   }
 

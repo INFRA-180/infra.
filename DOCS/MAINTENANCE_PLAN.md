@@ -67,15 +67,11 @@ Ordre recommandé :
 4. exécuter l’audit complet ;
 5. laisser l’utilisateur valider la PWA.
 
-## Sujet optionnel — léger clignotement des covers
+## Navigation et covers — stabilisées par audiofix350
 
-Ne rien modifier tant que le défaut reste mineur. S’il devient gênant, mesurer uniquement :
-
-- tap album ;
-- obtention du document ;
-- insertion DOM ;
-- decode de la cover canonique ;
-- premier paint visible.
-
-Éviter de réintroduire clone, snapshot, longue attente decode ou nouvelle variante 480/900 :
-l’historique montre que ces solutions ont ajouté des courses et des blocages.
+- La destination SPA est insérée avant le retrait de l’ancienne route.
+- Le retour Accueil réutilise son DOM et réconcilie les cartes sans vider la grille.
+- La cover canonique de destination est décodée au maximum une fois.
+- Clone, snapshot, canvas, attente graphique fixe et variantes 480/900 restent interdits.
+- Les futurs diagnostics utilisent le résumé de session existant : cache HTML, cache cover
+  et état de la cover au premier paint, sans augmenter les appels Worker/KV.

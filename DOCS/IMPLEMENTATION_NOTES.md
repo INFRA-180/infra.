@@ -1,5 +1,26 @@
 # Implementation Notes
 
+## 2026-07-18 — audiofix350 navigation PWA atomique et cache local observable
+
+- Gel préalable : commit `9a2696f`, conservé par le tag annoté
+  `backup-audiofix349-20260718`.
+- Les transitions SPA n’utilisent plus de clone, canvas, snapshot de l’accueil ni maintien
+  graphique de 320 ms. La destination complète est insérée avant le retrait de l’ancienne
+  route, dans la même tâche de rendu ; le retour Accueil réutilise directement son DOM.
+- La cover canonique de destination est verrouillée une seule fois et son élément réel est
+  décodé au maximum une fois. L’accueil réconcilie les cartes existantes sans vider la grille.
+  Sur PWA, la mémoire de covers est bornée à quatre entrées et la préparation à deux images
+  avec une seule tâche simultanée afin de ne pas concurrencer l’audio.
+- La première interaction PWA demande une fois le stockage persistant. Un inventaire borné
+  de Cache Storage, les hits/miss HTML et covers, ainsi que l’état de la cover au premier
+  paint enrichissent le `session_summary` existant. Aucun heartbeat, nouvel appel Worker,
+  nouvelle clé KV ou lecture de corps mis en cache n’est ajouté.
+- Identifiants atomiques : `audiofix350-20260718` et
+  `infra-shell-20260718-audio350`. Le cache audio v9, le prefetch, la lecture, Media Session,
+  le fullscreen et le CSS `audiofix347-20260717` restent inchangés ; le fichier CSS conserve
+  le SHA-256 `8d72c713e4176f91ee508327cad73a64e79ee7dd6e0129f94d2a6026d949f3ad`.
+  Les tests sont code-only et la validation UX finale reste celle de l’utilisateur sur iPhone.
+
 ## 2026-07-18 — audiofix349 commandes Favoris simplifiées
 
 - L’en-tête de la page Favoris affiche uniquement `Favoris`. Le compteur et la durée totale

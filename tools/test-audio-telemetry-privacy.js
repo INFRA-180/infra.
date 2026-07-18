@@ -417,6 +417,21 @@ async function settle(turns = 20) {
     to_url: "https://secret.example/music/target.html?token=secret",
     cached: true
   };
+  telemetry.recordCacheObservation("html", "hit");
+  telemetry.recordCacheObservation("cover", "hit");
+  telemetry.recordCacheObservation("cover", "miss");
+  telemetry.recordStorageSnapshot({
+    storage_persisted_state: 2,
+    storage_persist_request_count: 1,
+    storage_persist_granted_count: 1,
+    storage_usage_mb: 18,
+    storage_quota_mb: 4096,
+    storage_shell_present: 1,
+    storage_sw_controlled: 1,
+    storage_cover_entries: 31,
+    storage_audio_entries: 6,
+    storage_catalog_entries: 1
+  });
   telemetry.trackRuntimeEvent("nav:album_start", navBase);
   tick(20);
   telemetry.trackRuntimeEvent("album_open_tap", navBase);
@@ -428,7 +443,13 @@ async function settle(turns = 20) {
   }));
   telemetry.trackRuntimeEvent("spa_swap_start", navBase);
   tick(30);
-  telemetry.trackRuntimeEvent("spa_swap_done", Object.assign({}, navBase, { duration_ms: 30 }));
+  telemetry.trackRuntimeEvent("spa_swap_done", Object.assign({}, navBase, {
+    duration_ms: 30,
+    first_paint_wait_ms: 18,
+    paint_relevant_cover_count: 1,
+    paint_relevant_cover_ready_count: 1,
+    paint_relevant_cover_ready: true
+  }));
   telemetry.trackRuntimeEvent("spa_render_done", Object.assign({}, navBase, { duration_ms: 90 }));
   telemetry.trackRuntimeEvent("album_open_done", navBase);
   telemetry.trackRuntimeEvent("nav:album_done", navBase);
@@ -518,8 +539,28 @@ async function settle(turns = 20) {
   assert.strictEqual(compactSummary.waiting_count, 2);
   assert.strictEqual(compactSummary.stalled_count, 1);
   assert.strictEqual(compactSummary.spa_navigation_count, 1);
+  assert.strictEqual(compactSummary.spa_cover_not_ready_count, 0);
+  assert.strictEqual(compactSummary.max_first_paint_ms, 18);
   assert.strictEqual(compactSummary.mini_visibility_change_count, 3);
   assert.strictEqual(compactSummary.mini_unexpected_hidden_count, 1);
+  assert.strictEqual(compactSummary.html_cache_hit_count, 1);
+  assert.strictEqual(compactSummary.html_cache_miss_count, 0);
+  assert.strictEqual(compactSummary.cover_cache_hit_count, 1);
+  assert.strictEqual(compactSummary.cover_cache_miss_count, 1);
+  assert.strictEqual(compactSummary.storage_probe_count, 1);
+  assert.strictEqual(compactSummary.storage_persisted_state, 2);
+  assert.strictEqual(compactSummary.storage_persist_request_count, 1);
+  assert.strictEqual(compactSummary.storage_persist_granted_count, 1);
+  assert.strictEqual(compactSummary.storage_usage_mb, 18);
+  assert.strictEqual(compactSummary.storage_quota_mb, 4096);
+  assert.strictEqual(compactSummary.storage_shell_present, 1);
+  assert.strictEqual(compactSummary.storage_sw_controlled, 1);
+  assert.strictEqual(compactSummary.storage_cover_entries, 31);
+  assert.strictEqual(compactSummary.storage_audio_entries, 6);
+  assert.strictEqual(compactSummary.storage_catalog_entries, 1);
+  const compactNavigation = compactEvents.find((event) => event.event === "spa_navigation");
+  assert.strictEqual(compactNavigation.cover_ready_at_first_paint, true);
+  assert.strictEqual(compactNavigation.first_paint_ms, 18);
   const playingLatencies = compactEvents
     .filter((event) => event.event === "track_transition" && event.result === "playing")
     .map((event) => Number(event.delta_ms));

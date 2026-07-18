@@ -120,6 +120,7 @@
         grid.dataset.catalogReady = "1";
         return;
       }
+      if (reconcileHomeAlbumGrid(grid, albums)) return;
 
       const sentinel = document.createElement("li");
       sentinel.className = "catalog-scroll-sentinel";
@@ -208,6 +209,73 @@
       if (!image || image.dataset.spaCoverLocked !== "1") return false;
       const fileName = getAssetFileName(image.getAttribute("src"));
       return Boolean(fileName && fileName === getAssetFileName(expectedThumb));
+    }
+
+    function updateHomeAlbumCard(listItem, item, index) {
+      const card = listItem && listItem.querySelector("a.media-card.album-card");
+      const image = card && card.querySelector("img.album-cover");
+      const label = card && card.querySelector("span");
+      if (!card || !image || !label || !item) return false;
+
+      const displayTitle = displayAlbumCardTitle(item.title);
+      const expectedThumb = String(item.thumb || "").trim();
+      const currentThumb = String(image.getAttribute("src") || "").trim();
+      const sameCover = Boolean(
+        expectedThumb &&
+        getAssetFileName(currentThumb) === getAssetFileName(expectedThumb)
+      );
+
+      card.setAttribute("href", String(item.page || ""));
+      card.setAttribute("aria-label", `Ouvrir l'album ${displayTitle}`);
+      if (!sameCover) {
+        image.setAttribute("src", expectedThumb);
+        delete image.dataset.spaCoverLocked;
+      }
+      image.removeAttribute("srcset");
+      image.removeAttribute("sizes");
+      image.setAttribute("width", String(item.width || 1200));
+      image.setAttribute("height", String(item.height || 1200));
+      image.style.aspectRatio = `${item.width || 1200} / ${item.height || 1200}`;
+      image.setAttribute("alt", String(item.thumbAlt || item.title || ""));
+      image.setAttribute("decoding", "async");
+      image.setAttribute("loading", index < 4 ? "eager" : "lazy");
+      image.setAttribute("fetchpriority", index < 4 ? "high" : "low");
+      if (item.editKey) label.setAttribute("data-edit-key", item.editKey);
+      else label.removeAttribute("data-edit-key");
+      label.textContent = displayTitle;
+      return true;
+    }
+
+    function reconcileHomeAlbumGrid(grid, albums) {
+      if (!grid || !Array.isArray(albums) || !albums.length) return false;
+      const existing = Array.from(grid.children).filter(function (node) {
+        return node && !node.classList.contains("catalog-scroll-sentinel");
+      });
+      if (!existing.length) return false;
+
+      resetProgressiveAlbumGrid();
+      Array.from(grid.querySelectorAll(".catalog-scroll-sentinel")).forEach(function (node) {
+        node.remove();
+      });
+
+      albums.forEach(function (item, index) {
+        let listItem = existing[index] || null;
+        if (!updateHomeAlbumCard(listItem, item, index)) {
+          const replacement = buildCatalogCard(item, "album", index);
+          if (listItem && listItem.parentNode === grid) {
+            grid.replaceChild(replacement, listItem);
+            existing[index] = replacement;
+          } else {
+            grid.appendChild(replacement);
+            existing[index] = replacement;
+          }
+        }
+      });
+      existing.slice(albums.length).forEach(function (node) {
+        if (node && node.parentNode === grid) node.remove();
+      });
+      grid.dataset.catalogReady = "1";
+      return true;
     }
 
     function homeAlbumGridMatchesCatalog(grid, albums) {
@@ -461,6 +529,7 @@
       renderCatalogGrid,
       resetProgressiveAlbumGrid,
       renderProgressiveAlbumGrid,
+      reconcileHomeAlbumGrid,
       hydrateStaticHomeAlbumGrid,
       renderClipsSection,
       hydrateHomeCatalog

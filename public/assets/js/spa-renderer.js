@@ -23,6 +23,7 @@
     const absolutizeSrcsetForBase = method(ctx, "absolutizeSrcsetForBase", function (value) { return String(value || ""); });
     const getAudioTelemetryNow = method(ctx, "getAudioTelemetryNow", function () { return Date.now(); });
     const trackAudioRuntimeEvent = method(ctx, "trackAudioRuntimeEvent");
+    const recordCacheObservation = method(ctx, "recordCacheObservation");
     const parseSrcsetCandidates = method(ctx, "parseSrcsetCandidates", function () { return []; });
     const normalizeUrlAgainstBase = method(ctx, "normalizeUrlAgainstBase", function (value) { return String(value || ""); });
     const normalizeCoverUrl = method(ctx, "normalizeCoverUrl", function (value) { return String(value || ""); });
@@ -41,7 +42,6 @@
     const getScrollFromHistoryState = method(ctx, "getScrollFromHistoryState", function () { return { x: 0, y: 0 }; });
     const loadSpaPageDocument = method(ctx, "loadSpaPageDocument", function () { return Promise.resolve(null); });
     const releasePwaCoverHold = method(ctx, "releasePwaCoverHold");
-    const showPwaHomeReturnHold = method(ctx, "showPwaHomeReturnHold", function () { return false; });
     const disableNowPlayingOverlayUi = method(ctx, "disableNowPlayingOverlayUi");
     const syncPersistentUiAfterSpaSwap = method(ctx, "syncPersistentUiAfterSpaSwap");
     const isStandaloneDisplayMode = method(ctx, "isStandaloneDisplayMode", function () { return false; });
@@ -199,10 +199,6 @@
     });
 
     const targetRect = targetCard ? targetCard.getBoundingClientRect() : null;
-    const frozenResourceCount = freezeLiveHomeResourceUrls(
-      document.body,
-      renderedUrl && renderedUrl.href
-    );
     const documentHeight = Math.max(
       document.documentElement ? document.documentElement.scrollHeight : 0,
       document.body ? document.body.scrollHeight : 0,
@@ -218,7 +214,7 @@
       anchorHref: getComparableSpaUrl(targetUrl && targetUrl.href),
       anchorViewportTop: targetRect ? Math.round(targetRect.top) : null,
       coverStates,
-      frozenResourceCount,
+      frozenResourceCount: 0,
       fragment: null
     };
   }
@@ -256,10 +252,9 @@
 
   function lockLiveHomeCover(image, state) {
     if (!image || !state || !state.source) return;
-    const source = String(state.source);
-    image.setAttribute("src", source);
-    image.removeAttribute("srcset");
-    image.removeAttribute("sizes");
+    if (!String(image.getAttribute("src") || "").trim()) {
+      image.setAttribute("src", String(state.source));
+    }
     image.setAttribute("loading", "eager");
     image.setAttribute("decoding", "async");
     image.setAttribute("fetchpriority", "high");
@@ -272,7 +267,7 @@
       return Promise.resolve({ requested: 0, decoded: 0, timedOut: false });
     }
 
-    const images = states.map(function (state) {
+    const images = states.slice(0, 4).map(function (state) {
       const card = findAlbumCardByUrl(route.fragment, state.href);
       const image = card && card.querySelector("img.album-cover");
       if (image) lockLiveHomeCover(image, state);
@@ -286,6 +281,10 @@
     let timeoutId = 0;
     let timedOut = false;
     const decodePromise = Promise.all(images.map(function (image) {
+      if (image.complete && image.naturalWidth > 0) {
+        decoded += 1;
+        return Promise.resolve(true);
+      }
       return decodeSpaImage(image).then(function (ready) {
         if (ready) decoded += 1;
         return ready;
@@ -448,7 +447,11 @@
     const width = 1200;
     const target = getImagePreferredSrc(image, sourceUrl, { preferredWidth: width });
     if (!target) return "";
-    image.setAttribute("src", target);
+    const currentSource = String(image.getAttribute("src") || "").trim();
+    const normalizedCurrent = currentSource
+      ? normalizeCoverUrl(normalizeUrlAgainstBase(currentSource, sourceUrl || window.location.href), { width })
+      : "";
+    if (normalizedCurrent !== target) image.setAttribute("src", target);
     image.removeAttribute("srcset");
     image.removeAttribute("sizes");
     image.setAttribute("loading", "eager");
@@ -499,6 +502,7 @@
       }));
       return Promise.resolve();
     }
+    lockSpaCoverSource(image, sourceUrl, coverWidth);
 
     function rememberReady(urlValue, imageValue) {
       if (!urlValue) return;
@@ -549,39 +553,47 @@
       return new Promise(function (resolve) {
         let settled = false;
         let timeoutId = 0;
+        let decodeStarted = false;
         function done(decoded, timedOut) {
           if (settled) return;
           settled = true;
           if (timeoutId) window.clearTimeout(timeoutId);
+          image.removeEventListener("load", handleLoad);
+          image.removeEventListener("error", handleError);
+          if (decoded) rememberReady(target, image);
           finish(decoded, timedOut, cacheHint);
           resolve(Boolean(decoded));
+        }
+        function startDecode() {
+          if (decodeStarted || typeof image.decode !== "function") return;
+          decodeStarted = true;
+          image.decode().then(
+            function () { done(true, false); },
+            function () {
+              if (image.complete && image.naturalWidth > 0) done(true, false);
+            }
+          );
+        }
+        function handleLoad() {
+          if (typeof image.decode === "function") {
+            startDecode();
+            return;
+          }
+          done(true, false);
+        }
+        function handleError() {
+          done(false, false);
         }
         timeoutId = window.setTimeout(function () {
           done(false, true);
         }, timeoutMs);
-        const probe = new Image();
-        probe.decoding = "async";
-        probe.onload = function () {
-          if (typeof probe.decode === "function") {
-            probe.decode().then(
-              function () {
-                rememberReady(target, probe);
-                done(true, false);
-              },
-              function () {
-                rememberReady(target, probe);
-                done(true, false);
-              }
-            );
-            return;
-          }
-          rememberReady(target, probe);
+        image.addEventListener("load", handleLoad);
+        image.addEventListener("error", handleError);
+        if (image.complete && image.naturalWidth > 0) {
           done(true, false);
-        };
-        probe.onerror = function () {
-          done(false, false);
-        };
-        probe.src = target;
+          return;
+        }
+        startDecode();
       });
     };
 
@@ -589,6 +601,7 @@
       if (typeof caches !== "undefined" && caches.open) {
         return caches.open(COVERS_CACHE_NAME).then(function (cache) {
           return cache.match(target).then(function (cached) {
+            recordCacheObservation("cover", cached ? "hit" : "miss");
             if (cached) return waitForDecode("cache");
             return waitForDecode("network");
           });
@@ -599,93 +612,7 @@
       return waitForDecode("unknown");
     };
 
-    if (pwaCoverMode) {
-      const currentCover = document.querySelector(".album-layout .cover");
-      const sourceHref = (() => {
-        try {
-          return new URL(sourceUrl || window.location.href, window.location.href).href;
-        } catch (_err) {
-          return "";
-        }
-      })();
-      const placeholderMap = spaState.albumCoverPlaceholderByUrl instanceof Map
-        ? spaState.albumCoverPlaceholderByUrl
-        : null;
-      const linkedCoverSrc = placeholderMap && sourceHref
-        ? String(placeholderMap.get(sourceHref) || "")
-        : "";
-      const currentCoverSrc = currentCover
-        ? preferPwaCoverSource(currentCover.currentSrc || currentCover.src || getImagePreferredSrc(currentCover, window.location.href, { preferredWidth: coverWidth }))
-        : "";
-      const temporaryCoverSrc = linkedCoverSrc || (currentCoverSrc === target ? currentCoverSrc : "");
-      function applyTargetCover() {
-        image.setAttribute("src", target);
-        image.removeAttribute("srcset");
-        image.removeAttribute("sizes");
-        image.setAttribute("loading", "eager");
-        image.setAttribute("decoding", "async");
-        image.setAttribute("fetchpriority", "high");
-        image.dataset.spaCoverLocked = "1";
-      }
-      function decodeTargetCoverElement() {
-        applyTargetCover();
-        return decodeSpaImage(image).then(function (decoded) {
-          if (decoded) rememberReady(target, image);
-          return decoded;
-        });
-      }
-      function applyTemporaryCover() {
-        if (!temporaryCoverSrc) {
-          applyTargetCover();
-          return;
-        }
-        image.setAttribute("src", temporaryCoverSrc);
-        image.removeAttribute("srcset");
-        image.removeAttribute("sizes");
-        image.setAttribute("loading", "eager");
-        image.setAttribute("decoding", "async");
-        image.setAttribute("fetchpriority", "high");
-      }
-      function swapTargetAfterDecode() {
-        const probe = new Image();
-        probe.decoding = "async";
-        probe.onload = function () {
-          const apply = function () {
-            rememberReady(target, probe);
-            if (image.isConnected) applyTargetCover();
-            if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
-          };
-          if (typeof probe.decode === "function") {
-            probe.decode().then(apply, apply);
-            return;
-          }
-          apply();
-        };
-        probe.onerror = function () {
-          if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
-        };
-        probe.src = target;
-      }
-      image.removeAttribute("sizes");
-      image.setAttribute("loading", "eager");
-      image.setAttribute("decoding", "async");
-      image.setAttribute("fetchpriority", "high");
-      applyTemporaryCover();
-      if (targetReady) {
-        return decodeTargetCoverElement().then(function (decoded) {
-          finish(decoded, false, "memory_locked");
-          if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
-        });
-      }
-      return waitWithCacheHint().then(function (decoded) {
-        if (decoded) {
-          return decodeTargetCoverElement().then(function () {
-            if (placeholderMap && sourceHref) placeholderMap.delete(sourceHref);
-          });
-        }
-        swapTargetAfterDecode();
-      });
-    }
+    if (pwaCoverMode && targetReady) return waitForDecode("memory");
 
     // Navigation only waits for the destination album cover. A global session
     // warmup here delayed the page for unrelated covers and competed with audio.
@@ -724,6 +651,10 @@
       const rect = image.getBoundingClientRect();
       return rect.bottom > 0 && rect.top < window.innerHeight;
     }).map(getPaintImageState);
+    const relevantCoverCount = albumCover.present ? 1 : visibleHomeCovers.length;
+    const relevantCoverReadyCount = albumCover.present
+      ? (albumCover.complete ? 1 : 0)
+      : visibleHomeCovers.filter(function (cover) { return cover.complete; }).length;
     let mainOpacity = null;
     try {
       mainOpacity = main ? Number.parseFloat(window.getComputedStyle(main).opacity) : null;
@@ -742,6 +673,9 @@
       paint_visible_home_cover_count: visibleHomeCovers.length,
       paint_visible_home_cover_ready_count: visibleHomeCovers.filter(function (cover) { return cover.complete; }).length,
       paint_visible_home_cover_srcs: visibleHomeCovers.map(function (cover) { return cover.currentSrc; }).join("|"),
+      paint_relevant_cover_count: relevantCoverCount,
+      paint_relevant_cover_ready_count: relevantCoverReadyCount,
+      paint_relevant_cover_ready: relevantCoverCount === 0 || relevantCoverReadyCount === relevantCoverCount,
       paint_scroll_x: Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0)),
       paint_scroll_y: Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0))
     };
@@ -792,9 +726,22 @@
         document.body.classList.contains("home-screen")
       );
       const liveHomeFragment = preserveHome ? document.createDocumentFragment() : null;
+      const previousNodes = Array.from(document.body.childNodes).filter(function (node) {
+        return node !== persistRoot;
+      });
+      if (preserveHome && liveHomeCapture) {
+        liveHomeCapture.frozenResourceCount = freezeLiveHomeResourceUrls(
+          document.body,
+          liveHomeCapture.url || window.location.href
+        );
+      }
 
-      Array.from(document.body.childNodes).forEach((node) => {
-        if (node === persistRoot) return;
+      // Append the complete destination before detaching the previous route.
+      // Both operations remain in the same synchronous rendering task, so
+      // WebKit never observes an empty body between the two pages.
+      document.body.className = bodyClassName;
+      document.body.appendChild(fragment);
+      previousNodes.forEach((node) => {
         if (liveHomeFragment) liveHomeFragment.appendChild(node);
         else node.remove();
       });
@@ -802,9 +749,6 @@
         liveHomeCapture.fragment = liveHomeFragment;
         spaState.liveHomeRoute = liveHomeCapture;
       }
-
-      document.body.className = bodyClassName;
-      document.body.appendChild(fragment);
 
       if (document.body.firstChild !== persistRoot) {
         document.body.insertBefore(persistRoot, document.body.firstChild);
@@ -903,25 +847,21 @@
           x: Math.max(0, Number(route.scrollX) || 0),
           y: Math.max(0, Number(route.scrollY) || 0)
         };
-    const holdShown = showPwaHomeReturnHold(route, {
-      reason: "live_home_restore",
-      scrollX: requested.x,
-      scrollY: requested.y,
-      navToken: opts.navToken
-    });
     const coverResult = await prepareLiveHomeRouteCovers(route);
     if (Number.isFinite(opts.navToken) && spaState.navToken !== opts.navToken) {
-      if (holdShown) releasePwaCoverHold("stale_home_restore");
       return null;
     }
     const persistRoot = getSpaPersistRoot();
+    const previousNodes = Array.from(document.body.childNodes).filter(function (node) {
+      return node !== persistRoot;
+    });
 
     document.documentElement.classList.remove("pwa-native-swap");
-    Array.from(document.body.childNodes).forEach(function (node) {
-      if (node !== persistRoot) node.remove();
-    });
     document.body.className = sanitizeSpaBodyClassName(route.bodyClassName || "home-screen");
     document.body.appendChild(route.fragment);
+    previousNodes.forEach(function (node) {
+      node.remove();
+    });
     if (document.body.firstChild !== persistRoot) {
       document.body.insertBefore(persistRoot, document.body.firstChild);
     }
@@ -943,7 +883,6 @@
     const appliedX = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
     const appliedY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
     const paintState = await waitForSpaFirstPaint();
-    if (holdShown) releasePwaCoverHold("home_first_paint");
     const result = Object.assign({
       swap_mode: "live_dom_restore",
       swap_schedule_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
@@ -1140,6 +1079,7 @@
       if (!commitNavigationHistory("live_home")) return;
 
       spaState.currentUrl = url.href;
+      recordCacheObservation("html", "hit");
       const liveRenderStartedAt = getAudioTelemetryNow();
       const liveSpaTelemetry = {
         album: "home",
@@ -1192,6 +1132,7 @@
     if (cachedHtml) {
       const cachedDoc = parseSpaDocument(cachedHtml);
       if (cachedDoc) {
+        recordCacheObservation("html", "hit");
         trackAudioRuntimeEvent("spa_html_response", {
           track: "album_open",
           album: getAlbumNameFromUrlLike(url.href),
@@ -1327,6 +1268,7 @@
     const htmlStrategy = String(loadedPage && loadedPage.strategy || "missing");
     const htmlCacheHint = String(loadedPage && loadedPage.cacheHint || "miss");
     const reportedWorkerVersion = String(loadedPage && loadedPage.workerVersion || "");
+    recordCacheObservation("html", loadedPage && loadedPage.cached ? "hit" : "miss");
     trackAudioRuntimeEvent("spa_html_response", {
       track: "album_open",
       album: getAlbumNameFromUrlLike(url.href),

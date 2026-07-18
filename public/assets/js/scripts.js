@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix349-20260718";
+window.INFRA_BUILD_TAG = "audiofix350-20260718";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -181,7 +181,6 @@ function openAppDownloadGatekeeper(appName, url) {
     navigationActive: false,
     activeNavigationHref: "",
     prepaintSyncActive: false,
-    albumCoverPlaceholderByUrl: new Map(),
     pwaCoverHold: null,
     liveHomeRoute: null,
     pageCacheApi: null,
@@ -356,6 +355,8 @@ function openAppDownloadGatekeeper(appName, url) {
     choiceStorageKey: "infra_pwa_install_choice_v1",
     sessionDismissed: false
   };
+  const STORAGE_PERSIST_REQUEST_KEY = "infra_storage_persist_requested_v1";
+  let storageObservationStarted = false;
   const pwaInstallApi = createPwaInstallApi();
   const NOW_PLAYING_OVERLAY_ENABLED = true;
   const PLAYER_ICON_PLAY = "<svg class=\"player-glyph player-glyph-play\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M8 5v14l11-7z\"/></svg>";
@@ -388,15 +389,18 @@ function openAppDownloadGatekeeper(appName, url) {
     ? Boolean(coverConstants.SESSION_PREPARE_ENABLED)
     : true;
   // ROLLBACK: passer a false pour revenir au warmup cache-only audiofix200.
-  const COVER_SESSION_PREPARE_CONCURRENCY = Number.isFinite(Number(coverConstants.SESSION_PREPARE_CONCURRENCY))
+  const CONFIGURED_COVER_SESSION_PREPARE_CONCURRENCY = Number.isFinite(Number(coverConstants.SESSION_PREPARE_CONCURRENCY))
     ? Math.max(1, Number(coverConstants.SESSION_PREPARE_CONCURRENCY))
     : 3;
+  const COVER_SESSION_PREPARE_CONCURRENCY = isStandaloneDisplayMode()
+    ? 1
+    : CONFIGURED_COVER_SESSION_PREPARE_CONCURRENCY;
   const COVER_SESSION_NAVIGATION_GATE_ENABLED = Object.prototype.hasOwnProperty.call(coverConstants, "SESSION_NAVIGATION_GATE_ENABLED")
     ? Boolean(coverConstants.SESSION_NAVIGATION_GATE_ENABLED)
     : true;
   // ROLLBACK: passer a false pour ne plus attendre les covers avant ouverture album.
-  const ALBUM_COVER_IMAGE_CACHE_LIMIT = isStandaloneDisplayMode() ? 12 : 24;
-  const PWA_COVER_PREPARE_LIMIT = 4;
+  const ALBUM_COVER_IMAGE_CACHE_LIMIT = isStandaloneDisplayMode() ? 4 : 24;
+  const PWA_COVER_PREPARE_LIMIT = 2;
   const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(prefetchConstants.MAX_BYTES))
     ? Number(prefetchConstants.MAX_BYTES)
     : 2 * 1024 * 1024;
@@ -420,7 +424,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260718-audio349";
+  const SPA_SHELL_VERSION = "infra-shell-20260718-audio350";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -428,7 +432,7 @@ function openAppDownloadGatekeeper(appName, url) {
     : 240;
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix349-20260718";
+  const LOCAL_CATALOG_VERSION = "audiofix350-20260718";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -449,7 +453,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix349-20260718";
+  const runtimeVersion = "audiofix350-20260718";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -536,6 +540,8 @@ function openAppDownloadGatekeeper(appName, url) {
       startHeartbeat: function () {},
       stopHeartbeat: function () {},
       trackRuntimeEvent: function () {},
+      recordCacheObservation: function () {},
+      recordStorageSnapshot: function () {},
       sendMonitoringLog: function () {},
       logAuditEvent: function () {},
       hasPendingEvents: function () { return false; },
@@ -894,6 +900,7 @@ function openAppDownloadGatekeeper(appName, url) {
       absolutizeSrcsetForBase,
       getAudioTelemetryNow,
       trackAudioRuntimeEvent,
+      recordCacheObservation: audioTelemetryApi.recordCacheObservation,
       parseSrcsetCandidates,
       normalizeUrlAgainstBase,
       normalizeCoverUrl,
@@ -913,7 +920,6 @@ function openAppDownloadGatekeeper(appName, url) {
       prefetchSpaPage,
       loadSpaPageDocument,
       releasePwaCoverHold,
-      showPwaHomeReturnHold,
       disableNowPlayingOverlayUi,
       syncPersistentUiAfterSpaSwap,
       isStandaloneDisplayMode,
@@ -2158,13 +2164,6 @@ function openAppDownloadGatekeeper(appName, url) {
     const url = preferred ? normalizeCoverUrl(preferred, { width: 1200 }) : "";
     if (!url) return "";
 
-    spaState.albumCoverPlaceholderByUrl.set(new URL(targetUrl, window.location.href).href, url);
-    while (spaState.albumCoverPlaceholderByUrl.size > 12) {
-      const oldest = spaState.albumCoverPlaceholderByUrl.keys().next();
-      if (oldest.done) break;
-      spaState.albumCoverPlaceholderByUrl.delete(oldest.value);
-    }
-
     if (audioState.albumCoverReadyUrls.has(url) || audioState.albumCoverPrimeUrls.has(url)) return url;
 
     audioState.albumCoverPrimeUrls.add(url);
@@ -2188,7 +2187,7 @@ function openAppDownloadGatekeeper(appName, url) {
     }
 
     const reasonText = String(reason || "done");
-    const forceRelease = /^(replace|timeout|home_return_timeout|stale_|.*_aborted|fallback|fetch_error)$/i.test(reasonText);
+    const forceRelease = /^(replace|timeout|stale_|.*_aborted|fallback|fetch_error)$/i.test(reasonText);
     const now = getAudioTelemetryNow();
     const minVisibleUntil = Number(hold.minVisibleUntil) || 0;
     if (!forceRelease && minVisibleUntil > now) {
@@ -2211,343 +2210,12 @@ function openAppDownloadGatekeeper(appName, url) {
       window.clearTimeout(hold.releaseTimer);
     }
     const node = hold.node;
-    const isHomeReturnHold = Boolean(node.classList && node.classList.contains("pwa-home-return-hold"));
     node.dataset.reason = reasonText;
     node.style.opacity = "0";
     node.style.transition = "opacity 70ms ease-out";
     window.setTimeout(function () {
       if (node && node.parentNode) node.parentNode.removeChild(node);
-      if (isHomeReturnHold && document.documentElement) {
-        document.documentElement.classList.remove("pwa-home-restore-active");
-      }
     }, 90);
-  }
-
-  function showPwaCoverHold(link, coverSrc) {
-    if (!isMobilePwaCoverNavigation()) return false;
-    if (!link || typeof link.querySelector !== "function") return false;
-    const image = link.querySelector("img.album-cover, img.cover");
-    if (!image) return false;
-
-    releasePwaCoverHold("replace");
-    const rect = image.getBoundingClientRect();
-    if (!rect || rect.width < 8 || rect.height < 8) return false;
-
-    const url = normalizeCoverUrl(
-      coverSrc || choosePreferredSrcsetSource(image.getAttribute("srcset") || "", 1200) || image.currentSrc || image.src || "",
-      { width: 1200 }
-    );
-    if (!url) return false;
-
-    const root = getSpaPersistRoot();
-    const wrapper = document.createElement("div");
-    wrapper.className = "pwa-cover-hold";
-    wrapper.setAttribute("aria-hidden", "true");
-    Object.assign(wrapper.style, {
-      position: "fixed",
-      left: `${Math.round(rect.left)}px`,
-      top: `${Math.round(rect.top)}px`,
-      width: `${Math.round(rect.width)}px`,
-      height: `${Math.round(rect.height)}px`,
-      zIndex: "11990",
-      pointerEvents: "none",
-      overflow: "hidden",
-      borderRadius: window.getComputedStyle(image).borderRadius || "6px",
-      background: "transparent",
-      opacity: "1",
-      transform: "translateZ(0)",
-      WebkitTransform: "translateZ(0)",
-      contain: "layout paint style"
-    });
-
-    let visual = null;
-    if (image.complete && image.naturalWidth > 0 && typeof document.createElement === "function") {
-      try {
-        const ratio = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(rect.width * ratio));
-        canvas.height = Math.max(1, Math.round(rect.height * ratio));
-        canvas.style.width = "100%";
-        canvas.style.height = "100%";
-        canvas.style.display = "block";
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-          visual = canvas;
-        }
-      } catch (_err) {
-        visual = null;
-      }
-    }
-
-    if (!visual) {
-      const img = new Image();
-      img.decoding = "async";
-      img.src = url;
-      Object.assign(img.style, {
-        display: "block",
-        width: "100%",
-        height: "100%",
-        objectFit: "contain"
-      });
-      visual = img;
-    }
-
-    wrapper.appendChild(visual);
-    root.appendChild(wrapper);
-    spaState.pwaCoverHold = {
-      node: wrapper,
-      src: url,
-      startedAt: getAudioTelemetryNow(),
-      timer: window.setTimeout(function () {
-        releasePwaCoverHold("timeout");
-      }, 1400)
-    };
-    return true;
-  }
-
-  function getPwaHomeReturnHoldBackground() {
-    try {
-      const rootStyles = window.getComputedStyle(document.documentElement);
-      const start = rootStyles.getPropertyValue("--bg-start").trim() || "#ffffff";
-      const mid = rootStyles.getPropertyValue("--bg-mid").trim() || start;
-      const end = rootStyles.getPropertyValue("--bg-end").trim() || mid;
-      return `linear-gradient(180deg, ${start} 0%, ${mid} 52%, ${end} 100%)`;
-    } catch (_err) {
-      return "#ffffff";
-    }
-  }
-
-  function getComparablePwaSnapshotUrl(urlLike, baseUrl) {
-    try {
-      const url = new URL(String(urlLike || ""), baseUrl || window.location.href);
-      return `${url.origin}${url.pathname}${url.search}`;
-    } catch (_err) {
-      return "";
-    }
-  }
-
-  function findPwaSnapshotAlbumCard(route, state) {
-    const fragment = route && route.fragment;
-    if (!fragment || typeof fragment.querySelectorAll !== "function" || !state || !state.href) return null;
-    const target = getComparablePwaSnapshotUrl(state.href, route.url || window.location.href);
-    if (!target) return null;
-    return Array.from(fragment.querySelectorAll("a.album-card[href]")).find(function (card) {
-      return getComparablePwaSnapshotUrl(card.getAttribute("href"), route.url || window.location.href) === target;
-    }) || null;
-  }
-
-  function createPwaSnapshotCoverVisual(route, state) {
-    const card = findPwaSnapshotAlbumCard(route, state);
-    const sourceImage = card && card.querySelector("img.album-cover");
-    const width = Math.max(24, Math.round(Number(state && state.displayWidth) || 0));
-    const height = Math.max(24, Math.round(Number(state && state.displayHeight) || width));
-
-    if (sourceImage && sourceImage.complete && sourceImage.naturalWidth > 0) {
-      try {
-        const ratio = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(width * ratio));
-        canvas.height = Math.max(1, Math.round(height * ratio));
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
-        canvas.style.display = "block";
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(sourceImage, 0, 0, canvas.width, canvas.height);
-          return canvas;
-        }
-      } catch (_err) {
-        // Fall back to a normal image below.
-      }
-    }
-
-    const src = normalizeCoverUrl(state && state.source, { width: 1200 });
-    if (!src) return null;
-    const image = new Image();
-    image.decoding = "async";
-    image.loading = "eager";
-    image.setAttribute("fetchpriority", "high");
-    image.src = src;
-    Object.assign(image.style, {
-      display: "block",
-      width: `${width}px`,
-      height: `${height}px`,
-      objectFit: "contain"
-    });
-    return image;
-  }
-
-  function sanitizePwaHomeSnapshotClone(root, route) {
-    if (!root || typeof root.querySelectorAll !== "function") return;
-    root.querySelectorAll("script, template, style, noscript").forEach(function (node) {
-      node.remove();
-    });
-    root.querySelectorAll("[id]").forEach(function (node) {
-      node.removeAttribute("id");
-    });
-    root.querySelectorAll("a[href]").forEach(function (node) {
-      node.removeAttribute("href");
-    });
-    root.querySelectorAll("*").forEach(function (node) {
-      Array.from(node.attributes || []).forEach(function (attribute) {
-        if (/^data-/i.test(attribute.name)) node.removeAttribute(attribute.name);
-      });
-    });
-    root.querySelectorAll("img").forEach(function (image) {
-      const srcset = image.getAttribute("srcset") || "";
-      const preferred = image.classList && image.classList.contains("album-cover")
-        ? normalizeCoverUrl(
-            choosePreferredSrcsetSource(srcset, 1200) || image.getAttribute("src") || image.src || "",
-            { width: 1200 }
-          )
-        : normalizeUrlAgainstBase(image.getAttribute("src") || image.src || "", route && route.url);
-      if (preferred) image.setAttribute("src", preferred);
-      if (image.classList && image.classList.contains("album-cover")) {
-        image.removeAttribute("srcset");
-        image.removeAttribute("sizes");
-      }
-      image.setAttribute("loading", "eager");
-      image.setAttribute("decoding", "async");
-      image.setAttribute("fetchpriority", "high");
-    });
-  }
-
-  function appendPwaHomeSnapshotChildren(target, route) {
-    const fragment = route && route.fragment;
-    if (!target || !fragment || typeof fragment.cloneNode !== "function") return 0;
-    const clone = fragment.cloneNode(true);
-    let count = 0;
-    Array.from(clone.childNodes || []).forEach(function (node) {
-      if (node.nodeType === 1) {
-        const tagName = String(node.tagName || "").toLowerCase();
-        if (/^(script|template|style|noscript)$/i.test(tagName)) return;
-        if (node.id === "infraSpaPersist" || node.id === "infraPwaInstallModal") return;
-      }
-      target.appendChild(node);
-      count += 1;
-    });
-    sanitizePwaHomeSnapshotClone(target, route);
-    return count;
-  }
-
-  function showPwaHomeReturnHold(route, options) {
-    if (!isMobilePwaCoverNavigation()) return false;
-    const opts = options && typeof options === "object" ? options : { reason: options };
-    const states = Array.isArray(route && route.coverStates)
-      ? route.coverStates.filter(function (state) {
-          return Boolean(state && state.source);
-        }).slice(0, 10)
-      : [];
-    if (!route || !route.fragment) return false;
-
-    releasePwaCoverHold("replace");
-    const root = getSpaPersistRoot();
-    const scrollY = Math.max(0, Math.round(Number(opts.scrollY) || Number(route.scrollY) || 0));
-    const documentHeight = Math.max(
-      window.innerHeight,
-      Math.round(Number(route.documentHeight) || 0),
-      scrollY + window.innerHeight
-    );
-    const wrapper = document.createElement("div");
-    wrapper.className = "pwa-cover-hold pwa-home-return-hold";
-    wrapper.setAttribute("aria-hidden", "true");
-    wrapper.dataset.reason = String(opts.reason || "home_return");
-    Object.assign(wrapper.style, {
-      position: "fixed",
-      inset: "0",
-      zIndex: "11980",
-      pointerEvents: "none",
-      overflow: "hidden",
-      background: getPwaHomeReturnHoldBackground(),
-      opacity: "1",
-      transform: "translateZ(0)",
-      WebkitTransform: "translateZ(0)",
-      contain: "layout paint style"
-    });
-
-    const routeClasses = String(route.bodyClassName || "home-screen").split(/\s+/).filter(Boolean);
-    const shell = document.createElement("div");
-    shell.className = ["pwa-home-return-shell"].concat(routeClasses.filter(function (name) {
-      return name !== "home-screen";
-    })).join(" ");
-    Object.assign(shell.style, {
-      position: "absolute",
-      left: "0",
-      top: `${-scrollY}px`,
-      width: "100%",
-      minHeight: `${documentHeight}px`,
-      pointerEvents: "none",
-      transform: "translateZ(0)",
-      WebkitTransform: "translateZ(0)"
-    });
-
-    const page = document.createElement("div");
-    page.className = "pwa-home-return-page home-screen";
-    Object.assign(page.style, {
-      position: "relative",
-      width: "100%",
-      minHeight: `${documentHeight}px`,
-      pointerEvents: "none"
-    });
-    const clonedChildCount = appendPwaHomeSnapshotChildren(page, route);
-    shell.appendChild(page);
-    wrapper.appendChild(shell);
-
-    const coverLayer = document.createElement("div");
-    coverLayer.className = "pwa-home-return-cover-layer";
-    Object.assign(coverLayer.style, {
-      position: "fixed",
-      inset: "0",
-      zIndex: "2",
-      pointerEvents: "none",
-      overflow: "hidden",
-      transform: "translateZ(0)",
-      WebkitTransform: "translateZ(0)"
-    });
-
-    states.forEach(function (state) {
-      const width = Math.max(24, Math.round(Number(state.displayWidth) || 0));
-      const height = Math.max(24, Math.round(Number(state.displayHeight) || width));
-      const left = Math.round(Number(state.viewportLeft) || 0);
-      const top = Math.round(Number(state.viewportTop) || 0);
-      if (top > window.innerHeight + 120 || top + height < -120) return;
-
-      const visual = createPwaSnapshotCoverVisual(route, state);
-      if (!visual) return;
-      Object.assign(visual.style, {
-        position: "absolute",
-        left: `${left}px`,
-        top: `${top}px`,
-        width: `${width}px`,
-        height: `${height}px`,
-        display: "block",
-        objectFit: "contain",
-        borderRadius: state.borderRadius || "6px",
-        background: "rgba(17, 17, 17, 0.06)",
-        transform: "translateZ(0)",
-        WebkitTransform: "translateZ(0)"
-      });
-      coverLayer.appendChild(visual);
-    });
-    if (coverLayer.childNodes.length) wrapper.appendChild(coverLayer);
-
-    if (!clonedChildCount && !coverLayer.childNodes.length) return false;
-    if (document.documentElement) {
-      document.documentElement.classList.add("pwa-home-restore-active");
-    }
-    root.appendChild(wrapper);
-    const startedAt = getAudioTelemetryNow();
-    spaState.pwaCoverHold = {
-      node: wrapper,
-      src: "home-return",
-      startedAt,
-      minVisibleUntil: startedAt + 320,
-      timer: window.setTimeout(function () {
-        releasePwaCoverHold("home_return_timeout");
-      }, 1200)
-    };
-    return true;
   }
 
   function orderAlbumCoverWarmupUrls(covers) {
@@ -3279,9 +2947,105 @@ function openAppDownloadGatekeeper(appName, url) {
     }
   }
 
+  function readStoragePersistRequestMarker() {
+    try {
+      return localStorage.getItem(STORAGE_PERSIST_REQUEST_KEY) === "1";
+    } catch (_err) {
+      return false;
+    }
+  }
+
+  function writeStoragePersistRequestMarker() {
+    try {
+      localStorage.setItem(STORAGE_PERSIST_REQUEST_KEY, "1");
+    } catch (_err) {
+      // Persistence is still requested even if the marker cannot be written.
+    }
+  }
+
+  function countExistingCacheEntries(cacheNames, cacheName) {
+    if (!Array.isArray(cacheNames) || !cacheNames.includes(cacheName)) return Promise.resolve(0);
+    if (typeof caches === "undefined" || typeof caches.open !== "function") return Promise.resolve(0);
+    return caches.open(cacheName)
+      .then(function (cache) { return cache.keys(); })
+      .then(function (keys) { return Array.isArray(keys) ? keys.length : 0; })
+      .catch(function () { return 0; });
+  }
+
+  function beginPwaStorageObservation() {
+    if (storageObservationStarted || !isStandaloneDisplayMode()) return;
+    storageObservationStarted = true;
+    ["pointerdown", "touchstart", "keydown"].forEach(function (eventName) {
+      window.removeEventListener(eventName, beginPwaStorageObservation, true);
+    });
+
+    const storageManager = navigator.storage || null;
+    const shouldRequestPersistence = Boolean(
+      storageManager &&
+      typeof storageManager.persist === "function" &&
+      !readStoragePersistRequestMarker()
+    );
+    let persistRequestCount = 0;
+    let persistPromise = Promise.resolve(null);
+    if (shouldRequestPersistence) {
+      persistRequestCount = 1;
+      writeStoragePersistRequestMarker();
+      try {
+        persistPromise = Promise.resolve(storageManager.persist()).catch(function () { return false; });
+      } catch (_err) {
+        persistPromise = Promise.resolve(false);
+      }
+    } else if (storageManager && typeof storageManager.persisted === "function") {
+      try {
+        persistPromise = Promise.resolve(storageManager.persisted()).catch(function () { return null; });
+      } catch (_err) {
+        persistPromise = Promise.resolve(null);
+      }
+    }
+
+    const estimatePromise = storageManager && typeof storageManager.estimate === "function"
+      ? Promise.resolve(storageManager.estimate()).catch(function () { return {}; })
+      : Promise.resolve({});
+    const cacheNamesPromise = typeof caches !== "undefined" && typeof caches.keys === "function"
+      ? caches.keys().catch(function () { return []; })
+      : Promise.resolve([]);
+
+    Promise.all([persistPromise, estimatePromise, cacheNamesPromise]).then(function (results) {
+      const persisted = results[0];
+      const estimate = results[1] && typeof results[1] === "object" ? results[1] : {};
+      const cacheNames = Array.isArray(results[2]) ? results[2] : [];
+      return Promise.all([
+        countExistingCacheEntries(cacheNames, COVERS_CACHE_NAME),
+        countExistingCacheEntries(cacheNames, PREFETCH_NEXT_CACHE_NAME),
+        countExistingCacheEntries(cacheNames, LIVE_CATALOG_CACHE_NAME)
+      ]).then(function (entryCounts) {
+        const bytesPerMiB = 1024 * 1024;
+        audioTelemetryApi.recordStorageSnapshot({
+          storage_persisted_state: persisted === true ? 2 : (persisted === false ? 1 : 0),
+          storage_persist_request_count: persistRequestCount,
+          storage_persist_granted_count: persistRequestCount && persisted === true ? 1 : 0,
+          storage_usage_mb: Math.max(0, Math.round((Number(estimate.usage) || 0) / bytesPerMiB)),
+          storage_quota_mb: Math.max(0, Math.round((Number(estimate.quota) || 0) / bytesPerMiB)),
+          storage_shell_present: cacheNames.includes(SPA_SHELL_CACHE_NAME) ? 1 : 0,
+          storage_sw_controlled: navigator.serviceWorker && navigator.serviceWorker.controller ? 1 : 0,
+          storage_cover_entries: entryCounts[0] || 0,
+          storage_audio_entries: entryCounts[1] || 0,
+          storage_catalog_entries: entryCounts[2] || 0
+        });
+      });
+    }).catch(function () {
+      // Storage telemetry is a best-effort session summary only.
+    });
+  }
+
   ["pointerdown", "touchstart", "click", "keydown", "scroll"].forEach(function (eventName) {
     window.addEventListener(eventName, noteUserInteractionForServiceWorkerReload, { passive: true });
   });
+  if (isStandaloneDisplayMode()) {
+    ["pointerdown", "touchstart", "keydown"].forEach(function (eventName) {
+      window.addEventListener(eventName, beginPwaStorageObservation, { capture: true, passive: true });
+    });
+  }
 
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState !== "visible") return;
@@ -6105,14 +5869,13 @@ function openAppDownloadGatekeeper(appName, url) {
       }
 
       event.preventDefault();
-      const coverPlaceholderSrc = primeLinkedAlbumCoverForPwa(link, url.href);
+      primeLinkedAlbumCoverForPwa(link, url.href);
       // Keep the current interactive page and persistent mini-player visible
       // until the destination document is ready. The former foreground cover
       // clone made a slow first visit look like a frozen application.
       releasePwaCoverHold("replace");
       navigateTo(url.href, {
-        history: "push",
-        coverPlaceholderSrc
+        history: "push"
       });
     }, true);
 

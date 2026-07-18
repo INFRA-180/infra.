@@ -10,9 +10,11 @@ const ROOT = path.resolve(__dirname, "..");
 const SPA_PATH = path.join(ROOT, "public/assets/js/spa-renderer.js");
 const SCRIPTS_PATH = path.join(ROOT, "public/assets/js/scripts.js");
 const TRANSPORT_PATH = path.join(ROOT, "public/assets/js/transport-ui.js");
+const HOME_CATALOG_PATH = path.join(ROOT, "public/assets/js/home-catalog.js");
 const spaSource = fs.readFileSync(SPA_PATH, "utf8");
 const scriptsSource = fs.readFileSync(SCRIPTS_PATH, "utf8");
 const transportSource = fs.readFileSync(TRANSPORT_PATH, "utf8");
+const homeCatalogSource = fs.readFileSync(HOME_CATALOG_PATH, "utf8");
 
 function loadSpaFactory(overrides) {
   const sandbox = Object.assign({
@@ -134,8 +136,35 @@ async function testIosSwapIsAtomicWithoutNativeTransition() {
     order.indexOf("append_fragment") < order.indexOf("sync_persistent_ui"),
     "persistent UI sync must follow the destination DOM mutation"
   );
+  assert.ok(
+    order.indexOf("append_fragment") < order.indexOf("remove_old"),
+    "destination DOM must be inserted before the previous route is detached"
+  );
   const syncIndex = order.indexOf("sync_persistent_ui");
   assert.ok(order.slice(syncIndex + 1).includes("raf"), "persistent UI must sync before the first-paint RAF pair");
+}
+
+function testCoverSwapHasNoSnapshotOrSecondDecode() {
+  assert.ok(
+    !scriptsSource.includes("pwa-home-return-hold") &&
+      !scriptsSource.includes('document.createElement("canvas")'),
+    "PWA Home restoration must not build a cloned cover/canvas overlay"
+  );
+  const waitStart = spaSource.indexOf("function waitForSpaAlbumCoverReady");
+  const waitEnd = spaSource.indexOf("function getPaintImageState", waitStart);
+  const waitBody = spaSource.slice(waitStart, waitEnd);
+  assert.ok(waitStart >= 0 && waitEnd > waitStart, "album cover readiness function is missing");
+  assert.ok(!waitBody.includes("new Image()"), "destination cover must not be decoded through a detached duplicate");
+  assert.ok(!waitBody.includes("swapTargetAfterDecode"), "destination cover must not be reassigned after the route swap");
+  assert.ok(
+    waitBody.includes('recordCacheObservation("cover", cached ? "hit" : "miss")'),
+    "cover Cache Storage hit/miss must feed the compact session summary"
+  );
+  assert.ok(
+    homeCatalogSource.includes("reconcileHomeAlbumGrid") &&
+      homeCatalogSource.includes("if (reconcileHomeAlbumGrid(grid, albums)) return;"),
+    "an existing Home album grid must be reconciled instead of cleared"
+  );
 }
 
 function testFullscreenFinalizationAndSnapshotDedup() {
@@ -208,9 +237,10 @@ async function main() {
   await testRuntimeClassSanitizer();
   await testIosSwapIsAtomicWithoutNativeTransition();
   testFullscreenFinalizationAndSnapshotDedup();
+  testCoverSwapHasNoSnapshotOrSecondDecode();
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
-  console.log("audiofix349 SPA/transport tests: ok");
+  console.log("audiofix350 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

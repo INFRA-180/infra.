@@ -22,6 +22,7 @@
     const DOWNLOAD_ICON = ctx.DOWNLOAD_ICON || "";
     const SELECT_MODE_ICON = ctx.SELECT_MODE_ICON || "";
     const DONE_MODE_ICON = ctx.DONE_MODE_ICON || "";
+    const FAVORITES_TRASH_ICON = "<svg class=\"album-action-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.9\" d=\"M5 7h14M9 7V4.8h6V7m-8 0 1 12h8l1-12M10 10v6m4-6v6\"/></svg>";
     const infraDownloadsApi = ctx.infraDownloadsApi || null;
     const getAudioAssetPathKey = method(ctx, "getAudioAssetPathKey", function () { return ""; });
     const getAudioTelemetryNow = method(ctx, "getAudioTelemetryNow", function () { return Date.now(); });
@@ -44,7 +45,6 @@
     const srcMatches = method(ctx, "srcMatches", function (left, right) { return String(left || "") === String(right || ""); });
     const getMediaSessionFallbackArtwork = method(ctx, "getMediaSessionFallbackArtwork", function () { return ""; });
     const formatTrackDuration = method(ctx, "formatTrackDuration", function () { return "--:--"; });
-    const parseDurationText = method(ctx, "parseDurationText", function () { return 0; });
     let favoritesStorage = null;
 
   function createUnavailableFavoritesStorage() {
@@ -1127,13 +1127,6 @@
     return escapeHtml(value).replace(/`/g, "&#96;");
   }
 
-  function formatTotalDuration(secondsValue) {
-    const seconds = Number(secondsValue);
-    if (!Number.isFinite(seconds) || seconds <= 0) return "0 min";
-    const minutes = Math.max(1, Math.round(seconds / 60));
-    return `${minutes} min`;
-  }
-
   function createFavoriteRowCover(track) {
     const url = resolveCoverUrl(track || null, { width: 1200 });
     if (!url || srcMatches(url, getMediaSessionFallbackArtwork())) return "";
@@ -1254,16 +1247,22 @@
     });
     const toggle = view.querySelector("[data-favorites-select-toggle]");
     if (toggle) {
-      toggle.textContent = selecting ? "Termine" : "Selectionner";
+      toggle.innerHTML = selecting ? DONE_MODE_ICON : SELECT_MODE_ICON;
+      toggle.classList.toggle("is-on", selecting);
       toggle.setAttribute("aria-pressed", selecting ? "true" : "false");
+      toggle.setAttribute("aria-label", selecting ? "Terminer la sélection" : "Sélectionner des titres");
+      toggle.setAttribute("title", selecting ? "Terminer" : "Sélectionner");
     }
     const remove = view.querySelector("[data-favorites-remove-selected]");
     if (remove) {
       remove.hidden = !selecting;
       remove.disabled = selectedCount <= 0;
-      remove.textContent = selectedCount > 0
-        ? `Retirer des favoris (${selectedCount})`
-        : "Retirer des favoris";
+      remove.innerHTML = FAVORITES_TRASH_ICON;
+      const removeLabel = selectedCount > 0
+        ? `Retirer ${selectedCount} titre${selectedCount > 1 ? "s" : ""} des favoris`
+        : "Retirer les titres sélectionnés des favoris";
+      remove.setAttribute("aria-label", removeLabel);
+      remove.setAttribute("title", removeLabel);
     }
   }
 
@@ -1310,8 +1309,8 @@
         "  <button class=\"favorites-back\" type=\"button\" data-favorites-back aria-label=\"Retour a l'accueil\">" + getFavoritesBackIcon() + "</button>",
         "  <h2 data-favorites-title>Favoris</h2>",
         "  <div class=\"favorites-view-actions\">",
-        "    <button class=\"favorites-select-toggle\" type=\"button\" data-favorites-select-toggle aria-pressed=\"false\">Selectionner</button>",
-        "    <button class=\"favorites-remove-selected\" type=\"button\" data-favorites-remove-selected hidden disabled>Retirer des favoris</button>",
+        "    <button class=\"album-selection-toggle favorites-remove-selected\" type=\"button\" data-favorites-remove-selected hidden disabled aria-label=\"Retirer les titres sélectionnés des favoris\">" + FAVORITES_TRASH_ICON + "</button>",
+        "    <button class=\"album-selection-toggle favorites-select-toggle\" type=\"button\" data-favorites-select-toggle aria-pressed=\"false\" aria-label=\"Sélectionner des titres\" title=\"Sélectionner\">" + SELECT_MODE_ICON + "</button>",
         "  </div>",
         "</div>",
         "<div data-favorites-content>",
@@ -1354,10 +1353,6 @@
     loadFavoritesWithReset()
       .then(function (favoriteEntries) {
         const entries = sortFavoriteEntries(favoriteEntries || []);
-        const totalSeconds = buildFavoritesPlaylist(entries).reduce(function (sum, track) {
-          const seconds = Number(track && track.seconds);
-          return sum + (Number.isFinite(seconds) ? seconds : parseDurationText(track && track.duration));
-        }, 0);
         const count = entries.length;
         const title = view.querySelector("[data-favorites-title]");
         const content = view.querySelector("[data-favorites-content]");
@@ -1366,9 +1361,7 @@
           audioState.favoritesSelectedPaths.clear();
         }
         if (title) {
-          title.innerHTML = count
-            ? `Favoris · ${count} titre${count > 1 ? "s" : ""} · ${escapeHtml(formatTotalDuration(totalSeconds))}`
-            : "Favoris";
+          title.textContent = "Favoris";
         }
         if (content) {
           content.innerHTML = count
@@ -1636,7 +1629,6 @@
       refreshFavoritesViewIfOpen: refreshFavoritesViewIfOpen,
       escapeHtml: escapeHtml,
       escapeAttribute: escapeAttribute,
-      formatTotalDuration: formatTotalDuration,
       createFavoriteRowCover: createFavoriteRowCover,
       getFavoriteRowTitle: getFavoriteRowTitle,
       getFavoriteRowAlbum: getFavoriteRowAlbum,

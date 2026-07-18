@@ -7,8 +7,8 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix348-20260717`
-- Service Worker : `infra-shell-20260717-audio348`
+- Runtime : `audiofix349-20260718`
+- Service Worker : `infra-shell-20260718-audio349`
 - CSS figé : `audiofix347-20260717`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`

@@ -1,5 +1,21 @@
 # Implementation Notes
 
+## 2026-07-18 — audiofix349 commandes Favoris simplifiées
+
+- L’en-tête de la page Favoris affiche uniquement `Favoris`. Le compteur et la durée totale
+  sont retirés de cette ligne afin d’éviter une information peu utile et un encombrement sur
+  iPhone.
+- Le bouton texte `Sélectionner` réutilise maintenant l’icône ronde des pages album. En mode
+  sélection, les cercles par piste sont conservés, la sortie utilise le `×` existant et le
+  retrait utilise une poubelle désactivée tant qu’aucun titre n’est choisi.
+- Les libellés accessibles annoncent l’action et le nombre de titres concernés. Le retrait,
+  la persistance des favoris, la lecture, le mini-player et l’ordre manuel restent inchangés.
+- Un test code-only dédié protège l’en-tête, l’ordre des actions, les icônes, l’état désactivé
+  et les sélecteurs circulaires.
+- Identifiants atomiques : `audiofix349-20260718` et
+  `infra-shell-20260718-audio349`. Le CSS reste byte-identique sur
+  `audiofix347-20260717` ; aucune géométrie PWA n’est modifiée.
+
 ## 2026-07-18 — nettoyage conservateur du runtime et des assets
 
 - Le staging privé Music/R2 est ramené d’environ 15,6 Go à son seul état actif : 2 581

@@ -1,9 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 18 juillet 2026
-Baseline : `audiofix348-20260717`
-Commit : `f8a19aa`
-Service Worker : `infra-shell-20260717-audio348`
+Baseline : `audiofix349-20260718`
+Service Worker : `infra-shell-20260718-audio349`
 
 ## État
 
@@ -14,6 +13,8 @@ Service Worker : `infra-shell-20260717-audio348`
 - Prefetch v9 par segments de 2 MiB, N+1 à N+5.
 - Radio globale, Shuffle album et lecture chronologique consolidés.
 - Fullscreen, mini-player et Media Session validés par l’utilisateur sur iPhone.
+- Page Favoris simplifiée : titre stable, sélection ronde, fermeture `×` et retrait par
+  poubelle.
 - CSS `audiofix347-20260717` figé.
 - Frontière de publication limitée à `public/`.
 

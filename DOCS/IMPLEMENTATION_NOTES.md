@@ -1,5 +1,25 @@
 # Implementation Notes
 
+## 2026-07-18 — audiofix352 modale QR alignée sur le logo INFRA
+
+- Gel préalable : commit `12e2660`, conservé par le tag annoté
+  `backup-audiofix351-20260718`.
+- L’ancienne fiche QR avec titre, champ URL et bouton texte est remplacée par une modale
+  visuelle unique : fermeture à gauche, copie par deux carrés à droite, QR noir arrondi sur
+  disque rouge `#e52c31`, puis wordmark officiel du site.
+- La copie reste déclenchée directement par le clic utilisateur. Elle utilise l’Async
+  Clipboard API en contexte HTTPS puis le fallback de sélection Safari existant. Le bouton
+  ne change plus de taille : un toast `aria-live` affiche `Lien copié` ou l’échec pendant
+  1,6 seconde, puis disparaît.
+- Le QR utilise une correction d’erreur `H` et une zone calme de quatre modules. La fermeture
+  par croix, fond, `Escape`, la restauration du focus et la persistance SPA sont conservées.
+- Référence WebKit :
+  [Async Clipboard API](https://webkit.org/blog/10855/async-clipboard-api/), qui exige que
+  `writeText` reste dans le geste utilisateur et dans un contexte sécurisé.
+- Identifiants : `audiofix352-20260718`, `infra-shell-20260718-audio352` et CSS
+  `audiofix352-20260718`. Le lecteur, le prefetch v9, Media Session, le fullscreen, les
+  covers et toute la géométrie PWA restent inchangés.
+
 ## 2026-07-18 — audiofix351 handoff peint WebKit et export télémétrique récent
 
 - Gel préalable : commit `ed7b45b`, conservé par le tag annoté

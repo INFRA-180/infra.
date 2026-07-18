@@ -7,13 +7,13 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix351-20260718`
-- Service Worker : `infra-shell-20260718-audio351`
-- CSS figé : `audiofix347-20260717`
+- Runtime : `audiofix352-20260718`
+- Service Worker : `infra-shell-20260718-audio352`
+- CSS figé : `audiofix352-20260718`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
-- Sauvegarde : tag `backup-audiofix350-20260718`
+- Sauvegarde : tag `backup-audiofix351-20260718`
 
 ## Publication
 
@@ -119,6 +119,15 @@ Sur Safari compatible, le passage entre routes utilise le handoff peint natif de
 Transitions sans animation visuelle. La mutation DOM et le repositionnement du scroll sont
 séparés d’une frame. La cover hero de l’album décode en mode synchrone ; les images de la
 grille Accueil restent paresseuses et asynchrones.
+
+## Partage par QR
+
+Un appui long sur le logo, une cover d’accueil ou une cover d’album ouvre une modale
+persistante. Elle contient un QR noir sur le disque rouge exact du logo `#e52c31`, le
+wordmark officiel, une fermeture à gauche et une copie à droite. Le résultat de copie est
+annoncé par un toast temporaire `aria-live`. Le lien est écrit directement depuis le clic
+utilisateur avec `navigator.clipboard.writeText`, puis avec le fallback de sélection existant
+si Safari le refuse.
 
 ## Télémétrie
 

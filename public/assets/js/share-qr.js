@@ -8,10 +8,15 @@
   const MOVE_TOLERANCE_PX = 12;
   const CLICK_SUPPRESSION_MS = 1200;
   const CLOSE_CLICK_SUPPRESSION_MS = 650;
-  const QR_FILL = "#e5232f";
+  const SHARE_BRAND_RED = "#e52c31";
+  const QR_FILL = "#000000";
   const moduleScript = document.currentScript;
   const vendorUrl = new URL(
     "../vendor/qr-creator.min.js?v=1.0.0",
+    moduleScript && moduleScript.src ? moduleScript.src : window.location.href
+  ).href;
+  const brandLogoUrl = new URL(
+    "../branding/infra-logo-white-photoroom-title.png",
     moduleScript && moduleScript.src ? moduleScript.src : window.location.href
   ).href;
 
@@ -144,26 +149,30 @@
     }
   }
 
-  function resetCopyButton() {
+  function resetCopyFeedback() {
     if (!dialogParts) return;
     window.clearTimeout(copyStateTimer);
-    dialogParts.copyButton.textContent = "Copier le lien";
+    dialogParts.copyToast.textContent = "";
+    dialogParts.copyToast.classList.remove("is-visible");
+    delete dialogParts.copyToast.dataset.state;
     delete dialogParts.copyButton.dataset.state;
   }
 
-  function showCopyButtonState(message, state) {
+  function showCopyFeedback(message, state) {
     if (!dialogParts) return;
     window.clearTimeout(copyStateTimer);
-    dialogParts.copyButton.textContent = message;
+    dialogParts.copyToast.textContent = message;
+    dialogParts.copyToast.dataset.state = state || "info";
+    dialogParts.copyToast.classList.add("is-visible");
     dialogParts.copyButton.dataset.state = state || "info";
-    copyStateTimer = window.setTimeout(resetCopyButton, 1600);
+    copyStateTimer = window.setTimeout(resetCopyFeedback, 1600);
   }
 
   function handleDialogClosed() {
     window.clearTimeout(copyStateTimer);
     backdropPointer = null;
     clearShareSelection();
-    resetCopyButton();
+    resetCopyFeedback();
     restoreDialogFocus();
   }
 
@@ -173,28 +182,34 @@
     const dialog = document.createElement("dialog");
     dialog.id = "infraShareDialog";
     dialog.className = "share-dialog";
+    dialog.style.setProperty("--share-brand-red", SHARE_BRAND_RED);
     dialog.setAttribute("closedby", "any");
     dialog.setAttribute("aria-labelledby", "infraShareTitle");
     dialog.innerHTML = [
       '<div class="share-dialog-panel" data-share-dialog-panel>',
       '  <header class="share-dialog-head">',
+      '    <button class="share-icon-button share-dialog-close" type="button" aria-label="Fermer" autofocus>',
+      '      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5.75 5.75 18.25 18.25M18.25 5.75 5.75 18.25"/></svg>',
+      "    </button>",
       '    <h2 id="infraShareTitle"></h2>',
-      '    <button class="share-dialog-close" type="button" aria-label="Fermer" autofocus>&times;</button>',
+      '    <button class="share-icon-button share-copy" type="button" aria-label="Copier le lien">',
+      '      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="8.25" y="8.25" width="11" height="11" rx="2"/><rect x="4.75" y="4.75" width="11" height="11" rx="2"/></svg>',
+      "    </button>",
+      '    <div class="share-copy-toast" data-share-copy-toast role="status" aria-live="polite" aria-atomic="true"></div>',
       "  </header>",
       '  <div class="share-qr" data-share-qr aria-live="off"></div>',
-      '  <input class="share-link" type="url" readonly spellcheck="false" aria-label="Lien de partage" />',
-      '  <div class="share-actions">',
-      '    <button class="share-copy" type="button">Copier le lien</button>',
-      "  </div>",
+      '  <img class="share-brand-logo" data-share-brand-logo alt="" aria-hidden="true" decoding="async" />',
       "</div>"
     ].join("");
 
     const closeButton = dialog.querySelector(".share-dialog-close");
     const copyButton = dialog.querySelector(".share-copy");
+    const copyToast = dialog.querySelector("[data-share-copy-toast]");
     const panel = dialog.querySelector("[data-share-dialog-panel]");
     const title = dialog.querySelector("#infraShareTitle");
     const qr = dialog.querySelector("[data-share-qr]");
-    const link = dialog.querySelector(".share-link");
+    const brandLogo = dialog.querySelector("[data-share-brand-logo]");
+    brandLogo.src = brandLogoUrl;
 
     closeButton.addEventListener("click", closeFromPointer);
     closeButton.addEventListener("pointerup", closeFromPointer);
@@ -226,12 +241,21 @@
       window.clearTimeout(copyStateTimer);
     });
     copyButton.addEventListener("click", async function () {
-      const copied = await copyText(currentShareUrl, dialog);
-      showCopyButtonState(copied ? "Lien copié" : "Copie impossible", copied ? "success" : "error");
+      const copyToken = openToken;
+      const copyUrl = currentShareUrl;
+      const copied = await copyText(copyUrl, dialog);
+      if (
+        copyToken !== openToken ||
+        copyUrl !== currentShareUrl ||
+        !(dialog.open || dialog.classList.contains("is-fallback-open"))
+      ) {
+        return;
+      }
+      showCopyFeedback(copied ? "Lien copié" : "Copie impossible", copied ? "success" : "error");
     });
 
     getPersistRoot().appendChild(dialog);
-    dialogParts = { dialog, closeButton, copyButton, title, qr, link };
+    dialogParts = { dialog, closeButton, copyButton, copyToast, title, qr, brandLogo };
     return dialogParts;
   }
 
@@ -275,10 +299,11 @@
       QrCreator.render({
         text: url,
         radius: 0.5,
-        ecLevel: "M",
+        ecLevel: "H",
         fill: QR_FILL,
-        background: "#ffffff",
-        size: 256
+        background: SHARE_BRAND_RED,
+        quiet: 4,
+        size: 280
       }, parts.qr);
       const canvas = parts.qr.querySelector("canvas");
       if (canvas) {
@@ -341,9 +366,8 @@
     dialogInvoker = invoker || intent.element || document.activeElement;
     markShareSelected(intent.element);
     parts.title.textContent = intent.title;
-    parts.link.value = intent.url;
     parts.qr.classList.remove("is-error");
-    resetCopyButton();
+    resetCopyFeedback();
 
     if (typeof parts.dialog.showModal === "function") {
       if (!parts.dialog.open) parts.dialog.showModal();

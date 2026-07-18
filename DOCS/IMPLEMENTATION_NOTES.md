@@ -1,5 +1,23 @@
 # Implementation Notes
 
+## 2026-07-18 — nettoyage conservateur du runtime et des assets
+
+- Le staging privé Music/R2 est ramené d’environ 15,6 Go à son seul état actif : 2 581
+  générations non référencées sont supprimées après arrêt du LaunchAgent, inventaire,
+  sauvegarde des catalogues, SQLite, manifests et logs, puis vérification des hashes.
+- La sauvegarde ciblée est conservée sous
+  `/Users/infra/CODEX_APP/SITE_INFRA./BACKUPS/audio-r2-sync-retention-20260718/`.
+  L’ancienne copie complète de 10 Go `BACKUPS/SITE_2026-07/`, redondante avec son bundle Git
+  vérifié et les sauvegardes plus récentes, est retirée. Les bundles Git, freezes et
+  sauvegardes de régression restent intacts.
+- Le périmètre public conserve exactement 31 covers WebP 1200 canoniques et les quatre
+  originaux de `assets/music/sources/`. Les 69 variantes WebP 480/900, 37 anciens JPG/PNG
+  et 20 variantes d’icônes/branding sans aucune référence sont supprimés.
+- `tools/release-audit.js` compare désormais l’inventaire physique des covers au catalogue :
+  toute cover supplémentaire, manquante ou non canonique bloque la publication.
+- Aucun fichier du lecteur, du prefetch, du Service Worker, du CSS ou de la géométrie PWA
+  n’est modifié. La baseline reste `audiofix348-20260717`.
+
 ## 2026-07-18 — consolidation maintenance et audit de release
 
 - La baseline publique reste strictement `audiofix348-20260717` / `infra-shell-20260717-audio348` ; aucun fichier runtime, CSS, audio, prefetch, navigation, Media Session ou Service Worker n’est modifié.

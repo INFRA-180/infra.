@@ -100,8 +100,8 @@ Le contrat runtime est strict :
 - une URL canonique `*-cover-1200.webp` ;
 - la même URL sur l’accueil, la page album, le mini-player, le fullscreen et Media Session.
 
-Les WebP 480/900 et les anciens JPG/PNG sont des dérivés historiques, pas des sources runtime.
-Une exception manuelle doit passer par `COVER_OVERRIDES` avec copie de la source et SHA-256.
+Les WebP 480/900 et les anciens JPG/PNG ne sont plus stockés dans `public/`. Une exception
+manuelle doit passer par `COVER_OVERRIDES` avec copie de la source et SHA-256.
 
 ## PWA et fullscreen
 

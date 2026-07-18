@@ -2,8 +2,8 @@
 
 État de référence : 18 juillet 2026.
 
-Ce plan ne donne aucune autorisation de suppression. Toute purge physique doit faire l’objet
-d’un lot séparé, d’un inventaire final et d’un accord explicite.
+Les purges autorisées du 18 juillet sont terminées. Toute nouvelle suppression devra de
+nouveau être précédée d’un inventaire et d’une sauvegarde adaptée.
 
 ## Priorité 1 — geler le runtime stable
 
@@ -21,64 +21,24 @@ Conserver sans modification spéculative :
 Une intervention sur ces fichiers exige un bug reproductible, une preuve dans le code ou une
 télémétrie exploitable.
 
-## Priorité 2 — rétention du runtime Music/R2
+## Priorité 2 — rétention du runtime Music/R2 — terminée
 
-Constat au 18 juillet :
+- Sauvegarde vérifiée :
+  `/Users/infra/CODEX_APP/SITE_INFRA./BACKUPS/audio-r2-sync-retention-20260718/`
+- 2 581 générations de staging non référencées supprimées, soit environ 15,6 Go.
+- Les cinq générations locales encore actives, le catalogue live, le fallback, SQLite,
+  les manifests, les logs et l’inventaire avec hashes sont conservés.
+- Le LaunchAgent est relancé après chaque maintenance.
 
-- source : `_private/runtime/audio-r2-sync/`
-- volume : environ 15 Go ;
-- générations : environ 2 586 ;
-- accumulation principalement issue d’anciens essais MARSELHA, CDM et H2O.
+La bibliothèque Music reste strictement en lecture seule.
 
-Éléments à protéger impérativement :
+## Priorité 3 — nettoyage des pochettes historiques — terminé
 
-- `_private/runtime/audio-r2-sync/live-catalog.json`
-- `_private/runtime/audio-r2-sync/source-tracks.sqlite`
-- `_private/runtime/audio-r2-sync/auto-sync.log`
-- `_private/runtime/audio-r2-sync/auto-sync-error.log`
-- `.sqlite_local/itunes_r2_sync.sqlite*`
-- le dernier répertoire de publication confirmé pour chaque piste encore référencée.
-
-Destination de sauvegarde proposée pour un futur nettoyage :
-
-`/Users/infra/CODEX_APP/SITE_INFRA./BACKUPS/audio-r2-sync-retention-YYYYMMDD/`
-
-Procédure future :
-
-1. arrêter temporairement le LaunchAgent ;
-2. produire la liste exacte des références du catalogue live et Git ;
-3. copier les fichiers protégés vers la destination ;
-4. vérifier les hashes et ouvrir les deux catalogues ;
-5. supprimer uniquement les répertoires de staging non référencés ;
-6. redémarrer le LaunchAgent et vérifier un passage sans changement.
-
-La bibliothèque Music ne doit jamais être modifiée.
-
-## Priorité 3 — nettoyage des pochettes historiques
-
-Constat :
-
-- 137 fichiers physiques correspondant à des pochettes ;
-- 31 WebP 1200 référencés par le catalogue ;
-- 69 WebP responsive non référencés ;
-- 37 anciens JPG/PNG non référencés par le runtime.
-
-Sources à inventorier :
-
-- `public/assets/music/responsive/`
-- `public/assets/music/*-cover.jpg`
-- `public/assets/music/*-cover.png`
-
-Sources originales à préserver :
-
-- `public/assets/music/sources/`
-
-Destination de sauvegarde proposée :
-
-`/Users/infra/CODEX_APP/SITE_INFRA./BACKUPS/legacy-covers-YYYYMMDD/`
-
-Le nettoyage devra être un commit assets isolé. Les 31 URLs canoniques et les quatre originaux
-de `sources/` devront rester byte-identiques.
+- 31 WebP 1200 canoniques conservés : exactement une cover par album.
+- Les quatre originaux de `public/assets/music/sources/` sont conservés.
+- 69 anciennes variantes WebP 480/900 et 37 anciens JPG/PNG non référencés sont retirés.
+- `tools/release-audit.js` refuse désormais toute cover physique supplémentaire, manquante
+  ou différente du catalogue.
 
 ## Priorité 4 — source de vérité générée
 

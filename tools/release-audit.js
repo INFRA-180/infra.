@@ -141,7 +141,39 @@ function verifyNoLegacyRuntimeCovers() {
   if (legacyReferences.length) {
     fail(`legacy 480/900 runtime cover references: ${legacyReferences.join(", ")}`);
   }
-  console.log("Canonical cover policy passed: no 480/900 runtime reference.");
+
+  const tracks = readJson("public/data/tracks.json");
+  const expectedCovers = new Set(
+    (tracks.albums || []).map((album) => String(album.cover || "").replace(/^\/+/, ""))
+  );
+  const musicRoot = path.join(publicRoot, "assets/music");
+  const physicalCovers = new Set(
+    walk(musicRoot, (filePath) => {
+      const relativeMusicPath = path.relative(musicRoot, filePath);
+      return !relativeMusicPath.startsWith(`sources${path.sep}`) &&
+        /cover.*\.(?:webp|jpe?g|png)$/i.test(path.basename(filePath));
+    }).map((filePath) => path.relative(publicRoot, filePath).split(path.sep).join("/"))
+  );
+
+  const extras = [...physicalCovers].filter((cover) => !expectedCovers.has(cover));
+  const missing = [...expectedCovers].filter((cover) => !physicalCovers.has(cover));
+  if (
+    expectedCovers.size !== expected.albums ||
+    physicalCovers.size !== expected.albums ||
+    extras.length ||
+    missing.length
+  ) {
+    fail(
+      `canonical cover inventory mismatch ` +
+      `(expected=${expectedCovers.size}, physical=${physicalCovers.size}, ` +
+      `extras=${extras.join(",") || "none"}, missing=${missing.join(",") || "none"})`
+    );
+  }
+
+  console.log(
+    `Canonical cover policy passed: ${physicalCovers.size} physical covers, ` +
+    "one per album, no 480/900 runtime reference."
+  );
 }
 
 function verifySyntax() {

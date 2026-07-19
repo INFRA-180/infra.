@@ -258,7 +258,7 @@ async function main() {
   testCoverSwapHasNoSnapshotOrSecondDecode();
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
-  console.log("audiofix360 SPA/transport tests: ok");
+  console.log("audiofix361 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

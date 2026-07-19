@@ -1,5 +1,30 @@
 # Implementation Notes
 
+## 2026-07-19 — audiofix361 télémétrie diagnostic visualiseur desktop
+
+- Le test utilisateur `audiofix360` ne montre aucune différence visible, mais la télémétrie
+  précédente ne mesurait que la géométrie fullscreen. Elle ne permettait pas de distinguer un
+  ancien build en cache, une activation Web Audio absente, un contexte suspendu, un analyseur
+  silencieux ou une modulation simplement trop faible.
+- `audio-visualizer.js` agrège désormais localement les ouvertures, activations, erreurs,
+  frames dessinées, frames nulles/non nulles, progression audio, RMS, bandes fréquentielles,
+  plage d’énergie, amplitude calculée et visibilité réelle du canvas.
+- Une mesure est consolidée après l’activation, une seule fois après 1,6 seconde d’ouverture,
+  puis à la fermeture ou au passage caché. Aucun échantillon PCM, aucune URL et aucune donnée
+  par frame ne sortent du navigateur.
+- `audio-telemetry.js` remplace toujours le même événement `visualizer_health` et reporte les
+  maxima cumulés dans `session_summary`. Il ne consomme donc qu’un slot sur les 48 événements
+  et reste envoyé dans l’unique lot `hidden/pagehide` existant, sans requête Worker
+  supplémentaire.
+- Le Worker Cloudflare applique la même allowlist numérique et le rapport privé expose
+  directement build, résultat d’activation, état du contexte, signal, progression et canvas.
+  Version déployée : `699a19e5-a606-4068-ac16-f5e03bb6c5d7`, source privée SHA-256
+  `da9fe2a90927f42569554a99d6ee5034b5c301d84a277a15f509947e08603b47`.
+- Le rendu, les sensibilités Web Audio, le CSS, le mobile/PWA, le prefetch, Media Session et
+  la géométrie sont inchangés : cette release mesure avant toute nouvelle correction visuelle.
+- Identifiants atomiques : `audiofix361-20260719`, `infra-shell-20260719-audio361` et CSS
+  `audiofix361-20260719`.
+
 ## 2026-07-19 — audiofix360 analyse audio live fullscreen desktop
 
 - L’enveloppe pré-calculée suivait la position de lecture, pas le signal réellement entendu :

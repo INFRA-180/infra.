@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix360-20260719`
-- Service Worker : `infra-shell-20260719-audio360`
-- CSS figé : `audiofix360-20260719`
+- Runtime : `audiofix361-20260719`
+- Service Worker : `infra-shell-20260719-audio361`
+- CSS figé : `audiofix361-20260719`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -55,6 +55,10 @@ Principaux composants :
 - `audio-telemetry.js` : lot compact de session.
 
 Un seul élément `<audio>` global est autorisé.
+
+Le diagnostic du visualiseur est agrégé localement : un événement compact
+`visualizer_health` par session décrit l’activation Web Audio, le signal détecté et la
+visibilité du canvas. Il rejoint le lot différé existant sans envoi par frame.
 
 ## Modes de lecture
 

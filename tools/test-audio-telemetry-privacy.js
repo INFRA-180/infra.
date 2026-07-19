@@ -432,6 +432,53 @@ async function settle(turns = 20) {
     storage_audio_entries: 6,
     storage_catalog_entries: 1
   });
+  telemetry.trackRuntimeEvent("visualizer_health", {
+    reason: "activation",
+    result: "ready",
+    state: "running",
+    visualizer_open_count: 1,
+    visualizer_activation_count: 1,
+    visualizer_activation_success_count: 1,
+    visualizer_frame_count: 2,
+    visualizer_nonzero_frame_count: 2,
+    visualizer_zero_frame_count: 0,
+    visualizer_max_rms_milli: 210,
+    visualizer_energy_range_milli: 80,
+    visualizer_max_amplitude_px: 18,
+    visualizer_canvas_width: 720,
+    visualizer_canvas_height: 220,
+    visualizer_canvas_opacity_milli: 1000,
+    visualizer_audio_advanced_ms: 80,
+    visualizer_context_supported: 1,
+    visualizer_context_running: 1,
+    visualizer_analyser_ready: 1,
+    visualizer_canvas_visible: 1
+  });
+  telemetry.trackRuntimeEvent("visualizer_health", {
+    reason: "active_probe",
+    result: "ready",
+    state: "running",
+    visualizer_open_count: 1,
+    visualizer_activation_count: 1,
+    visualizer_activation_success_count: 1,
+    visualizer_frame_count: 42,
+    visualizer_nonzero_frame_count: 40,
+    visualizer_zero_frame_count: 2,
+    visualizer_max_rms_milli: 640,
+    visualizer_max_bass_milli: 780,
+    visualizer_max_mid_milli: 520,
+    visualizer_max_treble_milli: 310,
+    visualizer_energy_range_milli: 390,
+    visualizer_max_amplitude_px: 31,
+    visualizer_canvas_width: 720,
+    visualizer_canvas_height: 220,
+    visualizer_canvas_opacity_milli: 1000,
+    visualizer_audio_advanced_ms: 1500,
+    visualizer_context_supported: 1,
+    visualizer_context_running: 1,
+    visualizer_analyser_ready: 1,
+    visualizer_canvas_visible: 1
+  });
   telemetry.trackRuntimeEvent("nav:album_start", navBase);
   tick(20);
   telemetry.trackRuntimeEvent("album_open_tap", navBase);
@@ -506,6 +553,11 @@ async function settle(turns = 20) {
   );
   assert.strictEqual(compactEvents.filter((event) => event.event === "spa_navigation").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "mini_player_visibility").length, 3);
+  assert.strictEqual(
+    compactEvents.filter((event) => event.event === "visualizer_health").length,
+    1,
+    "Visualizer probes must update one compact event instead of appending per frame"
+  );
   assert.strictEqual(compactEvents.filter((event) => event.event === "session_summary").length, 1);
   assert.strictEqual(
     compactEvents.some((event) => [
@@ -564,6 +616,21 @@ async function settle(turns = 20) {
   assert.strictEqual(compactSummary.storage_cover_entries, 31);
   assert.strictEqual(compactSummary.storage_audio_entries, 6);
   assert.strictEqual(compactSummary.storage_catalog_entries, 1);
+  assert.strictEqual(compactSummary.visualizer_open_count, 1);
+  assert.strictEqual(compactSummary.visualizer_activation_success_count, 1);
+  assert.strictEqual(compactSummary.visualizer_frame_count, 42);
+  assert.strictEqual(compactSummary.visualizer_nonzero_frame_count, 40);
+  assert.strictEqual(compactSummary.visualizer_zero_frame_count, 2);
+  assert.strictEqual(compactSummary.visualizer_max_rms_milli, 640);
+  assert.strictEqual(compactSummary.visualizer_energy_range_milli, 390);
+  assert.strictEqual(compactSummary.visualizer_audio_advanced_ms, 1500);
+  assert.strictEqual(compactSummary.visualizer_context_running, 1);
+  assert.strictEqual(compactSummary.visualizer_analyser_ready, 1);
+  assert.strictEqual(compactSummary.visualizer_canvas_visible, 1);
+  const compactVisualizer = compactEvents.find((event) => event.event === "visualizer_health");
+  assert.strictEqual(compactVisualizer.result, "ready");
+  assert.strictEqual(compactVisualizer.state, "running");
+  assert.strictEqual(compactVisualizer.visualizer_frame_count, 42);
   const compactNavigation = compactEvents.find((event) => event.event === "spa_navigation");
   assert.strictEqual(compactNavigation.cover_ready_at_first_paint, true);
   assert.strictEqual(compactNavigation.first_paint_ms, 18);

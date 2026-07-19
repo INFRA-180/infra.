@@ -23,6 +23,7 @@ const classNames = new Set();
 const classList = {
   add: (name) => classNames.add(name),
   remove: (name) => classNames.delete(name),
+  contains: (name) => classNames.has(name),
   toggle: (name, force) => {
     if (force) classNames.add(name);
     else classNames.delete(name);
@@ -43,6 +44,7 @@ const canvas = {
   getBoundingClientRect: () => ({ width: 720, height: 220 })
 };
 const visualRoot = { classList };
+const healthReports = [];
 const audio = {
   currentSrc: "https://audio.example/assets/music/streams/v1/osiris/01-killu.m4a",
   src: "",
@@ -149,6 +151,11 @@ const sandbox = {
     AudioContext: MockAudioContext,
     location: { href: "https://infra.example/infra./index.html" },
     devicePixelRatio: 2,
+    getComputedStyle() {
+      return {
+        opacity: classNames.has("is-active") && classNames.has("is-ready") ? "1" : "0"
+      };
+    },
     matchMedia(query) {
       return query.includes("prefers-reduced-motion") ? motionQuery : desktopQuery;
     }
@@ -161,7 +168,14 @@ async function main() {
   const api = sandbox.window.InfraAudioVisualizer;
   assert.ok(api && typeof api.create === "function", "visualizer API is not exposed");
 
-  const controller = api.create({ audio, canvas, root: visualRoot });
+  const controller = api.create({
+    audio,
+    canvas,
+    root: visualRoot,
+    reportHealth(payload) {
+      healthReports.push(payload);
+    }
+  });
   assert.ok(controller, "visualizer controller was not created");
   assert.equal(typeof controller.activate, "function", "live analyser has no gesture activation");
 
@@ -201,6 +215,17 @@ async function main() {
   controller.sync({ active: false });
   assert.ok(!classNames.has("is-active"), "closed fullscreen keeps the visual active");
   assert.equal(contextCloseCount, 0, "closing the visualizer closed the audible audio graph");
+  const health = healthReports.at(-1);
+  assert.ok(health, "visualizer health was not reported");
+  assert.equal(health.result, "ready", "health report does not expose activation status");
+  assert.equal(health.state, "running", "health report does not expose context state");
+  assert.equal(health.visualizer_open_count, 1, "health report lost the fullscreen open");
+  assert.equal(health.visualizer_activation_count, 2, "health report lost activation attempts");
+  assert.equal(health.visualizer_activation_success_count, 2, "health report lost successful activations");
+  assert.ok(health.visualizer_frame_count > 0, "health report contains no drawn frame");
+  assert.ok(health.visualizer_nonzero_frame_count > 0, "health report did not detect live signal");
+  assert.equal(health.visualizer_analyser_ready, 1, "health report does not see the analyser");
+  assert.equal(health.visualizer_canvas_visible, 1, "health report does not see the canvas");
   console.log("Desktop live audio visualizer graph and lifecycle: ok");
 }
 

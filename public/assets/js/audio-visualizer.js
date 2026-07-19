@@ -18,6 +18,13 @@
   let sharedFrequencyData = null;
   let sharedTimeData = null;
   let sharedActivationPromise = null;
+  let sharedActivationResult = "idle";
+  let sharedActivationError = "";
+
+  function setActivationStatus(result, error) {
+    sharedActivationResult = String(result || "unknown").slice(0, 120);
+    sharedActivationError = String(error && error.name ? error.name : (error || "")).slice(0, 120);
+  }
 
   function getMediaQuery(query) {
     return typeof window.matchMedia === "function" ? window.matchMedia(query) : null;
@@ -78,12 +85,19 @@
   }
 
   function activateLiveAnalysis(audio) {
-    if (!audio || !isDesktopViewport()) return Promise.resolve(null);
-    if (sharedAudio && sharedAudio !== audio) return Promise.resolve(null);
+    if (!audio || !isDesktopViewport()) {
+      setActivationStatus("desktop_inactive");
+      return Promise.resolve(null);
+    }
+    if (sharedAudio && sharedAudio !== audio) {
+      setActivationStatus("different_audio");
+      return Promise.resolve(null);
+    }
 
     const existing = getSharedGraph(audio);
     if (existing) {
-      return resumeContext(existing.context).then(function () {
+      return resumeContext(existing.context).then(function (running) {
+        setActivationStatus(running ? "ready" : "resume_failed");
         return existing;
       });
     }
@@ -92,29 +106,37 @@
         if (!running) return null;
         try {
           attachAnalyser(sharedContext, sharedSource);
-        } catch (_err) {
+        } catch (error) {
+          setActivationStatus("analyser_failed", error);
           return null;
         }
+        setActivationStatus("ready");
         return getSharedGraph(audio);
       });
     }
     if (sharedActivationPromise) return sharedActivationPromise;
 
     const AudioContextConstructor = getAudioContextConstructor();
-    if (!AudioContextConstructor) return Promise.resolve(null);
+    if (!AudioContextConstructor) {
+      setActivationStatus("unsupported");
+      return Promise.resolve(null);
+    }
     if (String(audio.crossOrigin || "").toLowerCase() !== "anonymous") {
+      setActivationStatus("crossorigin_missing");
       return Promise.resolve(null);
     }
 
     let context = null;
     try {
       context = new AudioContextConstructor();
-    } catch (_err) {
+    } catch (error) {
+      setActivationStatus("context_failed", error);
       return Promise.resolve(null);
     }
 
     sharedActivationPromise = resumeContext(context).then(function (running) {
       if (!running) {
+        setActivationStatus("resume_failed");
         if (typeof context.close === "function") {
           try {
             context.close();
@@ -131,7 +153,8 @@
         // Keep the audible route direct. The analyser is a side branch and is
         // deliberately not connected to the destination.
         source.connect(context.destination);
-      } catch (_err) {
+      } catch (error) {
+        setActivationStatus("source_failed", error);
         // If the source was created, keep its direct destination route alive:
         // closing this context would mute the already-routed media element.
         if (!source && typeof context.close === "function") {
@@ -149,9 +172,11 @@
       sharedSource = source;
       try {
         attachAnalyser(context, source);
-      } catch (_err) {
+      } catch (error) {
+        setActivationStatus("analyser_failed", error);
         return null;
       }
+      setActivationStatus("ready");
       return getSharedGraph(audio);
     }).finally(function () {
       sharedActivationPromise = null;
@@ -222,6 +247,9 @@
     const audio = config.audio || null;
     const canvas = config.canvas || null;
     const root = config.root || null;
+    const reportHealth = typeof config.reportHealth === "function"
+      ? config.reportHealth
+      : function () {};
     if (!audio || !canvas || !root) return null;
     if (canvas.__infraAudioVisualizer) return canvas.__infraAudioVisualizer;
 
@@ -242,6 +270,23 @@
     let beatPulse = 0;
     let motionPhase = 0;
     let resizeObserver = null;
+    let healthProbeTimer = 0;
+    let openCount = 0;
+    let activationCount = 0;
+    let activationSuccessCount = 0;
+    let activationErrorCount = 0;
+    let drawnFrameCount = 0;
+    let nonzeroFrameCount = 0;
+    let zeroFrameCount = 0;
+    let maximumRms = 0;
+    let maximumBass = 0;
+    let maximumMid = 0;
+    let maximumTreble = 0;
+    let minimumEnergy = Infinity;
+    let maximumEnergy = 0;
+    let maximumAmplitudePx = 0;
+    let audioAdvancedMs = 0;
+    let previousAudioTime = null;
 
     function resizeCanvas() {
       const bounds = canvas.getBoundingClientRect();
@@ -308,6 +353,108 @@
         );
       }
       lastMotionAt = energyTimestamp;
+      return live;
+    }
+
+    function updateHealthFromFrame(live) {
+      const sample = live || {};
+      const rms = Math.max(0, Number(sample.rms) || 0);
+      const bass = Math.max(0, Number(sample.bass) || 0);
+      const mid = Math.max(0, Number(sample.mid) || 0);
+      const treble = Math.max(0, Number(sample.treble) || 0);
+      const energy = Math.max(0, Number(sample.energy) || 0);
+      drawnFrameCount += 1;
+      maximumRms = Math.max(maximumRms, rms);
+      maximumBass = Math.max(maximumBass, bass);
+      maximumMid = Math.max(maximumMid, mid);
+      maximumTreble = Math.max(maximumTreble, treble);
+      minimumEnergy = Math.min(minimumEnergy, energy);
+      maximumEnergy = Math.max(maximumEnergy, energy);
+      if (rms > 0.004 || bass > 0.01 || mid > 0.01 || treble > 0.01) {
+        nonzeroFrameCount += 1;
+      } else {
+        zeroFrameCount += 1;
+      }
+
+      const audioTime = Number(audio.currentTime);
+      if (Number.isFinite(audioTime)) {
+        if (Number.isFinite(previousAudioTime)) {
+          const advanced = audioTime - previousAudioTime;
+          if (advanced > 0 && advanced <= 2) audioAdvancedMs += advanced * 1000;
+        }
+        previousAudioTime = audioTime;
+      }
+    }
+
+    function getHealthSnapshot(reason) {
+      const graph = getSharedGraph(audio);
+      const bounds = canvas.getBoundingClientRect();
+      let opacity = 0;
+      try {
+        opacity = typeof window.getComputedStyle === "function"
+          ? Number(window.getComputedStyle(root).opacity)
+          : (root.classList.contains("is-active") && root.classList.contains("is-ready") ? 1 : 0);
+      } catch (_err) {
+        opacity = 0;
+      }
+      return {
+        reason: String(reason || "probe"),
+        result: sharedActivationResult,
+        state: sharedContext ? String(sharedContext.state || "unknown") : "absent",
+        error_name: sharedActivationError,
+        visualizer_open_count: openCount,
+        visualizer_activation_count: activationCount,
+        visualizer_activation_success_count: activationSuccessCount,
+        visualizer_activation_error_count: activationErrorCount,
+        visualizer_frame_count: drawnFrameCount,
+        visualizer_nonzero_frame_count: nonzeroFrameCount,
+        visualizer_zero_frame_count: zeroFrameCount,
+        visualizer_max_rms_milli: Math.round(maximumRms * 1000),
+        visualizer_max_bass_milli: Math.round(maximumBass * 1000),
+        visualizer_max_mid_milli: Math.round(maximumMid * 1000),
+        visualizer_max_treble_milli: Math.round(maximumTreble * 1000),
+        visualizer_energy_range_milli: Math.round(
+          Math.max(0, maximumEnergy - (Number.isFinite(minimumEnergy) ? minimumEnergy : maximumEnergy)) * 1000
+        ),
+        visualizer_max_amplitude_px: Math.round(maximumAmplitudePx),
+        visualizer_canvas_width: Math.round(Math.max(0, Number(bounds.width) || 0)),
+        visualizer_canvas_height: Math.round(Math.max(0, Number(bounds.height) || 0)),
+        visualizer_canvas_opacity_milli: Math.round(Math.max(0, Math.min(1, opacity || 0)) * 1000),
+        visualizer_audio_advanced_ms: Math.round(Math.max(0, audioAdvancedMs)),
+        visualizer_context_supported: getAudioContextConstructor() ? 1 : 0,
+        visualizer_context_running: sharedContext && sharedContext.state === "running" ? 1 : 0,
+        visualizer_analyser_ready: graph ? 1 : 0,
+        visualizer_canvas_visible: (
+          bounds.width > 0 &&
+          bounds.height > 0 &&
+          opacity > 0 &&
+          root.classList.contains("is-active") &&
+          root.classList.contains("is-ready")
+        ) ? 1 : 0
+      };
+    }
+
+    function emitHealth(reason) {
+      try {
+        reportHealth(getHealthSnapshot(reason));
+      } catch (_err) {
+        // Diagnostics must never affect playback or rendering.
+      }
+    }
+
+    function clearHealthProbe() {
+      if (!healthProbeTimer || typeof clearTimeout !== "function") return;
+      clearTimeout(healthProbeTimer);
+      healthProbeTimer = 0;
+    }
+
+    function scheduleHealthProbe() {
+      clearHealthProbe();
+      if (typeof setTimeout !== "function") return;
+      healthProbeTimer = setTimeout(function () {
+        healthProbeTimer = 0;
+        if (active) emitHealth("active_probe");
+      }, 1600);
     }
 
     function draw(timestamp) {
@@ -317,7 +464,8 @@
       if (!active || !isDesktopViewport() || !graph) return;
 
       const reduced = prefersReducedMotion();
-      updateEnergy(graph, timestamp, reduced);
+      const live = updateEnergy(graph, timestamp, reduced);
+      updateHealthFromFrame(live);
       const centerY = size.height * 0.5;
       const rhythmicEnergy = Math.max(
         0,
@@ -365,6 +513,7 @@
           (rhythmicEnergy * 0.075) +
           (layer.band * 0.065)
         ) * layer.scale;
+        maximumAmplitudePx = Math.max(maximumAmplitudePx, amplitude);
         for (let index = 0; index < pointCount; index += 1) {
           const ratio = index / (pointCount - 1);
           const primary = Math.sin(
@@ -438,23 +587,43 @@
     }
 
     function activate() {
-      if (!isDesktopViewport()) return Promise.resolve(false);
+      activationCount += 1;
+      if (!isDesktopViewport()) {
+        activationErrorCount += 1;
+        emitHealth("activation");
+        return Promise.resolve(false);
+      }
       return activateLiveAnalysis(audio).then(function (graph) {
+        if (graph) activationSuccessCount += 1;
+        else activationErrorCount += 1;
         root.classList.toggle("is-ready", Boolean(graph));
         refresh();
+        emitHealth("activation");
         return Boolean(graph);
       });
     }
 
     function sync(nextState) {
-      active = Boolean(nextState && nextState.active && isDesktopViewport());
+      const nextActive = Boolean(nextState && nextState.active && isDesktopViewport());
+      if (nextActive && !active) {
+        openCount += 1;
+        previousAudioTime = Number.isFinite(Number(audio.currentTime)) ? Number(audio.currentTime) : null;
+        scheduleHealthProbe();
+      } else if (!nextActive && active) {
+        clearHealthProbe();
+        emitHealth("close");
+      }
+      active = nextActive;
       refresh();
     }
 
     ["play", "playing", "pause", "ended", "loadstart", "seeked"].forEach(function (eventName) {
       audio.addEventListener(eventName, refresh, { passive: true });
     });
-    document.addEventListener("visibilitychange", refresh, { passive: true });
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) emitHealth("hidden");
+      refresh();
+    }, { passive: true });
 
     const desktopQuery = getMediaQuery(DESKTOP_QUERY);
     const motionQuery = getMediaQuery(REDUCED_MOTION_QUERY);
@@ -478,6 +647,8 @@
       sync,
       refresh,
       stop: function () {
+        clearHealthProbe();
+        emitHealth("stop");
         active = false;
         stopAnimation();
         refresh();

@@ -14,9 +14,9 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix360-20260719";
-const shellRelease = "infra-shell-20260719-audio360";
-const cssRelease = "audiofix360-20260719";
+const release = "audiofix361-20260719";
+const shellRelease = "infra-shell-20260719-audio361";
+const cssRelease = "audiofix361-20260719";
 const frozenCssSha256 = "43156fa7813bd352f64474977ebbec7801bc0e141ddd4ef73f556d2dd6864ba8";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
@@ -46,9 +46,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix360");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix360");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio360");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix361");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix361");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio361");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -62,6 +62,7 @@ expect(!styles.includes("is-meta-idle"), "desktop metadata idle opacity rule is 
 expect(transport.includes("data-now-playing-visual-canvas"), "desktop fullscreen has no visual canvas");
 expect(transport.includes("ensureDesktopAudioVisualizer"), "desktop fullscreen does not own the visualizer lifecycle");
 expect(transport.includes("visualizer.activate()"), "desktop fullscreen click does not unlock live audio analysis");
+expect(transport.includes('trackAudioRuntimeEvent("visualizer_health"'), "desktop visualizer has no compact health telemetry");
 expect(visualizer.includes("FRAME_INTERVAL_MS = 1000 / 30"), "desktop visualizer is not capped at 30 fps");
 expect(visualizer.includes("ENERGY_ATTACK_SECONDS = 0.045"), "desktop visualizer has no fast rhythmic attack");
 expect(visualizer.includes("ENERGY_RELEASE_SECONDS = 0.26"), "desktop visualizer has no controlled energy release");
@@ -72,6 +73,10 @@ expect(visualizer.includes("source.connect(context.destination)"), "live analyse
 expect(visualizer.includes("source.connect(analyser)"), "live analyser is not connected as a side branch");
 expect(!/analyser\.connect\s*\(\s*context\.destination/.test(visualizer), "live analyser duplicates the audible route");
 expect(!fs.existsSync(path.join(root, "public/data/audio-visuals.json")), "stale precomputed visual data is still public");
+expect(visualizer.includes("getHealthSnapshot"), "desktop visualizer does not aggregate health locally");
+expect(visualizer.includes('emitHealth("active_probe")'), "desktop visualizer has no bounded active probe");
+expect(telemetry.includes("processVisualizerHealth"), "visualizer health is not compacted into session telemetry");
+expect(telemetry.includes('upsertCompactEvent("visualizer_health"'), "visualizer health appends duplicate session events");
 expect(styles.includes(".now-playing-visual.is-active.is-ready"), "desktop visualizer has no ready-state styling");
 expect(!sw.slice(sw.indexOf('self.addEventListener("install"'), sw.indexOf('self.addEventListener("activate"')).includes("skipWaiting"), "Service Worker still activates during a live audio session");
 expect(sw.includes("const OPTIONAL_SHELL_ASSETS"), "optional shell resources are not isolated");
@@ -350,4 +355,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix360.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix361.");

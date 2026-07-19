@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 19 juillet 2026
-Baseline : `audiofix360-20260719`
-Service Worker : `infra-shell-20260719-audio360`
+Baseline : `audiofix361-20260719`
+Service Worker : `infra-shell-20260719-audio361`
 
 ## État
 
@@ -19,6 +19,9 @@ Service Worker : `infra-shell-20260719-audio360`
 - Visualisation desktop : analyse Web Audio live du signal réellement lu, trois lignes animées
   à 30 i/s maximum, graphe singleton avec sortie audible directe, branche d’analyse séparée et
   arrêt du rendu sans fermeture du contexte.
+- Diagnostic visualiseur : une seule entrée compacte par session mesure build, activation,
+  état du contexte, signal, progression audio, frames et canvas, sans audio brut ni requête
+  Worker supplémentaire.
 - Page Favoris simplifiée : titre stable, sélection ronde, fermeture `×` et retrait par
   poubelle.
 - Navigation SPA avec handoff peint WebKit feature-détecté, sans snapshot/canvas, scroll
@@ -28,7 +31,7 @@ Service Worker : `infra-shell-20260719-audio360`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix360-20260719` figé.
+- CSS `audiofix361-20260719` figé.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

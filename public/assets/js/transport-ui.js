@@ -75,7 +75,10 @@
     transport.visualizer = audioVisualizerApi.create({
       audio: audioState.audio,
       root: transport.overlayVisual,
-      canvas: transport.overlayVisualCanvas
+      canvas: transport.overlayVisualCanvas,
+      reportHealth: function (payload) {
+        trackAudioRuntimeEvent("visualizer_health", payload);
+      }
     });
     return transport.visualizer;
   }

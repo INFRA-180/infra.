@@ -23,6 +23,7 @@
     "external_resume_recovery_resolved",
     "external_resume_recovery_failed",
     "fullscreen_viewport",
+    "visualizer_health",
     "first_byte",
     "global_playlist_build_done",
     "global_playlist_build_start",
@@ -153,7 +154,17 @@
     "storage_persist_request_count", "storage_persist_granted_count",
     "storage_usage_mb", "storage_quota_mb", "storage_shell_present",
     "storage_sw_controlled", "storage_cover_entries", "storage_audio_entries",
-    "storage_catalog_entries"
+    "storage_catalog_entries",
+    "visualizer_open_count", "visualizer_activation_count",
+    "visualizer_activation_success_count", "visualizer_activation_error_count",
+    "visualizer_frame_count", "visualizer_nonzero_frame_count", "visualizer_zero_frame_count",
+    "visualizer_max_rms_milli", "visualizer_max_bass_milli",
+    "visualizer_max_mid_milli", "visualizer_max_treble_milli",
+    "visualizer_energy_range_milli", "visualizer_max_amplitude_px",
+    "visualizer_canvas_width", "visualizer_canvas_height",
+    "visualizer_canvas_opacity_milli", "visualizer_audio_advanced_ms",
+    "visualizer_context_supported", "visualizer_context_running",
+    "visualizer_analyser_ready", "visualizer_canvas_visible"
   ]);
   const TELEMETRY_BOOLEAN_FIELDS = new Set([
     "fine_event", "navigator_on_line", "auto", "error", "health_session_active",
@@ -247,7 +258,28 @@
     "storage_sw_controlled",
     "storage_cover_entries",
     "storage_audio_entries",
-    "storage_catalog_entries"
+    "storage_catalog_entries",
+    "visualizer_open_count",
+    "visualizer_activation_count",
+    "visualizer_activation_success_count",
+    "visualizer_activation_error_count",
+    "visualizer_frame_count",
+    "visualizer_nonzero_frame_count",
+    "visualizer_zero_frame_count",
+    "visualizer_max_rms_milli",
+    "visualizer_max_bass_milli",
+    "visualizer_max_mid_milli",
+    "visualizer_max_treble_milli",
+    "visualizer_energy_range_milli",
+    "visualizer_max_amplitude_px",
+    "visualizer_canvas_width",
+    "visualizer_canvas_height",
+    "visualizer_canvas_opacity_milli",
+    "visualizer_audio_advanced_ms",
+    "visualizer_context_supported",
+    "visualizer_context_running",
+    "visualizer_analyser_ready",
+    "visualizer_canvas_visible"
   ];
 
   function createSessionSummary() {
@@ -1369,6 +1401,50 @@
       return true;
     }
 
+    function processVisualizerHealth(payload, source, timestampMs) {
+      const session = ensureActiveSession();
+      const summary = getSessionSummary(session);
+      if (!session || !summary) return false;
+      const fields = [
+        "visualizer_open_count",
+        "visualizer_activation_count",
+        "visualizer_activation_success_count",
+        "visualizer_activation_error_count",
+        "visualizer_frame_count",
+        "visualizer_nonzero_frame_count",
+        "visualizer_zero_frame_count",
+        "visualizer_max_rms_milli",
+        "visualizer_max_bass_milli",
+        "visualizer_max_mid_milli",
+        "visualizer_max_treble_milli",
+        "visualizer_energy_range_milli",
+        "visualizer_max_amplitude_px",
+        "visualizer_canvas_width",
+        "visualizer_canvas_height",
+        "visualizer_canvas_opacity_milli",
+        "visualizer_audio_advanced_ms",
+        "visualizer_context_supported",
+        "visualizer_context_running",
+        "visualizer_analyser_ready",
+        "visualizer_canvas_visible"
+      ];
+      fields.forEach(function (field) {
+        const value = Number(source && source[field]);
+        if (!Number.isFinite(value) || value < 0) return;
+        summary[field] = Math.max(Number(summary[field]) || 0, Math.round(value));
+      });
+      upsertCompactEvent("visualizer_health", Object.assign({}, payload, {
+        event: "visualizer_health",
+        timestamp_ms: Number(timestampMs) || Date.now(),
+        result: String(source && source.result || ""),
+        state: String(source && source.state || ""),
+        reason: String(source && source.reason || "probe"),
+        error: Boolean(source && source.error_name),
+        error_name: String(source && source.error_name || "")
+      }), session);
+      return true;
+    }
+
     function finalizeOpenTransitions(reason, timestampMs) {
       trackTransitions.forEach(function (transition) {
         if (!transition.finalized) finalizeTrackTransition(transition, reason || "sealed", timestampMs);
@@ -1552,7 +1628,9 @@
         playlist_kind: source.playlist_kind || audioState.playlistKind || "",
         auto: getAutoFlag(eventType, source, requestToken),
         error: errorEvent,
-        error_name: source.reason || source.error_name || source.error_message || ""
+        error_name: eventType === "visualizer_health"
+          ? (source.error_name || "")
+          : (source.reason || source.error_name || source.error_message || "")
       });
 
       if (eventType.startsWith("prefetch_")) {
@@ -1568,6 +1646,10 @@
       processSpaRuntimeEvent(eventType, payload, source, timestampMs);
       if (eventType === "mini_player_visibility") {
         processMiniPlayerVisibility(payload, source, timestampMs);
+        return;
+      }
+      if (eventType === "visualizer_health") {
+        processVisualizerHealth(payload, source, timestampMs);
         return;
       }
       if (DIRECT_EVENTS.has(eventType) || storeStandaloneTrackEvent) enqueue(payload);

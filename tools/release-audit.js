@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix359-20260719",
-  shell: "infra-shell-20260719-audio359",
+  build: "audiofix360-20260719",
+  shell: "infra-shell-20260719-audio360",
   albums: 31,
   tracks: 283
 });
@@ -132,55 +132,37 @@ function verifyVersions() {
   console.log(`Version checks passed across ${playerDocuments} player documents.`);
 }
 
-function visualKey(srcLike) {
-  const clean = String(srcLike || "").split(/[?#]/, 1)[0].replace(/\\/g, "/");
-  return clean.split("/").filter(Boolean).slice(-2).join("/").normalize("NFC");
-}
-
 function verifyAudioVisuals() {
-  const catalog = readJson("public/data/tracks.json");
-  const visuals = readJson("public/data/audio-visuals.json");
+  const legacyVisualDataPath = path.join(publicRoot, "data/audio-visuals.json");
   const visualizerSource = fs.readFileSync(
     path.join(publicRoot, "assets/js/audio-visualizer.js"),
     "utf8"
   );
-  const flattenedTracks = (catalog.albums || []).flatMap((album) => album.tracks || []);
-  const entries = visuals && visuals.tracks ? visuals.tracks : {};
-  const expectedKeys = new Set(flattenedTracks.map((track) => visualKey(track.src)));
-
-  if (visuals.version !== expected.build) {
-    fail(`audio visual data is not ${expected.build}`);
-  }
-  if (visuals.points !== 1024) {
-    fail(`audio visual data uses ${visuals.points} points instead of 1024`);
-  }
-  if (expectedKeys.size !== expected.tracks || Object.keys(entries).length !== expected.tracks) {
-    fail(`audio visual data is not aligned on ${expected.tracks} unique tracks`);
-  }
-  for (const key of expectedKeys) {
-    const encoded = entries[key];
-    if (typeof encoded !== "string") fail(`audio visual envelope is missing for ${key}`);
-    const bytes = Buffer.from(encoded, "base64");
-    if (bytes.length !== visuals.points || !bytes.some((value) => value > 0)) {
-      fail(`audio visual envelope is invalid for ${key}`);
-    }
-  }
-  const extras = Object.keys(entries).filter((key) => !expectedKeys.has(key));
-  if (extras.length) fail(`audio visual data contains stale tracks: ${extras.join(", ")}`);
-  if (/AudioContext|createMediaElementSource|createAnalyser/.test(visualizerSource)) {
-    fail("desktop visualizer reroutes or analyzes the live audio element");
+  if (fs.existsSync(legacyVisualDataPath)) {
+    fail("precomputed audio visual data is still shipped");
   }
   if (
+    !visualizerSource.includes("window.AudioContext || window.webkitAudioContext") ||
+    !visualizerSource.includes("createMediaElementSource(audio)") ||
+    !visualizerSource.includes("createAnalyser()") ||
+    !visualizerSource.includes("source.connect(context.destination)") ||
+    !visualizerSource.includes("source.connect(analyser)") ||
+    !visualizerSource.includes("getByteFrequencyData") ||
+    !visualizerSource.includes("getByteTimeDomainData") ||
+    !visualizerSource.includes('crossOrigin || "").toLowerCase() !== "anonymous"') ||
     !visualizerSource.includes("(prefers-reduced-motion: reduce)") ||
     !visualizerSource.includes("FRAME_INTERVAL_MS = 1000 / 30") ||
-    !visualizerSource.includes("ENERGY_ATTACK_SECONDS = 0.055") ||
-    !visualizerSource.includes("ENERGY_RELEASE_SECONDS = 0.38") ||
+    !visualizerSource.includes("ENERGY_ATTACK_SECONDS = 0.045") ||
+    !visualizerSource.includes("ENERGY_RELEASE_SECONDS = 0.26") ||
     !visualizerSource.includes("document.hidden")
   ) {
-    fail("desktop visualizer is missing its motion or lifecycle guards");
+    fail("desktop live visualizer is missing its audio graph or lifecycle guards");
+  }
+  if (/analyser\.connect\s*\(\s*context\.destination/.test(visualizerSource)) {
+    fail("desktop analyser creates a duplicate audible destination path");
   }
 
-  console.log(`Desktop audio visuals passed: ${expected.tracks} envelopes / ${visuals.points} points.`);
+  console.log("Desktop live audio visualizer policy passed: singleton side-branch analyser, no data payload.");
 }
 
 function verifyNoLegacyRuntimeCovers() {

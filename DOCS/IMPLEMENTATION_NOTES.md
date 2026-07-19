@@ -1,5 +1,33 @@
 # Implementation Notes
 
+## 2026-07-19 — audiofix360 analyse audio live fullscreen desktop
+
+- L’enveloppe pré-calculée suivait la position de lecture, pas le signal réellement entendu :
+  elle ne pouvait donc pas réagir de façon fiable aux impacts, au niveau instantané ou aux
+  différentes bandes de fréquences.
+- Le clic utilisateur qui ouvre le fullscreen desktop active désormais un unique `AudioContext`
+  et un unique `MediaElementAudioSourceNode` pour l’élément `<audio>` global. La sortie audible
+  reste branchée directement vers `context.destination`; un `AnalyserNode` séparé lit le signal
+  sur une branche sans créer une seconde route audio.
+- L’analyse à 30 i/s combine RMS et bandes graves, médiums et aigus avec une FFT de 512 points.
+  L’attaque de 45 ms, la retombée de 260 ms et l’impulsion transitoire de 200 ms pilotent les
+  trois lignes tout en conservant leur opacité discrète.
+- Le contexte n’est jamais fermé lorsque le fullscreen se ferme : seul le
+  `requestAnimationFrame` visuel est arrêté, afin de ne jamais couper un élément média déjà
+  routé. Une seconde ouverture réutilise exactement le même graphe.
+- Le garde CORS exige `crossOrigin="anonymous"` avant le branchement. La source R2 courante a
+  été vérifiée avec une réponse Range `206`, `Access-Control-Allow-Origin:
+  https://infra-180.github.io` et `Vary: Origin`, conformément au contrat Web Audio.
+- `data/audio-visuals.json` et ses 283 enveloppes sont supprimés : aucun téléchargement de
+  données visuelles ni lecture des masters locaux n’est désormais nécessaire.
+- L’activation et le canvas restent strictement limités aux écrans d’au moins 981 px.
+  Mobile/PWA, géométrie, CSS, lecture, prefetch, Range, Service Worker fonctionnel et Media
+  Session ne changent pas.
+- Références : MDN *Visualizations with Web Audio API*, MDN
+  `createMediaElementSource()` et W3C Web Audio § CORS.
+- Identifiants atomiques : `audiofix360-20260719`, `infra-shell-20260719-audio360` et CSS
+  `audiofix360-20260719`.
+
 ## 2026-07-19 — audiofix359 visualisation desktop rythmique
 
 - Le retour `trop réactif` avait été interprété à l’envers dans `audiofix358` : la demande était

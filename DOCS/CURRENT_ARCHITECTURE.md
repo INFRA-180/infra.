@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix359-20260719`
-- Service Worker : `infra-shell-20260719-audio359`
-- CSS figé : `audiofix359-20260719`
+- Runtime : `audiofix360-20260719`
+- Service Worker : `infra-shell-20260719-audio360`
+- CSS figé : `audiofix360-20260719`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -50,7 +50,7 @@ Principaux composants :
 - `catalog-loader.js` : catalogue live, cache local et fallback Git ;
 - `spa-router.js` et `spa-renderer.js` : navigation album sans perdre le lecteur global ;
 - `transport-ui.js`, `now-playing.js`, `album-player-ui.js` : interfaces du lecteur ;
-- `audio-visualizer.js` : animation fullscreen desktop depuis les enveloppes précalculées ;
+- `audio-visualizer.js` : analyse Web Audio live et animation fullscreen desktop ;
 - `media-session.js` : commandes iOS, écran verrouillé et centre de contrôle ;
 - `audio-telemetry.js` : lot compact de session.
 
@@ -93,8 +93,8 @@ La synchronisation locale :
 Le catalogue live, CacheStorage et les JSON inclus dans Git forment les trois niveaux de
 repli. Le fallback Git est actuellement aligné sur le live à 283 pistes.
 
-`data/audio-visuals.json` conserve une enveloppe de 1024 octets par piste. Elle est chargée
-uniquement à l’ouverture du fullscreen desktop et ne contient ni média, ni chemin local.
+La visualisation desktop n’a plus de fichier de données par piste. Elle lit uniquement le
+signal instantané de l’élément audio global lorsqu’un utilisateur ouvre le fullscreen.
 
 ## Pochettes
 
@@ -119,11 +119,13 @@ La géométrie iPhone validée est figée :
 
 Le lecteur et `#infraSpaPersist` survivent aux changements de page.
 
-À partir de 981 px, le fullscreen desktop affiche une animation légère pilotée par l’enveloppe
-de la piste et son temps courant. Une attaque de 55 ms suit les impacts rythmiques, puis une
-retombée de 380 ms évite les coupures sèches. Le rendu est limité à 30 i/s, s’arrête en pause,
-à la fermeture ou quand l’onglet est caché, et devient statique avec `prefers-reduced-motion`.
-Il n’utilise pas Web Audio et ne reroute jamais l’élément audio global.
+À partir de 981 px, le fullscreen desktop affiche une animation légère pilotée en direct par
+le RMS et les graves, médiums et aigus d’un `AnalyserNode`. Le graphe Web Audio est créé une
+seule fois depuis le clic d’ouverture : la source reste connectée directement à la sortie et
+l’analyseur est une branche séparée. Une attaque de 45 ms suit les impacts, puis une retombée
+de 260 ms évite les coupures sèches. Le rendu est limité à 30 i/s, s’arrête en pause, à la
+fermeture ou quand l’onglet est caché, et devient statique avec `prefers-reduced-motion`. Le
+contexte reste vivant pour ne jamais interrompre l’audio routé.
 
 Sur Safari compatible, le passage entre routes utilise le handoff peint natif des View
 Transitions sans animation visuelle. La mutation DOM et le repositionnement du scroll sont

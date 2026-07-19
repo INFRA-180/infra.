@@ -692,6 +692,10 @@
                 target.closest("[data-transport-favorite]")
               ) return;
             }
+            const visualizer = ensureDesktopAudioVisualizer(audioState.transport);
+            if (visualizer && typeof visualizer.activate === "function") {
+              visualizer.activate();
+            }
             openNowPlayingOverlay();
           });
         }

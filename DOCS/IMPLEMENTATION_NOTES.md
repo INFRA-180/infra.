@@ -1,5 +1,26 @@
 # Implementation Notes
 
+## 2026-07-19 — audiofix357 visualisation musicale fullscreen desktop
+
+- Gel préalable de la version testée `audiofix356` : commit `cc47cdebb86761751e86ec7311a3bef1328b518b`,
+  tag annoté et publié `backup-audiofix356-20260719`, bundle complet vérifié
+  `SITE_backup/SITE_history_cc47cde_audiofix356_2026-07-19.bundle` (SHA-256
+  `c3838eb22b46c5a552f78b997fece0563a2451432532d74dafdaa8eb60c68e91`).
+- Les 283 masters Music ont été lus sans écriture afin de produire une enveloppe compacte de
+  256 octets par piste. `public/data/audio-visuals.json` pèse environ 105 Kio, ne contient aucun
+  chemin local et n’est chargé qu’à l’ouverture du fullscreen desktop.
+- `audio-visualizer.js` dessine trois lignes fluides et discrètes, dont l’amplitude suit
+  l’enveloppe autour du temps courant. Le rendu est plafonné à 30 i/s et à un ratio de pixels de
+  1,5 ; il s’arrête immédiatement en pause, à la fermeture, en fin de piste ou lorsque l’onglet
+  est caché. Un changement de piste remplace atomiquement l’enveloppe.
+- `prefers-reduced-motion` conserve un dessin statique. Aucun `AudioContext`,
+  `MediaElementAudioSourceNode` ou analyseur live n’est créé : l’élément audio global, CORS,
+  R2, les requêtes Range, le prefetch et Media Session restent inchangés.
+- Le canvas et son placement n’existent visuellement qu’à partir de 981 px. La géométrie mobile,
+  les safe areas et le fullscreen iPhone ne changent pas.
+- Identifiants atomiques : `audiofix357-20260719`, `infra-shell-20260719-audio357` et CSS
+  `audiofix357-20260719`.
+
 ## 2026-07-19 — audiofix356 métadonnées fullscreen desktop toujours visibles
 
 - Le comportement desktop historique qui ajoutait `is-meta-idle` après 2,4 secondes de lecture

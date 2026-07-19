@@ -9,7 +9,7 @@ const vm = require("node:vm");
 const ROOT = path.resolve(__dirname, "..");
 const ROUTER_PATH = path.join(ROOT, "public/assets/js/spa-router.js");
 const routerSource = fs.readFileSync(ROUTER_PATH, "utf8");
-const SHELL_CACHE = "infra-shell-20260719-audio356-shell";
+const SHELL_CACHE = "infra-shell-20260719-audio357-shell";
 
 function loadRouter(overrides) {
   const sandbox = Object.assign({
@@ -74,7 +74,7 @@ async function testInstalledShellWinsWithoutNetwork() {
   const result = await cache.load("music/salam-infra.html", { cacheName: SHELL_CACHE });
   assert.equal(result.cached, true);
   assert.equal(result.strategy, "window_shell_cache");
-  assert.equal(result.workerVersion, "infra-shell-20260719-audio356");
+  assert.equal(result.workerVersion, "infra-shell-20260719-audio357");
   assert.match(result.html, /Salam/);
   assert.equal(cacheMatchCalls, 1);
   assert.equal(fetchCalls, 0);
@@ -249,7 +249,7 @@ async function main() {
   await testNavigationUpgradesCacheOnlyWarmup();
   await testHungCacheLookupFallsBackBoundedly();
   testHistoryWritesAreBoundedAndNonThrowing();
-  console.log("audiofix356 SPA page-cache tests: ok");
+  console.log("audiofix357 SPA page-cache tests: ok");
 }
 
 main().catch(function (error) {

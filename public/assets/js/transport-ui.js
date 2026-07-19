@@ -61,9 +61,23 @@
     const getCurrentTrackAlbumPage = method(ctx, "getCurrentTrackAlbumPage", function () { return ""; });
     const syncCurrentFavoriteButtons = method(ctx, "syncCurrentFavoriteButtons");
     const trackAudioRuntimeEvent = method(ctx, "trackAudioRuntimeEvent");
+    const audioVisualizerApi = window.InfraAudioVisualizer || null;
 
   function isDesktopTransportViewport() {
     return typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 981px)").matches;
+  }
+
+  function ensureDesktopAudioVisualizer(transport) {
+    if (!transport || transport.visualizer || !audioState.audio || !isDesktopTransportViewport()) {
+      return transport ? transport.visualizer : null;
+    }
+    if (!audioVisualizerApi || typeof audioVisualizerApi.create !== "function") return null;
+    transport.visualizer = audioVisualizerApi.create({
+      audio: audioState.audio,
+      root: transport.overlayVisual,
+      canvas: transport.overlayVisualCanvas
+    });
+    return transport.visualizer;
   }
 
   function getDesktopTransportState() {
@@ -495,6 +509,7 @@
       !overlay.querySelector("[data-now-playing-queue-sheet]") ||
       !overlay.querySelector("[data-now-playing-close]") ||
       !overlay.querySelector("[data-now-playing-favorite]") ||
+      !overlay.querySelector("[data-now-playing-visual]") ||
       !root.querySelector("[data-transport-favorite]") ||
       !overlay.querySelector("[data-now-playing-volume-toggle]") ||
       !overlay.querySelector("[data-now-playing-volume]");
@@ -524,6 +539,9 @@
         "    <button class=\"now-playing-favorite\" type=\"button\" data-now-playing-favorite aria-label=\"Ajouter aux favoris\" aria-pressed=\"false\">",
         "      " + HEART_ICON_OUTLINE,
         "    </button>",
+        "  </div>",
+        "  <div class=\"now-playing-visual\" data-now-playing-visual aria-hidden=\"true\">",
+        "    <canvas class=\"now-playing-visual-canvas\" data-now-playing-visual-canvas></canvas>",
         "  </div>",
         "  <div class=\"now-playing-progress-wrap\">",
         "    <button class=\"now-playing-progress\" type=\"button\" data-now-playing-progress aria-label=\"Avancer dans le morceau\">",
@@ -609,6 +627,8 @@
     const overlayTitle = overlay.querySelector("[data-now-playing-title]");
     const overlayAlbum = overlay.querySelector("[data-now-playing-album]");
     const overlayFavorite = overlay.querySelector("[data-now-playing-favorite]");
+    const overlayVisual = overlay.querySelector("[data-now-playing-visual]");
+    const overlayVisualCanvas = overlay.querySelector("[data-now-playing-visual-canvas]");
     const overlayCurrent = overlay.querySelector("[data-now-playing-current]");
     const overlayDuration = overlay.querySelector("[data-now-playing-duration]");
     const overlayProgress = overlay.querySelector("[data-now-playing-progress]");
@@ -1379,6 +1399,8 @@
       overlayTitle,
       overlayAlbum,
       overlayFavorite,
+      overlayVisual,
+      overlayVisualCanvas,
       overlayCurrent,
       overlayDuration,
       overlayProgress,
@@ -1396,8 +1418,10 @@
       overlayQueueList,
       overlayVolumeToggle,
       overlayVolumeWrap,
-      overlayVolume
+      overlayVolume,
+      visualizer: null
     };
+    ensureDesktopAudioVisualizer(audioState.transport);
     syncTransportUi();
     syncNowPlayingOverlay();
     return audioState.transport;
@@ -1539,6 +1563,12 @@
     }
     if (transport.overlay) {
       transport.overlay.hidden = !audioState.nowPlayingOpen;
+    }
+    const visualizer = ensureDesktopAudioVisualizer(transport);
+    if (visualizer && typeof visualizer.sync === "function") {
+      visualizer.sync({
+        active: Boolean(audioState.nowPlayingOpen && canOpenNowPlaying && isDesktopTransportViewport())
+      });
     }
     document.body.classList.toggle("now-playing-open", Boolean(audioState.nowPlayingOpen && canOpenNowPlaying));
     document.documentElement.classList.toggle("now-playing-open", Boolean(audioState.nowPlayingOpen && canOpenNowPlaying));

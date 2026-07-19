@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 19 juillet 2026
-Baseline : `audiofix356-20260719`
-Service Worker : `infra-shell-20260719-audio356`
+Baseline : `audiofix357-20260719`
+Service Worker : `infra-shell-20260719-audio357`
 
 ## État
 
@@ -16,6 +16,8 @@ Service Worker : `infra-shell-20260719-audio356`
   modifier le layout. Mini-player et Media Session restent inchangés.
 - Fullscreen desktop : titre, album et `À suivre` restent à leur opacité normale, sans timer
   dépendant des mouvements de souris.
+- Visualisation desktop : 283 enveloppes compactes de 256 points, trois lignes animées à
+  30 i/s maximum, pause/fermeture/onglet caché respectés et aucun reroutage Web Audio.
 - Page Favoris simplifiée : titre stable, sélection ronde, fermeture `×` et retrait par
   poubelle.
 - Navigation SPA avec handoff peint WebKit feature-détecté, sans snapshot/canvas, scroll
@@ -25,7 +27,7 @@ Service Worker : `infra-shell-20260719-audio356`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix356-20260719` figé.
+- CSS `audiofix357-20260719` figé.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles
@@ -36,7 +38,8 @@ La commande de référence est :
 node tools/release-audit.js
 ```
 
-Elle couvre la syntaxe JavaScript, le catalogue, les pochettes canoniques, le cache audio,
+Elle couvre la syntaxe JavaScript, le catalogue, les enveloppes visuelles, les pochettes
+canoniques, le cache audio,
 le Service Worker, la navigation SPA, la télémétrie, la stabilité PWA et la frontière
 public/privé.
 

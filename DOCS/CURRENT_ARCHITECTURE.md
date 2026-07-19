@@ -7,13 +7,13 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix356-20260719`
-- Service Worker : `infra-shell-20260719-audio356`
-- CSS figé : `audiofix356-20260719`
+- Runtime : `audiofix357-20260719`
+- Service Worker : `infra-shell-20260719-audio357`
+- CSS figé : `audiofix357-20260719`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
-- Sauvegarde : tag `backup-audiofix351-20260718`
+- Sauvegarde : tag `backup-audiofix356-20260719`
 
 ## Publication
 
@@ -50,6 +50,7 @@ Principaux composants :
 - `catalog-loader.js` : catalogue live, cache local et fallback Git ;
 - `spa-router.js` et `spa-renderer.js` : navigation album sans perdre le lecteur global ;
 - `transport-ui.js`, `now-playing.js`, `album-player-ui.js` : interfaces du lecteur ;
+- `audio-visualizer.js` : animation fullscreen desktop depuis les enveloppes précalculées ;
 - `media-session.js` : commandes iOS, écran verrouillé et centre de contrôle ;
 - `audio-telemetry.js` : lot compact de session.
 
@@ -92,6 +93,9 @@ La synchronisation locale :
 Le catalogue live, CacheStorage et les JSON inclus dans Git forment les trois niveaux de
 repli. Le fallback Git est actuellement aligné sur le live à 283 pistes.
 
+`data/audio-visuals.json` conserve une enveloppe de 256 octets par piste. Elle est chargée
+uniquement à l’ouverture du fullscreen desktop et ne contient ni média, ni chemin local.
+
 ## Pochettes
 
 Le contrat runtime est strict :
@@ -114,6 +118,11 @@ La géométrie iPhone validée est figée :
 - aucun changement de hauteur, ancrage bas ou safe area sans preuve sur l’iPhone réel.
 
 Le lecteur et `#infraSpaPersist` survivent aux changements de page.
+
+À partir de 981 px, le fullscreen desktop affiche une animation légère pilotée par l’enveloppe
+de la piste et son temps courant. Le rendu est limité à 30 i/s, s’arrête en pause, à la fermeture
+ou quand l’onglet est caché, et devient statique avec `prefers-reduced-motion`. Il n’utilise pas
+Web Audio et ne reroute jamais l’élément audio global.
 
 Sur Safari compatible, le passage entre routes utilise le handoff peint natif des View
 Transitions sans animation visuelle. La mutation DOM et le repositionnement du scroll sont

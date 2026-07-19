@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix356-20260719",
-  shell: "infra-shell-20260719-audio356",
+  build: "audiofix357-20260719",
+  shell: "infra-shell-20260719-audio357",
   albums: 31,
   tracks: 283
 });
@@ -120,11 +120,65 @@ function verifyVersions() {
     if (!source.includes(`assets/js/scripts.js?v=${expected.build}`)) {
       fail(`stale runtime reference in ${path.relative(root, filePath)}`);
     }
+    const visualizerIndex = source.indexOf(`assets/js/audio-visualizer.js?v=${expected.build}`);
+    const transportIndex = source.indexOf(`assets/js/transport-ui.js?v=${expected.build}`);
+    if (visualizerIndex < 0 || transportIndex < 0 || visualizerIndex > transportIndex) {
+      fail(`desktop visualizer is not loaded before transport in ${path.relative(root, filePath)}`);
+    }
   }
   if (playerDocuments < expected.albums + 1) {
     fail(`only ${playerDocuments} player documents reference the current runtime`);
   }
   console.log(`Version checks passed across ${playerDocuments} player documents.`);
+}
+
+function visualKey(srcLike) {
+  const clean = String(srcLike || "").split(/[?#]/, 1)[0].replace(/\\/g, "/");
+  return clean.split("/").filter(Boolean).slice(-2).join("/").normalize("NFC");
+}
+
+function verifyAudioVisuals() {
+  const catalog = readJson("public/data/tracks.json");
+  const visuals = readJson("public/data/audio-visuals.json");
+  const visualizerSource = fs.readFileSync(
+    path.join(publicRoot, "assets/js/audio-visualizer.js"),
+    "utf8"
+  );
+  const flattenedTracks = (catalog.albums || []).flatMap((album) => album.tracks || []);
+  const entries = visuals && visuals.tracks ? visuals.tracks : {};
+  const expectedKeys = new Set(flattenedTracks.map((track) => visualKey(track.src)));
+
+  if (visuals.version !== expected.build) {
+    fail(`audio visual data is not ${expected.build}`);
+  }
+  if (visuals.points !== 256) {
+    fail(`audio visual data uses ${visuals.points} points instead of 256`);
+  }
+  if (expectedKeys.size !== expected.tracks || Object.keys(entries).length !== expected.tracks) {
+    fail(`audio visual data is not aligned on ${expected.tracks} unique tracks`);
+  }
+  for (const key of expectedKeys) {
+    const encoded = entries[key];
+    if (typeof encoded !== "string") fail(`audio visual envelope is missing for ${key}`);
+    const bytes = Buffer.from(encoded, "base64");
+    if (bytes.length !== visuals.points || !bytes.some((value) => value > 0)) {
+      fail(`audio visual envelope is invalid for ${key}`);
+    }
+  }
+  const extras = Object.keys(entries).filter((key) => !expectedKeys.has(key));
+  if (extras.length) fail(`audio visual data contains stale tracks: ${extras.join(", ")}`);
+  if (/AudioContext|createMediaElementSource|createAnalyser/.test(visualizerSource)) {
+    fail("desktop visualizer reroutes or analyzes the live audio element");
+  }
+  if (
+    !visualizerSource.includes("(prefers-reduced-motion: reduce)") ||
+    !visualizerSource.includes("FRAME_INTERVAL_MS = 1000 / 30") ||
+    !visualizerSource.includes("document.hidden")
+  ) {
+    fail("desktop visualizer is missing its motion or lifecycle guards");
+  }
+
+  console.log(`Desktop audio visuals passed: ${expected.tracks} envelopes / ${visuals.points} points.`);
 }
 
 function verifyNoLegacyRuntimeCovers() {
@@ -192,6 +246,7 @@ function runRegressionSuite() {
     "tools/test-audio-prefetch-cache.js",
     "tools/test-audio-prefetch-sw.js",
     "tools/test-audio-telemetry-privacy.js",
+    "tools/test-audio-visualizer.js",
     "tools/test-audiofix330-runtime.js",
     "tools/test-audiofix337-spa.js",
     "tools/test-catalog-loader-startup.js",
@@ -208,6 +263,7 @@ function runRegressionSuite() {
 function main() {
   verifyVersions();
   verifyCatalog();
+  verifyAudioVisuals();
   verifyNoLegacyRuntimeCovers();
   verifySyntax();
   runRegressionSuite();

@@ -3399,6 +3399,10 @@ body.now-playing-open {
   min-width: 0;
 }
 
+.now-playing-visual {
+  display: none;
+}
+
 .now-playing-title {
   color: #fff;
   width: auto;
@@ -4595,6 +4599,33 @@ body.now-playing-open {
     transform: translateY(clamp(18px, 2vh, 26px));
   }
 
+  .now-playing-visual {
+    grid-area: stage;
+    display: block;
+    width: 100%;
+    max-width: 780px;
+    height: clamp(170px, 27vh, 280px);
+    align-self: center;
+    justify-self: start;
+    transform: translateY(clamp(-54px, -4.5vh, -28px));
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    contain: strict;
+    transition: opacity 520ms ease;
+    z-index: 0;
+  }
+
+  .now-playing-visual.is-active.is-ready {
+    opacity: 1;
+  }
+
+  .now-playing-visual-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
   .now-playing-title {
     font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
     font-size: clamp(2.7rem, 3.8vw, 4.15rem);
@@ -4712,5 +4743,11 @@ body.now-playing-open {
     padding: 0;
     font-size: clamp(1.06rem, 1.35vw, 1.48rem);
     white-space: nowrap;
+  }
+}
+
+@media (min-width: 981px) and (prefers-reduced-motion: reduce) {
+  .now-playing-visual {
+    transition: none;
   }
 }

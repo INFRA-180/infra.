@@ -1,5 +1,19 @@
 # Implementation Notes
 
+## 2026-07-19 — audiofix359 visualisation desktop rythmique
+
+- Le retour `trop réactif` avait été interprété à l’envers dans `audiofix358` : la demande était
+  une animation plus corrélée au rythme. Le lissage lent de 2,8 secondes est supprimé.
+- Les 283 enveloppes sont régénérées en 1024 points au lieu de 256, soit environ quatre fois plus
+  de précision temporelle pour suivre les impacts sans analyser ni rerouter l’audio live.
+- Un suiveur d’enveloppe applique une attaque de 55 ms et une retombée de 380 ms. Les montées
+  rapides créent une impulsion courte de 180 ms qui module l’amplitude et légèrement la vitesse
+  des lignes ; la fenêtre visuelle autour du temps courant est resserrée.
+- Le fichier chargé à la demande pèse environ 388 Kio et reste limité au fullscreen desktop.
+  PWA mobile, géométrie, lecture, R2, Range, prefetch et Media Session restent inchangés.
+- Identifiants atomiques : `audiofix359-20260719`, `infra-shell-20260719-audio359` et CSS
+  `audiofix359-20260719`.
+
 ## 2026-07-19 — audiofix358 visualisation desktop plus ambiante
 
 - Le retour utilisateur sur `audiofix357` confirme le fonctionnement du visualiseur mais une

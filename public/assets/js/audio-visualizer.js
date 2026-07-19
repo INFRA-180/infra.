@@ -5,7 +5,9 @@
   const DESKTOP_QUERY = "(min-width: 981px)";
   const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
   const FRAME_INTERVAL_MS = 1000 / 30;
-  const ENERGY_SMOOTHING_SECONDS = 2.8;
+  const ENERGY_ATTACK_SECONDS = 0.055;
+  const ENERGY_RELEASE_SECONDS = 0.38;
+  const BEAT_RELEASE_SECONDS = 0.18;
   const MAX_DEVICE_PIXEL_RATIO = 1.5;
   const moduleScript = document.currentScript;
   const moduleUrl = moduleScript && moduleScript.src
@@ -105,7 +107,11 @@
     let animationFrame = 0;
     let lastFrameAt = 0;
     let lastEnergyAt = 0;
-    let smoothedEnergy = 0.36;
+    let lastMotionAt = 0;
+    let reactiveEnergy = 0.36;
+    let previousRawEnergy = 0.36;
+    let beatPulse = 0;
+    let motionPhase = 0;
     let resizeObserver = null;
 
     function resizeCanvas() {
@@ -141,8 +147,12 @@
         const decoded = decodeEnvelope(tracks[key]);
         envelopeKey = decoded ? key : "";
         envelope = decoded;
-        smoothedEnergy = decoded ? sampleEnvelope(decoded, 0) : 0.36;
+        reactiveEnergy = decoded ? sampleEnvelope(decoded, 0) : 0.36;
+        previousRawEnergy = reactiveEnergy;
+        beatPulse = 0;
         lastEnergyAt = 0;
+        lastMotionAt = 0;
+        motionPhase = 0;
         root.classList.toggle("is-ready", Boolean(decoded));
       });
     }
@@ -158,23 +168,44 @@
         ? Math.max(0, Math.min(1, currentTime / duration))
         : 0;
       const reduced = prefersReducedMotion();
-      const phase = reduced ? progress * 2 : (Number(timestamp) || performance.now()) / 1000;
       const centerY = size.height * 0.5;
       const rawEnergy = sampleEnvelope(envelope, progress);
       const energyTimestamp = Number(timestamp) || performance.now();
       if (reduced || !lastEnergyAt) {
-        smoothedEnergy = rawEnergy;
+        reactiveEnergy = rawEnergy;
+        beatPulse = 0;
       } else {
         const elapsed = Math.max(0, Math.min(0.25, (energyTimestamp - lastEnergyAt) / 1000));
-        const smoothing = 1 - Math.exp(-elapsed / ENERGY_SMOOTHING_SECONDS);
-        smoothedEnergy += (rawEnergy - smoothedEnergy) * smoothing;
+        const response = rawEnergy > reactiveEnergy
+          ? ENERGY_ATTACK_SECONDS
+          : ENERGY_RELEASE_SECONDS;
+        const smoothing = 1 - Math.exp(-elapsed / response);
+        reactiveEnergy += (rawEnergy - reactiveEnergy) * smoothing;
+        const positiveRise = Math.max(0, rawEnergy - previousRawEnergy);
+        beatPulse = Math.max(
+          beatPulse * Math.exp(-elapsed / BEAT_RELEASE_SECONDS),
+          Math.min(1, positiveRise * 4.2)
+        );
       }
+      previousRawEnergy = rawEnergy;
       lastEnergyAt = energyTimestamp;
+
+      if (reduced) {
+        motionPhase = progress * 2;
+      } else {
+        const motionElapsed = lastMotionAt
+          ? Math.max(0, Math.min(0.25, (energyTimestamp - lastMotionAt) / 1000))
+          : 0;
+        motionPhase += motionElapsed * (0.55 + (reactiveEnergy * 0.65) + (beatPulse * 0.9));
+      }
+      lastMotionAt = energyTimestamp;
+
+      const rhythmicEnergy = Math.max(0, Math.min(1, reactiveEnergy + (beatPulse * 0.28)));
       const pointCount = Math.max(52, Math.min(112, Math.round(size.width / 7)));
       const layers = [
-        { color: "rgba(255,255,255,0.07)", width: 1.05, speed: 0.09, frequency: 1.18, offset: 0.2, scale: 0.5 },
-        { color: "rgba(255,255,255,0.11)", width: 1.25, speed: -0.07, frequency: 1.58, offset: 2.1, scale: 0.68 },
-        { color: "rgba(242,38,45,0.12)", width: 1.1, speed: 0.055, frequency: 1.92, offset: 4.4, scale: 0.57 }
+        { color: "rgba(255,255,255,0.09)", width: 1.1, speed: 0.66, frequency: 1.22, offset: 0.2, scale: 0.52 },
+        { color: "rgba(255,255,255,0.15)", width: 1.3, speed: -0.52, frequency: 1.66, offset: 2.1, scale: 0.72 },
+        { color: "rgba(242,38,45,0.16)", width: 1.15, speed: 0.43, frequency: 2.08, offset: 4.4, scale: 0.6 }
       ];
 
       context.lineCap = "round";
@@ -185,20 +216,20 @@
         context.lineWidth = layer.width;
         for (let index = 0; index < pointCount; index += 1) {
           const ratio = index / (pointCount - 1);
-          const nearbyProgress = progress + ((ratio - 0.5) * 0.28);
+          const nearbyProgress = progress + ((ratio - 0.5) * 0.045);
           const energy = sampleEnvelope(envelope, nearbyProgress);
-          const envelopeStrength = 0.52 + (energy * 0.16) + (smoothedEnergy * 0.12);
-          const amplitude = size.height * (0.028 + (smoothedEnergy * 0.018)) * layer.scale;
+          const envelopeStrength = 0.2 + (energy * 0.6) + (rhythmicEnergy * 0.2);
+          const amplitude = size.height * (0.032 + (rhythmicEnergy * 0.065)) * layer.scale;
           const primary = Math.sin(
             (ratio * Math.PI * 2 * layer.frequency) +
-            (phase * layer.speed) +
+            (motionPhase * layer.speed) +
             layer.offset
           );
           const detail = Math.sin(
             (ratio * Math.PI * 2 * (layer.frequency * 2.35)) -
-            (phase * layer.speed * 0.72) +
+            (motionPhase * layer.speed * 0.72) +
             (layer.offset * 0.5)
-          ) * 0.12;
+          ) * 0.2;
           const edgeFade = Math.sin(Math.PI * ratio);
           const x = ratio * size.width;
           const y = centerY + ((primary + detail) * amplitude * envelopeStrength * edgeFade);

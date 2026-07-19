@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix358-20260719",
-  shell: "infra-shell-20260719-audio358",
+  build: "audiofix359-20260719",
+  shell: "infra-shell-20260719-audio359",
   albums: 31,
   tracks: 283
 });
@@ -151,8 +151,8 @@ function verifyAudioVisuals() {
   if (visuals.version !== expected.build) {
     fail(`audio visual data is not ${expected.build}`);
   }
-  if (visuals.points !== 256) {
-    fail(`audio visual data uses ${visuals.points} points instead of 256`);
+  if (visuals.points !== 1024) {
+    fail(`audio visual data uses ${visuals.points} points instead of 1024`);
   }
   if (expectedKeys.size !== expected.tracks || Object.keys(entries).length !== expected.tracks) {
     fail(`audio visual data is not aligned on ${expected.tracks} unique tracks`);
@@ -173,7 +173,8 @@ function verifyAudioVisuals() {
   if (
     !visualizerSource.includes("(prefers-reduced-motion: reduce)") ||
     !visualizerSource.includes("FRAME_INTERVAL_MS = 1000 / 30") ||
-    !visualizerSource.includes("ENERGY_SMOOTHING_SECONDS = 2.8") ||
+    !visualizerSource.includes("ENERGY_ATTACK_SECONDS = 0.055") ||
+    !visualizerSource.includes("ENERGY_RELEASE_SECONDS = 0.38") ||
     !visualizerSource.includes("document.hidden")
   ) {
     fail("desktop visualizer is missing its motion or lifecycle guards");

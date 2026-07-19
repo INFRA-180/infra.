@@ -9,7 +9,7 @@ const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "public/assets/js/audio-visualizer.js"), "utf8");
-const envelope = Buffer.alloc(256, 180).toString("base64");
+const envelope = Buffer.alloc(1024, 180).toString("base64");
 const mediaListeners = new Map();
 let requestedAnimationFrame = null;
 let cancelledFrames = 0;
@@ -84,7 +84,7 @@ const sandbox = {
       ok: true,
       json: async () => ({
         version: "test",
-        points: 256,
+        points: 1024,
         tracks: {
           "osiris/01-killu.m4a": envelope
         }

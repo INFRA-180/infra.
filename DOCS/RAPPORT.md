@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 19 juillet 2026
-Baseline : `audiofix358-20260719`
-Service Worker : `infra-shell-20260719-audio358`
+Baseline : `audiofix359-20260719`
+Service Worker : `infra-shell-20260719-audio359`
 
 ## État
 
@@ -16,8 +16,8 @@ Service Worker : `infra-shell-20260719-audio358`
   modifier le layout. Mini-player et Media Session restent inchangés.
 - Fullscreen desktop : titre, album et `À suivre` restent à leur opacité normale, sans timer
   dépendant des mouvements de souris.
-- Visualisation desktop : 283 enveloppes compactes de 256 points, trois lignes animées à
-  30 i/s maximum, énergie lissée sur 2,8 secondes, pause/fermeture/onglet caché respectés et
+- Visualisation desktop : 283 enveloppes rythmiques de 1024 points, trois lignes animées à
+  30 i/s maximum, attaque 55 ms/retombée 380 ms, pause/fermeture/onglet caché respectés et
   aucun reroutage Web Audio.
 - Page Favoris simplifiée : titre stable, sélection ronde, fermeture `×` et retrait par
   poubelle.
@@ -28,7 +28,7 @@ Service Worker : `infra-shell-20260719-audio358`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix358-20260719` figé.
+- CSS `audiofix359-20260719` figé.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

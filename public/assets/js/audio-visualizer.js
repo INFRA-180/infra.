@@ -5,6 +5,7 @@
   const DESKTOP_QUERY = "(min-width: 981px)";
   const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
   const FRAME_INTERVAL_MS = 1000 / 30;
+  const ENERGY_SMOOTHING_SECONDS = 2.8;
   const MAX_DEVICE_PIXEL_RATIO = 1.5;
   const moduleScript = document.currentScript;
   const moduleUrl = moduleScript && moduleScript.src
@@ -103,6 +104,8 @@
     let requestedKey = "";
     let animationFrame = 0;
     let lastFrameAt = 0;
+    let lastEnergyAt = 0;
+    let smoothedEnergy = 0.36;
     let resizeObserver = null;
 
     function resizeCanvas() {
@@ -138,6 +141,8 @@
         const decoded = decodeEnvelope(tracks[key]);
         envelopeKey = decoded ? key : "";
         envelope = decoded;
+        smoothedEnergy = decoded ? sampleEnvelope(decoded, 0) : 0.36;
+        lastEnergyAt = 0;
         root.classList.toggle("is-ready", Boolean(decoded));
       });
     }
@@ -155,12 +160,21 @@
       const reduced = prefersReducedMotion();
       const phase = reduced ? progress * 2 : (Number(timestamp) || performance.now()) / 1000;
       const centerY = size.height * 0.5;
-      const currentEnergy = sampleEnvelope(envelope, progress);
+      const rawEnergy = sampleEnvelope(envelope, progress);
+      const energyTimestamp = Number(timestamp) || performance.now();
+      if (reduced || !lastEnergyAt) {
+        smoothedEnergy = rawEnergy;
+      } else {
+        const elapsed = Math.max(0, Math.min(0.25, (energyTimestamp - lastEnergyAt) / 1000));
+        const smoothing = 1 - Math.exp(-elapsed / ENERGY_SMOOTHING_SECONDS);
+        smoothedEnergy += (rawEnergy - smoothedEnergy) * smoothing;
+      }
+      lastEnergyAt = energyTimestamp;
       const pointCount = Math.max(52, Math.min(112, Math.round(size.width / 7)));
       const layers = [
-        { color: "rgba(255,255,255,0.09)", width: 1.1, speed: 0.34, frequency: 1.25, offset: 0.2, scale: 0.52 },
-        { color: "rgba(255,255,255,0.16)", width: 1.35, speed: -0.26, frequency: 1.72, offset: 2.1, scale: 0.72 },
-        { color: "rgba(242,38,45,0.17)", width: 1.2, speed: 0.2, frequency: 2.16, offset: 4.4, scale: 0.6 }
+        { color: "rgba(255,255,255,0.07)", width: 1.05, speed: 0.09, frequency: 1.18, offset: 0.2, scale: 0.5 },
+        { color: "rgba(255,255,255,0.11)", width: 1.25, speed: -0.07, frequency: 1.58, offset: 2.1, scale: 0.68 },
+        { color: "rgba(242,38,45,0.12)", width: 1.1, speed: 0.055, frequency: 1.92, offset: 4.4, scale: 0.57 }
       ];
 
       context.lineCap = "round";
@@ -171,10 +185,10 @@
         context.lineWidth = layer.width;
         for (let index = 0; index < pointCount; index += 1) {
           const ratio = index / (pointCount - 1);
-          const nearbyProgress = progress + ((ratio - 0.5) * 0.18);
+          const nearbyProgress = progress + ((ratio - 0.5) * 0.28);
           const energy = sampleEnvelope(envelope, nearbyProgress);
-          const envelopeStrength = 0.18 + (energy * 0.82);
-          const amplitude = size.height * (0.045 + (currentEnergy * 0.055)) * layer.scale;
+          const envelopeStrength = 0.52 + (energy * 0.16) + (smoothedEnergy * 0.12);
+          const amplitude = size.height * (0.028 + (smoothedEnergy * 0.018)) * layer.scale;
           const primary = Math.sin(
             (ratio * Math.PI * 2 * layer.frequency) +
             (phase * layer.speed) +
@@ -184,7 +198,7 @@
             (ratio * Math.PI * 2 * (layer.frequency * 2.35)) -
             (phase * layer.speed * 0.72) +
             (layer.offset * 0.5)
-          ) * 0.24;
+          ) * 0.12;
           const edgeFade = Math.sin(Math.PI * ratio);
           const x = ratio * size.width;
           const y = centerY + ((primary + detail) * amplitude * envelopeStrength * edgeFade);

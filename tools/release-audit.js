@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix357-20260719",
-  shell: "infra-shell-20260719-audio357",
+  build: "audiofix358-20260719",
+  shell: "infra-shell-20260719-audio358",
   albums: 31,
   tracks: 283
 });
@@ -173,6 +173,7 @@ function verifyAudioVisuals() {
   if (
     !visualizerSource.includes("(prefers-reduced-motion: reduce)") ||
     !visualizerSource.includes("FRAME_INTERVAL_MS = 1000 / 30") ||
+    !visualizerSource.includes("ENERGY_SMOOTHING_SECONDS = 2.8") ||
     !visualizerSource.includes("document.hidden")
   ) {
     fail("desktop visualizer is missing its motion or lifecycle guards");

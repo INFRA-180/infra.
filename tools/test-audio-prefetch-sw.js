@@ -101,8 +101,8 @@ const sandbox = {
       "infra-shell-20260717-audio346-runtime",
       "infra-shell-20260717-audio347-shell",
       "infra-shell-20260717-audio347-runtime",
-      "infra-shell-20260719-audio357-shell",
-      "infra-shell-20260719-audio357-runtime"
+      "infra-shell-20260719-audio358-shell",
+      "infra-shell-20260719-audio358-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -207,7 +207,7 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(installedAlbumPages.length, 31, "all album documents must be installed with the PWA shell");
   assert(installedAlbumPages.includes("https://site.test/music/salam-infra.html"));
   assert(installedAlbumPages.includes("https://site.test/music/trou-noir-infra.html"));
-  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix357-20260719"));
+  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix358-20260719"));
   assert(
     installedOptionalShellAssets.includes("./assets/vendor/qr-creator.min.js?v=1.0.0"),
     "optional shell resources must still be attempted"
@@ -253,8 +253,8 @@ async function dispatchSiteFetch(request) {
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v9"));
   assert(!deletedCaches.includes("infra-covers-v2"));
-  assert(!deletedCaches.includes("infra-shell-20260719-audio357-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260719-audio357-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260719-audio358-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260719-audio358-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;
@@ -384,7 +384,7 @@ async function dispatchSiteFetch(request) {
     mode: "navigate",
     destination: "document"
   });
-  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260719-audio357");
+  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260719-audio358");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Strategy"), "shell_cache");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Cache"), "hit");
   assert.strictEqual(

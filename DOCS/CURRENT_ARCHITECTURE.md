@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix357-20260719`
-- Service Worker : `infra-shell-20260719-audio357`
-- CSS figé : `audiofix357-20260719`
+- Runtime : `audiofix358-20260719`
+- Service Worker : `infra-shell-20260719-audio358`
+- CSS figé : `audiofix358-20260719`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -120,9 +120,10 @@ La géométrie iPhone validée est figée :
 Le lecteur et `#infraSpaPersist` survivent aux changements de page.
 
 À partir de 981 px, le fullscreen desktop affiche une animation légère pilotée par l’enveloppe
-de la piste et son temps courant. Le rendu est limité à 30 i/s, s’arrête en pause, à la fermeture
-ou quand l’onglet est caché, et devient statique avec `prefers-reduced-motion`. Il n’utilise pas
-Web Audio et ne reroute jamais l’élément audio global.
+de la piste et son temps courant, avec une réponse énergétique lissée sur 2,8 secondes. Le rendu
+est limité à 30 i/s, s’arrête en pause, à la fermeture ou quand l’onglet est caché, et devient
+statique avec `prefers-reduced-motion`. Il n’utilise pas Web Audio et ne reroute jamais l’élément
+audio global.
 
 Sur Safari compatible, le passage entre routes utilise le handoff peint natif des View
 Transitions sans animation visuelle. La mutation DOM et le repositionnement du scroll sont

@@ -1,5 +1,18 @@
 # Implementation Notes
 
+## 2026-07-19 — audiofix358 visualisation desktop plus ambiante
+
+- Le retour utilisateur sur `audiofix357` confirme le fonctionnement du visualiseur mais une
+  réaction musicale trop présente. L’énergie instantanée passe désormais par un lissage
+  exponentiel de 2,8 secondes.
+- La vitesse des trois lignes est divisée par environ quatre, leur amplitude maximale est
+  réduite de plus de moitié et les détails rapides sont atténués. Une fenêtre d’enveloppe plus
+  large évite les changements de forme brusques.
+- Placement, opacité permanente des métadonnées, données des 283 pistes, audio, PWA mobile,
+  prefetch, Service Worker fonctionnel et Media Session restent inchangés.
+- Identifiants atomiques : `audiofix358-20260719`, `infra-shell-20260719-audio358` et CSS
+  `audiofix358-20260719`.
+
 ## 2026-07-19 — audiofix357 visualisation musicale fullscreen desktop
 
 - Gel préalable de la version testée `audiofix356` : commit `cc47cdebb86761751e86ec7311a3bef1328b518b`,

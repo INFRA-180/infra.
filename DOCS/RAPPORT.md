@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 19 juillet 2026
-Baseline : `audiofix355-20260719`
-Service Worker : `infra-shell-20260719-audio355`
+Baseline : `audiofix356-20260719`
+Service Worker : `infra-shell-20260719-audio356`
 
 ## État
 
@@ -14,6 +14,8 @@ Service Worker : `infra-shell-20260719-audio355`
 - Radio globale, Shuffle album et lecture chronologique consolidés.
 - Géométrie fullscreen stable restaurée ; la sonde observe le bug de status bar iOS 26 sans
   modifier le layout. Mini-player et Media Session restent inchangés.
+- Fullscreen desktop : titre, album et `À suivre` restent à leur opacité normale, sans timer
+  dépendant des mouvements de souris.
 - Page Favoris simplifiée : titre stable, sélection ronde, fermeture `×` et retrait par
   poubelle.
 - Navigation SPA avec handoff peint WebKit feature-détecté, sans snapshot/canvas, scroll
@@ -23,7 +25,7 @@ Service Worker : `infra-shell-20260719-audio355`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix355-20260719` figé.
+- CSS `audiofix356-20260719` figé.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

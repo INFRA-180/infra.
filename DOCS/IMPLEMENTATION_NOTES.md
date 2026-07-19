@@ -1,5 +1,19 @@
 # Implementation Notes
 
+## 2026-07-19 — audiofix356 métadonnées fullscreen desktop toujours visibles
+
+- Le comportement desktop historique qui ajoutait `is-meta-idle` après 2,4 secondes de lecture
+  sans mouvement est supprimé intégralement : timer, écouteurs d’activité, classe runtime et
+  branches de synchronisation.
+- Les règles CSS qui abaissaient à `0.35` l’opacité du titre, de l’album et de `À suivre`, ainsi
+  que les transitions et `will-change` devenus inutiles, sont supprimées. Ces informations
+  restent désormais dans leur état normal, avec ou sans mouvement de souris.
+- Changement limité au fullscreen desktop. Aucune position, dimension, animation musicale,
+  géométrie mobile/PWA, safe area, lecture audio, Media Session, prefetch ou Service Worker
+  fonctionnel n’est modifié.
+- Identifiants atomiques : `audiofix356-20260719`, `infra-shell-20260719-audio356` et CSS
+  `audiofix356-20260719`.
+
 ## 2026-07-19 — audiofix355 retour à la géométrie fullscreen stable
 
 - Le test utilisateur `audiofix354` sur l’iPhone 13 mini confirme que la compensation était bien

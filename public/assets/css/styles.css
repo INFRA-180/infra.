@@ -4589,21 +4589,10 @@ body.now-playing-open {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
     padding-right: 0;
-    transition: opacity 400ms ease;
   }
 
   .now-playing-meta-text {
     transform: translateY(clamp(18px, 2vh, 26px));
-  }
-
-  .now-playing-panel.is-meta-idle .now-playing-meta,
-  .now-playing-panel.is-meta-idle .now-playing-up-next {
-    opacity: 0.35;
-  }
-
-  .now-playing-panel.is-playing .now-playing-meta,
-  .now-playing-panel.is-playing .now-playing-up-next {
-    will-change: opacity;
   }
 
   .now-playing-title {
@@ -4714,7 +4703,6 @@ body.now-playing-open {
     align-self: start;
     justify-self: end;
     max-width: clamp(150px, 14vw, 230px);
-    transition: opacity 400ms ease;
   }
 
   .now-playing-up-next-toggle {

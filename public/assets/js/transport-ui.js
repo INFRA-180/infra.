@@ -66,61 +66,6 @@
     return typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 981px)").matches;
   }
 
-  function isNowPlayingDesktopLayout() {
-    return typeof window.matchMedia !== "function" ||
-      window.matchMedia("(min-width: 981px)").matches;
-  }
-
-  function clearNowPlayingMetaIdleTimer() {
-    if (!audioState.nowPlayingMetaIdleTimer) return;
-    clearTimeout(audioState.nowPlayingMetaIdleTimer);
-    audioState.nowPlayingMetaIdleTimer = null;
-  }
-
-  function setNowPlayingMetaIdleState(isIdle) {
-    const transport = audioState.transport;
-    if (!transport || !transport.overlayPanel) return;
-    transport.overlayPanel.classList.toggle("is-meta-idle", Boolean(isIdle));
-  }
-
-  function scheduleNowPlayingMetaIdle() {
-    const transport = audioState.transport;
-    const audio = audioState.audio;
-    clearNowPlayingMetaIdleTimer();
-    setNowPlayingMetaIdleState(false);
-    if (
-      !transport ||
-      !transport.overlayPanel ||
-      !audioState.nowPlayingOpen ||
-      !isNowPlayingDesktopLayout() ||
-      !audio ||
-      audio.paused
-    ) return;
-
-    audioState.nowPlayingMetaIdleTimer = setTimeout(function () {
-      if (
-        audioState.nowPlayingOpen &&
-        isNowPlayingDesktopLayout() &&
-        audioState.audio &&
-        !audioState.audio.paused
-      ) {
-        setNowPlayingMetaIdleState(true);
-      }
-    }, 2400);
-  }
-
-  function noteNowPlayingPanelActivity() {
-    scheduleNowPlayingMetaIdle();
-  }
-
-  function bindNowPlayingMetaIdle(panel) {
-    if (!panel || panel.dataset.metaIdleBound === "1") return;
-    panel.dataset.metaIdleBound = "1";
-    ["pointermove", "pointerdown", "focusin", "keydown"].forEach(function (eventName) {
-      panel.addEventListener(eventName, noteNowPlayingPanelActivity, { passive: true });
-    });
-  }
-
   function getDesktopTransportState() {
     if (!audioState.desktopTransportState) {
       audioState.desktopTransportState = {
@@ -686,7 +631,6 @@
     const overlayVolume = overlay.querySelector("[data-now-playing-volume]");
 
     bindDesktopTransportUi(root);
-    bindNowPlayingMetaIdle(overlayPanel);
 
     if (!alreadyBound) {
       if (!rootControlsAlreadyBound) {
@@ -729,7 +673,6 @@
               ) return;
             }
             openNowPlayingOverlay();
-            setTimeout(scheduleNowPlayingMetaIdle, 0);
           });
         }
         if (nowAlbum) {
@@ -1588,12 +1531,6 @@
     transport.root.classList.toggle("is-playing", Boolean(audio && !audio.paused));
     if (transport.overlayPanel) {
       transport.overlayPanel.classList.toggle("is-playing", Boolean(audio && !audio.paused));
-      if (!audioState.nowPlayingOpen || !audio || audio.paused || !isNowPlayingDesktopLayout()) {
-        clearNowPlayingMetaIdleTimer();
-        setNowPlayingMetaIdleState(false);
-      } else if (!audioState.nowPlayingMetaIdleTimer && !transport.overlayPanel.classList.contains("is-meta-idle")) {
-        scheduleNowPlayingMetaIdle();
-      }
     }
     syncDesktopTransportLayout(transport.root, hasPlaybackSessionActive);
     document.body.classList.toggle("has-mobile-player", mobileDockVisible);

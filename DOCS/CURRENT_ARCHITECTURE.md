@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix355-20260719`
-- Service Worker : `infra-shell-20260719-audio355`
-- CSS figé : `audiofix355-20260719`
+- Runtime : `audiofix356-20260719`
+- Service Worker : `infra-shell-20260719-audio356`
+- CSS figé : `audiofix356-20260719`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album

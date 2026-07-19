@@ -14,10 +14,10 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix355-20260719";
-const shellRelease = "infra-shell-20260719-audio355";
-const cssRelease = "audiofix355-20260719";
-const frozenCssSha256 = "b631067f1447cadbf6260a619a203aab312306635a3bbb2e811dad00d0f5d55e";
+const release = "audiofix356-20260719";
+const shellRelease = "infra-shell-20260719-audio356";
+const cssRelease = "audiofix356-20260719";
+const frozenCssSha256 = "ef0055766025ba4fe5081731e0ea7af8dd52ca8783eaf658bbef5b87b331190a";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");
@@ -45,9 +45,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix355");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix355");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio355");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix356");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix356");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio356");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -55,6 +55,9 @@ expect(covers.includes("adc-13-6e983f31-cover-1200.webp"), "stale ADC13 artwork 
 expect(catalogLoader.includes('normalizeCoverUrl", rawThumb, { width: 1200 }'), "live catalogue can reintroduce a non-canonical album cover");
 expect(sw.includes('const COVERS_CACHE = "infra-covers-v2"'), "Service Worker does not share the canonical cover cache");
 expect(sw.includes("cover-1200\\.webp"), "Service Worker does not cache the canonical cover URL");
+expect(!transport.includes("nowPlayingMetaIdleTimer"), "desktop metadata idle timer is still present");
+expect(!transport.includes("is-meta-idle"), "desktop metadata idle state is still present");
+expect(!styles.includes("is-meta-idle"), "desktop metadata idle opacity rule is still present");
 expect(!sw.slice(sw.indexOf('self.addEventListener("install"'), sw.indexOf('self.addEventListener("activate"')).includes("skipWaiting"), "Service Worker still activates during a live audio session");
 expect(sw.includes("const OPTIONAL_SHELL_ASSETS"), "optional shell resources are not isolated");
 expect(sw.includes("Promise.allSettled("), "an optional resource can still invalidate the PWA shell");
@@ -332,4 +335,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix355.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix356.");

@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-07-20 — audiofix364 amplitude miroir équilibrée
+
+- Après validation visuelle de l’axe central fixe, la demi-amplitude desktop passe de 46 % à
+  35 % de la hauteur du canvas : environ 70 px par côté et 140 px crête-à-crête dans le canvas
+  observé de 200 px.
+- Le spectre logarithmique, l’activation à froid, le mobile/PWA et le graphe audio restent
+  inchangés. Identifiants : `audiofix364-20260720`, `infra-shell-20260720-audio364`.
+
 ## 2026-07-20 — audiofix363 axe fixe et spectre miroir desktop
 
 - La télémétrie `audiofix362` confirme le rendu normal (`42/48` frames non nulles,

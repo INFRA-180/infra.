@@ -520,7 +520,7 @@
       const pointCount = Math.max(72, Math.min(160, Math.round(size.width / 5)));
       const immediateSpectrum = updateSpectrum(graph, timestamp, pointCount, reduced);
       const centerY = size.height * 0.5;
-      const maximumHeight = Math.min(size.height * 0.46, 112);
+      const maximumHeight = Math.min(size.height * 0.35, 88);
       const dynamicHeight = maximumHeight * (0.96 + (reactiveEnergy * 0.04));
       const envelopePeak = spectrumEnvelope.reduce(function (peak, value) {
         return Math.max(peak, Number(value) || 0);

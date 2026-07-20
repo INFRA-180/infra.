@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix362-20260720`
-- Service Worker : `infra-shell-20260720-audio362`
-- CSS figé : `audiofix362-20260720`
+- Runtime : `audiofix363-20260720`
+- Service Worker : `infra-shell-20260720-audio363`
+- CSS figé : `audiofix363-20260720`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -125,7 +125,8 @@ Le lecteur et `#infraSpaPersist` survivent aux changements de page.
 
 À partir de 981 px, le fullscreen desktop affiche le spectre fréquentiel réel d’un
 `AnalyserNode` : FFT 2 048 points, 40 Hz à 16 kHz sur un axe logarithmique gauche→droite.
-L’enveloppe visuelle attaque en 35 ms et retombe en 180 ms. Le graphe Web Audio est créé une
+Une ligne centrale reste fixe pendant que le spectre se déploie symétriquement sur 46 % de la
+hauteur de chaque côté. L’enveloppe visuelle attaque en 35 ms et retombe en 180 ms. Le graphe Web Audio est créé une
 seule fois depuis le clic d’ouverture : la source reste connectée directement à la sortie et
 l’analyseur est une branche séparée. Le rendu est limité à 30 i/s, s’arrête en pause, à la
 fermeture ou quand l’onglet est caché, et devient statique avec `prefers-reduced-motion`. Le

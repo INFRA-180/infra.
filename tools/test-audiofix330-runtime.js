@@ -2038,6 +2038,12 @@ function testPersistentAlbumAndFullscreenContracts() {
       nowPlayingSource.includes("animation.oncancel = finalize"),
     "Fullscreen completion and cancellation must share the mini-player restoration finalizer"
   );
+  const fullscreenOpenBody = extractFunctionBody(nowPlayingSource, "openNowPlayingOverlay");
+  assert(
+    fullscreenOpenBody.indexOf("syncTransportUi();") >
+      fullscreenOpenBody.indexOf("audioState.nowPlayingOpen = true"),
+    "The first cold fullscreen open must immediately synchronize the desktop visualizer"
+  );
 
   const transportSource = fs.readFileSync(TRANSPORT_UI_PATH, "utf8");
   const transportSyncBody = extractFunctionBody(transportSource, "syncTransportUi");
@@ -2161,7 +2167,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix362 runtime checks passed.");
+  console.log("audiofix363 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

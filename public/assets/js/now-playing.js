@@ -451,6 +451,10 @@
     document.body.style.right = "0";
     document.body.style.width = "100%";
     syncNowPlayingOverlay();
+    // The cold desktop open must publish nowPlayingOpen immediately. Waiting
+    // for a later audio/UI event leaves the analyser ready but its canvas at
+    // opacity 0 for the whole first fullscreen visit.
+    syncTransportUi();
     requestAnimationFrame(function () {
       animateNowPlayingPanel("open");
     });

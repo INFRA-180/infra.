@@ -198,9 +198,9 @@ async function main() {
   controller.sync({ active: true });
   assert.ok(classNames.has("is-active"), "active visual state is missing");
   assert.ok(classNames.has("is-ready"), "ready visual state is missing");
-  assert.ok(strokeCount >= 2, "live frequency-spectrum lines were not drawn");
+  assert.ok(strokeCount >= 3, "fixed axis and live frequency-spectrum lines were not drawn");
   assert.ok(fillCount >= 1, "live frequency-spectrum area was not filled");
-  assert.ok(linePointCount >= 140, "frequency spectrum does not span enough logarithmic points");
+  assert.ok(linePointCount >= 500, "mirrored frequency spectrum does not span enough logarithmic points");
   assert.ok(analyserFrequencyReads > 0, "frequency data was not read");
   assert.ok(analyserTimeReads > 0, "time-domain data was not read");
   assert.equal(typeof requestedAnimationFrame, "function", "playing visual did not schedule a frame");

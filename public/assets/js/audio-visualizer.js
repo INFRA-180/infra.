@@ -393,12 +393,16 @@
       return targets;
     }
 
-    function traceSpectrum(values, size, baselineY, maximumHeight) {
+    function traceSpectrum(values, size, centerY, maximumHeight, direction, reverse, continuePath) {
       const denominator = Math.max(1, values.length - 1);
-      for (let index = 0; index < values.length; index += 1) {
+      const verticalDirection = direction < 0 ? -1 : 1;
+      for (let point = 0; point < values.length; point += 1) {
+        const index = reverse ? values.length - 1 - point : point;
         const x = (index / denominator) * size.width;
-        const y = baselineY - (Math.max(0, Math.min(1, values[index])) * maximumHeight);
-        if (index === 0) drawingContext.moveTo(x, y);
+        const y = centerY + (
+          Math.max(0, Math.min(1, values[index])) * maximumHeight * verticalDirection
+        );
+        if (point === 0 && !continuePath) drawingContext.moveTo(x, y);
         else drawingContext.lineTo(x, y);
       }
     }
@@ -515,9 +519,9 @@
       updateHealthFromFrame(live);
       const pointCount = Math.max(72, Math.min(160, Math.round(size.width / 5)));
       const immediateSpectrum = updateSpectrum(graph, timestamp, pointCount, reduced);
-      const baselineY = size.height * 0.82;
-      const maximumHeight = Math.min(size.height * 0.38, 82);
-      const dynamicHeight = maximumHeight * (0.9 + (reactiveEnergy * 0.16));
+      const centerY = size.height * 0.5;
+      const maximumHeight = Math.min(size.height * 0.46, 112);
+      const dynamicHeight = maximumHeight * (0.96 + (reactiveEnergy * 0.04));
       const envelopePeak = spectrumEnvelope.reduce(function (peak, value) {
         return Math.max(peak, Number(value) || 0);
       }, 0);
@@ -529,23 +533,31 @@
       drawingContext.lineJoin = "round";
 
       drawingContext.beginPath();
-      drawingContext.moveTo(0, baselineY);
-      traceSpectrum(spectrumEnvelope, size, baselineY, dynamicHeight);
-      drawingContext.lineTo(size.width, baselineY);
+      traceSpectrum(spectrumEnvelope, size, centerY, dynamicHeight, -1, false);
+      traceSpectrum(spectrumEnvelope, size, centerY, dynamicHeight, 1, true, true);
       drawingContext.closePath();
       drawingContext.fillStyle = "rgba(255,255,255,0.055)";
       drawingContext.fill();
 
       drawingContext.beginPath();
+      drawingContext.strokeStyle = "rgba(255,255,255,0.13)";
+      drawingContext.lineWidth = 1;
+      drawingContext.moveTo(0, centerY);
+      drawingContext.lineTo(size.width, centerY);
+      drawingContext.stroke();
+
+      drawingContext.beginPath();
       drawingContext.strokeStyle = "rgba(229,44,49,0.24)";
       drawingContext.lineWidth = 1;
-      traceSpectrum(immediateSpectrum, size, baselineY, dynamicHeight * 0.96);
+      traceSpectrum(immediateSpectrum, size, centerY, dynamicHeight * 0.96, -1, false);
+      traceSpectrum(immediateSpectrum, size, centerY, dynamicHeight * 0.96, 1, false);
       drawingContext.stroke();
 
       drawingContext.beginPath();
       drawingContext.strokeStyle = "rgba(255,255,255,0.48)";
       drawingContext.lineWidth = 1.6;
-      traceSpectrum(spectrumEnvelope, size, baselineY, dynamicHeight);
+      traceSpectrum(spectrumEnvelope, size, centerY, dynamicHeight, -1, false);
+      traceSpectrum(spectrumEnvelope, size, centerY, dynamicHeight, 1, false);
       drawingContext.stroke();
     }
 

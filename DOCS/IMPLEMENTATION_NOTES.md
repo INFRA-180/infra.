@@ -1,5 +1,22 @@
 # Implementation Notes
 
+## 2026-07-20 — audiofix363 axe fixe et spectre miroir desktop
+
+- La télémétrie `audiofix362` confirme le rendu normal (`42/48` frames non nulles,
+  amplitude maximale `76 px`, canvas `687×200` visible), mais isole aussi le défaut à froid :
+  l’analyseur était `ready` avec une activation réussie alors que l’ouverture restait à zéro,
+  le canvas à opacité zéro et aucune frame n’était dessinée.
+- `openNowPlayingOverlay()` synchronise désormais le transport juste après avoir publié
+  `nowPlayingOpen`. Le premier clic conserve donc son activation Web Audio et rend le canvas
+  sans attendre un événement audio ou UI ultérieur.
+- La base mobile du spectre à 82 % de la hauteur est remplacée sur desktop par un axe central
+  fixe. Le même spectre logarithmique 40 Hz–16 kHz est dessiné en miroir au-dessus et
+  au-dessous ; l’axe ne varie jamais avec le signal.
+- Chaque demi-amplitude peut exploiter 46 % de la hauteur, soit environ 92 px par côté dans le
+  canvas observé de 200 px et près de 184 px crête-à-crête. FFT, lissage, cadence 30 i/s,
+  sortie audio, mobile/PWA, prefetch, Media Session et géométrie restent inchangés.
+- Identifiants atomiques : `audiofix363-20260720`, `infra-shell-20260720-audio363`.
+
 ## 2026-07-20 — audiofix362 spectre fréquentiel desktop
 
 - La télémétrie `audiofix361` confirmait un analyseur actif sans erreur sur 1 051 frames

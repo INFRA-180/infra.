@@ -13,6 +13,8 @@ const mediaListeners = new Map();
 let requestedAnimationFrame = null;
 let cancelledFrames = 0;
 let strokeCount = 0;
+let fillCount = 0;
+let linePointCount = 0;
 let audioContextCount = 0;
 let sourceCount = 0;
 let analyserFrequencyReads = 0;
@@ -33,9 +35,11 @@ const drawingContext = {
   setTransform() {},
   clearRect() {},
   beginPath() {},
+  closePath() {},
   moveTo() {},
-  lineTo() {},
-  stroke() { strokeCount += 1; }
+  lineTo() { linePointCount += 1; },
+  stroke() { strokeCount += 1; },
+  fill() { fillCount += 1; }
 };
 const canvas = {
   width: 0,
@@ -188,13 +192,15 @@ async function main() {
     [destination, analyser],
     "audio is not routed directly to output with the analyser on a side branch"
   );
-  assert.equal(analyser.fftSize, 512, "unexpected analyser FFT size");
-  assert.equal(analyser.smoothingTimeConstant, 0.58, "unexpected analyser smoothing");
+  assert.equal(analyser.fftSize, 2048, "unexpected analyser FFT size");
+  assert.equal(analyser.smoothingTimeConstant, 0.42, "unexpected analyser smoothing");
 
   controller.sync({ active: true });
   assert.ok(classNames.has("is-active"), "active visual state is missing");
   assert.ok(classNames.has("is-ready"), "ready visual state is missing");
-  assert.ok(strokeCount >= 3, "live visual waveform was not drawn");
+  assert.ok(strokeCount >= 2, "live frequency-spectrum lines were not drawn");
+  assert.ok(fillCount >= 1, "live frequency-spectrum area was not filled");
+  assert.ok(linePointCount >= 140, "frequency spectrum does not span enough logarithmic points");
   assert.ok(analyserFrequencyReads > 0, "frequency data was not read");
   assert.ok(analyserTimeReads > 0, "time-domain data was not read");
   assert.equal(typeof requestedAnimationFrame, "function", "playing visual did not schedule a frame");

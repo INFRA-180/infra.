@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
-Date : 19 juillet 2026
-Baseline : `audiofix361-20260719`
-Service Worker : `infra-shell-20260719-audio361`
+Date : 20 juillet 2026
+Baseline : `audiofix362-20260720`
+Service Worker : `infra-shell-20260720-audio362`
 
 ## État
 
@@ -16,9 +16,9 @@ Service Worker : `infra-shell-20260719-audio361`
   modifier le layout. Mini-player et Media Session restent inchangés.
 - Fullscreen desktop : titre, album et `À suivre` restent à leur opacité normale, sans timer
   dépendant des mouvements de souris.
-- Visualisation desktop : analyse Web Audio live du signal réellement lu, trois lignes animées
-  à 30 i/s maximum, graphe singleton avec sortie audible directe, branche d’analyse séparée et
-  arrêt du rendu sans fermeture du contexte.
+- Visualisation desktop : spectre FFT réel 40 Hz–16 kHz sur axe logarithmique gauche→droite,
+  ligne continue plus ample à 30 i/s maximum, graphe singleton avec sortie audible directe,
+  branche d’analyse séparée et arrêt du rendu sans fermeture du contexte.
 - Diagnostic visualiseur : une seule entrée compacte par session mesure build, activation,
   état du contexte, signal, progression audio, frames et canvas, sans audio brut ni requête
   Worker supplémentaire.
@@ -31,7 +31,7 @@ Service Worker : `infra-shell-20260719-audio361`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix361-20260719` figé.
+- CSS `audiofix362-20260720` figé.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

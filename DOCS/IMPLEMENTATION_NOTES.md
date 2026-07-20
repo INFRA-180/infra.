@@ -1,5 +1,22 @@
 # Implementation Notes
 
+## 2026-07-20 — audiofix362 spectre fréquentiel desktop
+
+- La télémétrie `audiofix361` confirmait un analyseur actif sans erreur sur 1 051 frames
+  non nulles, mais une amplitude maximale de seulement 23 px dans un canvas haut de 200 px.
+  Le défaut était donc le mapping visuel, pas le graphe Web Audio ni la source audio.
+- Les trois sinusoïdes procédurales ne représentent plus les moyennes
+  graves/médiums/aigus. Le canvas dessine désormais les bins FFT réels de gauche à droite sur
+  une échelle logarithmique de 40 Hz à 16 kHz.
+- La FFT passe de 512 à 2 048 points. Une enveloppe par point applique une attaque de 35 ms et
+  une retombée de 180 ms ; la hauteur utile peut atteindre environ 65 à 82 px selon le canvas.
+  Une ligne blanche lissée, un remplissage discret et une trace rouge instantanée utilisent
+  tous exactement le même axe fréquentiel.
+- Le rendu reste limité à 30 i/s et au fullscreen desktop. Le graphe audio singleton, la
+  sortie audible directe, la télémétrie compacte, le mobile/PWA, le prefetch, Media Session et
+  toute la géométrie restent inchangés.
+- Identifiants atomiques : `audiofix362-20260720`, `infra-shell-20260720-audio362`.
+
 ## 2026-07-19 — audiofix361 télémétrie diagnostic visualiseur desktop
 
 - Le test utilisateur `audiofix360` ne montre aucune différence visible, mais la télémétrie

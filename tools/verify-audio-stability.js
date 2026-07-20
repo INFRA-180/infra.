@@ -14,9 +14,9 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix361-20260719";
-const shellRelease = "infra-shell-20260719-audio361";
-const cssRelease = "audiofix361-20260719";
+const release = "audiofix362-20260720";
+const shellRelease = "infra-shell-20260720-audio362";
+const cssRelease = "audiofix362-20260720";
 const frozenCssSha256 = "43156fa7813bd352f64474977ebbec7801bc0e141ddd4ef73f556d2dd6864ba8";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
@@ -46,9 +46,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix361");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix361");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio361");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix362");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix362");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio362");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -66,6 +66,12 @@ expect(transport.includes('trackAudioRuntimeEvent("visualizer_health"'), "deskto
 expect(visualizer.includes("FRAME_INTERVAL_MS = 1000 / 30"), "desktop visualizer is not capped at 30 fps");
 expect(visualizer.includes("ENERGY_ATTACK_SECONDS = 0.045"), "desktop visualizer has no fast rhythmic attack");
 expect(visualizer.includes("ENERGY_RELEASE_SECONDS = 0.26"), "desktop visualizer has no controlled energy release");
+expect(visualizer.includes("SPECTRUM_ATTACK_SECONDS = 0.035"), "desktop frequency spectrum has no fast per-point attack");
+expect(visualizer.includes("SPECTRUM_RELEASE_SECONDS = 0.18"), "desktop frequency spectrum has no controlled per-point release");
+expect(visualizer.includes("FFT_SIZE = 2048"), "desktop frequency spectrum has insufficient FFT resolution");
+expect(visualizer.includes("MIN_FREQUENCY_HZ = 40"), "desktop frequency spectrum has no low-frequency boundary");
+expect(visualizer.includes("MAX_FREQUENCY_HZ = 16000"), "desktop frequency spectrum has no high-frequency boundary");
+expect(visualizer.includes("Math.pow(ratioRange"), "desktop visualizer x-axis is not logarithmic in Hz");
 expect(visualizer.includes("(prefers-reduced-motion: reduce)"), "desktop visualizer ignores reduced motion");
 expect(visualizer.includes("document.hidden"), "desktop visualizer does not stop while hidden");
 expect(visualizer.includes("createMediaElementSource(audio)"), "desktop visualizer does not analyze the global media element");
@@ -355,4 +361,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix361.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix362.");

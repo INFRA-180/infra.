@@ -6,10 +6,13 @@
   const FRAME_INTERVAL_MS = 1000 / 30;
   const ENERGY_ATTACK_SECONDS = 0.045;
   const ENERGY_RELEASE_SECONDS = 0.26;
-  const BEAT_RELEASE_SECONDS = 0.2;
+  const SPECTRUM_ATTACK_SECONDS = 0.035;
+  const SPECTRUM_RELEASE_SECONDS = 0.18;
   const MAX_DEVICE_PIXEL_RATIO = 1.5;
-  const FFT_SIZE = 512;
-  const ANALYSER_SMOOTHING = 0.58;
+  const FFT_SIZE = 2048;
+  const ANALYSER_SMOOTHING = 0.42;
+  const MIN_FREQUENCY_HZ = 40;
+  const MAX_FREQUENCY_HZ = 16000;
 
   let sharedAudio = null;
   let sharedContext = null;
@@ -242,6 +245,51 @@
     };
   }
 
+  function readLogSpectrum(values, context, pointCount) {
+    const count = Math.max(2, Number(pointCount) || 2);
+    const points = new Array(count);
+    if (!values || !values.length || !context) return points.fill(0);
+
+    const nyquist = Math.max(1, Number(context.sampleRate) / 2);
+    const minHz = Math.min(MIN_FREQUENCY_HZ, nyquist);
+    const maxHz = Math.max(minHz, Math.min(MAX_FREQUENCY_HZ, nyquist * 0.96));
+    const ratioRange = maxHz / Math.max(1, minHz);
+    const denominator = Math.max(1, count - 1);
+
+    function frequencyAt(ratio) {
+      return minHz * Math.pow(ratioRange, Math.max(0, Math.min(1, ratio)));
+    }
+
+    for (let index = 0; index < count; index += 1) {
+      const ratio = index / denominator;
+      const leftRatio = Math.max(0, (index - 0.5) / denominator);
+      const rightRatio = Math.min(1, (index + 0.5) / denominator);
+      const lowHz = frequencyAt(leftRatio);
+      const highHz = frequencyAt(rightRatio);
+      const firstBin = Math.max(0, Math.floor((lowHz / nyquist) * values.length));
+      const lastBin = Math.min(
+        values.length - 1,
+        Math.max(firstBin, Math.ceil((highHz / nyquist) * values.length))
+      );
+      let total = 0;
+      let peak = 0;
+      for (let bin = firstBin; bin <= lastBin; bin += 1) {
+        const value = Number(values[bin]) || 0;
+        total += value;
+        peak = Math.max(peak, value);
+      }
+      const average = total / Math.max(1, lastBin - firstBin + 1);
+      const normalized = ((average * 0.68) + (peak * 0.32)) / 255;
+      const noiseFloor = 0.045 + (ratio * 0.012);
+      const frequencyGain = 1.38 + (ratio * 0.2);
+      points[index] = Math.pow(
+        Math.max(0, Math.min(1, (normalized - noiseFloor) * frequencyGain)),
+        0.72
+      );
+    }
+    return points;
+  }
+
   function createVisualizer(options) {
     const config = options || {};
     const audio = config.audio || null;
@@ -260,15 +308,9 @@
     let animationFrame = 0;
     let lastFrameAt = 0;
     let lastEnergyAt = 0;
-    let lastMotionAt = 0;
+    let lastSpectrumAt = 0;
     let reactiveEnergy = 0;
-    let reactiveBass = 0;
-    let reactiveMid = 0;
-    let reactiveTreble = 0;
-    let previousBass = 0;
-    let previousRms = 0;
-    let beatPulse = 0;
-    let motionPhase = 0;
+    let spectrumEnvelope = [];
     let resizeObserver = null;
     let healthProbeTimer = 0;
     let openCount = 0;
@@ -312,10 +354,6 @@
       const energyTimestamp = Number(timestamp) || performance.now();
       if (reduced || !lastEnergyAt) {
         reactiveEnergy = live.energy;
-        reactiveBass = live.bass;
-        reactiveMid = live.mid;
-        reactiveTreble = live.treble;
-        beatPulse = 0;
       } else {
         const elapsed = Math.max(0, Math.min(0.25, (energyTimestamp - lastEnergyAt) / 1000));
         reactiveEnergy = smoothValue(
@@ -325,35 +363,44 @@
           ENERGY_ATTACK_SECONDS,
           ENERGY_RELEASE_SECONDS
         );
-        reactiveBass = smoothValue(reactiveBass, live.bass, elapsed, 0.04, 0.24);
-        reactiveMid = smoothValue(reactiveMid, live.mid, elapsed, 0.055, 0.22);
-        reactiveTreble = smoothValue(reactiveTreble, live.treble, elapsed, 0.035, 0.16);
-        const transient = Math.max(
-          0,
-          ((live.bass - previousBass) * 3.4) + ((live.rms - previousRms) * 2.2)
-        );
-        beatPulse = Math.max(
-          beatPulse * Math.exp(-elapsed / BEAT_RELEASE_SECONDS),
-          Math.min(1, transient)
-        );
       }
-      previousBass = live.bass;
-      previousRms = live.rms;
       lastEnergyAt = energyTimestamp;
-
-      if (!reduced) {
-        const motionElapsed = lastMotionAt
-          ? Math.max(0, Math.min(0.25, (energyTimestamp - lastMotionAt) / 1000))
-          : 0;
-        motionPhase += motionElapsed * (
-          0.48 +
-          (reactiveBass * 1.1) +
-          (reactiveMid * 0.55) +
-          (beatPulse * 1.45)
-        );
-      }
-      lastMotionAt = energyTimestamp;
       return live;
+    }
+
+    function updateSpectrum(graph, timestamp, pointCount, reduced) {
+      const targets = readLogSpectrum(graph.frequencyData, graph.context, pointCount);
+      const spectrumTimestamp = Number(timestamp) || performance.now();
+      const elapsed = lastSpectrumAt
+        ? Math.max(0, Math.min(0.25, (spectrumTimestamp - lastSpectrumAt) / 1000))
+        : 0;
+      if (spectrumEnvelope.length !== targets.length) {
+        spectrumEnvelope = targets.slice();
+      } else {
+        for (let index = 0; index < targets.length; index += 1) {
+          spectrumEnvelope[index] = reduced || !lastSpectrumAt
+            ? targets[index]
+            : smoothValue(
+              spectrumEnvelope[index],
+              targets[index],
+              elapsed,
+              SPECTRUM_ATTACK_SECONDS,
+              SPECTRUM_RELEASE_SECONDS
+            );
+        }
+      }
+      lastSpectrumAt = spectrumTimestamp;
+      return targets;
+    }
+
+    function traceSpectrum(values, size, baselineY, maximumHeight) {
+      const denominator = Math.max(1, values.length - 1);
+      for (let index = 0; index < values.length; index += 1) {
+        const x = (index / denominator) * size.width;
+        const y = baselineY - (Math.max(0, Math.min(1, values[index])) * maximumHeight);
+        if (index === 0) drawingContext.moveTo(x, y);
+        else drawingContext.lineTo(x, y);
+      }
     }
 
     function updateHealthFromFrame(live) {
@@ -466,74 +513,40 @@
       const reduced = prefersReducedMotion();
       const live = updateEnergy(graph, timestamp, reduced);
       updateHealthFromFrame(live);
-      const centerY = size.height * 0.5;
-      const rhythmicEnergy = Math.max(
-        0,
-        Math.min(1, reactiveEnergy + (reactiveBass * 0.2) + (beatPulse * 0.34))
+      const pointCount = Math.max(72, Math.min(160, Math.round(size.width / 5)));
+      const immediateSpectrum = updateSpectrum(graph, timestamp, pointCount, reduced);
+      const baselineY = size.height * 0.82;
+      const maximumHeight = Math.min(size.height * 0.38, 82);
+      const dynamicHeight = maximumHeight * (0.9 + (reactiveEnergy * 0.16));
+      const envelopePeak = spectrumEnvelope.reduce(function (peak, value) {
+        return Math.max(peak, Number(value) || 0);
+      }, 0);
+      maximumAmplitudePx = Math.max(
+        maximumAmplitudePx,
+        Math.min(maximumHeight, envelopePeak * dynamicHeight)
       );
-      const pointCount = Math.max(52, Math.min(112, Math.round(size.width / 7)));
-      const layers = [
-        {
-          color: "rgba(255,255,255,0.09)",
-          width: 1.1,
-          speed: 0.64,
-          frequency: 1.18,
-          offset: 0.2,
-          band: reactiveBass,
-          scale: 0.76
-        },
-        {
-          color: "rgba(255,255,255,0.15)",
-          width: 1.3,
-          speed: -0.54,
-          frequency: 1.7,
-          offset: 2.1,
-          band: reactiveMid,
-          scale: 0.62
-        },
-        {
-          color: "rgba(242,38,45,0.16)",
-          width: 1.15,
-          speed: 0.48,
-          frequency: 2.2,
-          offset: 4.4,
-          band: reactiveTreble,
-          scale: 0.5
-        }
-      ];
-
       drawingContext.lineCap = "round";
       drawingContext.lineJoin = "round";
-      for (const layer of layers) {
-        drawingContext.beginPath();
-        drawingContext.strokeStyle = layer.color;
-        drawingContext.lineWidth = layer.width;
-        const amplitude = size.height * (
-          0.018 +
-          (rhythmicEnergy * 0.075) +
-          (layer.band * 0.065)
-        ) * layer.scale;
-        maximumAmplitudePx = Math.max(maximumAmplitudePx, amplitude);
-        for (let index = 0; index < pointCount; index += 1) {
-          const ratio = index / (pointCount - 1);
-          const primary = Math.sin(
-            (ratio * Math.PI * 2 * layer.frequency) +
-            (motionPhase * layer.speed) +
-            layer.offset
-          );
-          const detail = Math.sin(
-            (ratio * Math.PI * 2 * (layer.frequency * (2.15 + (reactiveTreble * 0.6)))) -
-            (motionPhase * layer.speed * 0.78) +
-            (layer.offset * 0.5)
-          ) * (0.13 + (layer.band * 0.18));
-          const edgeFade = Math.sin(Math.PI * ratio);
-          const x = ratio * size.width;
-          const y = centerY + ((primary + detail) * amplitude * edgeFade);
-          if (index === 0) drawingContext.moveTo(x, y);
-          else drawingContext.lineTo(x, y);
-        }
-        drawingContext.stroke();
-      }
+
+      drawingContext.beginPath();
+      drawingContext.moveTo(0, baselineY);
+      traceSpectrum(spectrumEnvelope, size, baselineY, dynamicHeight);
+      drawingContext.lineTo(size.width, baselineY);
+      drawingContext.closePath();
+      drawingContext.fillStyle = "rgba(255,255,255,0.055)";
+      drawingContext.fill();
+
+      drawingContext.beginPath();
+      drawingContext.strokeStyle = "rgba(229,44,49,0.24)";
+      drawingContext.lineWidth = 1;
+      traceSpectrum(immediateSpectrum, size, baselineY, dynamicHeight * 0.96);
+      drawingContext.stroke();
+
+      drawingContext.beginPath();
+      drawingContext.strokeStyle = "rgba(255,255,255,0.48)";
+      drawingContext.lineWidth = 1.6;
+      traceSpectrum(spectrumEnvelope, size, baselineY, dynamicHeight);
+      drawingContext.stroke();
     }
 
     function stopAnimation() {

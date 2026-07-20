@@ -1,5 +1,12 @@
 # Implementation Notes
 
+## 2026-07-20 — audiofix365 amplitude miroir compacte
+
+- La demi-amplitude desktop passe de 35 % à 25 % de la hauteur du canvas : environ 50 px par
+  côté et 100 px crête-à-crête dans un canvas de 200 px.
+- Axe central, spectre logarithmique et activation à froid restent inchangés. Identifiants :
+  `audiofix365-20260720`, `infra-shell-20260720-audio365`.
+
 ## 2026-07-20 — audiofix364 amplitude miroir équilibrée
 
 - Après validation visuelle de l’axe central fixe, la demi-amplitude desktop passe de 46 % à

@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix364-20260720",
-  shell: "infra-shell-20260720-audio364",
+  build: "audiofix365-20260720",
+  shell: "infra-shell-20260720-audio365",
   albums: 31,
   tracks: 283
 });
@@ -159,7 +159,7 @@ function verifyAudioVisuals() {
     !visualizerSource.includes("MAX_FREQUENCY_HZ = 16000") ||
     !visualizerSource.includes("Math.pow(ratioRange") ||
     !visualizerSource.includes("const centerY = size.height * 0.5") ||
-    !visualizerSource.includes("size.height * 0.35") ||
+    !visualizerSource.includes("size.height * 0.25") ||
     !visualizerSource.includes("document.hidden")
   ) {
     fail("desktop live visualizer is missing its audio graph or lifecycle guards");

@@ -7,8 +7,8 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix366-20260722`
-- Service Worker : `infra-shell-20260722-audio366`
+- Runtime : `audiofix367-20260722`
+- Service Worker : `infra-shell-20260722-audio367`
 - CSS figé : `audiofix366-20260722`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
@@ -98,7 +98,10 @@ Le catalogue live, CacheStorage et les JSON inclus dans Git forment les trois ni
 repli. Le fallback Git est actuellement aligné sur le live à 283 pistes.
 
 La visualisation desktop n’a plus de fichier de données par piste. Elle lit uniquement le
-signal instantané de l’élément audio global lorsqu’un utilisateur ouvre le fullscreen.
+signal instantané de l’élément audio global lorsqu’un utilisateur ouvre le fullscreen. Son
+champ de 10 000 particules est projeté à chaque image depuis les mêmes bandes FFT locales que
+le contour : chaque point se rapproche ou s’éloigne de l’axe fixe selon sa fréquence, sans
+pulsation géométrique globale.
 
 ## Pochettes
 
@@ -126,13 +129,14 @@ Le lecteur et `#infraSpaPersist` survivent aux changements de page.
 À partir de 981 px, le fullscreen desktop affiche le spectre fréquentiel réel d’un
 `AnalyserNode` : FFT 2 048 points, 40 Hz à 16 kHz sur un axe logarithmique gauche→droite.
 Une ligne centrale reste fixe pendant que le spectre se déploie symétriquement sur 25 % de la
-hauteur de chaque côté. Un champ déterministe de 560 particules, confiné dans ces contours,
-réagit au RMS et aux transitoires graves sans déplacement horizontal. L’enveloppe visuelle
-attaque en 35 ms et retombe en 180 ms ; la poudre retombe en 220 ms. Le graphe Web Audio est créé une
-seule fois depuis le clic d’ouverture : la source reste connectée directement à la sortie et
-l’analyseur est une branche séparée. Le rendu est limité à 30 i/s, s’arrête en pause, à la
-fermeture ou quand l’onglet est caché, et devient statique avec `prefers-reduced-motion`. Le
-contexte reste vivant pour ne jamais interrompre l’audio routé.
+hauteur de chaque côté. Un champ déterministe de 10 000 particules miroir est confiné dans ces
+contours : chaque point garde sa fréquence horizontale et sa distance à l’axe, puis sa position
+verticale suit directement l’amplitude FFT locale. L’enveloppe visuelle attaque en 35 ms et
+retombe en 180 ms ; l’énergie globale ne module que légèrement la luminosité. Le graphe Web
+Audio est créé une seule fois depuis le clic d’ouverture : la source reste connectée directement
+à la sortie et l’analyseur est une branche séparée. Le rendu est limité à 30 i/s, s’arrête en
+pause, à la fermeture ou quand l’onglet est caché, et devient statique avec
+`prefers-reduced-motion`. Le contexte reste vivant pour ne jamais interrompre l’audio routé.
 
 Sur Safari compatible, le passage entre routes utilise le handoff peint natif des View
 Transitions sans animation visuelle. La mutation DOM et le repositionnement du scroll sont

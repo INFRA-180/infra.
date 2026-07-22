@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix366-20260722",
-  shell: "infra-shell-20260722-audio366",
+  build: "audiofix367-20260722",
+  shell: "infra-shell-20260722-audio367",
   albums: 31,
   tracks: 283
 });
@@ -160,8 +160,11 @@ function verifyAudioVisuals() {
     !visualizerSource.includes("Math.pow(ratioRange") ||
     !visualizerSource.includes("const centerY = size.height * 0.5") ||
     !visualizerSource.includes("size.height * 0.25") ||
-    !visualizerSource.includes("POWDER_PARTICLE_COUNT = 560") ||
+    !visualizerSource.includes("POWDER_PARTICLE_COUNT = 10000") ||
     !visualizerSource.includes("createPowderParticles(POWDER_PARTICLE_COUNT)") ||
+    !visualizerSource.includes("powderContext.createImageData(width, height)") ||
+    !visualizerSource.includes("particle.x * denominator") ||
+    !visualizerSource.includes("drawingContext.drawImage(") ||
     !visualizerSource.includes("drawingContext.clip()") ||
     !visualizerSource.includes("document.hidden")
   ) {

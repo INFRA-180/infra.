@@ -16,7 +16,12 @@ let strokeCount = 0;
 let fillCount = 0;
 let linePointCount = 0;
 let clipCount = 0;
-let particleFillCount = 0;
+let powderCanvasCount = 0;
+let powderImageWriteCount = 0;
+let powderNonzeroPixelCount = 0;
+let powderLeftSpread = 0;
+let powderRightSpread = 0;
+let drawImageCount = 0;
 let audioContextCount = 0;
 let sourceCount = 0;
 let analyserFrequencyReads = 0;
@@ -45,7 +50,7 @@ const drawingContext = {
   lineTo() { linePointCount += 1; },
   stroke() { strokeCount += 1; },
   fill() { fillCount += 1; },
-  fillRect() { particleFillCount += 1; }
+  drawImage() { drawImageCount += 1; }
 };
 const canvas = {
   width: 0,
@@ -155,7 +160,47 @@ const sandbox = {
       src: "https://infra.example/infra./assets/js/audio-visualizer.js?v=test"
     },
     hidden: false,
-    addEventListener() {}
+    addEventListener() {},
+    createElement(name) {
+      assert.equal(name, "canvas", "powder renderer created an unexpected element");
+      powderCanvasCount += 1;
+      const surface = {
+        width: 0,
+        height: 0,
+        getContext() {
+          return {
+            createImageData(width, height) {
+              return {
+                width,
+                height,
+                data: new Uint8ClampedArray(width * height * 4)
+              };
+            },
+            putImageData(imageData) {
+              powderImageWriteCount += 1;
+              const centerY = Math.floor(imageData.height / 2);
+              let nonzero = 0;
+              let leftSpread = 0;
+              let rightSpread = 0;
+              for (let offset = 3; offset < imageData.data.length; offset += 4) {
+                if (!imageData.data[offset]) continue;
+                nonzero += 1;
+                const pixel = (offset - 3) / 4;
+                const x = pixel % imageData.width;
+                const y = Math.floor(pixel / imageData.width);
+                const spread = Math.abs(y - centerY);
+                if (x < imageData.width / 2) leftSpread = Math.max(leftSpread, spread);
+                else rightSpread = Math.max(rightSpread, spread);
+              }
+              powderNonzeroPixelCount = nonzero;
+              powderLeftSpread = leftSpread;
+              powderRightSpread = rightSpread;
+            }
+          };
+        }
+      };
+      return surface;
+    }
   },
   window: {
     AudioContext: MockAudioContext,
@@ -208,7 +253,11 @@ async function main() {
   assert.ok(fillCount >= 1, "live frequency-spectrum area was not filled");
   assert.ok(linePointCount >= 500, "mirrored frequency spectrum does not span enough logarithmic points");
   assert.ok(clipCount >= 1, "powder particles are not clipped inside the spectrum");
-  assert.ok(particleFillCount >= 550, "the doubled powder particle field was not drawn");
+  assert.equal(powderCanvasCount, 1, "the powder surface was not created exactly once");
+  assert.ok(powderImageWriteCount >= 1, "the FFT-driven powder frame was not rasterized");
+  assert.ok(powderNonzeroPixelCount >= 5000, "the 10,000-particle powder field is unexpectedly sparse");
+  assert.ok(powderLeftSpread > powderRightSpread, "particle displacement does not follow local FFT bands");
+  assert.ok(drawImageCount >= 1, "the rasterized powder frame was not composited into the spectrum");
   assert.ok(analyserFrequencyReads > 0, "frequency data was not read");
   assert.ok(analyserTimeReads > 0, "time-domain data was not read");
   assert.equal(typeof requestedAnimationFrame, "function", "playing visual did not schedule a frame");
@@ -219,8 +268,10 @@ async function main() {
   assert.equal(audioContextCount, 1, "reactivation created a second AudioContext");
   assert.equal(sourceCount, 1, "reactivation rerouted the media element a second time");
 
+  const powderCanvasCountBeforeFrame = powderCanvasCount;
   requestedAnimationFrame(1040);
   assert.ok(analyserFrequencyReads > 1, "animation frames do not sample live audio");
+  assert.equal(powderCanvasCount, powderCanvasCountBeforeFrame, "a new powder surface was created per frame");
 
   audio.paused = true;
   mediaListeners.get("pause")();
@@ -240,6 +291,8 @@ async function main() {
   assert.ok(health.visualizer_nonzero_frame_count > 0, "health report did not detect live signal");
   assert.equal(health.visualizer_analyser_ready, 1, "health report does not see the analyser");
   assert.equal(health.visualizer_canvas_visible, 1, "health report does not see the canvas");
+  assert.equal(health.visualizer_powder_particle_count, 10000, "health report lost the powder density");
+  assert.equal(health.visualizer_powder_surface_ready, 1, "health report does not see the powder surface");
   console.log("Desktop live audio visualizer graph and lifecycle: ok");
 }
 

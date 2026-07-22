@@ -1,5 +1,23 @@
 # Implementation Notes
 
+## 2026-07-22 — audiofix367 poudre pilotée par les bandes FFT
+
+- Le champ desktop passe de 560 à 10 000 particules déterministes organisées en paires
+  miroir. Chaque point conserve sa fréquence horizontale et sa distance normalisée à l’axe ;
+  sa coordonnée verticale est recalculée à chaque frame depuis la même enveloppe FFT locale
+  40 Hz–16 kHz que le contour blanc.
+- La pulsation géométrique globale de la poudre est supprimée : une bande calme rabat ses
+  points vers la ligne centrale fixe, tandis qu’une bande active les éloigne. L’énergie RMS
+  ne module plus que légèrement leur luminosité.
+- Le rendu utilise un `ImageData` physique réutilisé puis une seule composition Canvas. Il
+  conserve 30 i/s, le DPR plafonné à 1,5, le masque du spectre, `prefers-reduced-motion` et le
+  graphe Web Audio singleton sans créer 10 000 appels `fillRect` par frame.
+- Le test simule un signal grave plus énergique et vérifie une dispersion plus grande à
+  gauche, une surface réutilisée, 10 000 particules déclarées et la télémétrie compacte
+  existante. Mobile/PWA, CSS, navigation, prefetch et lecture audio restent inchangés.
+- Identifiants : `audiofix367-20260722`, `infra-shell-20260722-audio367`. CSS conservé sans
+  modification sous `audiofix366-20260722`.
+
 ## 2026-07-22 — audiofix366 pulsation poudrée desktop
 
 - Le canvas desktop contient désormais un champ déterministe de 560 micro-particules, soit le

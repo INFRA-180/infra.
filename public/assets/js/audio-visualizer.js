@@ -13,9 +13,7 @@
   const ANALYSER_SMOOTHING = 0.42;
   const MIN_FREQUENCY_HZ = 40;
   const MAX_FREQUENCY_HZ = 16000;
-  const POWDER_PARTICLE_COUNT = 560;
-  const POWDER_PULSE_ATTACK_SECONDS = 0.028;
-  const POWDER_PULSE_RELEASE_SECONDS = 0.22;
+  const POWDER_PARTICLE_COUNT = 10000;
 
   let sharedAudio = null;
   let sharedContext = null;
@@ -294,33 +292,33 @@
   }
 
   function createPowderParticles(count) {
-    const particles = [];
+    const particleCount = Math.max(0, Math.floor(Number(count) || 0));
+    const particles = new Array(particleCount);
     let seed = 0x1f2e3d4c;
     function random() {
       seed = ((seed * 1664525) + 1013904223) >>> 0;
       return seed / 4294967296;
     }
-    for (let index = 0; index < count; index += 1) {
+    const pairCount = Math.floor(particleCount / 2);
+    for (let pair = 0; pair < pairCount; pair += 1) {
+      const x = random();
       const distance = Math.pow(random(), 1.7);
-      particles.push({
+      const size = 0.45 + (Math.pow(random(), 1.8) * 1.05);
+      const opacity = 0.13 + (random() * 0.32);
+      const accent = random() < 0.06;
+      particles[pair * 2] = { x, vertical: -distance, size, opacity, accent };
+      particles[(pair * 2) + 1] = { x, vertical: distance, size, opacity, accent };
+    }
+    if (particleCount % 2) {
+      particles[particleCount - 1] = {
         x: random(),
-        vertical: (random() < 0.5 ? -1 : 1) * distance,
-        size: 0.45 + (Math.pow(random(), 1.8) * 1.05),
-        opacity: 0.15 + (random() * 0.3),
-        accent: random() < 0.06
-      });
+        vertical: 0,
+        size: 0.75,
+        opacity: 0.28,
+        accent: false
+      };
     }
     return particles;
-  }
-
-  function sampleSpectrumLevel(values, ratio) {
-    if (!values || !values.length) return 0;
-    const position = Math.max(0, Math.min(1, ratio)) * Math.max(0, values.length - 1);
-    const first = Math.floor(position);
-    const second = Math.min(values.length - 1, first + 1);
-    const blend = position - first;
-    return ((Number(values[first]) || 0) * (1 - blend)) +
-      ((Number(values[second]) || 0) * blend);
   }
 
   function createVisualizer(options) {
@@ -343,11 +341,14 @@
     let lastEnergyAt = 0;
     let lastSpectrumAt = 0;
     let reactiveEnergy = 0;
-    let powderPulse = 0;
-    let previousPowderBass = 0;
-    let previousPowderRms = 0;
     let spectrumEnvelope = [];
     const powderParticles = createPowderParticles(POWDER_PARTICLE_COUNT);
+    let powderSurface = null;
+    let powderContext = null;
+    let powderImageData = null;
+    let powderPixels = null;
+    let powderSurfaceWidth = 0;
+    let powderSurfaceHeight = 0;
     let resizeObserver = null;
     let healthProbeTimer = 0;
     let openCount = 0;
@@ -377,7 +378,8 @@
       drawingContext.setTransform(ratio, 0, 0, ratio, 0, 0);
       return {
         width: Math.max(1, bounds.width),
-        height: Math.max(1, bounds.height)
+        height: Math.max(1, bounds.height),
+        ratio
       };
     }
 
@@ -391,7 +393,6 @@
       const energyTimestamp = Number(timestamp) || performance.now();
       if (reduced || !lastEnergyAt) {
         reactiveEnergy = live.energy;
-        powderPulse = 0;
       } else {
         const elapsed = Math.max(0, Math.min(0.25, (energyTimestamp - lastEnergyAt) / 1000));
         reactiveEnergy = smoothValue(
@@ -401,21 +402,7 @@
           ENERGY_ATTACK_SECONDS,
           ENERGY_RELEASE_SECONDS
         );
-        const transient = Math.max(
-          0,
-          ((live.bass - previousPowderBass) * 3.2) +
-          ((live.rms - previousPowderRms) * 2.1)
-        );
-        powderPulse = smoothValue(
-          powderPulse,
-          Math.min(1, transient),
-          elapsed,
-          POWDER_PULSE_ATTACK_SECONDS,
-          POWDER_PULSE_RELEASE_SECONDS
-        );
       }
-      previousPowderBass = live.bass;
-      previousPowderRms = live.rms;
       lastEnergyAt = energyTimestamp;
       return live;
     }
@@ -459,50 +446,111 @@
       }
     }
 
-    function drawPowder(values, size, centerY, maximumHeight, reduced) {
-      const energy = Math.max(0, Math.min(1, reactiveEnergy));
-      const pulse = reduced ? 0 : Math.max(0, Math.min(1, powderPulse));
-      const spread = Math.min(1, 0.72 + (energy * 0.12) + (pulse * 0.2));
-      const brightness = 0.42 + (energy * 0.3) + (pulse * 0.5);
-
-      function drawGroup(accent) {
-        drawingContext.fillStyle = accent ? "rgb(229,44,49)" : "rgb(255,255,255)";
-        for (let index = 0; index < powderParticles.length; index += 1) {
-          const particle = powderParticles[index];
-          if (particle.accent !== accent) continue;
-          const localHeight = Math.max(
-            1.5,
-            sampleSpectrumLevel(values, particle.x) * maximumHeight
-          );
-          const distance = Math.abs(particle.vertical);
-          const edgeFade = Math.min(
-            1,
-            particle.x / 0.035,
-            (1 - particle.x) / 0.035
-          );
-          const alpha = Math.max(
-            0,
-            Math.min(
-              0.62,
-              particle.opacity * brightness * (1 - (Math.pow(distance, 3) * 0.68)) * edgeFade
-            )
-          );
-          if (alpha <= 0.003) continue;
-          const x = particle.x * size.width;
-          const y = centerY + (particle.vertical * localHeight * spread);
-          drawingContext.globalAlpha = alpha * (accent ? 0.7 : 1);
-          drawingContext.fillRect(
-            x - (particle.size * 0.5),
-            y - (particle.size * 0.5),
-            particle.size,
-            particle.size
-          );
+    function ensurePowderSurface(size) {
+      const width = Math.max(1, Math.round(size.width * size.ratio));
+      const height = Math.max(1, Math.round(size.height * size.ratio));
+      if (!powderSurface) {
+        try {
+          powderSurface = document.createElement("canvas");
+          powderContext = powderSurface.getContext("2d", { alpha: true });
+        } catch (_err) {
+          powderSurface = null;
+          powderContext = null;
         }
       }
+      if (!powderSurface || !powderContext) return false;
+      if (
+        powderImageData &&
+        powderSurfaceWidth === width &&
+        powderSurfaceHeight === height
+      ) {
+        return true;
+      }
+      powderSurface.width = width;
+      powderSurface.height = height;
+      powderSurfaceWidth = width;
+      powderSurfaceHeight = height;
+      try {
+        powderImageData = powderContext.createImageData(width, height);
+        powderPixels = powderImageData.data;
+      } catch (_err) {
+        powderImageData = null;
+        powderPixels = null;
+      }
+      return Boolean(powderImageData && powderPixels);
+    }
 
-      drawGroup(false);
-      drawGroup(true);
+    function paintPowderPoint(x, y, size, accent, alpha) {
+      const radius = size >= 1.6 ? 1 : 0;
+      const alphaByte = Math.max(0, Math.min(255, Math.round(alpha * 255)));
+      if (!alphaByte) return;
+      const red = accent ? 229 : 255;
+      const green = accent ? 44 : 255;
+      const blue = accent ? 49 : 255;
+      for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
+        const pixelY = y + offsetY;
+        if (pixelY < 0 || pixelY >= powderSurfaceHeight) continue;
+        for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
+          const pixelX = x + offsetX;
+          if (pixelX < 0 || pixelX >= powderSurfaceWidth) continue;
+          const offset = ((pixelY * powderSurfaceWidth) + pixelX) * 4;
+          if (alphaByte < powderPixels[offset + 3]) continue;
+          powderPixels[offset] = red;
+          powderPixels[offset + 1] = green;
+          powderPixels[offset + 2] = blue;
+          powderPixels[offset + 3] = alphaByte;
+        }
+      }
+    }
+
+    function drawPowder(values, size, centerY, maximumHeight) {
+      if (!ensurePowderSurface(size)) return;
+      powderPixels.fill(0);
+      const energy = Math.max(0, Math.min(1, reactiveEnergy));
+      const brightness = 0.56 + (energy * 0.28);
+      const denominator = Math.max(1, values.length - 1);
+      for (let index = 0; index < powderParticles.length; index += 1) {
+        const particle = powderParticles[index];
+        const spectrumPosition = particle.x * denominator;
+        const spectrumIndex = Math.floor(spectrumPosition);
+        const nextIndex = Math.min(values.length - 1, spectrumIndex + 1);
+        const blend = spectrumPosition - spectrumIndex;
+        const localLevel = (
+          ((Number(values[spectrumIndex]) || 0) * (1 - blend)) +
+          ((Number(values[nextIndex]) || 0) * blend)
+        );
+        const localHeight = Math.max(1.5, localLevel * maximumHeight);
+        const distance = Math.abs(particle.vertical);
+        const edgeFade = Math.min(1, particle.x / 0.035, (1 - particle.x) / 0.035);
+        const alpha = Math.max(
+          0,
+          Math.min(
+            0.62,
+            particle.opacity * brightness * (1 - (Math.pow(distance, 3) * 0.68)) * edgeFade
+          )
+        );
+        if (alpha <= 0.003) continue;
+        paintPowderPoint(
+          Math.round(particle.x * Math.max(0, powderSurfaceWidth - 1)),
+          Math.round((centerY + (particle.vertical * localHeight)) * size.ratio),
+          particle.size * size.ratio,
+          particle.accent,
+          alpha * (particle.accent ? 0.7 : 1)
+        );
+      }
+      powderContext.putImageData(powderImageData, 0, 0);
       drawingContext.globalAlpha = 1;
+      drawingContext.drawImage(
+        powderSurface,
+        0,
+        0,
+        powderSurfaceWidth,
+        powderSurfaceHeight,
+        0,
+        0,
+        size.width,
+        size.height
+      );
     }
 
     function updateHealthFromFrame(live) {
@@ -566,6 +614,8 @@
           Math.max(0, maximumEnergy - (Number.isFinite(minimumEnergy) ? minimumEnergy : maximumEnergy)) * 1000
         ),
         visualizer_max_amplitude_px: Math.round(maximumAmplitudePx),
+        visualizer_powder_particle_count: POWDER_PARTICLE_COUNT,
+        visualizer_powder_surface_ready: powderImageData ? 1 : 0,
         visualizer_canvas_width: Math.round(Math.max(0, Number(bounds.width) || 0)),
         visualizer_canvas_height: Math.round(Math.max(0, Number(bounds.height) || 0)),
         visualizer_canvas_opacity_milli: Math.round(Math.max(0, Math.min(1, opacity || 0)) * 1000),
@@ -639,7 +689,7 @@
 
       drawingContext.save();
       drawingContext.clip();
-      drawPowder(spectrumEnvelope, size, centerY, dynamicHeight, reduced);
+      drawPowder(spectrumEnvelope, size, centerY, dynamicHeight);
       drawingContext.restore();
 
       drawingContext.beginPath();

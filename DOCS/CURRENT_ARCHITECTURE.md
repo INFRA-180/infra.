@@ -1,15 +1,15 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 20 juillet 2026.
+État de référence : 22 juillet 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix365-20260720`
-- Service Worker : `infra-shell-20260720-audio365`
-- CSS figé : `audiofix365-20260720`
+- Runtime : `audiofix366-20260722`
+- Service Worker : `infra-shell-20260722-audio366`
+- CSS figé : `audiofix366-20260722`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -126,7 +126,9 @@ Le lecteur et `#infraSpaPersist` survivent aux changements de page.
 À partir de 981 px, le fullscreen desktop affiche le spectre fréquentiel réel d’un
 `AnalyserNode` : FFT 2 048 points, 40 Hz à 16 kHz sur un axe logarithmique gauche→droite.
 Une ligne centrale reste fixe pendant que le spectre se déploie symétriquement sur 25 % de la
-hauteur de chaque côté. L’enveloppe visuelle attaque en 35 ms et retombe en 180 ms. Le graphe Web Audio est créé une
+hauteur de chaque côté. Un champ déterministe de 560 particules, confiné dans ces contours,
+réagit au RMS et aux transitoires graves sans déplacement horizontal. L’enveloppe visuelle
+attaque en 35 ms et retombe en 180 ms ; la poudre retombe en 220 ms. Le graphe Web Audio est créé une
 seule fois depuis le clic d’ouverture : la source reste connectée directement à la sortie et
 l’analyseur est une branche séparée. Le rendu est limité à 30 i/s, s’arrête en pause, à la
 fermeture ou quand l’onglet est caché, et devient statique avec `prefers-reduced-motion`. Le

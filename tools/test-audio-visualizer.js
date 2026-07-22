@@ -15,6 +15,8 @@ let cancelledFrames = 0;
 let strokeCount = 0;
 let fillCount = 0;
 let linePointCount = 0;
+let clipCount = 0;
+let particleFillCount = 0;
 let audioContextCount = 0;
 let sourceCount = 0;
 let analyserFrequencyReads = 0;
@@ -36,10 +38,14 @@ const drawingContext = {
   clearRect() {},
   beginPath() {},
   closePath() {},
+  save() {},
+  restore() {},
+  clip() { clipCount += 1; },
   moveTo() {},
   lineTo() { linePointCount += 1; },
   stroke() { strokeCount += 1; },
-  fill() { fillCount += 1; }
+  fill() { fillCount += 1; },
+  fillRect() { particleFillCount += 1; }
 };
 const canvas = {
   width: 0,
@@ -201,6 +207,8 @@ async function main() {
   assert.ok(strokeCount >= 3, "fixed axis and live frequency-spectrum lines were not drawn");
   assert.ok(fillCount >= 1, "live frequency-spectrum area was not filled");
   assert.ok(linePointCount >= 500, "mirrored frequency spectrum does not span enough logarithmic points");
+  assert.ok(clipCount >= 1, "powder particles are not clipped inside the spectrum");
+  assert.ok(particleFillCount >= 550, "the doubled powder particle field was not drawn");
   assert.ok(analyserFrequencyReads > 0, "frequency data was not read");
   assert.ok(analyserTimeReads > 0, "time-domain data was not read");
   assert.equal(typeof requestedAnimationFrame, "function", "playing visual did not schedule a frame");

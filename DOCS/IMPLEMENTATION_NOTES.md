@@ -1,5 +1,21 @@
 # Implementation Notes
 
+## 2026-07-22 — audiofix366 pulsation poudrée desktop
+
+- Le canvas desktop contient désormais un champ déterministe de 560 micro-particules, soit le
+  double des 280 prévues lors de la maquette. Le champ est créé une seule fois par visualiseur :
+  aucune particule et aucun objet aléatoire ne sont recréés à chaque frame.
+- Les positions horizontales restent strictement fixes. La hauteur locale vient directement
+  du spectre logarithmique existant ; le masque Canvas empêche toute poudre de dépasser les
+  contours supérieur et inférieur.
+- La majorité des particules est blanche, 6 % utilisent le rouge INFRA `#e52c31`. RMS et
+  variations de graves modulent uniquement dispersion et opacité, avec une attaque de 28 ms
+  et une retombée de 220 ms.
+- Le rendu conserve le canvas unique, la limite de 30 i/s, le DPR plafonné à 1,5 et tous les
+  arrêts existants. Aucun second graphe audio, DOM, WebGL, CSS, mobile/PWA, prefetch ou Media
+  Session n’est ajouté.
+- Identifiants : `audiofix366-20260722`, `infra-shell-20260722-audio366`.
+
 ## 2026-07-20 — audiofix365 amplitude miroir compacte
 
 - La demi-amplitude desktop passe de 35 % à 25 % de la hauteur du canvas : environ 50 px par

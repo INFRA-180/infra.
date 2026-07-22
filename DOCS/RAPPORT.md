@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
-Date : 20 juillet 2026
-Baseline : `audiofix365-20260720`
-Service Worker : `infra-shell-20260720-audio365`
+Date : 22 juillet 2026
+Baseline : `audiofix366-20260722`
+Service Worker : `infra-shell-20260722-audio366`
 
 ## État
 
@@ -18,8 +18,9 @@ Service Worker : `infra-shell-20260720-audio365`
   dépendant des mouvements de souris.
 - Visualisation desktop : spectre FFT réel 40 Hz–16 kHz sur axe logarithmique gauche→droite,
   axe central fixe, rendu miroir amplifié et activation visible dès l’ouverture à froid, à
-  30 i/s maximum. Le graphe singleton garde sa sortie audible directe, sa branche d’analyse
-  séparée et l’arrêt du rendu sans fermeture du contexte.
+  30 i/s maximum. Une poudre de 560 particules fixes horizontalement pulse à l’intérieur du
+  masque du spectre. Le graphe singleton garde sa sortie audible directe, sa branche
+  d’analyse séparée et l’arrêt du rendu sans fermeture du contexte.
 - Diagnostic visualiseur : une seule entrée compacte par session mesure build, activation,
   état du contexte, signal, progression audio, frames et canvas, sans audio brut ni requête
   Worker supplémentaire.
@@ -32,7 +33,7 @@ Service Worker : `infra-shell-20260720-audio365`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix365-20260720` figé.
+- CSS `audiofix366-20260722` figé.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix367-20260722`
-- Service Worker : `infra-shell-20260722-audio367`
-- CSS figé : `audiofix366-20260722`
+- Runtime : `audiofix368-20260722`
+- Service Worker : `infra-shell-20260722-audio368`
+- CSS : `audiofix368-20260722`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -55,6 +55,19 @@ Principaux composants :
 - `audio-telemetry.js` : lot compact de session.
 
 Un seul élément `<audio>` global est autorisé.
+
+### Mini-player desktop et Document PiP
+
+Sur un navigateur desktop exposant `documentPictureInPicture`, le mini-player devient
+détachable lorsqu’un drag est relâché à moins de 18 px d’un bord de viewport. La fenêtre PiP
+native reste au-dessus des autres applications et l’utilisateur la déplace avec les mécanismes
+de son système ; le site ne force pas sa position.
+
+Le document PiP partage l’état et les commandes du lecteur global : lecture/pause,
+Previous/Next, Radio, Shuffle, favori et seek. Le mini-player de la page est masqué pendant
+l’ouverture, la navigation SPA conserve la fenêtre, puis `pagehide` restaure le lecteur. En
+dessous de 380×150 la vue reste compacte ; au-dessus, elle affiche aussi la cover. Sans support
+Document PiP, le drag reste strictement interne à la page.
 
 Le diagnostic du visualiseur est agrégé localement : un événement compact
 `visualizer_health` par session décrit l’activation Web Audio, le signal détecté et la

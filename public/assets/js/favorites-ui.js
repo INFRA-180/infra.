@@ -415,6 +415,16 @@
         isCurrentFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
       );
     }
+    if (transport && transport.pipFavorite) {
+      setFavoriteButtonPath(transport.pipFavorite, currentPath);
+      transport.pipFavorite.hidden = !currentPath;
+      transport.pipFavorite.disabled = !currentPath;
+      setFavoriteButtonState(transport.pipFavorite, isCurrentFavorite);
+      transport.pipFavorite.setAttribute(
+        "aria-label",
+        isCurrentFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
+      );
+    }
 
     const homeFavoriteButton = document.querySelector("[data-home-favorites]");
     if (homeFavoriteButton) {

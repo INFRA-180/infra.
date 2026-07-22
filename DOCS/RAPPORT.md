@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 22 juillet 2026
-Baseline : `audiofix367-20260722`
-Service Worker : `infra-shell-20260722-audio367`
+Baseline : `audiofix368-20260722`
+Service Worker : `infra-shell-20260722-audio368`
 
 ## État
 
@@ -12,6 +12,9 @@ Service Worker : `infra-shell-20260722-audio367`
 - Aucun ancien dérivé de cover 480/900, JPG ou PNG dans le périmètre public.
 - Prefetch v9 par segments de 2 MiB, N+1 à N+5.
 - Radio globale, Shuffle album et lecture chronologique consolidés.
+- Mini-player desktop détachable par drag sur un bord en vraie fenêtre Document PiP. Le PiP
+  reste au-dessus des applications, se déplace nativement, partage toutes les commandes et
+  l’état du lecteur, survit à la navigation SPA et révèle la cover quand il est agrandi.
 - Géométrie fullscreen stable restaurée ; la sonde observe le bug de status bar iOS 26 sans
   modifier le layout. Mini-player et Media Session restent inchangés.
 - Fullscreen desktop : titre, album et `À suivre` restent à leur opacité normale, sans timer
@@ -35,7 +38,7 @@ Service Worker : `infra-shell-20260722-audio367`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix366-20260722` figé.
+- CSS `audiofix368-20260722`.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

@@ -1,5 +1,27 @@
 # Implementation Notes
 
+## 2026-07-22 — audiofix368 mini-player desktop détachable en Document PiP
+
+- Sur desktop compatible, déplacer le mini-player jusqu’à une marge de 18 px de n’importe quel
+  bord puis relâcher ouvre une vraie fenêtre Document Picture-in-Picture, maintenue au-dessus
+  des autres applications par le navigateur et repositionnable par l’utilisateur via l’OS.
+- La fenêtre PiP reste branchée sur l’unique état audio : titre, album, lecture/pause,
+  Previous/Next, Radio, Shuffle, favori et seek utilisent les mêmes commandes que le lecteur
+  principal. La navigation SPA ne l’interrompt pas.
+- Le format compact demandé est 320×180 et masque la cover. Dès que la fenêtre atteint les
+  seuils desktop existants de 380×150, elle passe en disposition étendue et affiche la cover.
+- Pendant le PiP, le mini-player de la page est masqué. La fermeture native restaure ce même
+  player et son état. Un navigateur sans `documentPictureInPicture` conserve simplement le
+  comportement de déplacement actuel.
+- Le chargement CSS du document PiP est résolu depuis la base runtime afin de rester correct
+  après une navigation SPA. Le Service Worker diffère ses rechargements tant que le PiP est
+  ouvert ou en cours d’ouverture.
+- Validation : test VM dédié, audit de release complet et scénario Playwright Chromium réel
+  couvrant le drag, le mode compact, la cover redimensionnée, Next, la navigation SPA et la
+  fermeture/restauration.
+- Identifiants : `audiofix368-20260722`, `infra-shell-20260722-audio368`, CSS
+  `audiofix368-20260722`.
+
 ## 2026-07-22 — audiofix367 poudre pilotée par les bandes FFT
 
 - Le champ desktop passe de 560 à 10 000 particules déterministes organisées en paires

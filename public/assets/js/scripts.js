@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix367-20260722";
+window.INFRA_BUILD_TAG = "audiofix368-20260722";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -265,6 +265,8 @@ function openAppDownloadGatekeeper(appName, url) {
     nowPlayingMiniRect: null,
     nowPlayingVolumeVisible: false,
     nowPlayingVolumeStorageKey: "infra_now_playing_volume_visible_v1",
+    transportPipOpen: false,
+    transportPipOpening: false,
     desktopTransportState: null,
     trackFailureCounts: new Map(),
     trackDurationData: null,
@@ -424,7 +426,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260722-audio367";
+  const SPA_SHELL_VERSION = "infra-shell-20260722-audio368";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -453,7 +455,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix367-20260722";
+  const runtimeVersion = "audiofix368-20260722";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -1291,7 +1293,10 @@ function openAppDownloadGatekeeper(appName, url) {
       getCurrentAlbumTitle,
       getCurrentTrackAlbumPage,
       syncCurrentFavoriteButtons,
-      trackAudioRuntimeEvent
+      trackAudioRuntimeEvent,
+      getRuntimeAssetUrl: function (path) {
+        return new URL(String(path || ""), runtime.baseUrl).href;
+      }
     });
   }
 
@@ -2834,7 +2839,14 @@ function openAppDownloadGatekeeper(appName, url) {
     const audio = audioState.audio;
     const audioPlaying = Boolean(audio && !audio.paused && getCurrentPlayableAudioSrc(audio));
     const trackStarting = Boolean(audioState.trackStartInFlight);
-    const overlayOpen = Boolean(audioState.nowPlayingOpen || audioState.nowPlayingClosing);
+    // A paused detached player must not be destroyed by a deferred runtime
+    // reload. Treat Document PiP like the fullscreen surface for reload safety.
+    const overlayOpen = Boolean(
+      audioState.nowPlayingOpen ||
+      audioState.nowPlayingClosing ||
+      audioState.transportPipOpen ||
+      audioState.transportPipOpening
+    );
     const navigationActive = Boolean(spaState.navigationActive);
     const visible = document.visibilityState === "visible";
     const idleForMs = Math.max(0, Math.round(now - lastUserInteractionAt));

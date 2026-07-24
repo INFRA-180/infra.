@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
-Date : 22 juillet 2026
-Baseline : `audiofix368-20260722`
-Service Worker : `infra-shell-20260722-audio368`
+Date : 24 juillet 2026
+Baseline : `audiofix369-20260724`
+Service Worker : `infra-shell-20260724-audio369`
 
 ## État
 
@@ -21,11 +21,12 @@ Service Worker : `infra-shell-20260722-audio368`
   dépendant des mouvements de souris.
 - Visualisation desktop : spectre FFT réel 40 Hz–16 kHz sur axe logarithmique gauche→droite,
   axe central fixe, rendu miroir amplifié et activation visible dès l’ouverture à froid, à
-  30 i/s maximum. Une poudre de 10 000 particules suit directement l’amplitude de sa bande FFT
-  locale autour de l’axe : les points se déplacent avec le même spectre que les contours, sans
-  pulsation géométrique globale. Un tampon de pixels réutilisé limite le coût Canvas. Le graphe
-  singleton garde sa sortie audible directe, sa branche d’analyse séparée et l’arrêt du rendu
-  sans fermeture du contexte.
+  30 i/s maximum. Un lit de 10 000 grains reste immobile sur l’axe central ; chaque bande FFT
+  déclenche une quantité et une hauteur de grains proportionnelles à son niveau et à son attaque.
+  Les grains conservent ensuite leur inertie, retombent sous une gravité terrestre de 9,80665 m/s²
+  et terminent par un rebond amorti. Le tampon de pixels réutilisé limite le coût Canvas. Le
+  graphe singleton garde sa sortie audible directe, sa branche d’analyse séparée et l’arrêt du
+  rendu sans fermeture du contexte.
 - Diagnostic visualiseur : une seule entrée compacte par session mesure build, activation,
   état du contexte, signal, progression audio, frames et canvas, sans audio brut ni requête
   Worker supplémentaire.
@@ -38,7 +39,7 @@ Service Worker : `infra-shell-20260722-audio368`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix368-20260722`.
+- CSS `audiofix368-20260722`, inchangé par audiofix369.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

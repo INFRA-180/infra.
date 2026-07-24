@@ -1,14 +1,14 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 22 juillet 2026.
+État de référence : 24 juillet 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix368-20260722`
-- Service Worker : `infra-shell-20260722-audio368`
+- Runtime : `audiofix369-20260724`
+- Service Worker : `infra-shell-20260724-audio369`
 - CSS : `audiofix368-20260722`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
@@ -142,12 +142,15 @@ Le lecteur et `#infraSpaPersist` survivent aux changements de page.
 À partir de 981 px, le fullscreen desktop affiche le spectre fréquentiel réel d’un
 `AnalyserNode` : FFT 2 048 points, 40 Hz à 16 kHz sur un axe logarithmique gauche→droite.
 Une ligne centrale reste fixe pendant que le spectre se déploie symétriquement sur 25 % de la
-hauteur de chaque côté. Un champ déterministe de 10 000 particules miroir est confiné dans ces
-contours : chaque point garde sa fréquence horizontale et sa distance à l’axe, puis sa position
-verticale suit directement l’amplitude FFT locale. L’enveloppe visuelle attaque en 35 ms et
-retombe en 180 ms ; l’énergie globale ne module que légèrement la luminosité. Le graphe Web
-Audio est créé une seule fois depuis le clic d’ouverture : la source reste connectée directement
-à la sortie et l’analyseur est une branche séparée. Le rendu est limité à 30 i/s, s’arrête en
+hauteur de chaque côté. Cette ligne sert aussi de sol à 10 000 grains déterministes. Chaque
+grain garde sa fréquence horizontale et possède une hauteur, une vitesse, un seuil de départ
+et une restitution propres. La variation positive et le niveau de sa bande FFT déterminent
+le nombre de départs et une hauteur cible ; la vitesse initiale est calculée pour cette hauteur,
+puis une gravité de 9,80665 m/s², une faible traînée et un rebond amorti gouvernent seuls la
+trajectoire. Le grain demeure visible après la baisse du signal jusqu’à son retour au repos.
+L’enveloppe des contours attaque en 35 ms et retombe en 180 ms. Le graphe Web Audio est créé
+une seule fois depuis le clic d’ouverture : la source reste connectée directement à la sortie
+et l’analyseur est une branche séparée. Le rendu est limité à 30 i/s, s’arrête en
 pause, à la fermeture ou quand l’onglet est caché, et devient statique avec
 `prefers-reduced-motion`. Le contexte reste vivant pour ne jamais interrompre l’audio routé.
 

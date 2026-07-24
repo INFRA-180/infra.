@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix368-20260722",
-  shell: "infra-shell-20260722-audio368",
+  build: "audiofix369-20260724",
+  shell: "infra-shell-20260724-audio369",
   albums: 31,
   tracks: 283
 });
@@ -163,9 +163,12 @@ function verifyAudioVisuals() {
     !visualizerSource.includes("POWDER_PARTICLE_COUNT = 10000") ||
     !visualizerSource.includes("createPowderParticles(POWDER_PARTICLE_COUNT)") ||
     !visualizerSource.includes("powderContext.createImageData(width, height)") ||
-    !visualizerSource.includes("particle.x * denominator") ||
+    !visualizerSource.includes("EARTH_GRAVITY_METERS_PER_SECOND2 = 9.80665") ||
+    !visualizerSource.includes("samplePowderBand(powderSpectrumFlux, particle.x)") ||
+    !visualizerSource.includes("Math.sqrt(") ||
+    !visualizerSource.includes("particle.velocity -= POWDER_GRAVITY_PX_PER_SECOND2 * step") ||
     !visualizerSource.includes("drawingContext.drawImage(") ||
-    !visualizerSource.includes("drawingContext.clip()") ||
+    visualizerSource.includes("drawingContext.clip()") ||
     !visualizerSource.includes("document.hidden")
   ) {
     fail("desktop live visualizer is missing its audio graph or lifecycle guards");

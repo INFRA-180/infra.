@@ -21,6 +21,7 @@ let powderImageWriteCount = 0;
 let powderNonzeroPixelCount = 0;
 let powderLeftSpread = 0;
 let powderRightSpread = 0;
+let powderTopSpread = 0;
 let drawImageCount = 0;
 let audioContextCount = 0;
 let sourceCount = 0;
@@ -73,6 +74,7 @@ const audio = {
   }
 };
 const destination = { name: "destination" };
+let analyserMode = "bass";
 const analyser = {
   fftSize: 0,
   smoothingTimeConstant: 0,
@@ -83,6 +85,10 @@ const analyser = {
   },
   getByteFrequencyData(values) {
     analyserFrequencyReads += 1;
+    if (analyserMode === "silence") {
+      values.fill(0);
+      return;
+    }
     values.fill(72);
     for (let index = 1; index < Math.min(6, values.length); index += 1) values[index] = 210;
   },
@@ -195,6 +201,7 @@ const sandbox = {
               powderNonzeroPixelCount = nonzero;
               powderLeftSpread = leftSpread;
               powderRightSpread = rightSpread;
+              powderTopSpread = Math.max(leftSpread, rightSpread);
             }
           };
         }
@@ -252,11 +259,10 @@ async function main() {
   assert.ok(strokeCount >= 3, "fixed axis and live frequency-spectrum lines were not drawn");
   assert.ok(fillCount >= 1, "live frequency-spectrum area was not filled");
   assert.ok(linePointCount >= 500, "mirrored frequency spectrum does not span enough logarithmic points");
-  assert.ok(clipCount >= 1, "powder particles are not clipped inside the spectrum");
+  assert.equal(clipCount, 0, "ballistic particles are still clipped by the instantaneous spectrum");
   assert.equal(powderCanvasCount, 1, "the powder surface was not created exactly once");
   assert.ok(powderImageWriteCount >= 1, "the FFT-driven powder frame was not rasterized");
   assert.ok(powderNonzeroPixelCount >= 5000, "the 10,000-particle powder field is unexpectedly sparse");
-  assert.ok(powderLeftSpread > powderRightSpread, "particle displacement does not follow local FFT bands");
   assert.ok(drawImageCount >= 1, "the rasterized powder frame was not composited into the spectrum");
   assert.ok(analyserFrequencyReads > 0, "frequency data was not read");
   assert.ok(analyserTimeReads > 0, "time-domain data was not read");
@@ -269,13 +275,31 @@ async function main() {
   assert.equal(sourceCount, 1, "reactivation rerouted the media element a second time");
 
   const powderCanvasCountBeforeFrame = powderCanvasCount;
-  requestedAnimationFrame(1040);
+  function runAnimationFrame(timestamp) {
+    const callback = requestedAnimationFrame;
+    assert.equal(typeof callback, "function", `no animation frame was scheduled for ${timestamp}`);
+    requestedAnimationFrame = null;
+    callback(timestamp);
+  }
+  runAnimationFrame(1040);
   assert.ok(analyserFrequencyReads > 1, "animation frames do not sample live audio");
+  assert.ok(
+    powderLeftSpread > powderRightSpread,
+    `particle launch height does not follow local FFT bands (${powderLeftSpread}/${powderRightSpread})`
+  );
   assert.equal(powderCanvasCount, powderCanvasCountBeforeFrame, "a new powder surface was created per frame");
 
+  const launchedSpread = powderTopSpread;
+  analyserMode = "silence";
   audio.paused = true;
   mediaListeners.get("pause")();
   assert.ok(cancelledFrames > 0, "pause did not cancel the animation frame");
+  assert.ok(powderTopSpread > 8, "particles disappeared as soon as the FFT signal stopped");
+  for (let timestamp = 1080; timestamp <= 2600 && requestedAnimationFrame; timestamp += 40) {
+    runAnimationFrame(timestamp);
+  }
+  assert.ok(launchedSpread > powderTopSpread, "earth gravity did not bring the particles back to rest");
+  assert.ok(powderTopSpread <= 9, "particles did not settle on their static powder bed");
 
   controller.sync({ active: false });
   assert.ok(!classNames.has("is-active"), "closed fullscreen keeps the visual active");
@@ -293,6 +317,11 @@ async function main() {
   assert.equal(health.visualizer_canvas_visible, 1, "health report does not see the canvas");
   assert.equal(health.visualizer_powder_particle_count, 10000, "health report lost the powder density");
   assert.equal(health.visualizer_powder_surface_ready, 1, "health report does not see the powder surface");
+  assert.ok(health.visualizer_powder_kick_count > 0, "health report contains no FFT particle kick");
+  assert.ok(health.visualizer_powder_max_airborne_count > 0, "health report contains no airborne particle");
+  assert.ok(health.visualizer_powder_max_rise_px > 8, "health report lost the ballistic rise height");
+  assert.equal(health.visualizer_powder_airborne_count, 0, "health report sees particles still airborne after settling");
+  assert.equal(health.visualizer_powder_gravity_milli, 9807, "particle gravity is not Earth gravity");
   console.log("Desktop live audio visualizer graph and lifecycle: ok");
 }
 

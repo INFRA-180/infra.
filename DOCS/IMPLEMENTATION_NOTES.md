@@ -1,5 +1,24 @@
 # Implementation Notes
 
+## 2026-07-24 — audiofix369 poudre balistique pilotée par FFT
+
+- La poudre desktop n’est plus géométriquement redimensionnée par le contour. Les 10 000 grains
+  reposent dans un lit fin au-dessus de l’axe central et conservent entre les frames leur hauteur,
+  leur vitesse, leur seuil de déclenchement, leur réponse et leur restitution.
+- Le niveau et le flux positif de chaque bande FFT 40 Hz–16 kHz déterminent combien de grains
+  partent et leur hauteur cible. La vitesse initiale vient de `sqrt(2 × g × hauteur)` ; après le
+  départ, une gravité de 9,80665 m/s² à l’échelle de 100 px/m, une traînée légère et un unique
+  rebond amorti produisent la chute. Une baisse du signal ne masque plus un grain en vol.
+- Le rendu conserve exactement 10 000 grains : 85 % occupent un pixel physique et 15 % deux
+  pixels, ce qui garde un aspect poudre sans augmenter l’overdraw. `ImageData`, DPR 1,5 et le
+  plafond de 30 i/s sont conservés. Après Pause, le rendu continue seulement jusqu’au retour
+  complet au repos.
+- La télémétrie compacte existante ajoute les impulsions, le maximum de grains en vol, la hauteur
+  maximale et la constante de gravité sans nouvel envoi Worker. Le test simule une attaque grave,
+  coupe le signal, vérifie la persistance en vol puis le retour statique sous la gravité.
+- Identifiants : `audiofix369-20260724`, `infra-shell-20260724-audio369`. CSS, PWA mobile,
+  prefetch, navigation et moteur audio restent inchangés sous leur état validé.
+
 ## 2026-07-22 — audiofix368 mini-player desktop détachable en Document PiP
 
 - Sur desktop compatible, déplacer le mini-player jusqu’à une marge de 18 px de n’importe quel

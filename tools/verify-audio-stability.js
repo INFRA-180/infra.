@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix368-20260722";
-const shellRelease = "infra-shell-20260722-audio368";
+const release = "audiofix369-20260724";
+const shellRelease = "infra-shell-20260724-audio369";
 const cssRelease = "audiofix368-20260722";
 const frozenCssSha256 = "370e3cbd3302972d454b99751c20d78422c8f2971739e67f36c11387e22c562a";
 const scripts = read("public/assets/js/scripts.js");
@@ -46,9 +46,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix368");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix368");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio368");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix369");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix369");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio369");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -79,9 +79,12 @@ expect(visualizer.includes("dynamicHeight, 1, false"), "desktop frequency spectr
 expect(visualizer.includes("POWDER_PARTICLE_COUNT = 10000"), "desktop powder field does not contain 10,000 particles");
 expect(visualizer.includes("createPowderParticles(POWDER_PARTICLE_COUNT)"), "desktop powder field is not created once per visualizer");
 expect(visualizer.includes("powderContext.createImageData(width, height)"), "desktop powder field has no reusable pixel buffer");
-expect(visualizer.includes("particle.x * denominator"), "desktop powder displacement is not tied to local FFT bands");
+expect(visualizer.includes("EARTH_GRAVITY_METERS_PER_SECOND2 = 9.80665"), "desktop powder does not use Earth gravity");
+expect(visualizer.includes("samplePowderBand(powderSpectrumFlux, particle.x)"), "desktop powder kicks are not tied to local FFT bands");
+expect(visualizer.includes("particle.velocity -= POWDER_GRAVITY_PX_PER_SECOND2 * step"), "desktop powder has no persistent ballistic fall");
+expect(visualizer.includes("impactSpeed * particle.restitution"), "desktop powder has no damped ground collision");
 expect(visualizer.includes("drawingContext.drawImage("), "desktop powder buffer is not composited efficiently");
-expect(visualizer.includes("drawingContext.clip()"), "desktop powder particles are not clipped inside the spectrum");
+expect(!visualizer.includes("drawingContext.clip()"), "desktop ballistic powder is still clipped by the current FFT envelope");
 expect(!visualizer.includes("powderPulse"), "desktop powder still uses a global pulse instead of local FFT displacement");
 const coldOpenBody = functionBody(nowPlaying, "openNowPlayingOverlay", "closeNowPlayingOverlay");
 expect(
@@ -377,4 +380,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix368.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix369.");

@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix373-20260724",
-  shell: "infra-shell-20260724-audio373",
+  build: "audiofix374-20260724",
+  shell: "infra-shell-20260724-audio374",
   albums: 31,
   tracks: 283
 });
@@ -162,11 +162,12 @@ function verifyAudioVisuals() {
     !visualizerSource.includes("Math.pow(ratioRange") ||
     !visualizerSource.includes("const centerY = size.height * 0.5") ||
     !visualizerSource.includes("size.height * 0.25") ||
+    !visualizerSource.includes("const PURE_FFT_MODE = true") ||
     !visualizerSource.includes("POWDER_EARTH_PARTICLE_COUNT = 250000") ||
     !visualizerSource.includes("POWDER_MOON_PARTICLE_COUNT = 250000") ||
     !visualizerSource.includes("POWDER_PARTICLE_COUNT = 500000") ||
     !visualizerSource.includes("POWDER_HELIX_PARTICLE_COUNT = 60000") ||
-    !visualizerSource.includes("createPowderParticles(POWDER_PARTICLE_COUNT)") ||
+    !visualizerSource.includes("createPowderParticles(PURE_FFT_MODE ? 0 : POWDER_PARTICLE_COUNT)") ||
     !visualizerSource.includes("height: new Float32Array(particleCount)") ||
     !visualizerSource.includes("side: new Uint8Array(particleCount)") ||
     !visualizerSource.includes("gravityClass: new Uint8Array(particleCount)") ||
@@ -189,7 +190,10 @@ function verifyAudioVisuals() {
     !visualizerSource.includes("drawingContext.quadraticCurveTo(") ||
     !visualizerSource.includes("powderContainmentRawEnvelope[index],") ||
     !visualizerSource.includes("drawingContext.drawImage(") ||
+    !visualizerSource.includes("if (!PURE_FFT_MODE) {\n        updatePowderPhysics(") ||
+    !visualizerSource.includes("if (!PURE_FFT_MODE) drawPowder(size, centerY);") ||
     visualizerSource.includes("drawingContext.clip()") ||
+    visualizerSource.includes('drawingContext.strokeStyle = "rgba(255,255,255,0.13)"') ||
     !visualizerSource.includes("document.hidden")
   ) {
     fail("desktop live visualizer is missing its audio graph or lifecycle guards");
@@ -198,7 +202,7 @@ function verifyAudioVisuals() {
     fail("desktop analyser creates a duplicate audible destination path");
   }
 
-  console.log("Desktop live audio visualizer policy passed: singleton side-branch analyser, no data payload.");
+  console.log("Desktop pure FFT policy passed: live analyser, no median line, no particle allocation.");
 }
 
 function verifyNoLegacyRuntimeCovers() {

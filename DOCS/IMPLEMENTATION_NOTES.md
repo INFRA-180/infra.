@@ -1,5 +1,20 @@
 # Implementation Notes
 
+## 2026-07-24 — audiofix374 comparaison FFT pure
+
+- L’état complet précédent est figé par le tag Git annoté
+  `backup-audiofix373-20260724`, pointant sur le commit `8dd8721`.
+- `PURE_FFT_MODE` conserve uniquement le spectre live : remplissage miroir, contour rouge
+  immédiat et contour blanc lissé. La ligne horizontale médiane est retirée.
+- Le mode pur crée un champ de zéro particule et court-circuite la simulation ainsi que le
+  compositing de la poudre. Il évite donc l’allocation des tableaux des 500 000 grains, tout en
+  conservant l’implémentation derrière le commutateur pour une comparaison ou un retour précis.
+- Le test du visualiseur vérifie deux contours FFT, le remplissage, l’absence de surface poudre,
+  l’absence de pixels particules, l’arrêt après Pause et une télémétrie particules entièrement
+  nulle.
+- Aucun changement audio, CSS, PWA, navigation, prefetch ou Media Session.
+- Identifiants : `audiofix374-20260724`, `infra-shell-20260724-audio374`.
+
 ## 2026-07-24 — audiofix373 spectre ondulant et hélice compacte
 
 - Le rayon de la double hélice centrale passe de `0.12 + signal × 0.52` à

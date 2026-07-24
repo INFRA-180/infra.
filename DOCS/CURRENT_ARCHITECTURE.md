@@ -7,13 +7,13 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix373-20260724`
-- Service Worker : `infra-shell-20260724-audio373`
+- Runtime : `audiofix374-20260724`
+- Service Worker : `infra-shell-20260724-audio374`
 - CSS : `audiofix368-20260722`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
-- Sauvegarde : tag `backup-audiofix356-20260719`
+- Sauvegarde comparative : tag `backup-audiofix373-20260724`
 
 ## Publication
 
@@ -111,16 +111,13 @@ Le catalogue live, CacheStorage et les JSON inclus dans Git forment les trois ni
 repli. Le fallback Git est actuellement aligné sur le live à 283 pistes.
 
 La visualisation desktop n’a plus de fichier de données par piste. Elle lit uniquement le
-signal instantané de l’élément audio global lorsqu’un utilisateur ouvre le fullscreen. Son
-champ de 500 000 grains physiques utilise des tableaux typés compacts et une tranche FFT
-préassignée par grain. Il contient 250 000 grains terrestres et 250 000 grains lunaires,
-également répartis au-dessus et au-dessous de l’axe. Le contour rouge montre le signal immédiat ;
-le contour blanc suit l’enveloppe physique minimale qui contient le spectre lissé et le grain
-le plus éloigné de chaque tranche, sans coupure brutale ni dépassement incohérent. Un sous-champ
-central de 60 000 grains forme deux hélices opposées dont la rotation et le rayon suivent le FFT.
-Le rayon hélicoïdal est borné à une plage compacte d’environ 4–16 px. Le pilotage est temporisé,
-les niveaux sont lissés avec un noyau fréquentiel `[1,4,6,4,1]/16` et les contours utilisent
-des courbes quadratiques sans dépassement.
+signal instantané de l’élément audio global lorsqu’un utilisateur ouvre le fullscreen.
+`audiofix374` est une version comparative FFT pure : les contours rouge immédiat et blanc
+lissé, le remplissage miroir et l’axe fréquentiel logarithmique 40 Hz–16 kHz sont conservés,
+mais aucune ligne médiane ni particule n’est affichée. Le mode n’alloue pas les tableaux des
+500 000 grains, ne lance pas leur simulation et ne compose aucun tampon de poudre. Le code
+physique reste disponible derrière le commutateur local pour comparer proprement avec la
+sauvegarde `backup-audiofix373-20260724`.
 
 ## Pochettes
 

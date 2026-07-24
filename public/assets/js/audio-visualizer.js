@@ -17,6 +17,7 @@
   const ANALYSER_SMOOTHING = 0.42;
   const MIN_FREQUENCY_HZ = 40;
   const MAX_FREQUENCY_HZ = 16000;
+  const PURE_FFT_MODE = true;
   const POWDER_EARTH_PARTICLE_COUNT = 250000;
   const POWDER_MOON_PARTICLE_COUNT = 250000;
   const POWDER_PARTICLE_COUNT = 500000;
@@ -414,7 +415,7 @@
     let lastSpectrumAt = 0;
     let reactiveEnergy = 0;
     let spectrumEnvelope = [];
-    const powderParticles = createPowderParticles(POWDER_PARTICLE_COUNT);
+    const powderParticles = createPowderParticles(PURE_FFT_MODE ? 0 : POWDER_PARTICLE_COUNT);
     let powderContainmentEnvelope = [];
     let powderContainmentRawEnvelope = [];
     let powderBandMaxHeights = new Float32Array(0);
@@ -1020,22 +1021,26 @@
           Math.max(0, maximumEnergy - (Number.isFinite(minimumEnergy) ? minimumEnergy : maximumEnergy)) * 1000
         ),
         visualizer_max_amplitude_px: Math.round(maximumAmplitudePx),
-        visualizer_powder_particle_count: POWDER_PARTICLE_COUNT,
+        visualizer_powder_particle_count: powderParticles.count,
         visualizer_powder_surface_ready: powderImageData ? 1 : 0,
         visualizer_powder_kick_count: powderKickCount,
         visualizer_powder_airborne_count: powderAirborneCount,
         visualizer_powder_max_airborne_count: maximumPowderAirborneCount,
         visualizer_powder_max_rise_px: Math.round(maximumPowderRisePx),
-        visualizer_powder_earth_particle_count: POWDER_EARTH_PARTICLE_COUNT,
-        visualizer_powder_moon_particle_count: POWDER_MOON_PARTICLE_COUNT,
-        visualizer_powder_upper_particle_count: POWDER_PARTICLE_COUNT / 2,
-        visualizer_powder_lower_particle_count: POWDER_PARTICLE_COUNT / 2,
-        visualizer_powder_helix_particle_count: POWDER_HELIX_PARTICLE_COUNT,
+        visualizer_powder_earth_particle_count: PURE_FFT_MODE ? 0 : POWDER_EARTH_PARTICLE_COUNT,
+        visualizer_powder_moon_particle_count: PURE_FFT_MODE ? 0 : POWDER_MOON_PARTICLE_COUNT,
+        visualizer_powder_upper_particle_count: PURE_FFT_MODE ? 0 : POWDER_PARTICLE_COUNT / 2,
+        visualizer_powder_lower_particle_count: PURE_FFT_MODE ? 0 : POWDER_PARTICLE_COUNT / 2,
+        visualizer_powder_helix_particle_count: PURE_FFT_MODE ? 0 : POWDER_HELIX_PARTICLE_COUNT,
         visualizer_powder_helix_active_count: powderHelixActiveCount,
         visualizer_powder_helix_max_active_count: maximumPowderHelixActiveCount,
         visualizer_powder_helix_max_offset_px: Math.round(maximumPowderHelixOffsetPx),
-        visualizer_powder_gravity_milli: Math.round(EARTH_GRAVITY_METERS_PER_SECOND2 * 1000),
-        visualizer_powder_moon_gravity_milli: Math.round(MOON_GRAVITY_METERS_PER_SECOND2 * 1000),
+        visualizer_powder_gravity_milli: PURE_FFT_MODE
+          ? 0
+          : Math.round(EARTH_GRAVITY_METERS_PER_SECOND2 * 1000),
+        visualizer_powder_moon_gravity_milli: PURE_FFT_MODE
+          ? 0
+          : Math.round(MOON_GRAVITY_METERS_PER_SECOND2 * 1000),
         visualizer_powder_max_update_ms: Math.round(maximumPowderUpdateMs),
         visualizer_canvas_width: Math.round(Math.max(0, Number(bounds.width) || 0)),
         visualizer_canvas_height: Math.round(Math.max(0, Number(bounds.height) || 0)),
@@ -1091,16 +1096,22 @@
       const centerY = size.height * 0.5;
       const maximumHeight = Math.min(size.height * 0.25, 64);
       const dynamicHeight = maximumHeight * (0.96 + (reactiveEnergy * 0.04));
-      updatePowderPhysics(
-        immediateSpectrum,
-        dynamicHeight,
-        timestamp,
-        reduced,
-        !audio.paused && !audio.ended
-      );
-      const visibleEnvelope = powderContainmentEnvelope.length === spectrumEnvelope.length
-        ? powderContainmentEnvelope
-        : spectrumEnvelope;
+      if (!PURE_FFT_MODE) {
+        updatePowderPhysics(
+          immediateSpectrum,
+          dynamicHeight,
+          timestamp,
+          reduced,
+          !audio.paused && !audio.ended
+        );
+      }
+      const visibleEnvelope = PURE_FFT_MODE
+        ? spectrumEnvelope
+        : (
+          powderContainmentEnvelope.length === spectrumEnvelope.length
+            ? powderContainmentEnvelope
+            : spectrumEnvelope
+        );
       const envelopePeak = visibleEnvelope.reduce(function (peak, value) {
         return Math.max(peak, Number(value) || 0);
       }, 0);
@@ -1118,14 +1129,7 @@
       drawingContext.fillStyle = "rgba(255,255,255,0.055)";
       drawingContext.fill();
 
-      drawPowder(size, centerY);
-
-      drawingContext.beginPath();
-      drawingContext.strokeStyle = "rgba(255,255,255,0.13)";
-      drawingContext.lineWidth = 1;
-      drawingContext.moveTo(0, centerY);
-      drawingContext.lineTo(size.width, centerY);
-      drawingContext.stroke();
+      if (!PURE_FFT_MODE) drawPowder(size, centerY);
 
       drawingContext.beginPath();
       drawingContext.strokeStyle = "rgba(229,44,49,0.24)";

@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 24 juillet 2026
-Baseline : `audiofix373-20260724`
-Service Worker : `infra-shell-20260724-audio373`
+Baseline : `audiofix374-20260724`
+Service Worker : `infra-shell-20260724-audio374`
 
 ## État
 
@@ -19,22 +19,10 @@ Service Worker : `infra-shell-20260724-audio373`
   modifier le layout. Mini-player et Media Session restent inchangés.
 - Fullscreen desktop : titre, album et `À suivre` restent à leur opacité normale, sans timer
   dépendant des mouvements de souris.
-- Visualisation desktop : spectre FFT réel 40 Hz–16 kHz sur axe logarithmique gauche→droite,
-  axe central fixe, rendu miroir amplifié et activation visible dès l’ouverture à froid, à
-  30 i/s maximum. Le champ contient 500 000 grains compacts répartis sur les deux faces :
-  250 000 sous gravité terrestre de 9,80665 m/s² et 250 000 sous gravité lunaire de 1,62 m/s².
-  Chaque face reçoit la moitié de chaque population. Les premiers retombent avec poids et impact ;
-  les seconds conservent une traîne flottante plus longue. Des tableaux typés, une tranche FFT
-  préassignée et un tampon de pixels avec accumulation alpha limitent le coût Canvas. Le contour
-  rouge représente le FFT immédiat ; le contour blanc contient le grain le plus éloigné de chaque
-  tranche sur les deux faces. Aucun grain n’est coupé ni autorisé à sortir de cette enveloppe.
-  Un groupe central de 60 000 grains forme deux flux hélicoïdaux en sens opposés. Leur rayon
-  augmente sur les attaques FFT, les grains lunaires prolongent la rotation et le champ revient
-  sur deux fines lignes au silence. Le lit immobile est réparti hors de l’axe et rendu plus léger.
-  Son rayon est réduit à environ 4–16 px et son drive reçoit une attaque/retombée dédiée. Un
-  filtre fréquentiel `[1,4,6,4,1]/16` diffuse les réactions entre bandes adjacentes ; le contour
-  quadratique et l’enveloppe de confinement relevée aux voisins produisent une ondulation
-  continue sans angles ni perte de confinement.
+- Visualisation desktop comparative FFT pure : spectre réel 40 Hz–16 kHz sur axe logarithmique,
+  contours rouge immédiat et blanc lissé, remplissage miroir et courbes quadratiques à 30 i/s
+  maximum. La ligne médiane et les particules sont absentes ; aucun tableau de grains, aucune
+  simulation physique et aucun tampon de poudre ne sont alloués.
 - Diagnostic visualiseur : une seule entrée compacte par session mesure build, activation,
   état du contexte, signal, progression audio, frames et canvas, sans audio brut ni requête
   Worker supplémentaire.
@@ -47,7 +35,7 @@ Service Worker : `infra-shell-20260724-audio373`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix368-20260722`, inchangé par audiofix373.
+- CSS `audiofix368-20260722`, inchangé par audiofix374.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

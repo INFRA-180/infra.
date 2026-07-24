@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix373-20260724";
-const shellRelease = "infra-shell-20260724-audio373";
+const release = "audiofix374-20260724";
+const shellRelease = "infra-shell-20260724-audio374";
 const cssRelease = "audiofix368-20260722";
 const frozenCssSha256 = "370e3cbd3302972d454b99751c20d78422c8f2971739e67f36c11387e22c562a";
 const scripts = read("public/assets/js/scripts.js");
@@ -46,9 +46,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix373");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix373");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio373");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix374");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix374");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio374");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -78,11 +78,15 @@ expect(visualizer.includes("const centerY = size.height * 0.5"), "desktop freque
 expect(visualizer.includes("size.height * 0.25"), "desktop frequency spectrum does not use the compact mirrored range");
 expect(visualizer.includes("dynamicHeight, -1, false"), "desktop frequency spectrum is not drawn above its axis");
 expect(visualizer.includes("dynamicHeight, 1, false"), "desktop frequency spectrum is not drawn below its axis");
+expect(visualizer.includes("const PURE_FFT_MODE = true"), "desktop visualizer is not in pure FFT comparison mode");
 expect(visualizer.includes("POWDER_EARTH_PARTICLE_COUNT = 250000"), "desktop powder field does not contain 250,000 Earth particles");
 expect(visualizer.includes("POWDER_MOON_PARTICLE_COUNT = 250000"), "desktop powder field does not contain 250,000 lunar particles");
 expect(visualizer.includes("POWDER_PARTICLE_COUNT = 500000"), "desktop powder field does not contain 500,000 particles");
 expect(visualizer.includes("POWDER_HELIX_PARTICLE_COUNT = 60000"), "desktop powder field does not contain its 60,000-grain helix");
-expect(visualizer.includes("createPowderParticles(POWDER_PARTICLE_COUNT)"), "desktop powder field is not created once per visualizer");
+expect(
+  visualizer.includes("createPowderParticles(PURE_FFT_MODE ? 0 : POWDER_PARTICLE_COUNT)"),
+  "pure FFT mode does not suppress particle allocation"
+);
 expect(visualizer.includes("height: new Float32Array(particleCount)"), "desktop powder does not use compact persistent heights");
 expect(visualizer.includes("side: new Uint8Array(particleCount)"), "desktop powder does not retain its upper/lower face");
 expect(visualizer.includes("gravityClass: new Uint8Array(particleCount)"), "desktop powder does not retain its gravity class");
@@ -105,8 +109,17 @@ expect(visualizer.includes("drawingContext.quadraticCurveTo("), "desktop frequen
 expect(visualizer.includes("powderContainmentRawEnvelope[index],"), "desktop powder containment is not smoothed without lowering its raw ceiling");
 expect(visualizer.includes("impactSpeed * restitutions[index]"), "desktop powder has no damped ground collision");
 expect(visualizer.includes("drawingContext.drawImage("), "desktop powder buffer is not composited efficiently");
+expect(
+  visualizer.includes("if (!PURE_FFT_MODE) {\n        updatePowderPhysics("),
+  "pure FFT mode does not suppress particle simulation"
+);
+expect(visualizer.includes("if (!PURE_FFT_MODE) drawPowder(size, centerY);"), "pure FFT mode does not suppress particle drawing");
 expect(!visualizer.includes("drawingContext.clip()"), "desktop ballistic powder is still clipped by the current FFT envelope");
 expect(!visualizer.includes("powderPulse"), "desktop powder still uses a global pulse instead of local FFT displacement");
+expect(
+  !visualizer.includes('drawingContext.strokeStyle = "rgba(255,255,255,0.13)"'),
+  "desktop pure FFT comparison still draws the median line"
+);
 const coldOpenBody = functionBody(nowPlaying, "openNowPlayingOverlay", "closeNowPlayingOverlay");
 expect(
   coldOpenBody.indexOf("syncTransportUi();") > coldOpenBody.indexOf("audioState.nowPlayingOpen = true"),
@@ -401,4 +414,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix373.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix374.");

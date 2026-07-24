@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix370-20260724",
-  shell: "infra-shell-20260724-audio370",
+  build: "audiofix371-20260724",
+  shell: "infra-shell-20260724-audio371",
   albums: 31,
   tracks: 283
 });
@@ -160,16 +160,22 @@ function verifyAudioVisuals() {
     !visualizerSource.includes("Math.pow(ratioRange") ||
     !visualizerSource.includes("const centerY = size.height * 0.5") ||
     !visualizerSource.includes("size.height * 0.25") ||
-    !visualizerSource.includes("POWDER_PARTICLE_COUNT = 100000") ||
+    !visualizerSource.includes("POWDER_EARTH_PARTICLE_COUNT = 250000") ||
+    !visualizerSource.includes("POWDER_MOON_PARTICLE_COUNT = 250000") ||
+    !visualizerSource.includes("POWDER_PARTICLE_COUNT = 500000") ||
     !visualizerSource.includes("createPowderParticles(POWDER_PARTICLE_COUNT)") ||
     !visualizerSource.includes("height: new Float32Array(particleCount)") ||
+    !visualizerSource.includes("side: new Uint8Array(particleCount)") ||
+    !visualizerSource.includes("gravityClass: new Uint8Array(particleCount)") ||
     !visualizerSource.includes("bandIndex: new Uint16Array(particleCount)") ||
     !visualizerSource.includes("powderContext.createImageData(width, height)") ||
     !visualizerSource.includes("EARTH_GRAVITY_METERS_PER_SECOND2 = 9.80665") ||
+    !visualizerSource.includes("MOON_GRAVITY_METERS_PER_SECOND2 = 1.62") ||
     !visualizerSource.includes("updatePowderBandMap(values.length)") ||
     !visualizerSource.includes("powderContainmentEnvelope[index] = Math.max(") ||
     !visualizerSource.includes("Math.sqrt(") ||
-    !visualizerSource.includes("velocity -= POWDER_GRAVITY_PX_PER_SECOND2 * step") ||
+    !visualizerSource.includes("velocity -= gravity * step") ||
+    !visualizerSource.includes("(sides[index] ? 1 : -1)") ||
     !visualizerSource.includes("drawingContext.drawImage(") ||
     visualizerSource.includes("drawingContext.clip()") ||
     !visualizerSource.includes("document.hidden")

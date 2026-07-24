@@ -1,5 +1,22 @@
 # Implementation Notes
 
+## 2026-07-24 — audiofix371 poudre terrestre et lunaire sur deux faces
+
+- Le visualiseur desktop contient désormais 500 000 grains persistants : 250 000 sous gravité
+  terrestre de 9,80665 m/s² et 250 000 sous gravité lunaire de 1,62 m/s². Chaque population est
+  divisée également entre la face supérieure et la face inférieure du spectre.
+- La gravité agit vers l’axe central sur les deux faces. Les grains terrestres produisent les
+  chutes courtes et lourdes ; les grains lunaires utilisent une impulsion plus haute dans la même
+  enveloppe FFT et forment une traîne naturellement plus lente avant leur retour au repos.
+- Les états restent dans des tableaux typés compacts. Les accès aux tableaux sont localisés dans
+  les boucles chaudes et l’écriture des pixels est intégrée au rasteriseur afin de limiter le coût
+  des 500 000 corps sans multiplier les appels Canvas.
+- Le confinement `audiofix370` est conservé : le contour rouge reste instantané et le contour
+  blanc contient le grain le plus éloigné de chaque bande, quelle que soit sa face ou sa gravité.
+  La télémétrie compacte distingue les deux populations et les deux faces sans nouvel envoi.
+- Identifiants : `audiofix371-20260724`, `infra-shell-20260724-audio371`. CSS, PWA mobile,
+  prefetch, navigation, Media Session et moteur audio restent inchangés.
+
 ## 2026-07-24 — audiofix370 100 000 grains contenus par l’enveloppe FFT
 
 - Le champ desktop passe de 10 000 à 100 000 grains d’un pixel physique. Leurs états persistants

@@ -13,11 +13,16 @@
   const ANALYSER_SMOOTHING = 0.42;
   const MIN_FREQUENCY_HZ = 40;
   const MAX_FREQUENCY_HZ = 16000;
-  const POWDER_PARTICLE_COUNT = 100000;
+  const POWDER_EARTH_PARTICLE_COUNT = 250000;
+  const POWDER_MOON_PARTICLE_COUNT = 250000;
+  const POWDER_PARTICLE_COUNT = 500000;
   const EARTH_GRAVITY_METERS_PER_SECOND2 = 9.80665;
+  const MOON_GRAVITY_METERS_PER_SECOND2 = 1.62;
   const POWDER_PIXELS_PER_METER = 100;
-  const POWDER_GRAVITY_PX_PER_SECOND2 =
+  const POWDER_EARTH_GRAVITY_PX_PER_SECOND2 =
     EARTH_GRAVITY_METERS_PER_SECOND2 * POWDER_PIXELS_PER_METER;
+  const POWDER_MOON_GRAVITY_PX_PER_SECOND2 =
+    MOON_GRAVITY_METERS_PER_SECOND2 * POWDER_PIXELS_PER_METER;
   const POWDER_AIR_DRAG_PER_SECOND = 0.18;
   const POWDER_MAX_PHYSICS_STEP_SECONDS = 1 / 60;
 
@@ -307,6 +312,8 @@
       restOffset: new Float32Array(particleCount),
       opacity: new Uint8Array(particleCount),
       accent: new Uint8Array(particleCount),
+      side: new Uint8Array(particleCount),
+      gravityClass: new Uint8Array(particleCount),
       response: new Float32Array(particleCount),
       launchThreshold: new Float32Array(particleCount),
       restitution: new Float32Array(particleCount),
@@ -323,9 +330,13 @@
     for (let index = 0; index < particleCount; index += 1) {
       particles.x[index] = random();
       particles.restOffset[index] = Math.pow(random(), 2.2) * 5;
-      particles.opacity[index] = 4 + Math.floor(random() * 17);
+      particles.opacity[index] = 2 + Math.floor(random() * 7);
       particles.accent[index] = random() < 0.045 ? 1 : 0;
-      particles.response[index] = 0.68 + (random() * 0.3);
+      particles.side[index] = index & 1;
+      particles.gravityClass[index] = (index >> 1) & 1;
+      particles.response[index] = particles.gravityClass[index]
+        ? 0.9 + (random() * 0.1)
+        : 0.68 + (random() * 0.3);
       particles.launchThreshold[index] = 0.08 + (random() * 0.84);
       particles.restitution[index] = 0.08 + (random() * 0.1);
     }
@@ -501,30 +512,6 @@
       return Boolean(powderImageData && powderPixels);
     }
 
-    function paintPowderPoint(x, y, accent, alphaByte) {
-      if (
-        alphaByte <= 0 ||
-        x < 0 ||
-        x >= powderSurfaceWidth ||
-        y < 0 ||
-        y >= powderSurfaceHeight
-      ) {
-        return;
-      }
-      const offset = ((y * powderSurfaceWidth) + x) * 4;
-      const currentAlpha = powderPixels[offset + 3];
-      const combinedAlpha = Math.min(
-        255,
-        currentAlpha + Math.round(((255 - currentAlpha) * alphaByte) / 255)
-      );
-      if (!currentAlpha || accent) {
-        powderPixels[offset] = accent ? 229 : 255;
-        powderPixels[offset + 1] = accent ? 44 : 255;
-        powderPixels[offset + 2] = accent ? 49 : 255;
-      }
-      powderPixels[offset + 3] = combinedAlpha;
-    }
-
     function updatePowderBandMap(pointCount) {
       const count = Math.max(2, Number(pointCount) || 2);
       if (powderParticles.bandPointCount === count) return;
@@ -583,46 +570,61 @@
       const drag = Math.exp(-POWDER_AIR_DRAG_PER_SECOND * step);
       let airborne = 0;
       const lastBand = Math.max(0, values.length - 1);
+      const bandIndices = powderParticles.bandIndex;
+      const bandBlends = powderParticles.bandBlend;
+      const heights = powderParticles.height;
+      const velocities = powderParticles.velocity;
+      const gravityClasses = powderParticles.gravityClass;
+      const nextLaunchTimes = powderParticles.nextLaunchAt;
+      const launchThresholds = powderParticles.launchThreshold;
+      const restOffsets = powderParticles.restOffset;
+      const responses = powderParticles.response;
+      const restitutions = powderParticles.restitution;
 
       for (let index = 0; index < powderParticles.count; index += 1) {
-        const first = powderParticles.bandIndex[index];
+        const first = bandIndices[index];
         const second = Math.min(lastBand, first + 1);
-        const blend = powderParticles.bandBlend[index];
+        const blend = bandBlends[index];
         const localLevel = (
-          ((Number(values[first]) || 0) * (1 - blend)) +
-          ((Number(values[second]) || 0) * blend)
+          (values[first] * (1 - blend)) +
+          (values[second] * blend)
         );
         const localFlux = (
-          ((Number(powderSpectrumFlux[first]) || 0) * (1 - blend)) +
-          ((Number(powderSpectrumFlux[second]) || 0) * blend)
+          (powderSpectrumFlux[first] * (1 - blend)) +
+          (powderSpectrumFlux[second] * blend)
         );
-        let height = powderParticles.height[index];
-        let velocity = powderParticles.velocity[index];
+        let height = heights[index];
+        let velocity = velocities[index];
+        const gravity = gravityClasses[index]
+          ? POWDER_MOON_GRAVITY_PX_PER_SECOND2
+          : POWDER_EARTH_GRAVITY_PX_PER_SECOND2;
         const grounded = height <= 0.01 && Math.abs(velocity) <= 0.01;
         if (
           !reduced &&
           grounded &&
           allowLaunch &&
-          physicsTimestamp >= powderParticles.nextLaunchAt[index]
+          physicsTimestamp >= nextLaunchTimes[index]
         ) {
           const drive = Math.min(1, (localFlux * 3.4) + (localLevel * 0.38));
-          if (drive >= powderParticles.launchThreshold[index]) {
+          if (drive >= launchThresholds[index]) {
             const localCeiling = Math.max(
               0,
-              (localLevel * frameHeight) - powderParticles.restOffset[index] - 1
+              (localLevel * frameHeight) - restOffsets[index] - 1
             );
-            const launchRatio = Math.min(1, 0.5 + (localLevel * 0.34) + (localFlux * 1.2));
+            const launchRatio = gravityClasses[index]
+              ? Math.min(1, 0.78 + (localLevel * 0.16) + (localFlux * 0.8))
+              : Math.min(1, 0.5 + (localLevel * 0.34) + (localFlux * 1.2));
             const targetHeight = Math.min(
               localCeiling,
-              localCeiling * launchRatio * powderParticles.response[index]
+              localCeiling * launchRatio * responses[index]
             );
             if (targetHeight >= 1) {
-              velocity = Math.sqrt(2 * POWDER_GRAVITY_PX_PER_SECOND2 * targetHeight);
+              velocity = Math.sqrt(2 * gravity * targetHeight);
               height = 0.02;
-              powderParticles.nextLaunchAt[index] =
-                physicsTimestamp + 120 + (powderParticles.launchThreshold[index] * 260);
-              powderParticles.launchThreshold[index] = 0.08 + (
-                ((powderParticles.launchThreshold[index] * 1.618) + 0.173) % 0.84
+              nextLaunchTimes[index] =
+                physicsTimestamp + 120 + (launchThresholds[index] * 260);
+              launchThresholds[index] = 0.08 + (
+                ((launchThresholds[index] * 1.618) + 0.173) % 0.84
               );
               powderKickCount += 1;
             }
@@ -634,14 +636,14 @@
           substep < stepCount && (height > 0 || velocity > 0);
           substep += 1
         ) {
-          velocity -= POWDER_GRAVITY_PX_PER_SECOND2 * step;
+          velocity -= gravity * step;
           velocity *= drag;
           height += velocity * step;
           if (height <= 0) {
             const impactSpeed = Math.max(0, -velocity);
             height = 0;
             if (impactSpeed >= 85) {
-              velocity = impactSpeed * powderParticles.restitution[index];
+              velocity = impactSpeed * restitutions[index];
               height = 0.02;
             } else {
               velocity = 0;
@@ -650,20 +652,20 @@
         }
         const maximumParticleHeight = Math.max(
           0,
-          frameHeight - powderParticles.restOffset[index] - 1
+          frameHeight - restOffsets[index] - 1
         );
         if (height > maximumParticleHeight) {
           height = maximumParticleHeight;
           if (velocity > 0) velocity = 0;
         }
-        powderParticles.height[index] = height;
-        powderParticles.velocity[index] = velocity;
+        heights[index] = height;
+        velocities[index] = velocity;
         if (height > 0 || Math.abs(velocity) > 0.01) airborne += 1;
         maximumPowderRisePx = Math.max(maximumPowderRisePx, height);
 
         const visibleHeight = Math.min(
           frameHeight,
-          height + powderParticles.restOffset[index] + 1
+          height + restOffsets[index] + 1
         );
         if (visibleHeight > powderBandMaxHeights[first]) powderBandMaxHeights[first] = visibleHeight;
         if (visibleHeight > powderBandMaxHeights[second]) powderBandMaxHeights[second] = visibleHeight;
@@ -689,21 +691,42 @@
       powderPixels.fill(0);
       const energy = Math.max(0, Math.min(1, reactiveEnergy));
       const brightness = 0.56 + (energy * 0.28);
+      const xs = powderParticles.x;
+      const opacities = powderParticles.opacity;
+      const accents = powderParticles.accent;
+      const sides = powderParticles.side;
+      const restOffsets = powderParticles.restOffset;
+      const heights = powderParticles.height;
+      const maximumPixelX = Math.max(0, powderSurfaceWidth - 1);
       for (let index = 0; index < powderParticles.count; index += 1) {
-        const x = powderParticles.x[index];
+        const x = xs[index];
         const edgeFade = Math.min(1, x / 0.035, (1 - x) / 0.035);
         const alphaByte = Math.max(
           0,
-          Math.min(255, Math.round(powderParticles.opacity[index] * brightness * edgeFade))
+          Math.min(255, Math.round(opacities[index] * brightness * edgeFade))
         );
         if (!alphaByte) continue;
-        paintPowderPoint(
-          Math.round(x * Math.max(0, powderSurfaceWidth - 1)),
-          Math.round(
-            (centerY - powderParticles.restOffset[index] - powderParticles.height[index]) * size.ratio
-          ),
-          Boolean(powderParticles.accent[index]),
-          powderParticles.accent[index] ? Math.round(alphaByte * 0.72) : alphaByte
+        const pixelX = Math.round(x * maximumPixelX);
+        const pixelY = Math.round(
+          (
+            centerY +
+            (sides[index] ? 1 : -1) *
+              (restOffsets[index] + heights[index])
+          ) * size.ratio
+        );
+        if (pixelY < 0 || pixelY >= powderSurfaceHeight) continue;
+        const offset = ((pixelY * powderSurfaceWidth) + pixelX) * 4;
+        const accent = accents[index];
+        const pointAlpha = accent ? Math.round(alphaByte * 0.72) : alphaByte;
+        const currentAlpha = powderPixels[offset + 3];
+        if (!currentAlpha || accent) {
+          powderPixels[offset] = accent ? 229 : 255;
+          powderPixels[offset + 1] = accent ? 44 : 255;
+          powderPixels[offset + 2] = accent ? 49 : 255;
+        }
+        powderPixels[offset + 3] = Math.min(
+          255,
+          currentAlpha + Math.round(((255 - currentAlpha) * pointAlpha) / 255)
         );
       }
       powderContext.putImageData(powderImageData, 0, 0);
@@ -788,7 +811,12 @@
         visualizer_powder_airborne_count: powderAirborneCount,
         visualizer_powder_max_airborne_count: maximumPowderAirborneCount,
         visualizer_powder_max_rise_px: Math.round(maximumPowderRisePx),
+        visualizer_powder_earth_particle_count: POWDER_EARTH_PARTICLE_COUNT,
+        visualizer_powder_moon_particle_count: POWDER_MOON_PARTICLE_COUNT,
+        visualizer_powder_upper_particle_count: POWDER_PARTICLE_COUNT / 2,
+        visualizer_powder_lower_particle_count: POWDER_PARTICLE_COUNT / 2,
         visualizer_powder_gravity_milli: Math.round(EARTH_GRAVITY_METERS_PER_SECOND2 * 1000),
+        visualizer_powder_moon_gravity_milli: Math.round(MOON_GRAVITY_METERS_PER_SECOND2 * 1000),
         visualizer_powder_max_update_ms: Math.round(maximumPowderUpdateMs),
         visualizer_canvas_width: Math.round(Math.max(0, Number(bounds.width) || 0)),
         visualizer_canvas_height: Math.round(Math.max(0, Number(bounds.height) || 0)),

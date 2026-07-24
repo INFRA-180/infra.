@@ -22,6 +22,10 @@ let powderNonzeroPixelCount = 0;
 let powderLeftSpread = 0;
 let powderRightSpread = 0;
 let powderTopSpread = 0;
+let powderUpperSpread = 0;
+let powderLowerSpread = 0;
+let powderUpperPixelCount = 0;
+let powderLowerPixelCount = 0;
 let drawImageCount = 0;
 let audioContextCount = 0;
 let sourceCount = 0;
@@ -188,6 +192,10 @@ const sandbox = {
               let nonzero = 0;
               let leftSpread = 0;
               let rightSpread = 0;
+              let upperSpread = 0;
+              let lowerSpread = 0;
+              let upperPixels = 0;
+              let lowerPixels = 0;
               for (let offset = 3; offset < imageData.data.length; offset += 4) {
                 if (!imageData.data[offset]) continue;
                 nonzero += 1;
@@ -197,11 +205,22 @@ const sandbox = {
                 const spread = Math.abs(y - centerY);
                 if (x < imageData.width / 2) leftSpread = Math.max(leftSpread, spread);
                 else rightSpread = Math.max(rightSpread, spread);
+                if (y < centerY) {
+                  upperPixels += 1;
+                  upperSpread = Math.max(upperSpread, spread);
+                } else if (y > centerY) {
+                  lowerPixels += 1;
+                  lowerSpread = Math.max(lowerSpread, spread);
+                }
               }
               powderNonzeroPixelCount = nonzero;
               powderLeftSpread = leftSpread;
               powderRightSpread = rightSpread;
               powderTopSpread = Math.max(leftSpread, rightSpread);
+              powderUpperSpread = upperSpread;
+              powderLowerSpread = lowerSpread;
+              powderUpperPixelCount = upperPixels;
+              powderLowerPixelCount = lowerPixels;
             }
           };
         }
@@ -262,7 +281,9 @@ async function main() {
   assert.equal(clipCount, 0, "ballistic particles are still clipped by the instantaneous spectrum");
   assert.equal(powderCanvasCount, 1, "the powder surface was not created exactly once");
   assert.ok(powderImageWriteCount >= 1, "the FFT-driven powder frame was not rasterized");
-  assert.ok(powderNonzeroPixelCount >= 5000, "the 100,000-particle powder field is unexpectedly sparse");
+  assert.ok(powderNonzeroPixelCount >= 8000, "the 500,000-particle powder field is unexpectedly sparse");
+  assert.ok(powderUpperPixelCount >= 3000, "the upper powder face is unexpectedly sparse");
+  assert.ok(powderLowerPixelCount >= 3000, "the lower powder face is unexpectedly sparse");
   assert.ok(drawImageCount >= 1, "the rasterized powder frame was not composited into the spectrum");
   assert.ok(analyserFrequencyReads > 0, "frequency data was not read");
   assert.ok(analyserTimeReads > 0, "time-domain data was not read");
@@ -287,6 +308,8 @@ async function main() {
     powderLeftSpread > powderRightSpread,
     `particle launch height does not follow local FFT bands (${powderLeftSpread}/${powderRightSpread})`
   );
+  assert.ok(powderUpperSpread > 8, "the upper FFT face contains no launched particles");
+  assert.ok(powderLowerSpread > 8, "the lower FFT face contains no launched particles");
   assert.equal(powderCanvasCount, powderCanvasCountBeforeFrame, "a new powder surface was created per frame");
 
   const launchedSpread = powderTopSpread;
@@ -296,10 +319,17 @@ async function main() {
   mediaListeners.get("pause")();
   assert.ok(cancelledFrames > 0, "pause did not cancel the animation frame");
   assert.ok(powderTopSpread > 8, "particles disappeared as soon as the FFT signal stopped");
-  for (let timestamp = 1080; timestamp <= 2600 && requestedAnimationFrame; timestamp += 40) {
+  for (let timestamp = 1080; timestamp <= 1960 && requestedAnimationFrame; timestamp += 80) {
     runAnimationFrame(timestamp);
   }
-  assert.ok(launchedSpread > powderTopSpread, "earth gravity did not bring the particles back to rest");
+  assert.ok(
+    powderTopSpread > 9,
+    "the lunar-gravity population did not preserve a floating tail after the Earth grains fell"
+  );
+  for (let timestamp = 2040; timestamp <= 3400 && requestedAnimationFrame; timestamp += 80) {
+    runAnimationFrame(timestamp);
+  }
+  assert.ok(launchedSpread > powderTopSpread, "hybrid gravity did not bring the particles back to rest");
   assert.ok(powderTopSpread <= 9, "particles did not settle on their static powder bed");
 
   controller.sync({ active: false });
@@ -316,13 +346,18 @@ async function main() {
   assert.ok(health.visualizer_nonzero_frame_count > 0, "health report did not detect live signal");
   assert.equal(health.visualizer_analyser_ready, 1, "health report does not see the analyser");
   assert.equal(health.visualizer_canvas_visible, 1, "health report does not see the canvas");
-  assert.equal(health.visualizer_powder_particle_count, 100000, "health report lost the powder density");
+  assert.equal(health.visualizer_powder_particle_count, 500000, "health report lost the powder density");
+  assert.equal(health.visualizer_powder_earth_particle_count, 250000, "health report lost the Earth population");
+  assert.equal(health.visualizer_powder_moon_particle_count, 250000, "health report lost the lunar population");
+  assert.equal(health.visualizer_powder_upper_particle_count, 250000, "health report lost the upper population");
+  assert.equal(health.visualizer_powder_lower_particle_count, 250000, "health report lost the lower population");
   assert.equal(health.visualizer_powder_surface_ready, 1, "health report does not see the powder surface");
   assert.ok(health.visualizer_powder_kick_count > 0, "health report contains no FFT particle kick");
   assert.ok(health.visualizer_powder_max_airborne_count > 0, "health report contains no airborne particle");
   assert.ok(health.visualizer_powder_max_rise_px > 8, "health report lost the ballistic rise height");
   assert.equal(health.visualizer_powder_airborne_count, 0, "health report sees particles still airborne after settling");
   assert.equal(health.visualizer_powder_gravity_milli, 9807, "particle gravity is not Earth gravity");
+  assert.equal(health.visualizer_powder_moon_gravity_milli, 1620, "particle gravity is not lunar gravity");
   assert.ok(Number.isFinite(health.visualizer_powder_max_update_ms), "health report lost powder update cost");
   console.log("Desktop live audio visualizer graph and lifecycle: ok");
 }

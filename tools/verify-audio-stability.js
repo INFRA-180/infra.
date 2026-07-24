@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix370-20260724";
-const shellRelease = "infra-shell-20260724-audio370";
+const release = "audiofix371-20260724";
+const shellRelease = "infra-shell-20260724-audio371";
 const cssRelease = "audiofix368-20260722";
 const frozenCssSha256 = "370e3cbd3302972d454b99751c20d78422c8f2971739e67f36c11387e22c562a";
 const scripts = read("public/assets/js/scripts.js");
@@ -46,9 +46,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix370");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix370");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio370");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix371");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix371");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio371");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -76,16 +76,22 @@ expect(visualizer.includes("const centerY = size.height * 0.5"), "desktop freque
 expect(visualizer.includes("size.height * 0.25"), "desktop frequency spectrum does not use the compact mirrored range");
 expect(visualizer.includes("dynamicHeight, -1, false"), "desktop frequency spectrum is not drawn above its axis");
 expect(visualizer.includes("dynamicHeight, 1, false"), "desktop frequency spectrum is not drawn below its axis");
-expect(visualizer.includes("POWDER_PARTICLE_COUNT = 100000"), "desktop powder field does not contain 100,000 particles");
+expect(visualizer.includes("POWDER_EARTH_PARTICLE_COUNT = 250000"), "desktop powder field does not contain 250,000 Earth particles");
+expect(visualizer.includes("POWDER_MOON_PARTICLE_COUNT = 250000"), "desktop powder field does not contain 250,000 lunar particles");
+expect(visualizer.includes("POWDER_PARTICLE_COUNT = 500000"), "desktop powder field does not contain 500,000 particles");
 expect(visualizer.includes("createPowderParticles(POWDER_PARTICLE_COUNT)"), "desktop powder field is not created once per visualizer");
 expect(visualizer.includes("height: new Float32Array(particleCount)"), "desktop powder does not use compact persistent heights");
+expect(visualizer.includes("side: new Uint8Array(particleCount)"), "desktop powder does not retain its upper/lower face");
+expect(visualizer.includes("gravityClass: new Uint8Array(particleCount)"), "desktop powder does not retain its gravity class");
 expect(visualizer.includes("bandIndex: new Uint16Array(particleCount)"), "desktop powder does not preassign FFT bands");
 expect(visualizer.includes("powderContext.createImageData(width, height)"), "desktop powder field has no reusable pixel buffer");
 expect(visualizer.includes("EARTH_GRAVITY_METERS_PER_SECOND2 = 9.80665"), "desktop powder does not use Earth gravity");
+expect(visualizer.includes("MOON_GRAVITY_METERS_PER_SECOND2 = 1.62"), "desktop powder does not use lunar gravity");
 expect(visualizer.includes("updatePowderBandMap(values.length)"), "desktop powder does not reuse preassigned local FFT bands");
 expect(visualizer.includes("powderContainmentEnvelope[index] = Math.max("), "desktop powder has no FFT containment envelope");
-expect(visualizer.includes("velocity -= POWDER_GRAVITY_PX_PER_SECOND2 * step"), "desktop powder has no persistent ballistic fall");
-expect(visualizer.includes("impactSpeed * powderParticles.restitution[index]"), "desktop powder has no damped ground collision");
+expect(visualizer.includes("velocity -= gravity * step"), "desktop powder has no persistent hybrid-gravity fall");
+expect(visualizer.includes("(sides[index] ? 1 : -1)"), "desktop powder is not rendered above and below the axis");
+expect(visualizer.includes("impactSpeed * restitutions[index]"), "desktop powder has no damped ground collision");
 expect(visualizer.includes("drawingContext.drawImage("), "desktop powder buffer is not composited efficiently");
 expect(!visualizer.includes("drawingContext.clip()"), "desktop ballistic powder is still clipped by the current FFT envelope");
 expect(!visualizer.includes("powderPulse"), "desktop powder still uses a global pulse instead of local FFT displacement");
@@ -383,4 +389,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix370.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix371.");

@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 24 juillet 2026
-Baseline : `audiofix370-20260724`
-Service Worker : `infra-shell-20260724-audio370`
+Baseline : `audiofix371-20260724`
+Service Worker : `infra-shell-20260724-audio371`
 
 ## État
 
@@ -21,13 +21,13 @@ Service Worker : `infra-shell-20260724-audio370`
   dépendant des mouvements de souris.
 - Visualisation desktop : spectre FFT réel 40 Hz–16 kHz sur axe logarithmique gauche→droite,
   axe central fixe, rendu miroir amplifié et activation visible dès l’ouverture à froid, à
-  30 i/s maximum. Un lit de 100 000 grains compacts reste immobile sur l’axe central ; chaque
-  bande FFT déclenche une quantité et une hauteur proportionnelles à son niveau et à son attaque.
-  Les grains conservent ensuite leur inertie, retombent sous une gravité terrestre de 9,80665 m/s²
-  et terminent par un rebond amorti. Des tableaux typés, une tranche FFT préassignée et un tampon
-  de pixels avec accumulation alpha limitent le coût Canvas. Le contour rouge représente le FFT
-  immédiat ; le contour blanc est l’enveloppe physique minimale qui contient aussi le grain le
-  plus haut de chaque tranche. Aucun grain n’est coupé ni autorisé à sortir de cette enveloppe.
+  30 i/s maximum. Le champ contient 500 000 grains compacts répartis sur les deux faces :
+  250 000 sous gravité terrestre de 9,80665 m/s² et 250 000 sous gravité lunaire de 1,62 m/s².
+  Chaque face reçoit la moitié de chaque population. Les premiers retombent avec poids et impact ;
+  les seconds conservent une traîne flottante plus longue. Des tableaux typés, une tranche FFT
+  préassignée et un tampon de pixels avec accumulation alpha limitent le coût Canvas. Le contour
+  rouge représente le FFT immédiat ; le contour blanc contient le grain le plus éloigné de chaque
+  tranche sur les deux faces. Aucun grain n’est coupé ni autorisé à sortir de cette enveloppe.
 - Diagnostic visualiseur : une seule entrée compacte par session mesure build, activation,
   état du contexte, signal, progression audio, frames et canvas, sans audio brut ni requête
   Worker supplémentaire.
@@ -40,7 +40,7 @@ Service Worker : `infra-shell-20260724-audio370`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix368-20260722`, inchangé par audiofix370.
+- CSS `audiofix368-20260722`, inchangé par audiofix371.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

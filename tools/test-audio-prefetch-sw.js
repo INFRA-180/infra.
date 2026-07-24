@@ -110,7 +110,9 @@ const sandbox = {
       "infra-shell-20260724-audio369-shell",
       "infra-shell-20260724-audio369-runtime",
       "infra-shell-20260724-audio370-shell",
-      "infra-shell-20260724-audio370-runtime"
+      "infra-shell-20260724-audio370-runtime",
+      "infra-shell-20260724-audio371-shell",
+      "infra-shell-20260724-audio371-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -215,7 +217,7 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(installedAlbumPages.length, 31, "all album documents must be installed with the PWA shell");
   assert(installedAlbumPages.includes("https://site.test/music/salam-infra.html"));
   assert(installedAlbumPages.includes("https://site.test/music/trou-noir-infra.html"));
-  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix370-20260724"));
+  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix371-20260724"));
   assert(
     installedOptionalShellAssets.includes("./assets/vendor/qr-creator.min.js?v=1.0.0"),
     "optional shell resources must still be attempted"
@@ -265,12 +267,14 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260722-audio368-runtime",
     "infra-shell-20260722-audio368-shell",
     "infra-shell-20260724-audio369-runtime",
-    "infra-shell-20260724-audio369-shell"
+    "infra-shell-20260724-audio369-shell",
+    "infra-shell-20260724-audio370-runtime",
+    "infra-shell-20260724-audio370-shell"
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v9"));
   assert(!deletedCaches.includes("infra-covers-v2"));
-  assert(!deletedCaches.includes("infra-shell-20260724-audio370-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260724-audio370-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260724-audio371-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260724-audio371-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;
@@ -400,7 +404,7 @@ async function dispatchSiteFetch(request) {
     mode: "navigate",
     destination: "document"
   });
-  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260724-audio370");
+  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260724-audio371");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Strategy"), "shell_cache");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Cache"), "hit");
   assert.strictEqual(

@@ -311,6 +311,10 @@ async function main() {
   assert.ok(powderUpperSpread > 8, "the upper FFT face contains no launched particles");
   assert.ok(powderLowerSpread > 8, "the lower FFT face contains no launched particles");
   assert.equal(powderCanvasCount, powderCanvasCountBeforeFrame, "a new powder surface was created per frame");
+  runAnimationFrame(1080);
+  runAnimationFrame(1120);
+  runAnimationFrame(1160);
+  runAnimationFrame(1200);
 
   const launchedSpread = powderTopSpread;
   assert.ok(launchedSpread <= 84, "particles exceeded the original local FFT frame");
@@ -319,18 +323,19 @@ async function main() {
   mediaListeners.get("pause")();
   assert.ok(cancelledFrames > 0, "pause did not cancel the animation frame");
   assert.ok(powderTopSpread > 8, "particles disappeared as soon as the FFT signal stopped");
-  for (let timestamp = 1080; timestamp <= 1960 && requestedAnimationFrame; timestamp += 80) {
+  for (let timestamp = 1280; timestamp <= 2200 && requestedAnimationFrame; timestamp += 80) {
+    runAnimationFrame(timestamp);
+  }
+  const floatingTailSpread = powderTopSpread;
+  for (let timestamp = 2280; timestamp <= 4400 && requestedAnimationFrame; timestamp += 80) {
     runAnimationFrame(timestamp);
   }
   assert.ok(
-    powderTopSpread > 9,
-    "the lunar-gravity population did not preserve a floating tail after the Earth grains fell"
+    floatingTailSpread > powderTopSpread + 5,
+    "the lunar helix did not preserve a floating centrifugal tail before settling"
   );
-  for (let timestamp = 2040; timestamp <= 3400 && requestedAnimationFrame; timestamp += 80) {
-    runAnimationFrame(timestamp);
-  }
   assert.ok(launchedSpread > powderTopSpread, "hybrid gravity did not bring the particles back to rest");
-  assert.ok(powderTopSpread <= 9, "particles did not settle on their static powder bed");
+  assert.ok(powderTopSpread <= 24, "particles did not settle on their distributed powder bed");
 
   controller.sync({ active: false });
   assert.ok(!classNames.has("is-active"), "closed fullscreen keeps the visual active");
@@ -351,6 +356,10 @@ async function main() {
   assert.equal(health.visualizer_powder_moon_particle_count, 250000, "health report lost the lunar population");
   assert.equal(health.visualizer_powder_upper_particle_count, 250000, "health report lost the upper population");
   assert.equal(health.visualizer_powder_lower_particle_count, 250000, "health report lost the lower population");
+  assert.equal(health.visualizer_powder_helix_particle_count, 60000, "health report lost the helix population");
+  assert.equal(health.visualizer_powder_helix_active_count, 0, "health report sees a helix still moving after settling");
+  assert.ok(health.visualizer_powder_helix_max_active_count > 0, "health report contains no rotating helix grain");
+  assert.ok(health.visualizer_powder_helix_max_offset_px > 15, "health report lost the centrifugal helix radius");
   assert.equal(health.visualizer_powder_surface_ready, 1, "health report does not see the powder surface");
   assert.ok(health.visualizer_powder_kick_count > 0, "health report contains no FFT particle kick");
   assert.ok(health.visualizer_powder_max_airborne_count > 0, "health report contains no airborne particle");

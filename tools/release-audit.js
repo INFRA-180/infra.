@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix371-20260724",
-  shell: "infra-shell-20260724-audio371",
+  build: "audiofix372-20260724",
+  shell: "infra-shell-20260724-audio372",
   albums: 31,
   tracks: 283
 });
@@ -163,10 +163,13 @@ function verifyAudioVisuals() {
     !visualizerSource.includes("POWDER_EARTH_PARTICLE_COUNT = 250000") ||
     !visualizerSource.includes("POWDER_MOON_PARTICLE_COUNT = 250000") ||
     !visualizerSource.includes("POWDER_PARTICLE_COUNT = 500000") ||
+    !visualizerSource.includes("POWDER_HELIX_PARTICLE_COUNT = 60000") ||
     !visualizerSource.includes("createPowderParticles(POWDER_PARTICLE_COUNT)") ||
     !visualizerSource.includes("height: new Float32Array(particleCount)") ||
     !visualizerSource.includes("side: new Uint8Array(particleCount)") ||
     !visualizerSource.includes("gravityClass: new Uint8Array(particleCount)") ||
+    !visualizerSource.includes("helixOffset: new Float32Array(particleCount)") ||
+    !visualizerSource.includes("helixBaseSin: new Float32Array(particleCount)") ||
     !visualizerSource.includes("bandIndex: new Uint16Array(particleCount)") ||
     !visualizerSource.includes("powderContext.createImageData(width, height)") ||
     !visualizerSource.includes("EARTH_GRAVITY_METERS_PER_SECOND2 = 9.80665") ||
@@ -176,6 +179,9 @@ function verifyAudioVisuals() {
     !visualizerSource.includes("Math.sqrt(") ||
     !visualizerSource.includes("velocity -= gravity * step") ||
     !visualizerSource.includes("(sides[index] ? 1 : -1)") ||
+    !visualizerSource.includes("powderHelixRotationPhase") ||
+    !visualizerSource.includes("targetOffset - helixOffset") ||
+    !visualizerSource.includes("const restingOpacity = moving ? 1 : 0.34") ||
     !visualizerSource.includes("drawingContext.drawImage(") ||
     visualizerSource.includes("drawingContext.clip()") ||
     !visualizerSource.includes("document.hidden")

@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 24 juillet 2026
-Baseline : `audiofix371-20260724`
-Service Worker : `infra-shell-20260724-audio371`
+Baseline : `audiofix372-20260724`
+Service Worker : `infra-shell-20260724-audio372`
 
 ## État
 
@@ -28,6 +28,9 @@ Service Worker : `infra-shell-20260724-audio371`
   préassignée et un tampon de pixels avec accumulation alpha limitent le coût Canvas. Le contour
   rouge représente le FFT immédiat ; le contour blanc contient le grain le plus éloigné de chaque
   tranche sur les deux faces. Aucun grain n’est coupé ni autorisé à sortir de cette enveloppe.
+  Un groupe central de 60 000 grains forme deux flux hélicoïdaux en sens opposés. Leur rayon
+  augmente sur les attaques FFT, les grains lunaires prolongent la rotation et le champ revient
+  sur deux fines lignes au silence. Le lit immobile est réparti hors de l’axe et rendu plus léger.
 - Diagnostic visualiseur : une seule entrée compacte par session mesure build, activation,
   état du contexte, signal, progression audio, frames et canvas, sans audio brut ni requête
   Worker supplémentaire.
@@ -40,7 +43,7 @@ Service Worker : `infra-shell-20260724-audio371`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix368-20260722`, inchangé par audiofix371.
+- CSS `audiofix368-20260722`, inchangé par audiofix372.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

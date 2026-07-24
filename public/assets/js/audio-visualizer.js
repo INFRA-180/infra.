@@ -16,6 +16,9 @@
   const POWDER_EARTH_PARTICLE_COUNT = 250000;
   const POWDER_MOON_PARTICLE_COUNT = 250000;
   const POWDER_PARTICLE_COUNT = 500000;
+  const POWDER_HELIX_PARTICLE_COUNT = 60000;
+  const POWDER_HELIX_TURNS = 3.25;
+  const POWDER_HELIX_IDLE_RADIUS_PX = 2.4;
   const EARTH_GRAVITY_METERS_PER_SECOND2 = 9.80665;
   const MOON_GRAVITY_METERS_PER_SECOND2 = 1.62;
   const POWDER_PIXELS_PER_METER = 100;
@@ -314,6 +317,12 @@
       accent: new Uint8Array(particleCount),
       side: new Uint8Array(particleCount),
       gravityClass: new Uint8Array(particleCount),
+      helixClass: new Uint8Array(particleCount),
+      helixStrand: new Uint8Array(particleCount),
+      helixOffset: new Float32Array(particleCount),
+      helixVelocity: new Float32Array(particleCount),
+      helixBaseSin: new Float32Array(particleCount),
+      helixBaseCos: new Float32Array(particleCount),
       response: new Float32Array(particleCount),
       launchThreshold: new Float32Array(particleCount),
       restitution: new Float32Array(particleCount),
@@ -329,11 +338,25 @@
     }
     for (let index = 0; index < particleCount; index += 1) {
       particles.x[index] = random();
-      particles.restOffset[index] = Math.pow(random(), 2.2) * 5;
-      particles.opacity[index] = 2 + Math.floor(random() * 7);
-      particles.accent[index] = random() < 0.045 ? 1 : 0;
       particles.side[index] = index & 1;
       particles.gravityClass[index] = (index >> 1) & 1;
+      particles.helixClass[index] = index % 25 < 3 ? 1 : 0;
+      particles.helixStrand[index] = (Math.floor(index / 25) + index) & 1;
+      if (particles.helixClass[index]) {
+        const basePhase = (
+          particles.x[index] * POWDER_HELIX_TURNS * Math.PI * 2
+        ) + (particles.helixStrand[index] ? Math.PI : 0);
+        particles.helixBaseSin[index] = Math.sin(basePhase);
+        particles.helixBaseCos[index] = Math.cos(basePhase);
+        particles.helixOffset[index] = (
+          particles.side[index] ? 1 : -1
+        ) * POWDER_HELIX_IDLE_RADIUS_PX;
+      }
+      particles.restOffset[index] = particles.gravityClass[index]
+        ? 3.5 + (Math.pow(random(), 0.7) * 11)
+        : 2.2 + (Math.pow(random(), 0.8) * 8);
+      particles.opacity[index] = 2 + Math.floor(random() * 7);
+      particles.accent[index] = random() < 0.045 ? 1 : 0;
       particles.response[index] = particles.gravityClass[index]
         ? 0.9 + (random() * 0.1)
         : 0.68 + (random() * 0.3);
@@ -374,6 +397,10 @@
     let powderKickCount = 0;
     let maximumPowderAirborneCount = 0;
     let maximumPowderRisePx = 0;
+    let powderHelixActiveCount = 0;
+    let maximumPowderHelixActiveCount = 0;
+    let maximumPowderHelixOffsetPx = 0;
+    let powderHelixRotationPhase = 0;
     let maximumPowderUpdateMs = 0;
     let powderSurface = null;
     let powderContext = null;
@@ -529,7 +556,16 @@
       powderParticles.height.fill(0);
       powderParticles.velocity.fill(0);
       powderParticles.nextLaunchAt.fill(0);
+      powderParticles.helixVelocity.fill(0);
+      for (let index = 0; index < powderParticles.count; index += 1) {
+        if (!powderParticles.helixClass[index]) continue;
+        powderParticles.helixOffset[index] = (
+          powderParticles.side[index] ? 1 : -1
+        ) * POWDER_HELIX_IDLE_RADIUS_PX;
+      }
       powderAirborneCount = 0;
+      powderHelixActiveCount = 0;
+      powderHelixRotationPhase = 0;
       lastPowderPhysicsAt = 0;
       previousPowderSpectrum.fill(0);
       powderSpectrumFlux.fill(0);
@@ -545,10 +581,13 @@
         });
         powderSpectrumFlux = new Array(values.length).fill(0);
       }
+      let averageFlux = 0;
       for (let index = 0; index < values.length; index += 1) {
         const current = Math.max(0, Math.min(1, Number(values[index]) || 0));
         powderSpectrumFlux[index] = Math.max(0, current - previousPowderSpectrum[index]);
+        averageFlux += powderSpectrumFlux[index];
       }
+      averageFlux /= Math.max(1, values.length);
 
       if (reduced) {
         settlePowderParticles();
@@ -568,7 +607,17 @@
       const stepCount = Math.max(1, Math.ceil(elapsed / POWDER_MAX_PHYSICS_STEP_SECONDS));
       const step = elapsed / stepCount;
       const drag = Math.exp(-POWDER_AIR_DRAG_PER_SECOND * step);
+      const helixDrive = allowLaunch && !reduced
+        ? Math.max(0, Math.min(1, (reactiveEnergy * 0.65) + (averageFlux * 4)))
+        : 0;
+      const helixRotationSpeed = allowLaunch ? 0.55 + (helixDrive * 4.2) : 0;
+      powderHelixRotationPhase = (
+        powderHelixRotationPhase + (helixRotationSpeed * elapsed)
+      ) % (Math.PI * 2);
+      const helixRotationSin = Math.sin(powderHelixRotationPhase);
+      const helixRotationCos = Math.cos(powderHelixRotationPhase);
       let airborne = 0;
+      let helixActive = 0;
       const lastBand = Math.max(0, values.length - 1);
       const bandIndices = powderParticles.bandIndex;
       const bandBlends = powderParticles.bandBlend;
@@ -580,6 +629,13 @@
       const restOffsets = powderParticles.restOffset;
       const responses = powderParticles.response;
       const restitutions = powderParticles.restitution;
+      const sides = powderParticles.side;
+      const helixClasses = powderParticles.helixClass;
+      const helixStrands = powderParticles.helixStrand;
+      const helixOffsets = powderParticles.helixOffset;
+      const helixVelocities = powderParticles.helixVelocity;
+      const helixBaseSines = powderParticles.helixBaseSin;
+      const helixBaseCosines = powderParticles.helixBaseCos;
 
       for (let index = 0; index < powderParticles.count; index += 1) {
         const first = bandIndices[index];
@@ -598,6 +654,78 @@
         const gravity = gravityClasses[index]
           ? POWDER_MOON_GRAVITY_PX_PER_SECOND2
           : POWDER_EARTH_GRAVITY_PX_PER_SECOND2;
+        if (helixClasses[index]) {
+          const direction = helixStrands[index] ? -1 : 1;
+          const wave = (
+            (helixBaseSines[index] * helixRotationCos) +
+            (direction * helixBaseCosines[index] * helixRotationSin)
+          );
+          const signal = Math.max(
+            0,
+            Math.min(1, (localLevel * 0.78) + (localFlux * 2.2) + (helixDrive * 0.18))
+          );
+          const idleOffset = (sides[index] ? 1 : -1) * POWDER_HELIX_IDLE_RADIUS_PX;
+          const radius = allowLaunch && signal > 0.008
+            ? Math.min(
+              frameHeight - 1,
+              POWDER_HELIX_IDLE_RADIUS_PX +
+                (frameHeight * (0.12 + (signal * 0.52)) * responses[index])
+            )
+            : POWDER_HELIX_IDLE_RADIUS_PX;
+          const targetOffset = allowLaunch && signal > 0.008
+            ? wave * radius
+            : idleOffset;
+          let helixOffset = helixOffsets[index];
+          let helixVelocity = helixVelocities[index];
+          const helixSpring = allowLaunch
+            ? (gravityClasses[index] ? 15 : 32)
+            : (gravityClasses[index] ? 24 : 36);
+          const helixDampingRate = allowLaunch
+            ? (gravityClasses[index] ? 2.4 : 5.8)
+            : (gravityClasses[index] ? 4.8 : 7);
+          const helixDamping = Math.exp(-helixDampingRate * step);
+          for (let substep = 0; substep < stepCount; substep += 1) {
+            helixVelocity += (targetOffset - helixOffset) * helixSpring * step;
+            helixVelocity *= helixDamping;
+            helixOffset += helixVelocity * step;
+          }
+          const helixLimit = Math.max(POWDER_HELIX_IDLE_RADIUS_PX, frameHeight - 1);
+          helixOffset = Math.max(-helixLimit, Math.min(helixLimit, helixOffset));
+          if (
+            !allowLaunch &&
+            Math.abs(targetOffset - helixOffset) < 0.4 &&
+            Math.abs(helixVelocity) < 1
+          ) {
+            helixOffset = idleOffset;
+            helixVelocity = 0;
+          }
+          helixOffsets[index] = helixOffset;
+          helixVelocities[index] = helixVelocity;
+          const helixMoving = allowLaunch
+            ? signal > 0.008 || Math.abs(helixVelocity) > 0.04
+            : (
+              Math.abs(targetOffset - helixOffset) > 0.4 ||
+              Math.abs(helixVelocity) > 1
+            );
+          if (helixMoving) {
+            helixActive += 1;
+            airborne += 1;
+          }
+          const absoluteHelixOffset = Math.abs(helixOffset);
+          maximumPowderRisePx = Math.max(maximumPowderRisePx, absoluteHelixOffset);
+          maximumPowderHelixOffsetPx = Math.max(
+            maximumPowderHelixOffsetPx,
+            absoluteHelixOffset
+          );
+          const visibleHelixHeight = Math.min(frameHeight, absoluteHelixOffset + 1);
+          if (visibleHelixHeight > powderBandMaxHeights[first]) {
+            powderBandMaxHeights[first] = visibleHelixHeight;
+          }
+          if (visibleHelixHeight > powderBandMaxHeights[second]) {
+            powderBandMaxHeights[second] = visibleHelixHeight;
+          }
+          continue;
+        }
         const grounded = height <= 0.01 && Math.abs(velocity) <= 0.01;
         if (
           !reduced &&
@@ -672,7 +800,9 @@
       }
 
       powderAirborneCount = airborne;
+      powderHelixActiveCount = helixActive;
       maximumPowderAirborneCount = Math.max(maximumPowderAirborneCount, airborne);
+      maximumPowderHelixActiveCount = Math.max(maximumPowderHelixActiveCount, helixActive);
       for (let index = 0; index < values.length; index += 1) {
         previousPowderSpectrum[index] = Math.max(0, Math.min(1, Number(values[index]) || 0));
         powderContainmentEnvelope[index] = Math.max(
@@ -697,22 +827,35 @@
       const sides = powderParticles.side;
       const restOffsets = powderParticles.restOffset;
       const heights = powderParticles.height;
+      const helixClasses = powderParticles.helixClass;
+      const helixOffsets = powderParticles.helixOffset;
+      const helixVelocities = powderParticles.helixVelocity;
       const maximumPixelX = Math.max(0, powderSurfaceWidth - 1);
       for (let index = 0; index < powderParticles.count; index += 1) {
         const x = xs[index];
         const edgeFade = Math.min(1, x / 0.035, (1 - x) / 0.035);
+        const helix = helixClasses[index];
+        const moving = helix
+          ? (
+            Math.abs(helixVelocities[index]) > 0.04 ||
+            Math.abs(helixOffsets[index]) > POWDER_HELIX_IDLE_RADIUS_PX + 0.4
+          )
+          : heights[index] > 0.05;
+        const restingOpacity = moving ? 1 : 0.34;
         const alphaByte = Math.max(
           0,
-          Math.min(255, Math.round(opacities[index] * brightness * edgeFade))
+          Math.min(
+            255,
+            Math.round(opacities[index] * brightness * edgeFade * restingOpacity)
+          )
         );
         if (!alphaByte) continue;
         const pixelX = Math.round(x * maximumPixelX);
+        const verticalOffset = helix
+          ? helixOffsets[index]
+          : (sides[index] ? 1 : -1) * (restOffsets[index] + heights[index]);
         const pixelY = Math.round(
-          (
-            centerY +
-            (sides[index] ? 1 : -1) *
-              (restOffsets[index] + heights[index])
-          ) * size.ratio
+          (centerY + verticalOffset) * size.ratio
         );
         if (pixelY < 0 || pixelY >= powderSurfaceHeight) continue;
         const offset = ((pixelY * powderSurfaceWidth) + pixelX) * 4;
@@ -815,6 +958,10 @@
         visualizer_powder_moon_particle_count: POWDER_MOON_PARTICLE_COUNT,
         visualizer_powder_upper_particle_count: POWDER_PARTICLE_COUNT / 2,
         visualizer_powder_lower_particle_count: POWDER_PARTICLE_COUNT / 2,
+        visualizer_powder_helix_particle_count: POWDER_HELIX_PARTICLE_COUNT,
+        visualizer_powder_helix_active_count: powderHelixActiveCount,
+        visualizer_powder_helix_max_active_count: maximumPowderHelixActiveCount,
+        visualizer_powder_helix_max_offset_px: Math.round(maximumPowderHelixOffsetPx),
         visualizer_powder_gravity_milli: Math.round(EARTH_GRAVITY_METERS_PER_SECOND2 * 1000),
         visualizer_powder_moon_gravity_milli: Math.round(MOON_GRAVITY_METERS_PER_SECOND2 * 1000),
         visualizer_powder_max_update_ms: Math.round(maximumPowderUpdateMs),

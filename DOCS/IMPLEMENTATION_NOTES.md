@@ -1,5 +1,23 @@
 # Implementation Notes
 
+## 2026-07-24 — audiofix372 double hélice centrifuge au centre du FFT
+
+- Parmi les 500 000 grains de `audiofix371`, 60 000 forment désormais deux flux hélicoïdaux
+  opposés autour de l’axe central fixe. Les phases spatiales sinus/cosinus sont pré-calculées ;
+  chaque frame ne calcule que la rotation globale des deux sens.
+- Le niveau, le flux positif et l’énergie FFT locale déterminent le rayon. Les attaques écartent
+  les grains du centre comme une impulsion centrifuge, sans dépasser l’enveloppe blanche. La
+  population terrestre suit rapidement la cible ; la population lunaire conserve une traîne
+  plus lente avant de revenir vers son fin rayon de repos.
+- Les 440 000 autres grains ne sont plus concentrés dans 5 px : leur lit est distribué à partir
+  d’un corridor central libre, et son opacité tombe à 34 % lorsqu’ils sont immobiles. Les grains
+  en mouvement récupèrent leur opacité complète.
+- La télémétrie compacte ajoute le nombre de grains hélicoïdaux, leur activité maximale et leur
+  rayon maximal. Le test vérifie les deux faces, la traîne centrifuge, le retour au repos, le
+  confinement FFT et l’unicité du graphe Web Audio.
+- Identifiants : `audiofix372-20260724`, `infra-shell-20260724-audio372`. CSS, PWA mobile,
+  prefetch, navigation, Media Session et moteur audio restent inchangés.
+
 ## 2026-07-24 — audiofix371 poudre terrestre et lunaire sur deux faces
 
 - Le visualiseur desktop contient désormais 500 000 grains persistants : 250 000 sous gravité

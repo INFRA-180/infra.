@@ -1,5 +1,22 @@
 # Implementation Notes
 
+## 2026-07-24 — audiofix370 100 000 grains contenus par l’enveloppe FFT
+
+- Le champ desktop passe de 10 000 à 100 000 grains d’un pixel physique. Leurs états persistants
+  sont stockés dans des tableaux typés compacts ; la tranche FFT et son interpolation sont
+  préassignées à l’initialisation pour éviter 100 000 recherches de fréquence à chaque frame.
+- Chaque grain est lancé par le niveau et l’attaque de sa propre tranche. Sa hauteur cible reste
+  bornée par l’amplitude FFT locale, puis la gravité terrestre, la traînée et le rebond amorti de
+  `audiofix369` gouvernent sa chute.
+- Le contour rouge reste le spectre instantané. Le contour blanc devient l’enveloppe physique
+  minimale entre le spectre lissé et le grain le plus haut de chaque tranche. Les grains restent
+  donc cohérents avec le FFT sans dépasser le contour ni disparaître brutalement pendant la chute.
+- Le tampon `ImageData` additionne l’alpha des grains qui occupent le même pixel au lieu de les
+  écraser. La télémétrie compacte existante ajoute seulement le temps maximal de mise à jour de
+  la poudre, toujours dans l’unique lot différé de session.
+- Identifiants : `audiofix370-20260724`, `infra-shell-20260724-audio370`. CSS, PWA mobile,
+  prefetch, navigation, Media Session et moteur audio restent inchangés.
+
 ## 2026-07-24 — audiofix369 poudre balistique pilotée par FFT
 
 - La poudre desktop n’est plus géométriquement redimensionnée par le contour. Les 10 000 grains

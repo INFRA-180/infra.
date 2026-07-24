@@ -262,7 +262,7 @@ async function main() {
   assert.equal(clipCount, 0, "ballistic particles are still clipped by the instantaneous spectrum");
   assert.equal(powderCanvasCount, 1, "the powder surface was not created exactly once");
   assert.ok(powderImageWriteCount >= 1, "the FFT-driven powder frame was not rasterized");
-  assert.ok(powderNonzeroPixelCount >= 5000, "the 10,000-particle powder field is unexpectedly sparse");
+  assert.ok(powderNonzeroPixelCount >= 5000, "the 100,000-particle powder field is unexpectedly sparse");
   assert.ok(drawImageCount >= 1, "the rasterized powder frame was not composited into the spectrum");
   assert.ok(analyserFrequencyReads > 0, "frequency data was not read");
   assert.ok(analyserTimeReads > 0, "time-domain data was not read");
@@ -290,6 +290,7 @@ async function main() {
   assert.equal(powderCanvasCount, powderCanvasCountBeforeFrame, "a new powder surface was created per frame");
 
   const launchedSpread = powderTopSpread;
+  assert.ok(launchedSpread <= 84, "particles exceeded the original local FFT frame");
   analyserMode = "silence";
   audio.paused = true;
   mediaListeners.get("pause")();
@@ -315,13 +316,14 @@ async function main() {
   assert.ok(health.visualizer_nonzero_frame_count > 0, "health report did not detect live signal");
   assert.equal(health.visualizer_analyser_ready, 1, "health report does not see the analyser");
   assert.equal(health.visualizer_canvas_visible, 1, "health report does not see the canvas");
-  assert.equal(health.visualizer_powder_particle_count, 10000, "health report lost the powder density");
+  assert.equal(health.visualizer_powder_particle_count, 100000, "health report lost the powder density");
   assert.equal(health.visualizer_powder_surface_ready, 1, "health report does not see the powder surface");
   assert.ok(health.visualizer_powder_kick_count > 0, "health report contains no FFT particle kick");
   assert.ok(health.visualizer_powder_max_airborne_count > 0, "health report contains no airborne particle");
   assert.ok(health.visualizer_powder_max_rise_px > 8, "health report lost the ballistic rise height");
   assert.equal(health.visualizer_powder_airborne_count, 0, "health report sees particles still airborne after settling");
   assert.equal(health.visualizer_powder_gravity_milli, 9807, "particle gravity is not Earth gravity");
+  assert.ok(Number.isFinite(health.visualizer_powder_max_update_ms), "health report lost powder update cost");
   console.log("Desktop live audio visualizer graph and lifecycle: ok");
 }
 

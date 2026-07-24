@@ -7,8 +7,8 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix369-20260724`
-- Service Worker : `infra-shell-20260724-audio369`
+- Runtime : `audiofix370-20260724`
+- Service Worker : `infra-shell-20260724-audio370`
 - CSS : `audiofix368-20260722`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
@@ -112,9 +112,10 @@ repli. Le fallback Git est actuellement aligné sur le live à 283 pistes.
 
 La visualisation desktop n’a plus de fichier de données par piste. Elle lit uniquement le
 signal instantané de l’élément audio global lorsqu’un utilisateur ouvre le fullscreen. Son
-champ de 10 000 particules est projeté à chaque image depuis les mêmes bandes FFT locales que
-le contour : chaque point se rapproche ou s’éloigne de l’axe fixe selon sa fréquence, sans
-pulsation géométrique globale.
+champ de 100 000 grains physiques utilise des tableaux typés compacts et une tranche FFT
+préassignée par grain. Le contour rouge montre le signal immédiat ; le contour blanc suit
+l’enveloppe physique minimale qui contient le spectre lissé et le grain le plus haut de chaque
+tranche, sans coupure brutale ni dépassement incohérent.
 
 ## Pochettes
 
@@ -142,12 +143,15 @@ Le lecteur et `#infraSpaPersist` survivent aux changements de page.
 À partir de 981 px, le fullscreen desktop affiche le spectre fréquentiel réel d’un
 `AnalyserNode` : FFT 2 048 points, 40 Hz à 16 kHz sur un axe logarithmique gauche→droite.
 Une ligne centrale reste fixe pendant que le spectre se déploie symétriquement sur 25 % de la
-hauteur de chaque côté. Cette ligne sert aussi de sol à 10 000 grains déterministes. Chaque
+hauteur de chaque côté. Cette ligne sert aussi de sol à 100 000 grains déterministes. Chaque
 grain garde sa fréquence horizontale et possède une hauteur, une vitesse, un seuil de départ
 et une restitution propres. La variation positive et le niveau de sa bande FFT déterminent
 le nombre de départs et une hauteur cible ; la vitesse initiale est calculée pour cette hauteur,
 puis une gravité de 9,80665 m/s², une faible traînée et un rebond amorti gouvernent seuls la
 trajectoire. Le grain demeure visible après la baisse du signal jusqu’à son retour au repos.
+À chaque frame, le point le plus haut de chaque tranche complète l’enveloppe FFT lissée : le
+contour blanc contient ainsi tous les grains pendant leur chute, tandis que le contour rouge
+reste la lecture instantanée du signal.
 L’enveloppe des contours attaque en 35 ms et retombe en 180 ms. Le graphe Web Audio est créé
 une seule fois depuis le clic d’ouverture : la source reste connectée directement à la sortie
 et l’analyseur est une branche séparée. Le rendu est limité à 30 i/s, s’arrête en

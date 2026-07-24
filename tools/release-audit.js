@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix372-20260724",
-  shell: "infra-shell-20260724-audio372",
+  build: "audiofix373-20260724",
+  shell: "infra-shell-20260724-audio373",
   albums: 31,
   tracks: 283
 });
@@ -154,6 +154,8 @@ function verifyAudioVisuals() {
     !visualizerSource.includes("FRAME_INTERVAL_MS = 1000 / 30") ||
     !visualizerSource.includes("ENERGY_ATTACK_SECONDS = 0.045") ||
     !visualizerSource.includes("ENERGY_RELEASE_SECONDS = 0.26") ||
+    !visualizerSource.includes("SPECTRUM_SPATIAL_KERNEL = Object.freeze([1, 4, 6, 4, 1])") ||
+    !visualizerSource.includes("smoothSpectrumSpatially(points)") ||
     !visualizerSource.includes("FFT_SIZE = 2048") ||
     !visualizerSource.includes("MIN_FREQUENCY_HZ = 40") ||
     !visualizerSource.includes("MAX_FREQUENCY_HZ = 16000") ||
@@ -180,8 +182,12 @@ function verifyAudioVisuals() {
     !visualizerSource.includes("velocity -= gravity * step") ||
     !visualizerSource.includes("(sides[index] ? 1 : -1)") ||
     !visualizerSource.includes("powderHelixRotationPhase") ||
+    !visualizerSource.includes("HELIX_DRIVE_ATTACK_SECONDS = 0.09") ||
+    !visualizerSource.includes("frameHeight * (0.035 + (signal * 0.18))") ||
     !visualizerSource.includes("targetOffset - helixOffset") ||
     !visualizerSource.includes("const restingOpacity = moving ? 1 : 0.34") ||
+    !visualizerSource.includes("drawingContext.quadraticCurveTo(") ||
+    !visualizerSource.includes("powderContainmentRawEnvelope[index],") ||
     !visualizerSource.includes("drawingContext.drawImage(") ||
     visualizerSource.includes("drawingContext.clip()") ||
     !visualizerSource.includes("document.hidden")

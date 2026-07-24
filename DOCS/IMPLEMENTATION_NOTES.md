@@ -1,5 +1,23 @@
 # Implementation Notes
 
+## 2026-07-24 — audiofix373 spectre ondulant et hélice compacte
+
+- Le rayon de la double hélice centrale passe de `0.12 + signal × 0.52` à
+  `0.035 + signal × 0.18`, soit environ 4–16 px dans le cadre courant au lieu de 10–43 px.
+  L’influence du flux est réduite et son drive reçoit une attaque de 90 ms et une retombée de
+  240 ms, ce qui conserve la rotation tout en supprimant les ouvertures brutales.
+- Le spectre logarithmique est filtré sur cinq points avec le noyau binomial
+  `[1,4,6,4,1]/16`. Les grains utilisent directement ces niveaux lissés : une attaque se diffuse
+  progressivement aux fréquences voisines au lieu de former une colonne verticale isolée.
+- Les contours rouge et blanc utilisent des courbes quadratiques par points médians. Cette
+  interpolation reste dans l’enveloppe convexe des valeurs et n’ajoute donc pas de dépassement.
+  L’enveloppe blanche garde chaque maximum physique brut puis relève seulement ses voisins avec
+  le même filtre, afin de lisser les pentes sans couper un grain.
+- Le test mesure le rendu courbe, borne le rayon centrifuge sous 20 px, vérifie la traîne, le
+  retour au repos, les deux faces et le confinement FFT. Aucun changement audio, CSS, PWA,
+  navigation, prefetch ou Media Session.
+- Identifiants : `audiofix373-20260724`, `infra-shell-20260724-audio373`.
+
 ## 2026-07-24 — audiofix372 double hélice centrifuge au centre du FFT
 
 - Parmi les 500 000 grains de `audiofix371`, 60 000 forment désormais deux flux hélicoïdaux

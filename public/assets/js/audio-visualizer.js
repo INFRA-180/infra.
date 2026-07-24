@@ -8,6 +8,10 @@
   const ENERGY_RELEASE_SECONDS = 0.26;
   const SPECTRUM_ATTACK_SECONDS = 0.035;
   const SPECTRUM_RELEASE_SECONDS = 0.18;
+  const SPECTRUM_SPATIAL_KERNEL = Object.freeze([1, 4, 6, 4, 1]);
+  const SPECTRUM_SPATIAL_KERNEL_WEIGHT = 16;
+  const HELIX_DRIVE_ATTACK_SECONDS = 0.09;
+  const HELIX_DRIVE_RELEASE_SECONDS = 0.24;
   const MAX_DEVICE_PIXEL_RATIO = 1.5;
   const FFT_SIZE = 2048;
   const ANALYSER_SMOOTHING = 0.42;
@@ -302,7 +306,30 @@
         0.72
       );
     }
-    return points;
+    return smoothSpectrumSpatially(points);
+  }
+
+  function smoothSpectrumSpatially(values) {
+    const count = values && values.length ? values.length : 0;
+    if (!count) return [];
+    if (count < 3) return Array.from(values);
+    const smoothed = new Array(count);
+    const last = count - 1;
+    for (let index = 0; index < count; index += 1) {
+      let total = 0;
+      for (let kernelIndex = 0; kernelIndex < SPECTRUM_SPATIAL_KERNEL.length; kernelIndex += 1) {
+        const sourceIndex = Math.max(
+          0,
+          Math.min(last, index + kernelIndex - 2)
+        );
+        total += (
+          Math.max(0, Math.min(1, Number(values[sourceIndex]) || 0)) *
+          SPECTRUM_SPATIAL_KERNEL[kernelIndex]
+        );
+      }
+      smoothed[index] = total / SPECTRUM_SPATIAL_KERNEL_WEIGHT;
+    }
+    return smoothed;
   }
 
   function createPowderParticles(count) {
@@ -389,6 +416,7 @@
     let spectrumEnvelope = [];
     const powderParticles = createPowderParticles(POWDER_PARTICLE_COUNT);
     let powderContainmentEnvelope = [];
+    let powderContainmentRawEnvelope = [];
     let powderBandMaxHeights = new Float32Array(0);
     let previousPowderSpectrum = [];
     let powderSpectrumFlux = [];
@@ -401,6 +429,7 @@
     let maximumPowderHelixActiveCount = 0;
     let maximumPowderHelixOffsetPx = 0;
     let powderHelixRotationPhase = 0;
+    let powderHelixDrive = 0;
     let maximumPowderUpdateMs = 0;
     let powderSurface = null;
     let powderContext = null;
@@ -494,15 +523,39 @@
     function traceSpectrum(values, size, centerY, maximumHeight, direction, reverse, continuePath) {
       const denominator = Math.max(1, values.length - 1);
       const verticalDirection = direction < 0 ? -1 : 1;
-      for (let point = 0; point < values.length; point += 1) {
+      if (!values.length) return;
+
+      function coordinates(point) {
         const index = reverse ? values.length - 1 - point : point;
-        const x = (index / denominator) * size.width;
-        const y = centerY + (
-          Math.max(0, Math.min(1, values[index])) * maximumHeight * verticalDirection
-        );
-        if (point === 0 && !continuePath) drawingContext.moveTo(x, y);
-        else drawingContext.lineTo(x, y);
+        return {
+          x: (index / denominator) * size.width,
+          y: centerY + (
+            Math.max(0, Math.min(1, values[index])) * maximumHeight * verticalDirection
+          )
+        };
       }
+
+      let previous = coordinates(0);
+      if (continuePath) drawingContext.lineTo(previous.x, previous.y);
+      else drawingContext.moveTo(previous.x, previous.y);
+      if (typeof drawingContext.quadraticCurveTo !== "function") {
+        for (let point = 1; point < values.length; point += 1) {
+          const current = coordinates(point);
+          drawingContext.lineTo(current.x, current.y);
+        }
+        return;
+      }
+      for (let point = 1; point < values.length; point += 1) {
+        const current = coordinates(point);
+        drawingContext.quadraticCurveTo(
+          previous.x,
+          previous.y,
+          (previous.x + current.x) * 0.5,
+          (previous.y + current.y) * 0.5
+        );
+        previous = current;
+      }
+      drawingContext.quadraticCurveTo(previous.x, previous.y, previous.x, previous.y);
     }
 
     function ensurePowderSurface(size) {
@@ -566,6 +619,7 @@
       powderAirborneCount = 0;
       powderHelixActiveCount = 0;
       powderHelixRotationPhase = 0;
+      powderHelixDrive = 0;
       lastPowderPhysicsAt = 0;
       previousPowderSpectrum.fill(0);
       powderSpectrumFlux.fill(0);
@@ -596,6 +650,7 @@
       if (powderBandMaxHeights.length !== values.length) {
         powderBandMaxHeights = new Float32Array(values.length);
         powderContainmentEnvelope = new Array(values.length).fill(0);
+        powderContainmentRawEnvelope = new Array(values.length).fill(0);
       } else {
         powderBandMaxHeights.fill(0);
       }
@@ -607,10 +662,20 @@
       const stepCount = Math.max(1, Math.ceil(elapsed / POWDER_MAX_PHYSICS_STEP_SECONDS));
       const step = elapsed / stepCount;
       const drag = Math.exp(-POWDER_AIR_DRAG_PER_SECOND * step);
-      const helixDrive = allowLaunch && !reduced
-        ? Math.max(0, Math.min(1, (reactiveEnergy * 0.65) + (averageFlux * 4)))
+      const helixDriveTarget = allowLaunch && !reduced
+        ? Math.max(0, Math.min(1, (reactiveEnergy * 0.45) + (averageFlux * 1.5)))
         : 0;
-      const helixRotationSpeed = allowLaunch ? 0.55 + (helixDrive * 4.2) : 0;
+      powderHelixDrive = reduced
+        ? 0
+        : smoothValue(
+          powderHelixDrive,
+          helixDriveTarget,
+          elapsed,
+          HELIX_DRIVE_ATTACK_SECONDS,
+          HELIX_DRIVE_RELEASE_SECONDS
+        );
+      const helixDrive = powderHelixDrive;
+      const helixRotationSpeed = allowLaunch ? 0.42 + (helixDrive * 1.45) : 0;
       powderHelixRotationPhase = (
         powderHelixRotationPhase + (helixRotationSpeed * elapsed)
       ) % (Math.PI * 2);
@@ -662,14 +727,14 @@
           );
           const signal = Math.max(
             0,
-            Math.min(1, (localLevel * 0.78) + (localFlux * 2.2) + (helixDrive * 0.18))
+            Math.min(1, (localLevel * 0.82) + (localFlux * 0.75) + (helixDrive * 0.06))
           );
           const idleOffset = (sides[index] ? 1 : -1) * POWDER_HELIX_IDLE_RADIUS_PX;
           const radius = allowLaunch && signal > 0.008
             ? Math.min(
               frameHeight - 1,
               POWDER_HELIX_IDLE_RADIUS_PX +
-                (frameHeight * (0.12 + (signal * 0.52)) * responses[index])
+                (frameHeight * (0.035 + (signal * 0.18)) * responses[index])
             )
             : POWDER_HELIX_IDLE_RADIUS_PX;
           const targetOffset = allowLaunch && signal > 0.008
@@ -805,9 +870,16 @@
       maximumPowderHelixActiveCount = Math.max(maximumPowderHelixActiveCount, helixActive);
       for (let index = 0; index < values.length; index += 1) {
         previousPowderSpectrum[index] = Math.max(0, Math.min(1, Number(values[index]) || 0));
-        powderContainmentEnvelope[index] = Math.max(
+        powderContainmentRawEnvelope[index] = Math.max(
           Math.max(0, Math.min(1, Number(spectrumEnvelope[index]) || 0)),
           Math.max(0, Math.min(1, powderBandMaxHeights[index] / Math.max(1, frameHeight)))
+        );
+      }
+      const smoothedContainment = smoothSpectrumSpatially(powderContainmentRawEnvelope);
+      for (let index = 0; index < values.length; index += 1) {
+        powderContainmentEnvelope[index] = Math.max(
+          powderContainmentRawEnvelope[index],
+          smoothedContainment[index]
         );
       }
       maximumPowderUpdateMs = Math.max(

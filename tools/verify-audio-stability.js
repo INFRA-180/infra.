@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix372-20260724";
-const shellRelease = "infra-shell-20260724-audio372";
+const release = "audiofix373-20260724";
+const shellRelease = "infra-shell-20260724-audio373";
 const cssRelease = "audiofix368-20260722";
 const frozenCssSha256 = "370e3cbd3302972d454b99751c20d78422c8f2971739e67f36c11387e22c562a";
 const scripts = read("public/assets/js/scripts.js");
@@ -46,9 +46,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix372");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix372");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio372");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix373");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix373");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio373");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -68,6 +68,8 @@ expect(visualizer.includes("ENERGY_ATTACK_SECONDS = 0.045"), "desktop visualizer
 expect(visualizer.includes("ENERGY_RELEASE_SECONDS = 0.26"), "desktop visualizer has no controlled energy release");
 expect(visualizer.includes("SPECTRUM_ATTACK_SECONDS = 0.035"), "desktop frequency spectrum has no fast per-point attack");
 expect(visualizer.includes("SPECTRUM_RELEASE_SECONDS = 0.18"), "desktop frequency spectrum has no controlled per-point release");
+expect(visualizer.includes("SPECTRUM_SPATIAL_KERNEL = Object.freeze([1, 4, 6, 4, 1])"), "desktop frequency spectrum has no five-band spatial smoothing");
+expect(visualizer.includes("smoothSpectrumSpatially(points)"), "desktop frequency spectrum does not smooth raw logarithmic bands");
 expect(visualizer.includes("FFT_SIZE = 2048"), "desktop frequency spectrum has insufficient FFT resolution");
 expect(visualizer.includes("MIN_FREQUENCY_HZ = 40"), "desktop frequency spectrum has no low-frequency boundary");
 expect(visualizer.includes("MAX_FREQUENCY_HZ = 16000"), "desktop frequency spectrum has no high-frequency boundary");
@@ -95,8 +97,12 @@ expect(visualizer.includes("powderContainmentEnvelope[index] = Math.max("), "des
 expect(visualizer.includes("velocity -= gravity * step"), "desktop powder has no persistent hybrid-gravity fall");
 expect(visualizer.includes("(sides[index] ? 1 : -1)"), "desktop powder is not rendered above and below the axis");
 expect(visualizer.includes("powderHelixRotationPhase"), "desktop powder has no rotating helix phase");
+expect(visualizer.includes("HELIX_DRIVE_ATTACK_SECONDS = 0.09"), "desktop helix drive has no temporal smoothing");
+expect(visualizer.includes("frameHeight * (0.035 + (signal * 0.18))"), "desktop helix radius is not reduced");
 expect(visualizer.includes("targetOffset - helixOffset"), "desktop powder helix has no physical spring");
 expect(visualizer.includes("const restingOpacity = moving ? 1 : 0.34"), "desktop powder does not reduce its static central density");
+expect(visualizer.includes("drawingContext.quadraticCurveTo("), "desktop frequency spectrum is still drawn as angular segments");
+expect(visualizer.includes("powderContainmentRawEnvelope[index],"), "desktop powder containment is not smoothed without lowering its raw ceiling");
 expect(visualizer.includes("impactSpeed * restitutions[index]"), "desktop powder has no damped ground collision");
 expect(visualizer.includes("drawingContext.drawImage("), "desktop powder buffer is not composited efficiently");
 expect(!visualizer.includes("drawingContext.clip()"), "desktop ballistic powder is still clipped by the current FFT envelope");
@@ -395,4 +401,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix372.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix373.");

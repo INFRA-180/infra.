@@ -7,8 +7,8 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix372-20260724`
-- Service Worker : `infra-shell-20260724-audio372`
+- Runtime : `audiofix373-20260724`
+- Service Worker : `infra-shell-20260724-audio373`
 - CSS : `audiofix368-20260722`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
@@ -118,6 +118,9 @@ préassignée par grain. Il contient 250 000 grains terrestres et 250 000 grains
 le contour blanc suit l’enveloppe physique minimale qui contient le spectre lissé et le grain
 le plus éloigné de chaque tranche, sans coupure brutale ni dépassement incohérent. Un sous-champ
 central de 60 000 grains forme deux hélices opposées dont la rotation et le rayon suivent le FFT.
+Le rayon hélicoïdal est borné à une plage compacte d’environ 4–16 px. Le pilotage est temporisé,
+les niveaux sont lissés avec un noyau fréquentiel `[1,4,6,4,1]/16` et les contours utilisent
+des courbes quadratiques sans dépassement.
 
 ## Pochettes
 
@@ -157,6 +160,9 @@ Parmi les 500 000 grains, 60 000 utilisent un champ hélicoïdal central : deux 
 tournent autour de l’axe fixe, les attaques augmentent leur rayon local et les deux gravités
 contrôlent leur inertie de retour. Les grains au repos sont répartis hors d’un corridor central
 et rendus à opacité réduite pour préserver la lecture de l’axe.
+Le même lissage spatial est appliqué au niveau utilisé par les grains. L’enveloppe physique
+blanche conserve d’abord chaque maximum brut de confinement, puis relève les bandes voisines
+avec le noyau spatial afin de supprimer les découpes verticales sans laisser sortir un grain.
 À chaque frame, le point le plus haut de chaque tranche complète l’enveloppe FFT lissée : le
 contour blanc contient ainsi tous les grains pendant leur chute, tandis que le contour rouge
 reste la lecture instantanée du signal.

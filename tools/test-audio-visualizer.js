@@ -15,6 +15,7 @@ let cancelledFrames = 0;
 let strokeCount = 0;
 let fillCount = 0;
 let linePointCount = 0;
+let quadraticCurveCount = 0;
 let clipCount = 0;
 let powderCanvasCount = 0;
 let powderImageWriteCount = 0;
@@ -53,6 +54,10 @@ const drawingContext = {
   clip() { clipCount += 1; },
   moveTo() {},
   lineTo() { linePointCount += 1; },
+  quadraticCurveTo() {
+    linePointCount += 1;
+    quadraticCurveCount += 1;
+  },
   stroke() { strokeCount += 1; },
   fill() { fillCount += 1; },
   drawImage() { drawImageCount += 1; }
@@ -278,6 +283,7 @@ async function main() {
   assert.ok(strokeCount >= 3, "fixed axis and live frequency-spectrum lines were not drawn");
   assert.ok(fillCount >= 1, "live frequency-spectrum area was not filled");
   assert.ok(linePointCount >= 500, "mirrored frequency spectrum does not span enough logarithmic points");
+  assert.ok(quadraticCurveCount >= 400, "frequency spectrum is still rendered as angular line segments");
   assert.equal(clipCount, 0, "ballistic particles are still clipped by the instantaneous spectrum");
   assert.equal(powderCanvasCount, 1, "the powder surface was not created exactly once");
   assert.ok(powderImageWriteCount >= 1, "the FFT-driven powder frame was not rasterized");
@@ -359,7 +365,11 @@ async function main() {
   assert.equal(health.visualizer_powder_helix_particle_count, 60000, "health report lost the helix population");
   assert.equal(health.visualizer_powder_helix_active_count, 0, "health report sees a helix still moving after settling");
   assert.ok(health.visualizer_powder_helix_max_active_count > 0, "health report contains no rotating helix grain");
-  assert.ok(health.visualizer_powder_helix_max_offset_px > 15, "health report lost the centrifugal helix radius");
+  assert.ok(
+    health.visualizer_powder_helix_max_offset_px > 4 &&
+      health.visualizer_powder_helix_max_offset_px <= 20,
+    "health report does not expose the reduced centrifugal helix radius"
+  );
   assert.equal(health.visualizer_powder_surface_ready, 1, "health report does not see the powder surface");
   assert.ok(health.visualizer_powder_kick_count > 0, "health report contains no FFT particle kick");
   assert.ok(health.visualizer_powder_max_airborne_count > 0, "health report contains no airborne particle");

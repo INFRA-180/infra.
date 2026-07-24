@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 24 juillet 2026
-Baseline : `audiofix372-20260724`
-Service Worker : `infra-shell-20260724-audio372`
+Baseline : `audiofix373-20260724`
+Service Worker : `infra-shell-20260724-audio373`
 
 ## État
 
@@ -31,6 +31,10 @@ Service Worker : `infra-shell-20260724-audio372`
   Un groupe central de 60 000 grains forme deux flux hélicoïdaux en sens opposés. Leur rayon
   augmente sur les attaques FFT, les grains lunaires prolongent la rotation et le champ revient
   sur deux fines lignes au silence. Le lit immobile est réparti hors de l’axe et rendu plus léger.
+  Son rayon est réduit à environ 4–16 px et son drive reçoit une attaque/retombée dédiée. Un
+  filtre fréquentiel `[1,4,6,4,1]/16` diffuse les réactions entre bandes adjacentes ; le contour
+  quadratique et l’enveloppe de confinement relevée aux voisins produisent une ondulation
+  continue sans angles ni perte de confinement.
 - Diagnostic visualiseur : une seule entrée compacte par session mesure build, activation,
   état du contexte, signal, progression audio, frames et canvas, sans audio brut ni requête
   Worker supplémentaire.
@@ -43,7 +47,7 @@ Service Worker : `infra-shell-20260724-audio372`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix368-20260722`, inchangé par audiofix372.
+- CSS `audiofix368-20260722`, inchangé par audiofix373.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

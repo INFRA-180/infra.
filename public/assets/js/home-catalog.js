@@ -433,15 +433,15 @@
           menu.removeEventListener("toggle", menu._infraClipsToggleHandler);
         }
         const onToggle = function () {
-          if (!clipState.activeId && clipState.clips.length) {
-            clipState.activeId = clipState.clips[0].id;
+          if (menu.open) {
+            const activeId = clipState.activeId || (clipState.clips[0] && clipState.clips[0].id);
+            if (activeId) setActiveClip(activeId, { autoplay: false });
+            return;
           }
-          if (!menu.open) {
-            iframe.removeAttribute("src");
-            clipState.currentSrc = "";
-            const shell = iframe.closest(".clip-player-shell");
-            if (shell) shell.classList.add("is-idle");
-          }
+          iframe.removeAttribute("src");
+          clipState.currentSrc = "";
+          const shell = iframe.closest(".clip-player-shell");
+          if (shell) shell.classList.add("is-idle");
         };
         menu._infraClipsToggleHandler = onToggle;
         menu.addEventListener("toggle", onToggle);

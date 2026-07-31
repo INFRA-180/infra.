@@ -274,6 +274,7 @@ function runRegressionSuite() {
     "tools/test-audiofix330-runtime.js",
     "tools/test-audiofix337-spa.js",
     "tools/test-catalog-loader-startup.js",
+    "tools/test-home-clips.js",
     "tools/test-favorites-page-ui.js",
     "tools/test-share-qr-ui.js",
     "tools/test-spa-page-cache.js",

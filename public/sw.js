@@ -38,6 +38,7 @@ const SHELL_ASSETS = [
   "./data/track-durations.json?v=audiofix366-20260722",
   "./data/tracks.json?v=audiofix366-20260722",
   "./data/playlists.json?v=audiofix374-20260724",
+  "./assets/css/playlists.css?v=playlist-collage-20260801",
   "./assets/branding/infra-logo-white-photoroom-title.png",
   "./assets/pwa/favicon-logo-white-64.png",
   "./assets/pwa/icon-192-logo-white.png",

@@ -36,6 +36,12 @@
 - Playlist queues use a dedicated `playlistKind: "playlist"` so shuffle, next/previous, and session restore retain the complete cross-album order without invoking album-continuity expansion.
 - `tools/test-music-playlists.js` protects the four names, signs, native Music order, 234 occurrences, 225 unique catalogue sources, generated pages, home ordering, and queue contracts.
 
+## 2026-08-01 — Playlist signs and four-cover mosaics
+
+- Visible playlist titles are reduced to their black sign (`☀`, `☾`, `❄`, `𓅃`) at a larger size, while the complete `INFRA + sign` name remains in accessible labels, metadata, and structured data.
+- Home cards and playlist heroes reuse the first four distinct album artworks encountered in native Music order as a gapless 2×2 mosaic. No derivative image file is generated, and the read-only playlist export remains the source of truth.
+- Playlist-only presentation lives in `public/assets/css/playlists.css`, keeping the frozen shared fullscreen/audio stylesheet unchanged.
+
 ## 2026-07-24 — audiofix374 comparaison FFT pure
 
 - L’état complet précédent est figé par le tag Git annoté

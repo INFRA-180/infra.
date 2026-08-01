@@ -1,0 +1,67 @@
+/* Playlist covers intentionally reuse the first four distinct album artworks. */
+.playlist-thumb,
+.playlist-hero-art {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: #111111;
+}
+
+.playlist-thumb {
+  width: 100%;
+  border-radius: 6px;
+}
+
+.playlist-cover-tile {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0;
+  min-height: 0;
+  max-width: none !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: cover !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #111111;
+}
+
+.playlist-card .playlist-card-title {
+  margin-top: 4px;
+  color: #111111;
+  font-size: clamp(1.12rem, 1.8vw, 1.46rem) !important;
+  line-height: 1;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.playlist-visible-title {
+  color: #111111;
+  font-size: clamp(2.8rem, 7vw, 5.6rem);
+  line-height: 0.95;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.playlist-hero-art {
+  position: relative;
+  isolation: auto;
+  width: 100%;
+  border-radius: 16px;
+}
+
+.playlist-hero-art::after {
+  content: none !important;
+}
+
+.playlist-hero-symbol,
+.playlist-thumb-symbol,
+.playlist-thumb-wordmark,
+.album-layout .playlist-cover {
+  display: none !important;
+}

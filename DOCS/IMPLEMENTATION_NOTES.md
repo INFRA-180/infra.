@@ -57,6 +57,22 @@
 - Home cards and playlist heroes reuse the first four distinct album artworks encountered in native Music order as a gapless 2×2 mosaic. No derivative image file is generated, and the read-only playlist export remains the source of truth.
 - Playlist-only presentation lives in `public/assets/css/playlists.css`, keeping the frozen shared fullscreen/audio stylesheet unchanged.
 
+## 2026-08-01 — mini-player PWA Clear HUD
+
+- Identifiants : runtime inchangé `audiofix377-20260801`, Service Worker
+  `infra-shell-20260801-audio378`, CSS `audiofix378-20260801`.
+- Le mini-player mobile conserve ses cinq commandes, le favori, le seek et des cibles tactiles
+  de 44 px, mais rassemble désormais le titre et l’album sur une ligne. La progression de 2 px
+  est intégrée à la base de cette ligne sans ajouter une troisième zone verticale.
+- La surface reste une seule couche de verre : rayon 14 px, tint dépendant du thème, blur ramené
+  de 20 à 13 px, ombre raccourcie et liseré interne d’un pixel. Les icônes sont visuellement
+  réduites à 22 px, avec un anneau fin sur Lecture/Pause et un point d’état pour Radio/Shuffle.
+- L’ancrage `env(safe-area-inset-bottom)` et le calcul dynamique `--mobile-player-space` sont
+  inchangés. Le patch est borné à `max-width: 980px` et ne modifie ni le Document PiP, ni le
+  fullscreen, ni le moteur audio.
+- `prefers-reduced-transparency: reduce` utilise une surface quasi opaque sans blur. Les
+  navigateurs sans `backdrop-filter` reçoivent également un fallback opaque adapté au thème.
+
 ## 2026-07-24 — audiofix374 comparaison FFT pure
 
 - L’état complet précédent est figé par le tag Git annoté

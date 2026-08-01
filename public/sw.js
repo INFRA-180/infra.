@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260801-audio377";
+const VERSION = "infra-shell-20260801-audio378";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers-v2";
@@ -10,7 +10,7 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix377-20260801",
+  "./assets/css/styles.css?v=audiofix378-20260801",
   "./assets/js/covers.js?v=audiofix377-20260801",
   "./assets/js/favorites.js?v=audiofix377-20260801",
   "./assets/js/favorites-ui.js?v=audiofix377-20260801",

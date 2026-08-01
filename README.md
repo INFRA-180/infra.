@@ -7,8 +7,8 @@ Site public et PWA audio INFRA.
 - Site publié : `public/`
 - Branche : `codex/beta-site`
 - Baseline publiée : `audiofix377-20260801`
-- Service Worker : `infra-shell-20260801-audio377`
-- CSS publié : `audiofix377-20260801`
+- Service Worker : `infra-shell-20260801-audio378`
+- CSS publié : `audiofix378-20260801`
 - Catalogue : 31 albums, 283 pistes
 - Playlists : 4 pages, 234 occurrences, 225 pistes uniques
 - Play à froid contextuel : Radio sur l’accueil, piste 1 sur un album ou une playlist

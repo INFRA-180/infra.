@@ -15,9 +15,9 @@ const expect = (condition, message) => {
 };
 
 const release = "audiofix377-20260801";
-const shellRelease = "infra-shell-20260801-audio377";
-const cssRelease = "audiofix377-20260801";
-const frozenCssSha256 = "508d9be98a34150e9432e3cc0994c9f209454414a8b83fae31bad7d93319e058";
+const shellRelease = "infra-shell-20260801-audio378";
+const cssRelease = "audiofix378-20260801";
+const frozenCssSha256 = "369a23bb2fcba8a6c2f19d22d318ee9ce43a5e028103422a582e8cb75bf6a83d";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");
@@ -48,7 +48,7 @@ function functionBody(source, name, nextName) {
 
 expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix377");
 expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix377");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio377");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio378");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -375,7 +375,7 @@ expect(!nowPlaying.includes("ios-standalone-viewport-gap"), "ineffective iOS vie
 expect(!telemetry.includes('"fullscreen_compensated"'), "obsolete fullscreen compensation telemetry remains");
 
 const cssHash = crypto.createHash("sha256").update(styles).digest("hex");
-expect(cssHash === frozenCssSha256, "styles.css differs from the restored stable fullscreen geometry");
+expect(cssHash === frozenCssSha256, "styles.css differs from the audio378 Clear HUD fingerprint");
 expect(!styles.includes("100lvh"), "forbidden 100lvh geometry was introduced");
 expect(styles.includes(".share-dialog-close:focus-visible"), "QR close control does not keep the pure cross state");
 expect(styles.includes("transform: translateZ(0) scale(1.002)"), "WebKit cover seam guard is missing");

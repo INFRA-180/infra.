@@ -79,6 +79,19 @@
     return typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 981px)").matches;
   }
 
+  function canStartCurrentPageCollectionFromIdle(audio) {
+    return Boolean(
+      document.body &&
+      document.body.classList.contains("album-screen") &&
+      audio &&
+      audio.paused &&
+      !getCurrentPlayableAudioSrc(audio) &&
+      audioState.ui &&
+      Array.isArray(audioState.ui.playlist) &&
+      audioState.ui.playlist.length
+    );
+  }
+
   function getTransportPictureInPictureState() {
     const desktopState = getDesktopTransportState();
     if (!desktopState.pictureInPicture) {
@@ -262,7 +275,13 @@
     const hasPlaybackSessionActive = hasPlaybackSession();
     const hasPlaylist = Boolean(audioState.playlist && audioState.playlist.length);
     const canStartInitialRandom = canStartInitialGlobalRandomPlayback();
-    const canToggle = Boolean(audio && (hasPlaybackSessionActive || hasPlaylist || canStartInitialRandom));
+    const canStartCurrentCollection = canStartCurrentPageCollectionFromIdle(audio);
+    const canToggle = Boolean(audio && (
+      hasPlaybackSessionActive ||
+      hasPlaylist ||
+      canStartInitialRandom ||
+      canStartCurrentCollection
+    ));
     const canSkip = Boolean(audioState.playlist && audioState.playlist.length > 1);
     const isRadioMode = audioState.homeMode === "radio";
     const shuffleActive = Boolean(audioState.shuffleOn && !isRadioMode);
@@ -2130,10 +2149,16 @@
     const radioIdleReady = !isRadioMode ||
       hasPlaybackSessionActive ||
       canStartInitialRandom ||
+      canStartCurrentPageCollectionFromIdle(audio) ||
       Boolean(Array.isArray(audioState.radioQueue) && audioState.radioQueue.length);
     const canToggle = Boolean(audio) &&
       radioIdleReady &&
-      (hasPlaybackSessionActive || hasPlaylist || canStartInitialRandom);
+      (
+        hasPlaybackSessionActive ||
+        hasPlaylist ||
+        canStartInitialRandom ||
+        canStartCurrentPageCollectionFromIdle(audio)
+      );
     if (transport.toggleBtn) {
       transport.toggleBtn.disabled = !canToggle || Boolean(audioState.globalRandomStartInFlight);
       transport.toggleBtn.setAttribute("aria-label", audio && !audio.paused ? "Pause" : "Lecture");

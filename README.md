@@ -6,11 +6,12 @@ Site public et PWA audio INFRA.
 
 - Site publié : `public/`
 - Branche : `codex/beta-site`
-- Baseline publiée : `audiofix376-20260801`
-- Service Worker : `infra-shell-20260801-audio376`
-- CSS publié : `audiofix368-20260722`
+- Baseline publiée : `audiofix377-20260801`
+- Service Worker : `infra-shell-20260801-audio377`
+- CSS publié : `audiofix377-20260801`
 - Catalogue : 31 albums, 283 pistes
 - Playlists : 4 pages, 234 occurrences, 225 pistes uniques
+- Play à froid contextuel : Radio sur l’accueil, piste 1 sur un album ou une playlist
 
 La validation UX finale est réalisée sur l’iPhone de l’utilisateur. Les contrôles locaux
 restent des vérifications de code et ne remplacent pas ce test réel.

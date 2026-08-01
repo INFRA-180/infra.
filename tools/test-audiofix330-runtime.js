@@ -574,6 +574,125 @@ function testInMemoryColdPlayIsSynchronous() {
   assert.strictEqual(state.playlist.length, sourceTracks.length);
 }
 
+function testColdCollectionPlayUsesCurrentAlbumOrPlaylist() {
+  [
+    { kind: "album", playlistScreen: false, surface: "album_cold" },
+    { kind: "playlist", playlistScreen: true, surface: "playlist_cold" }
+  ].forEach((scenario) => {
+    const sandbox = createSandbox();
+    sandbox.document.body.classList.contains = (name) => (
+      name === "album-screen" || (scenario.playlistScreen && name === "playlist-screen")
+    );
+    loadScript(sandbox, RADIO_PATH);
+
+    const collection = makeTracks(4).map((track, index) => Object.assign({}, track, {
+      album: scenario.kind === "playlist" ? `Album ${index}` : "Current album"
+    }));
+    const staleRadio = makeTracks(3).map((track) => Object.assign({}, track, { album: "Stale radio" }));
+    const audio = makeAudio();
+    const startCalls = [];
+    const events = [];
+    let toggleCalls = 0;
+    const state = {
+      audio,
+      activeLogicalSrc: "",
+      homeModeInitialized: true,
+      homeMode: "radio",
+      homeModeStorageKey: `infra_home_mode_${scenario.kind}`,
+      queueStorageKey: `infra_queue_${scenario.kind}`,
+      resumeStorageKey: `infra_resume_${scenario.kind}`,
+      playlist: staleRadio.slice(),
+      playlistKind: "radio",
+      currentIndex: 1,
+      ui: { playlistKind: scenario.kind, playlist: collection.slice() },
+      radioPlaylist: staleRadio.slice(),
+      radioQueue: staleRadio.slice(),
+      radioQueueCursor: 1,
+      shuffleOn: true,
+      shuffleSessionSeed: "stale-seed",
+      shuffleHistory: [staleRadio[1].src],
+      shuffleHistoryCursor: 0,
+      initialRandomReady: true,
+      initialRandomPlaylist: staleRadio.slice(),
+      initialRandomFirstSrc: staleRadio[0].src,
+      initialRandomPrepareToken: 1,
+      recentPlayed: [1]
+    };
+    const radio = sandbox.InfraAudioRadio.createAudioRadio({
+      audioState: state,
+      runtime: { baseUrl: new URL("https://site.test/") },
+      getCurrentLogicalAudioSrc: () => state.activeLogicalSrc || "",
+      getCurrentPlayableAudioSrc: (element) => element.currentSrc || element.src || "",
+      normalizeAudioSourceUrl: (src) => String(src || ""),
+      toAbsoluteUrlOrEmpty: (src) => String(src || ""),
+      toAbsoluteUrl: (src) => String(src || ""),
+      normalizeTrackTitle: (value) => String(value || ""),
+      normalizeAlbumTitle: (value) => String(value || ""),
+      syncPlaylistContext() {},
+      syncMediaSessionMetadata() {},
+      trackAudioRuntimeEvent(type, payload) { events.push({ type, payload }); },
+      togglePlayPause() { toggleCalls += 1; },
+      startTrack(index, startOptions) { startCalls.push({ index, options: startOptions }); }
+    });
+
+    const result = radio.startCurrentPageCollectionFromIdle(audio);
+    assert.strictEqual(result, true, `${scenario.kind} cold Play must consume the current page collection`);
+    assert.strictEqual(startCalls.length, 1, `${scenario.kind} cold Play must start exactly once`);
+    assert.strictEqual(startCalls[0].index, 0);
+    assert.strictEqual(startCalls[0].options.immediatePlay, true);
+    assert.strictEqual(startCalls[0].options.userGesture, true);
+    assert.strictEqual(startCalls[0].options.coldStart, true);
+    assert.strictEqual(startCalls[0].options.surface, scenario.surface);
+    assert.strictEqual(state.homeMode, "album", `${scenario.kind} cold Play must turn Radio off`);
+    assert.strictEqual(state.playlistKind, scenario.kind);
+    assert.deepStrictEqual(
+      Array.from(state.playlist, (track) => track.src),
+      collection.map((track) => track.src),
+      `${scenario.kind} cold Play must preserve the page order`
+    );
+    assert.strictEqual(state.currentIndex, 0);
+    assert.strictEqual(state.radioQueue.length, 0);
+    assert.strictEqual(state.shuffleOn, false);
+    assert.strictEqual(state.shuffleHistory.length, 0);
+    assert.strictEqual(state.initialRandomReady, false);
+    assert.strictEqual(toggleCalls, 0);
+    const event = events.find((entry) => entry.type === "collection_cold_start");
+    assert(event, `${scenario.kind} cold Play must be observable`);
+    assert.strictEqual(event.payload.collection_kind, scenario.kind);
+  });
+
+  const sandbox = createSandbox();
+  sandbox.document.body.classList.contains = (name) => name === "album-screen";
+  loadScript(sandbox, RADIO_PATH);
+  const currentTrack = makeTracks(1)[0];
+  const audio = makeAudio();
+  audio.src = currentTrack.src;
+  audio.currentSrc = currentTrack.src;
+  let toggleCalls = 0;
+  let startCalls = 0;
+  const state = {
+    audio,
+    activeLogicalSrc: currentTrack.src,
+    homeMode: "radio",
+    playlist: [currentTrack],
+    playlistKind: "radio",
+    currentIndex: 0,
+    ui: { playlistKind: "album", playlist: makeTracks(3) }
+  };
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc,
+    getCurrentPlayableAudioSrc: () => currentTrack.src,
+    togglePlayPause() { toggleCalls += 1; },
+    startTrack() { startCalls += 1; }
+  });
+  radio.handleGlobalTransportToggle();
+  assert.strictEqual(toggleCalls, 1, "A paused existing session must resume instead of adopting the page");
+  assert.strictEqual(startCalls, 0, "A paused existing session must not restart at the page first track");
+  assert.strictEqual(state.homeMode, "radio", "Navigation must not turn off an active Radio session");
+  assert.strictEqual(state.playlistKind, "radio");
+}
+
 function createDeferredRadioNavigationHarness() {
   let resolveTracksData;
   const tracksDataPromise = new Promise((resolve) => {
@@ -2151,6 +2270,23 @@ function testPersistentAlbumAndFullscreenContracts() {
     "An album route must preserve a foreign active queue instead of replacing it"
   );
 
+  const radioSource = fs.readFileSync(RADIO_PATH, "utf8");
+  assert(
+    radioSource.includes("startCurrentPageCollectionFromIdle(audio)"),
+    "The global transport must inspect the current collection before cold Radio"
+  );
+
+  const modeStylesSource = fs.readFileSync(STYLES_PATH, "utf8");
+  assert(
+    modeStylesSource.includes(".play-btn.is-current:not(.is-playing) .track-eq span"),
+    "A paused current track must not keep an animated equalizer"
+  );
+  assert(
+    modeStylesSource.includes(".now-playing-mode-btn.is-on") &&
+      /\.global-transport-mode\.is-on,[\s\S]*?color:\s*var\(--accent\)/.test(modeStylesSource),
+    "Radio and Shuffle active states must share the accent color"
+  );
+
   const nowPlayingSource = fs.readFileSync(NOW_PLAYING_PATH, "utf8");
   assert(
     nowPlayingSource.includes("animation.onfinish = finalize") &&
@@ -2262,6 +2398,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   testSameOriginRootArtworkRepair();
   testPreparedColdPlayIsSynchronous();
   testInMemoryColdPlayIsSynchronous();
+  testColdCollectionPlayUsesCurrentAlbumOrPlaylist();
   testRadioIdlePlayUsesSynchronousPreparedQueueAndDedupesPendingPlay();
   await testQueuedRadioNavigationReplaysInOrderAndInvalidatesOnModeChange();
   await testCachedPrefixIsMaterializedBeforeColdTap();
@@ -2288,7 +2425,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix376 runtime checks passed.");
+  console.log("audiofix377 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

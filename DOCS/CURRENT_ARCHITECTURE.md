@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix376-20260801`
-- Service Worker : `infra-shell-20260801-audio376`
-- CSS : `audiofix368-20260722`
+- Runtime : `audiofix377-20260801`
+- Service Worker : `infra-shell-20260801-audio377`
+- CSS : `audiofix377-20260801`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -76,6 +76,9 @@ visibilité du canvas. Il rejoint le lot différé existant sans envoi par frame
 
 ## Modes de lecture
 
+- Play à froid sur l’accueil : Radio globale préparée.
+- Play à froid sur une page album ou playlist : Radio et Shuffle désactivés, première piste de
+  la collection affichée. Une source existante reste prioritaire et reprend sans changement de file.
 - Page playlist : ordre Music complet conservé, même entre plusieurs albums.
 - Radio active : file globale matérialisée.
 - Radio inactive et Shuffle actif : album courant uniquement, avec historique.

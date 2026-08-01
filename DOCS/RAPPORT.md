@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 1er août 2026
-Baseline : `audiofix376-20260801`
-Service Worker : `infra-shell-20260801-audio376`
+Baseline : `audiofix377-20260801`
+Service Worker : `infra-shell-20260801-audio377`
 
 ## État
 
@@ -13,6 +13,8 @@ Service Worker : `infra-shell-20260801-audio376`
 - Aucun ancien dérivé de cover 480/900, JPG ou PNG dans le périmètre public.
 - Prefetch v9 par segments de 2 MiB, N+1 à N+5.
 - Radio globale, Shuffle album et lecture chronologique consolidés.
+- Play à froid contextuel : Radio sur l’accueil, première piste et ordre de la collection sur
+  un album ou une playlist ; une session existante n’est jamais remplacée par la navigation.
 - `Previous` redémarre la piste courante après 3 secondes sur l’interface et Media Session,
   sans rechargement ni second `play()`.
 - Mini-player desktop détachable par drag sur un bord en vraie fenêtre Document PiP. Le PiP
@@ -40,7 +42,7 @@ Service Worker : `infra-shell-20260801-audio376`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix368-20260722`, inchangé par audiofix376.
+- CSS `audiofix377-20260801`, états Radio/Shuffle actifs clairement accentués.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

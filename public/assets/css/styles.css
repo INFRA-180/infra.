@@ -699,7 +699,7 @@ body.home-screen {
 .global-transport-btn[data-transport-shuffle].is-on {
   background: transparent;
   border: 0;
-  color: var(--ink);
+  color: var(--accent);
   box-shadow: none;
   opacity: 1;
 }
@@ -2509,6 +2509,10 @@ body.transport-pip-document .transport-pip-player.is-expanded .global-transport-
 .track-eq span:nth-child(4) {
   height: 13px;
   animation-delay: -520ms;
+}
+
+.play-btn.is-current:not(.is-playing) .track-eq span {
+  animation-play-state: paused;
 }
 
 .player-glyph {
@@ -4326,6 +4330,10 @@ body.now-playing-open {
   box-shadow: none;
   color: #fff;
   text-shadow: none;
+}
+
+.now-playing-mode-btn.is-on {
+  color: var(--accent);
 }
 
 .now-playing-btn-main.is-on {

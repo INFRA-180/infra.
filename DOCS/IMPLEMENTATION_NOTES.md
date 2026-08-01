@@ -1,5 +1,20 @@
 # Implementation Notes
 
+## 2026-08-01 — audiofix377 Play à froid contextuel
+
+- Le Play global sans source démarre désormais la première piste de la page album ou playlist
+  affichée. L’accueil conserve exclusivement le démarrage Radio aléatoire préparé.
+- L’adoption de la page est limitée au vrai démarrage à froid : une source existante, même en
+  pause après navigation, reprend sa file courante sans désactiver Radio ni changer d’album.
+- Une collection contextuelle désactive Radio et Shuffle, annule les préparations Radio devenues
+  obsolètes et conserve `playlistKind: "playlist"` ainsi que l’ordre multi-albums des playlists.
+- Mini-player, plein écran et Document PiP partagent le même état `is-on` / `aria-pressed` ; les
+  modes actifs utilisent l’accent et l’égaliseur d’une piste courante reste immobile en pause.
+- Tests : démarrage album/playlist synchrone dans le geste, conservation d’une session existante,
+  ordre de collection, états de modes, audit audio/PWA et frontière publique.
+- Identifiants : `audiofix377-20260801`, `infra-shell-20260801-audio377`, CSS
+  `audiofix377-20260801`.
+
 ## 2026-08-01 — audiofix376 commandes iPhone et télémétrie Media Session v3
 
 - `Previous` applique désormais la même règle sur le plein écran et Media Session : au-delà de

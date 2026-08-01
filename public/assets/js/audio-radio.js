@@ -975,6 +975,12 @@
           canStartInitialGlobalRandomPlayback() ||
           hasPlaybackSession() ||
           (audioState.playlist && audioState.playlist.length) ||
+          (
+            document.body.classList.contains("album-screen") &&
+            audioState.ui &&
+            Array.isArray(audioState.ui.playlist) &&
+            audioState.ui.playlist.length
+          ) ||
           (document.body.classList.contains("home-screen") && audioState.homeMode === "radio")
         )
       );
@@ -988,7 +994,7 @@
       if (isDesktopKeyboard && event.key === " ") {
         if (!canTogglePlayback) return;
         event.preventDefault();
-        togglePlayPause();
+        handleGlobalTransportToggle();
         return;
       }
 
@@ -2101,8 +2107,74 @@
 
 
 
+  function startCurrentPageCollectionFromIdle(audioElement) {
+    const audio = audioElement || audioState.audio;
+    const isCollectionPage = Boolean(
+      document.body && document.body.classList.contains("album-screen")
+    );
+    const ui = audioState.ui;
+    const collection = ui && Array.isArray(ui.playlist)
+      ? ui.playlist.filter(function (track) { return track && track.src; })
+      : [];
+
+    if (
+      !isCollectionPage ||
+      !audio ||
+      !audio.paused ||
+      audioState.trackStartInFlight ||
+      getCurrentPlayableAudioSrc(audio) ||
+      getCurrentLogicalAudioSrc() ||
+      !collection.length
+    ) {
+      return false;
+    }
+
+    const collectionKind = ui && ui.playlistKind === "playlist" ? "playlist" : "album";
+    const nextPlaylist = collection.map(function (track) {
+      return Object.assign({}, track);
+    });
+
+    audioState.modeTransitionToken = Number(audioState.modeTransitionToken || 0) + 1;
+    audioState.radioNavigationRequest = null;
+    audioState.radioNavigationPromise = null;
+    resetPreparedInitialGlobalRandomPlayback();
+    clearRadioQueue();
+    audioState.homeMode = "album";
+    persistHomePlayMode("album");
+    audioState.shuffleOn = false;
+    audioState.shuffleSessionSeed = "";
+    audioState.shuffleHistory = [];
+    audioState.shuffleHistoryCursor = -1;
+    audioState.upcomingTrackPlan = null;
+    audioState.playlistKind = collectionKind;
+    audioState.playlist = nextPlaylist;
+    audioState.currentIndex = 0;
+    audioState.albumPlaylistSnapshot = collectionKind === "album" ? nextPlaylist.slice() : [];
+    audioState.albumIndexSnapshot = collectionKind === "album" ? 0 : -1;
+    syncPlaylistContext(audioState.playlist);
+    savePlaybackQueueContext();
+    syncMediaSessionMetadata({ forcePosition: true });
+    trackAudioRuntimeEvent("collection_cold_start", {
+      collection_kind: collectionKind,
+      tracks_count: nextPlaylist.length,
+      start_index: 0,
+      source: "global_transport"
+    });
+    startTrack(0, {
+      seamless: true,
+      immediatePlay: true,
+      userGesture: true,
+      coldStart: true,
+      surface: collectionKind === "playlist" ? "playlist_cold" : "album_cold"
+    });
+    return true;
+  }
+
+
+
   function handleGlobalTransportToggle() {
     const audio = audioState.audio || ensureGlobalAudio();
+    if (startCurrentPageCollectionFromIdle(audio)) return;
     if (
       audio &&
       audio.paused &&
@@ -3541,6 +3613,7 @@
       markAudioPauseIntent,
       cancelExternalResumeCommand,
       playFromExternalControl,
+      startCurrentPageCollectionFromIdle,
       handleGlobalTransportToggle,
       ensureGlobalAudio,
       stopAudioRaf,
@@ -3604,6 +3677,7 @@
       markAudioPauseIntent: function () {},
       cancelExternalResumeCommand: function () {},
       playFromExternalControl: function () {},
+      startCurrentPageCollectionFromIdle: function () { return false; },
       handleGlobalTransportToggle: function () {},
       ensureGlobalAudio: function () { return null; },
       stopAudioRaf: function () {},

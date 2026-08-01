@@ -1,17 +1,20 @@
 # Rapport courant — SITE INFRA
 
-Date : 24 juillet 2026
-Baseline : `audiofix374-20260724`
-Service Worker : `infra-shell-20260724-audio374`
+Date : 1er août 2026
+Baseline : `audiofix376-20260801`
+Service Worker : `infra-shell-20260801-audio376`
 
 ## État
 
 - 31 albums, 283 pistes et 283 durées.
+- 4 playlists Music en lecture seule, 234 occurrences et 225 pistes uniques.
 - Catalogue live et fallback Git alignés.
 - Une pochette WebP 1200 canonique par album.
 - Aucun ancien dérivé de cover 480/900, JPG ou PNG dans le périmètre public.
 - Prefetch v9 par segments de 2 MiB, N+1 à N+5.
 - Radio globale, Shuffle album et lecture chronologique consolidés.
+- `Previous` redémarre la piste courante après 3 secondes sur l’interface et Media Session,
+  sans rechargement ni second `play()`.
 - Mini-player desktop détachable par drag sur un bord en vraie fenêtre Document PiP. Le PiP
   reste au-dessus des applications, se déplace nativement, partage toutes les commandes et
   l’état du lecteur, survit à la navigation SPA et révèle la cover quand il est agrandi.
@@ -26,6 +29,8 @@ Service Worker : `infra-shell-20260724-audio374`
 - Diagnostic visualiseur : une seule entrée compacte par session mesure build, activation,
   état du contexte, signal, progression audio, frames et canvas, sans audio brut ni requête
   Worker supplémentaire.
+- Télémétrie Media Session v3 regroupée par commande, avec sondes bornées et sans URL audio,
+  user-agent brut ni affirmation abusive sur l’écran verrouillé.
 - Page Favoris simplifiée : titre stable, sélection ronde, fermeture `×` et retrait par
   poubelle.
 - Navigation SPA avec handoff peint WebKit feature-détecté, sans snapshot/canvas, scroll
@@ -35,7 +40,7 @@ Service Worker : `infra-shell-20260724-audio374`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix368-20260722`, inchangé par audiofix374.
+- CSS `audiofix368-20260722`, inchangé par audiofix376.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles
@@ -46,8 +51,8 @@ La commande de référence est :
 node tools/release-audit.js
 ```
 
-Elle couvre la syntaxe JavaScript, le catalogue, le graphe d’analyse audio live, les pochettes
-canoniques, le cache audio,
+Elle couvre la syntaxe JavaScript, le catalogue, les playlists, le graphe d’analyse audio live,
+les pochettes canoniques, le cache audio,
 le Service Worker, la navigation SPA, la télémétrie, la stabilité PWA et la frontière
 public/privé.
 

@@ -19,6 +19,23 @@
   compteur KV concurrent ; les logs d’ingestion structurés excluent toute donnée de piste.
 - Identifiants : `audiofix376-20260801`, `infra-shell-20260801-audio376`.
 
+## 2026-08-01 — consolidation des guides et métadonnées des apps
+
+- `README.md`, l’architecture et le rapport courant pointent désormais sur la baseline publiée
+  `audiofix376-20260801` et décrivent les quatre playlists Music en lecture seule.
+- La description obsolète du visualiseur à 500 000 grains est retirée de l’architecture active :
+  le mode publié reste la comparaison FFT pure, sans ligne médiane ni allocation de particules.
+- Les trois pages d’applications disposent d’un titre distinct, d’une description et d’une URL
+  canonique. Leur date, ainsi que celle de l’accueil, est actualisée dans le sitemap.
+- Les chemins des guides locaux et de l’outil Music/R2 sont réalignés sous `_private/`.
+
+## 2026-08-01 — Read-only Music playlists
+
+- The four exact Music.app user playlists (`INFRA ☀`, `INFRA ☾`, `INFRA ❄`, `INFRA 𓅃`) are exported read-only and matched to the existing 283-track public catalogue by Music persistent ID; persistent IDs remain private and are omitted from `public/data/playlists.json`.
+- The home page opens Playlists first and keeps Albums closed by default. Each playlist has a static, SEO-addressable page under `public/playlists/`, backed by the shared player runtime and cached by the PWA shell.
+- Playlist queues use a dedicated `playlistKind: "playlist"` so shuffle, next/previous, and session restore retain the complete cross-album order without invoking album-continuity expansion.
+- `tools/test-music-playlists.js` protects the four names, signs, native Music order, 234 occurrences, 225 unique catalogue sources, generated pages, home ordering, and queue contracts.
+
 ## 2026-07-24 — audiofix374 comparaison FFT pure
 
 - L’état complet précédent est figé par le tag Git annoté
@@ -918,10 +935,3 @@
 - Live Web Inspector measurements on the installed PWA showed a `844px` screen but a `797px` viewport and matching `html`, `body`, overlay, and panel bottoms; the missing `47px` matched the top safe-area inset.
 - No mobile overlay or panel height, bottom anchor, or bottom filler changed. The removed status-bar overlay layer, safe top control spacing, and artwork-only top extension remain intact.
 - Release shell: `infra-shell-20260715-audio328`; the unchanged fullscreen stylesheet remains `audiofix327-20260715`.
-
-## 2026-08-01 — Read-only Music playlists
-
-- The four exact Music.app user playlists (`INFRA ☀`, `INFRA ☾`, `INFRA ❄`, `INFRA 𓅃`) are exported read-only and matched to the existing 283-track public catalogue by Music persistent ID; persistent IDs remain private and are omitted from `public/data/playlists.json`.
-- The home page opens Playlists first and keeps Albums closed by default. Each playlist has a static, SEO-addressable page under `public/playlists/`, backed by the shared player runtime and cached by the PWA shell.
-- Playlist queues use a dedicated `playlistKind: "playlist"` so shuffle, next/previous, and session restore retain the complete cross-album order without invoking album-continuity expansion.
-- `tools/test-music-playlists.js` protects the four names, signs, native Music order, 234 occurrences, 225 unique catalogue sources, generated pages, home ordering, and queue contracts.

@@ -1,14 +1,14 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 24 juillet 2026.
+État de référence : 1er août 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix374-20260724`
-- Service Worker : `infra-shell-20260724-audio374`
+- Runtime : `audiofix376-20260801`
+- Service Worker : `infra-shell-20260801-audio376`
 - CSS : `audiofix368-20260722`
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
@@ -23,6 +23,7 @@ GitHub Pages publie exclusivement `public/`.
 public/
 ├── index.html
 ├── music/                    31 pages album
+├── playlists/                4 pages de playlists Music
 ├── apps/                     3 applications
 ├── assets/
 │   ├── css/
@@ -75,6 +76,7 @@ visibilité du canvas. Il rejoint le lot différé existant sans envoi par frame
 
 ## Modes de lecture
 
+- Page playlist : ordre Music complet conservé, même entre plusieurs albums.
 - Radio active : file globale matérialisée.
 - Radio inactive et Shuffle actif : album courant uniquement, avec historique.
 - Radio inactive et Shuffle inactif : ordre de l’album puis album chronologique adjacent.
@@ -110,6 +112,10 @@ La synchronisation locale :
 Le catalogue live, CacheStorage et les JSON inclus dans Git forment les trois niveaux de
 repli. Le fallback Git est actuellement aligné sur le live à 283 pistes.
 
+Les quatre playlists Music sont exportées en lecture seule dans `data/playlists.json`. Elles
+représentent 234 occurrences et 225 pistes uniques du catalogue public. Les identifiants
+persistants Music servent uniquement au rapprochement local et ne sont jamais publiés.
+
 La visualisation desktop n’a plus de fichier de données par piste. Elle lit uniquement le
 signal instantané de l’élément audio global lorsqu’un utilisateur ouvre le fullscreen.
 `audiofix374` est une version comparative FFT pure : les contours rouge immédiat et blanc
@@ -142,32 +148,10 @@ La géométrie iPhone validée est figée :
 
 Le lecteur et `#infraSpaPersist` survivent aux changements de page.
 
-À partir de 981 px, le fullscreen desktop affiche le spectre fréquentiel réel d’un
-`AnalyserNode` : FFT 2 048 points, 40 Hz à 16 kHz sur un axe logarithmique gauche→droite.
-Une ligne centrale reste fixe pendant que le spectre se déploie symétriquement sur 25 % de la
-hauteur de chaque côté. Cette ligne sert aussi de sol central à 500 000 grains déterministes.
-Chaque face reçoit 125 000 grains sous gravité terrestre et 125 000 sous gravité lunaire. Chaque
-grain garde sa fréquence horizontale et possède une hauteur, une vitesse, un seuil de départ
-et une restitution propres. La variation positive et le niveau de sa bande FFT déterminent
-le nombre de départs et une hauteur cible ; la vitesse initiale est calculée pour cette hauteur,
-ensuite une gravité de 9,80665 m/s² ou 1,62 m/s², une faible traînée et un rebond amorti
-gouvernent seuls la trajectoire vers l’axe. Les grains lunaires forment une traîne flottante plus
-longue. Le grain demeure visible après la baisse du signal jusqu’à son retour au repos.
-Parmi les 500 000 grains, 60 000 utilisent un champ hélicoïdal central : deux phases opposées
-tournent autour de l’axe fixe, les attaques augmentent leur rayon local et les deux gravités
-contrôlent leur inertie de retour. Les grains au repos sont répartis hors d’un corridor central
-et rendus à opacité réduite pour préserver la lecture de l’axe.
-Le même lissage spatial est appliqué au niveau utilisé par les grains. L’enveloppe physique
-blanche conserve d’abord chaque maximum brut de confinement, puis relève les bandes voisines
-avec le noyau spatial afin de supprimer les découpes verticales sans laisser sortir un grain.
-À chaque frame, le point le plus haut de chaque tranche complète l’enveloppe FFT lissée : le
-contour blanc contient ainsi tous les grains pendant leur chute, tandis que le contour rouge
-reste la lecture instantanée du signal.
-L’enveloppe des contours attaque en 35 ms et retombe en 180 ms. Le graphe Web Audio est créé
-une seule fois depuis le clic d’ouverture : la source reste connectée directement à la sortie
-et l’analyseur est une branche séparée. Le rendu est limité à 30 i/s, s’arrête en
-pause, à la fermeture ou quand l’onglet est caché, et devient statique avec
-`prefers-reduced-motion`. Le contexte reste vivant pour ne jamais interrompre l’audio routé.
+À partir de 981 px, le fullscreen desktop affiche la comparaison FFT pure décrite plus haut.
+Le graphe Web Audio est créé une seule fois depuis le clic d’ouverture ; l’analyseur reste une
+branche séparée de la sortie audio. Le rendu est limité à 30 i/s, s’arrête en pause, à la
+fermeture ou quand l’onglet est caché, et devient statique avec `prefers-reduced-motion`.
 
 Sur Safari compatible, le passage entre routes utilise le handoff peint natif des View
 Transitions sans animation visuelle. La mutation DOM et le repositionnement du scroll sont
@@ -185,7 +169,7 @@ si Safari le refuse.
 
 ## Télémétrie
 
-Un seul lot compact est produit par session :
+Un seul lot compact v3 est produit par session :
 
 - 48 événements maximum ;
 - 32 Kio maximum ;
@@ -193,6 +177,10 @@ Un seul lot compact est produit par session :
 - un envoi à `hidden/pagehide` ;
 - reprise IndexedDB en cas d’échec ;
 - aucun heartbeat ou envoi continu.
+
+Les commandes Media Session sont regroupées par jeton avec leur décision et trois sondes
+bornées. La visibilité de page reste un indice et n’est jamais présentée comme une preuve de
+l’écran verrouillé ou du centre de contrôle.
 
 Ce même résumé contient un inventaire borné du stockage local, les hits/miss HTML et covers,
 ainsi que l’état de la cover aux première et deuxième frames peintes. Cette observabilité

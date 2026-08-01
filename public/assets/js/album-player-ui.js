@@ -225,8 +225,9 @@
       }
       return;
     }
-    if (audioState.playlistKind === "global" || audioState.playlistKind === "favorites") return;
-    audioState.playlistKind = "album";
+    const uiKind = ui && ui.playlistKind === "playlist" ? "playlist" : "album";
+    if (uiKind !== "playlist" && (audioState.playlistKind === "global" || audioState.playlistKind === "favorites")) return;
+    audioState.playlistKind = uiKind;
     audioState.playlist = ui.playlist.slice();
     syncPlaylistContext(audioState.playlist);
   }
@@ -242,7 +243,7 @@
           return track && srcMatches(track.src, currentSrc);
         }))
       );
-      audioState.playlistKind = "album";
+      audioState.playlistKind = ui && ui.playlistKind === "playlist" ? "playlist" : "album";
       ensurePlaylistFromUi(ui);
       if (changesShuffleAlbum) {
         const selectedSrc = String(selectedTrack && selectedTrack.src || "");
@@ -293,6 +294,7 @@
 
     const pageHref = toAbsoluteUrl(window.location.pathname);
     const albumTitle = getCurrentAlbumTitle();
+    const playlistKind = document.body.classList.contains("playlist-screen") ? "playlist" : "album";
     const albumArtwork = resolveTracksAlbumArtwork({ page: pageHref, album: albumTitle }) ||
       getAlbumCoverFromDoc(document, window.location.href);
 
@@ -300,6 +302,7 @@
       section,
       albumTitle,
       albumArtwork,
+      playlistKind,
       tracks: [],
       playlist: [],
       pageHref
@@ -343,6 +346,9 @@
       const cleanedName = normalizeTrackTitle(nameEl.textContent);
       if (cleanedName) nameEl.textContent = cleanedName;
       const meta = getTrackMetaByAssetPath(absSrc, window.location.href) || {};
+      const rowAlbum = normalizeTrackTitle(row.dataset.trackAlbum || meta.album || ui.albumTitle);
+      const rowPage = toAbsoluteUrl(row.dataset.trackPage || meta.page || ui.pageHref);
+      const rowArtwork = toAbsoluteUrl(row.dataset.trackArtwork || meta.artwork || ui.albumArtwork);
 
       if (!absSrc) {
         button.textContent = "×";
@@ -418,10 +424,10 @@
       ui.playlist.push({
         src: absSrc,
         name: track.trackName,
-        album: ui.albumTitle,
-        page: ui.pageHref,
+        album: rowAlbum,
+        page: rowPage,
         artist: "INFRA.",
-        artwork: ui.albumArtwork,
+        artwork: rowArtwork,
         duration: String(meta.duration || "").trim(),
         seconds: Number(meta.seconds)
       });
@@ -581,10 +587,10 @@
     audioState.ui = ui;
     const activeSrc = getCurrentLogicalAudioSrc();
     if (
-      document.body.classList.contains("album-screen") &&
+      (document.body.classList.contains("album-screen") || document.body.classList.contains("playlist-screen")) &&
       activeSrc &&
       audioState.homeMode !== "radio" &&
-      audioState.playlistKind === "album"
+      audioState.playlistKind === ui.playlistKind
     ) {
       const matchIndex = ui.playlist.findIndex((track) => srcMatches(track.src, activeSrc));
       if (matchIndex >= 0) {
@@ -623,7 +629,7 @@
   }
 
   function hydrateCurrentAlbumTrackRows(tracksData) {
-    if (!document.body.classList.contains("album-screen")) return;
+    if (!document.body.classList.contains("album-screen") || document.body.classList.contains("playlist-screen")) return;
     const section = document.querySelector(".tracks");
     if (!section) return;
     const currentFile = decodeURIComponent(String(window.location.pathname || "").split("/").pop() || "");

@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="INFRA." />
   <title>INFRA.</title>
-  <meta name="description" content="INFRA. Applications, albums et clips en telechargement direct." />
+  <meta name="description" content="INFRA. Playlists, albums, applications et clips en telechargement direct." />
   <link rel="manifest" href="manifest.webmanifest?v=logo-white-20260216" />
   <link rel="preconnect" href="https://pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev" crossorigin />
   <link rel="dns-prefetch" href="https://pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev" />
@@ -24,13 +24,13 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="INFRA." />
   <meta property="og:title" content="INFRA." />
-  <meta property="og:description" content="Applications, albums et clips en telechargement direct." />
+  <meta property="og:description" content="Playlists, albums, applications et clips en telechargement direct." />
   <meta property="og:url" content="https://infra-180.github.io/infra./" />
   <meta property="og:image" content="https://infra-180.github.io/infra./assets/pwa/icon-512-logo-white.png" />
   <meta property="og:image:type" content="image/png" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="INFRA." />
-  <meta name="twitter:description" content="Applications, albums et clips en telechargement direct." />
+  <meta name="twitter:description" content="Playlists, albums, applications et clips en telechargement direct." />
   <meta name="twitter:image" content="https://infra-180.github.io/infra./assets/pwa/icon-512-logo-white.png" />
   <link rel="stylesheet" href="assets/css/styles.css?v=audiofix368-20260722" />
 </head>
@@ -53,13 +53,53 @@
     <button class="home-favorites-btn" type="button" data-home-favorites hidden aria-label="Ouvrir les favoris" aria-pressed="false">
       <svg class="heart-icon heart-icon-outline" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M19.5 12.572 12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.566Z"/></svg>
     </button>
-    <p class="hero-sub" data-edit-key="subtitle">Applications, albums et clips en telechargement direct</p>
+    <p class="hero-sub" data-edit-key="subtitle">Playlists, albums, applications et clips en telechargement direct</p>
     <div class="admin-mount" id="adminMount"></div>
   </header>
 
   <main class="container one-page-layout">
+    <section class="module one-col" data-module-id="playlists">
+      <details class="albums-menu playlists-menu" open>
+        <summary class="module-head albums-menu-toggle">
+          <h2>Playlists</h2>
+        </summary>
+        <ul class="media-grid albums-grid playlists-grid" aria-label="Playlists INFRA">
+        <!-- PLAYLIST_GRID_START -->
+          <li>
+            <a class="media-card album-card playlist-card" href="playlists/infra-sun.html" aria-label="Ouvrir la playlist INFRA ☀">
+              <span class="playlist-thumb" aria-hidden="true"><span class="playlist-thumb-wordmark">INFRA.</span><span class="playlist-thumb-symbol">☀</span></span>
+              <span class="playlist-card-title">INFRA ☀</span>
+              <span class="playlist-card-meta">29 titres · 1 h 49 min</span>
+            </a>
+          </li>
+          <li>
+            <a class="media-card album-card playlist-card" href="playlists/infra-moon.html" aria-label="Ouvrir la playlist INFRA ☾">
+              <span class="playlist-thumb" aria-hidden="true"><span class="playlist-thumb-wordmark">INFRA.</span><span class="playlist-thumb-symbol">☾</span></span>
+              <span class="playlist-card-title">INFRA ☾</span>
+              <span class="playlist-card-meta">108 titres · 5 h 14 min</span>
+            </a>
+          </li>
+          <li>
+            <a class="media-card album-card playlist-card" href="playlists/infra-snow.html" aria-label="Ouvrir la playlist INFRA ❄">
+              <span class="playlist-thumb" aria-hidden="true"><span class="playlist-thumb-wordmark">INFRA.</span><span class="playlist-thumb-symbol">❄</span></span>
+              <span class="playlist-card-title">INFRA ❄</span>
+              <span class="playlist-card-meta">45 titres · 2 h 14 min</span>
+            </a>
+          </li>
+          <li>
+            <a class="media-card album-card playlist-card" href="playlists/infra-falcon.html" aria-label="Ouvrir la playlist INFRA 𓅃">
+              <span class="playlist-thumb" aria-hidden="true"><span class="playlist-thumb-wordmark">INFRA.</span><span class="playlist-thumb-symbol">𓅃</span></span>
+              <span class="playlist-card-title">INFRA 𓅃</span>
+              <span class="playlist-card-meta">52 titres · 2 h 44 min</span>
+            </a>
+          </li>
+        <!-- PLAYLIST_GRID_END -->
+        </ul>
+      </details>
+    </section>
+
     <section class="module one-col" data-module-id="albums">
-      <details class="albums-menu" open>
+      <details class="albums-menu">
         <summary class="module-head albums-menu-toggle">
           <h2 data-edit-key="heading_albums">Albums</h2>
         </summary>
@@ -284,6 +324,13 @@
 
     <nav class="seo-direct-links" aria-label="Liens directs">
       <h2>Navigation directe</h2>
+      <div class="seo-direct-links-group">
+        <h3>Playlists</h3>
+        <a href="playlists/infra-sun.html">INFRA ☀</a>
+        <a href="playlists/infra-moon.html">INFRA ☾</a>
+        <a href="playlists/infra-snow.html">INFRA ❄</a>
+        <a href="playlists/infra-falcon.html">INFRA 𓅃</a>
+      </div>
       <div class="seo-direct-links-group">
         <h3>Albums</h3>
         <a href="music/v-23pi56-infra.html">V-23π56</a>

@@ -1284,7 +1284,7 @@
       setHomePlayMode("album", { force: true, deferPrefetch: true });
       constrainPlaybackToCurrentAlbum();
     } else {
-      constrainPlaybackToCurrentAlbum();
+      if (audioState.playlistKind !== "playlist") constrainPlaybackToCurrentAlbum();
       audioState.shuffleOn = !audioState.shuffleOn;
       audioState.upcomingTrackPlan = null;
     }
@@ -1547,7 +1547,7 @@
         playlist: sanitizedPlaylist,
         currentIndex,
         homeMode: audioState.homeMode === "radio" ? "radio" : "album",
-        playlistKind: audioState.playlistKind === "global" || audioState.playlistKind === "favorites"
+        playlistKind: ["global", "favorites", "playlist"].includes(audioState.playlistKind)
           ? audioState.playlistKind
           : (audioState.homeMode === "radio" ? "radio" : "album"),
         shuffleOn: Boolean(audioState.shuffleOn),
@@ -1594,12 +1594,12 @@
       return false;
     }
 
-    let restoredKind = payload.playlistKind === "global" || payload.playlistKind === "favorites"
+    let restoredKind = ["global", "favorites", "playlist"].includes(payload.playlistKind)
       ? payload.playlistKind
       : (restoredMode === "radio" ? "radio" : "album");
     const activeSrc = toAbsoluteUrlOrEmpty(getCurrentLogicalAudioSrc() || payload.currentSrc || "");
     let currentIndex = Number.isInteger(payload.currentIndex) ? payload.currentIndex : -1;
-    if (restoredMode !== "radio") {
+    if (restoredMode !== "radio" && restoredKind !== "playlist") {
       const scoped = scopeAlbumPlaylistToCurrentTrack(
         restoredPlaylist,
         activeSrc ? { src: activeSrc } : null,
@@ -1633,10 +1633,10 @@
     }
     audioState.currentIndex = currentIndex;
 
-    if (audioState.homeMode !== "radio" && audioState.playlistKind !== "global" && audioState.playlistKind !== "favorites") {
+    if (audioState.homeMode !== "radio" && audioState.playlistKind === "album") {
       audioState.albumPlaylistSnapshot = audioState.playlist.slice();
       audioState.albumIndexSnapshot = audioState.currentIndex;
-    } else {
+    } else if (audioState.homeMode === "radio") {
       audioState.radioQueue = audioState.playlist.slice();
       audioState.radioQueueCursor = audioState.currentIndex;
       audioState.playlist = audioState.radioQueue;
@@ -1649,7 +1649,7 @@
 
 
   function expandSingleTrackAlbumFromRadioCache() {
-    if (audioState.homeMode === "radio") return false;
+    if (audioState.homeMode === "radio" || audioState.playlistKind === "playlist") return false;
     const list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
     if (list.length !== 1) return false;
 
@@ -1755,12 +1755,12 @@
 
   function ensurePlayablePlaylistContext() {
     if (Array.isArray(audioState.playlist) && audioState.playlist.length) {
-      expandSingleTrackAlbumFromRadioCache();
+      if (audioState.playlistKind !== "playlist") expandSingleTrackAlbumFromRadioCache();
       return;
     }
 
     if (restorePlaybackQueueContext()) {
-      expandSingleTrackAlbumFromRadioCache();
+      if (audioState.playlistKind !== "playlist") expandSingleTrackAlbumFromRadioCache();
       ensureCurrentIndexFromAudio();
       return;
     }
@@ -1791,9 +1791,10 @@
     const ui = audioState.ui;
     if (!ui || !Array.isArray(ui.playlist) || !ui.playlist.length) return;
     audioState.playlist = ui.playlist.slice();
+    audioState.playlistKind = ui.playlistKind === "playlist" ? "playlist" : "album";
     syncPlaylistContext(audioState.playlist);
     ensureCurrentIndexFromAudio();
-    expandSingleTrackAlbumFromRadioCache();
+    if (audioState.playlistKind !== "playlist") expandSingleTrackAlbumFromRadioCache();
   }
 
 

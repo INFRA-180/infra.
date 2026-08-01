@@ -1,7 +1,7 @@
 {
   "name": "INFRA.",
   "short_name": "INFRA.",
-  "description": "Applications, albums et clips en telechargement direct.",
+  "description": "Playlists, albums, applications et clips en telechargement direct.",
   "lang": "fr",
   "id": "./",
   "start_url": "./",

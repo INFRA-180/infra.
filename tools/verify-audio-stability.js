@@ -17,7 +17,7 @@ const expect = (condition, message) => {
 const release = "audiofix374-20260724";
 const shellRelease = "infra-shell-20260724-audio374";
 const cssRelease = "audiofix368-20260722";
-const frozenCssSha256 = "370e3cbd3302972d454b99751c20d78422c8f2971739e67f36c11387e22c562a";
+const frozenCssSha256 = "d1f812f9e5a29e87ccdb0a1c3d0c60f5d83803e2355ff440f938bbf1a8d80161";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");

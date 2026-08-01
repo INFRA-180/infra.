@@ -4445,7 +4445,7 @@ function openAppDownloadGatekeeper(appName, url) {
     const anchorIndex = Math.min(list.length - 1, requestedFromIndex);
     if (!list.length || currentIndex < 0 || anchorIndex < list.length - 1) return -1;
     if (audioState.homeMode === "radio" || audioState.shuffleOn) return -1;
-    if (audioState.playlistKind === "global" || audioState.playlistKind === "favorites") return -1;
+    if (audioState.playlistKind !== "album") return -1;
     if (String(audioState.playlistToken || "").startsWith("manual-")) return -1;
 
     const tracksAlbums = getAlbumContinuityTracksData();
@@ -4502,7 +4502,7 @@ function openAppDownloadGatekeeper(appName, url) {
       : currentIndex;
     if (!list.length || currentIndex < 0 || requestedFromIndex > 0) return -1;
     if (audioState.homeMode === "radio" || audioState.shuffleOn) return -1;
-    if (audioState.playlistKind === "global" || audioState.playlistKind === "favorites") return -1;
+    if (audioState.playlistKind !== "album") return -1;
     if (String(audioState.playlistToken || "").startsWith("manual-")) return -1;
 
     const tracksAlbums = getAlbumContinuityTracksData();

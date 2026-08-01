@@ -2024,8 +2024,8 @@ function testPersistentAlbumAndFullscreenContracts() {
   assert(!albumUiSource.includes("data-track-prev"));
   assert(!albumUiSource.includes("data-track-next"));
   assert(
-    albumUiSource.includes('audioState.playlistKind === "album"'),
-    "An album page may rebind only an already-active album queue"
+    albumUiSource.includes("audioState.playlistKind === ui.playlistKind"),
+    "A collection page may rebind only its already-active album or playlist queue"
   );
   assert(
     albumUiSource.includes("if (matchIndex >= 0)"),

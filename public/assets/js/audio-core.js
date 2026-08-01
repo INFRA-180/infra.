@@ -455,7 +455,12 @@
       if (audioState.homeMode === "radio" && audioState.playlist === audioState.radioQueue) {
         audioState.radioQueueCursor = index;
       }
-      if (audioState.homeMode !== "radio" && audioState.playlistKind !== "global" && audioState.playlistKind !== "favorites") {
+      if (
+        audioState.homeMode !== "radio" &&
+        audioState.playlistKind !== "global" &&
+        audioState.playlistKind !== "favorites" &&
+        audioState.playlistKind !== "playlist"
+      ) {
         audioState.playlistKind = "album";
       }
       if (nextSrc) audioState.activeLogicalSrc = nextSrc;

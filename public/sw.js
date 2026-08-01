@@ -37,6 +37,7 @@ const SHELL_ASSETS = [
   "./data/catalog.json?v=audiofix366-20260722",
   "./data/track-durations.json?v=audiofix366-20260722",
   "./data/tracks.json?v=audiofix366-20260722",
+  "./data/playlists.json?v=audiofix374-20260724",
   "./assets/branding/infra-logo-white-photoroom-title.png",
   "./assets/pwa/favicon-logo-white-64.png",
   "./assets/pwa/icon-192-logo-white.png",
@@ -92,7 +93,11 @@ const ALBUM_PAGES = [
   "./music/sanguin-infra.html",
   "./music/trou-noir-infra.html",
   "./music/v-23pi56-infra.html",
-  "./music/voyager-infra.html"
+  "./music/voyager-infra.html",
+  "./playlists/infra-sun.html",
+  "./playlists/infra-moon.html",
+  "./playlists/infra-snow.html",
+  "./playlists/infra-falcon.html"
 ];
 
 async function precacheAlbumDocuments(cache) {

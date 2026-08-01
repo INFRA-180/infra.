@@ -899,3 +899,10 @@
 - Live Web Inspector measurements on the installed PWA showed a `844px` screen but a `797px` viewport and matching `html`, `body`, overlay, and panel bottoms; the missing `47px` matched the top safe-area inset.
 - No mobile overlay or panel height, bottom anchor, or bottom filler changed. The removed status-bar overlay layer, safe top control spacing, and artwork-only top extension remain intact.
 - Release shell: `infra-shell-20260715-audio328`; the unchanged fullscreen stylesheet remains `audiofix327-20260715`.
+
+## 2026-08-01 — Read-only Music playlists
+
+- The four exact Music.app user playlists (`INFRA ☀`, `INFRA ☾`, `INFRA ❄`, `INFRA 𓅃`) are exported read-only and matched to the existing 283-track public catalogue by Music persistent ID; persistent IDs remain private and are omitted from `public/data/playlists.json`.
+- The home page opens Playlists first and keeps Albums closed by default. Each playlist has a static, SEO-addressable page under `public/playlists/`, backed by the shared player runtime and cached by the PWA shell.
+- Playlist queues use a dedicated `playlistKind: "playlist"` so shuffle, next/previous, and session restore retain the complete cross-album order without invoking album-continuity expansion.
+- `tools/test-music-playlists.js` protects the four names, signs, native Music order, 234 occurrences, 225 unique catalogue sources, generated pages, home ordering, and queue contracts.

@@ -157,7 +157,7 @@ const playlistStyles = read("public/assets/css/playlists.css");
 if (!playlistStyles.includes("grid-template-columns: repeat(2")) {
   fail("playlist mosaics are not styled correctly");
 }
-if (!playlistStyles.includes("color: #000000") || !playlistStyles.includes("font-size: clamp(2rem, 3vw, 2.6rem)") || !playlistStyles.includes("font-size: clamp(4rem, 10vw, 7rem)")) {
+if (!playlistStyles.includes("color: #000000") || !playlistStyles.includes("font-size: clamp(1.12rem, 1.8vw, 1.46rem)") || !playlistStyles.includes("font-size: clamp(2.8rem, 7vw, 5.6rem)")) {
   fail("playlist mosaics or black signs are not styled correctly");
 }
 

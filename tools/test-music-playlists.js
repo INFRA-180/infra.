@@ -154,7 +154,10 @@ for (const contract of expected) {
 }
 
 const playlistStyles = read("public/assets/css/playlists.css");
-if (!playlistStyles.includes("grid-template-columns: repeat(2") || !playlistStyles.includes("color: #111111")) {
+if (!playlistStyles.includes("grid-template-columns: repeat(2")) {
+  fail("playlist mosaics are not styled correctly");
+}
+if (!playlistStyles.includes("color: #000000") || !playlistStyles.includes("font-size: clamp(2rem, 3vw, 2.6rem)") || !playlistStyles.includes("font-size: clamp(4rem, 10vw, 7rem)")) {
   fail("playlist mosaics or black signs are not styled correctly");
 }
 

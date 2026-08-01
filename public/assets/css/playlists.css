@@ -32,19 +32,23 @@
 }
 
 .playlist-card .playlist-card-title {
+  display: block;
+  width: 100%;
   margin-top: 4px;
-  color: #111111;
-  font-size: clamp(1.12rem, 1.8vw, 1.46rem) !important;
-  line-height: 1;
+  color: #000000;
+  font-size: clamp(2rem, 3vw, 2.6rem) !important;
+  line-height: 0.9;
   letter-spacing: 0 !important;
+  text-align: center;
   text-transform: none !important;
 }
 
 .playlist-visible-title {
-  color: #111111;
-  font-size: clamp(2.8rem, 7vw, 5.6rem);
-  line-height: 0.95;
+  color: #000000;
+  font-size: clamp(4rem, 10vw, 7rem);
+  line-height: 0.9;
   letter-spacing: 0;
+  text-align: center;
   text-transform: none;
 }
 

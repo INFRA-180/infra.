@@ -14,8 +14,8 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix374-20260724";
-const shellRelease = "infra-shell-20260724-audio374";
+const release = "audiofix376-20260801";
+const shellRelease = "infra-shell-20260801-audio376";
 const cssRelease = "audiofix368-20260722";
 const frozenCssSha256 = "d1f812f9e5a29e87ccdb0a1c3d0c60f5d83803e2355ff440f938bbf1a8d80161";
 const scripts = read("public/assets/js/scripts.js");
@@ -46,9 +46,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix374");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix374");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio374");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix376");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix376");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio376");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -414,4 +414,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix374.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix376.");

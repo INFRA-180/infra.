@@ -37,6 +37,9 @@
     "media_session_pause",
     "media_session_play",
     "media_session_previoustrack",
+    "media_command",
+    "media_capabilities",
+    "audio_interruption",
     "transport_nexttrack",
     "transport_previoustrack",
     "play_request",
@@ -99,7 +102,7 @@
   const DB_NAME = "infra_audio_telemetry_v2";
   const DB_STORE = "sessions";
   const LEGACY_DB_NAME = "infra_audio_telemetry_v1";
-  const SESSION_SCHEMA_VERSION = 2;
+  const SESSION_SCHEMA_VERSION = 3;
   const SESSION_EVENT_CAP = 48;
   const SESSION_STORE_CAP = 4;
   const SESSION_TTL_MS = 72 * 60 * 60 * 1000;
@@ -113,7 +116,10 @@
     "reason", "error_name", "action", "strategy", "cache_hint", "state",
     "phase", "mode", "playlist_kind", "audio_session_state", "audio_session_type",
     "from_album", "to_album", "result", "recovery_reason", "intent_reason",
-    "route_kind", "display_mode", "orientation"
+    "route_kind", "display_mode", "orientation", "command_token", "origin",
+    "surface_hint", "decision", "outcome", "probe_stage", "supported_actions",
+    "unsupported_actions", "cleared_actions", "registration_result", "interruption_token",
+    "interruption_kind", "before_media_session_state", "after_media_session_state"
   ]);
   const TELEMETRY_NUMBER_FIELDS = new Set([
     "timestamp_ms", "delta_ms", "duration_before_play_ms", "duration_ms", "delay_ms",
@@ -164,7 +170,15 @@
     "visualizer_canvas_width", "visualizer_canvas_height",
     "visualizer_canvas_opacity_milli", "visualizer_audio_advanced_ms",
     "visualizer_context_supported", "visualizer_context_running",
-    "visualizer_analyser_ready", "visualizer_canvas_visible"
+    "visualizer_analyser_ready", "visualizer_canvas_visible",
+    "command_sequence", "event_sequence", "before_current_time", "after_current_time",
+    "probe_600_ms", "probe_1500_ms", "probe_3000_ms", "command_latency_ms",
+    "from_ms", "to_ms", "media_command_count", "media_command_success_count",
+    "media_command_noop_count", "media_command_dedup_count", "media_command_rejected_count",
+    "media_command_no_progress_count", "media_command_recovered_count",
+    "media_command_recovery_failed_count", "media_command_incomplete_count",
+    "media_play_count", "media_pause_count", "media_previous_count", "media_next_count",
+    "media_seek_count", "media_restart_count", "audio_interruption_count"
   ]);
   const TELEMETRY_BOOLEAN_FIELDS = new Set([
     "fine_event", "navigator_on_line", "auto", "error", "health_session_active",
@@ -175,7 +189,9 @@
     "served_from_prefetch", "is_ios", "is_standalone", "prepared", "prefetch_ready",
     "cover_timed_out", "visible", "unexpected", "navigation_active", "fullscreen_open",
     "has_playback_session", "has_source", "is_home", "is_album",
-    "cover_ready_at_first_paint", "cover_ready_at_second_paint"
+    "cover_ready_at_first_paint", "cover_ready_at_second_paint",
+    "before_paused", "after_paused", "confirmed", "recovery_attempted",
+    "handler_play", "handler_pause", "handler_previous", "handler_next", "handler_seekto"
   ]);
 
   function now() {
@@ -279,7 +295,23 @@
     "visualizer_context_supported",
     "visualizer_context_running",
     "visualizer_analyser_ready",
-    "visualizer_canvas_visible"
+    "visualizer_canvas_visible",
+    "media_command_count",
+    "media_command_success_count",
+    "media_command_noop_count",
+    "media_command_dedup_count",
+    "media_command_rejected_count",
+    "media_command_no_progress_count",
+    "media_command_recovered_count",
+    "media_command_recovery_failed_count",
+    "media_command_incomplete_count",
+    "media_play_count",
+    "media_pause_count",
+    "media_previous_count",
+    "media_next_count",
+    "media_seek_count",
+    "media_restart_count",
+    "audio_interruption_count"
   ];
 
   function createSessionSummary() {
@@ -444,11 +476,14 @@
     const spaKeyByTarget = new Map();
     const spaKeyByNavigation = new Map();
     const compactEvents = new Map();
+    const mediaCommands = new Map();
+    const audioInterruptions = new Map();
     let activeTrackToken = 0;
     let activeSpaKey = "";
     let spaSequence = 0;
     let miniVisibilityState = "";
     let miniVisibilitySequence = 0;
+    let mediaEventSequence = 0;
 
     function getWorkerUrl() {
       if (call(ctx, "isTelemetryOriginAllowed") === false) return "";
@@ -746,6 +781,126 @@
         source: "summary",
         ua_class: session.ua_class || getUaClass()
       }, summary || {}), session);
+    }
+
+    function isTerminalMediaCommandOutcome(value) {
+      return [
+        "success", "noop", "dedup", "rejected", "no_progress",
+        "recovered", "recovery_failed", "incomplete"
+      ].includes(String(value || ""));
+    }
+
+    function mediaCommandOutcomeSummaryField(outcome) {
+      const normalized = String(outcome || "");
+      if (normalized === "success") return "media_command_success_count";
+      if (normalized === "noop") return "media_command_noop_count";
+      if (normalized === "dedup") return "media_command_dedup_count";
+      if (normalized === "rejected") return "media_command_rejected_count";
+      if (normalized === "no_progress") return "media_command_no_progress_count";
+      if (normalized === "recovered") return "media_command_recovered_count";
+      if (normalized === "recovery_failed") return "media_command_recovery_failed_count";
+      if (normalized === "incomplete") return "media_command_incomplete_count";
+      return "";
+    }
+
+    function mediaActionSummaryField(action) {
+      const normalized = String(action || "");
+      if (normalized === "play") return "media_play_count";
+      if (normalized === "pause") return "media_pause_count";
+      if (normalized === "previous") return "media_previous_count";
+      if (normalized === "next") return "media_next_count";
+      if (normalized.startsWith("seek")) return "media_seek_count";
+      return "";
+    }
+
+    function processMediaCommand(payload, source, timestampMs) {
+      const commandToken = String(source && source.command_token || payload.command_token || "").trim().slice(0, 120);
+      if (!commandToken) return false;
+      const session = ensureActiveSession();
+      if (!session) return true;
+      let record = mediaCommands.get(commandToken);
+      const firstObservation = !record;
+      if (!record) {
+        record = {
+          event: "media_command",
+          command_token: commandToken,
+          event_sequence: ++mediaEventSequence,
+          timestamp_ms: Number(timestampMs) || Date.now(),
+          outcome: "pending",
+          counted_outcomes: {},
+          restart_counted: false
+        };
+        mediaCommands.set(commandToken, record);
+      }
+      const previousOutcome = record.outcome;
+      Object.assign(record, payload, {
+        event: "media_command",
+        command_token: commandToken,
+        event_sequence: record.event_sequence,
+        timestamp_ms: Number(timestampMs) || Date.now()
+      });
+      if (firstObservation) {
+        incrementSummary("media_command_count", 1, session);
+        const actionField = mediaActionSummaryField(record.action);
+        if (actionField) incrementSummary(actionField, 1, session);
+      }
+      if (record.decision === "restart" && !record.restart_counted) {
+        incrementSummary("media_restart_count", 1, session);
+        record.restart_counted = true;
+      }
+      if (
+        isTerminalMediaCommandOutcome(record.outcome) &&
+        record.outcome !== previousOutcome &&
+        !record.counted_outcomes[record.outcome]
+      ) {
+        const outcomeField = mediaCommandOutcomeSummaryField(record.outcome);
+        if (outcomeField) incrementSummary(outcomeField, 1, session);
+        record.counted_outcomes[record.outcome] = true;
+      }
+      const compact = Object.assign({}, record);
+      delete compact.counted_outcomes;
+      delete compact.restart_counted;
+      upsertCompactEvent(`media-command:${commandToken}`, compact, session);
+      pruneLocalMap(mediaCommands, LOCAL_CORRELATION_CAP);
+      return true;
+    }
+
+    function processMediaCapabilities(payload, source, timestampMs) {
+      const session = ensureActiveSession();
+      if (!session) return true;
+      upsertCompactEvent("media-capabilities", Object.assign({}, payload, {
+        event: "media_capabilities",
+        event_sequence: ++mediaEventSequence,
+        timestamp_ms: Number(timestampMs) || Date.now(),
+        result: String(source && source.registration_result || payload.registration_result || "unknown")
+      }), session);
+      return true;
+    }
+
+    function processAudioInterruption(payload, source, timestampMs) {
+      const interruptionToken = String(
+        source && source.interruption_token || payload.interruption_token || "interruption"
+      ).trim().slice(0, 120);
+      const session = ensureActiveSession();
+      if (!session) return true;
+      const firstObservation = !audioInterruptions.has(interruptionToken);
+      const record = Object.assign(
+        audioInterruptions.get(interruptionToken) || {},
+        payload,
+        {
+          event: "audio_interruption",
+          interruption_token: interruptionToken,
+          event_sequence: audioInterruptions.has(interruptionToken)
+            ? audioInterruptions.get(interruptionToken).event_sequence
+            : ++mediaEventSequence,
+          timestamp_ms: Number(timestampMs) || Date.now()
+        }
+      );
+      audioInterruptions.set(interruptionToken, record);
+      if (firstObservation) incrementSummary("audio_interruption_count", 1, session);
+      upsertCompactEvent(`audio-interruption:${interruptionToken}`, record, session);
+      pruneLocalMap(audioInterruptions, LOCAL_CORRELATION_CAP);
+      return true;
     }
 
     function clearLegacyDb() {
@@ -1466,6 +1621,13 @@
       trackTransitions.forEach(function (transition) {
         if (!transition.finalized) finalizeTrackTransition(transition, reason || "sealed", timestampMs);
       });
+      mediaCommands.forEach(function (command) {
+        if (isTerminalMediaCommandOutcome(command.outcome)) return;
+        processMediaCommand(Object.assign({}, command, {
+          outcome: "incomplete",
+          reason: String(reason || "sealed")
+        }), command, timestampMs);
+      });
       spaTransitions.forEach(function (transition) {
         if (!transition.finalized) {
           transition.reason = transition.reason || String(reason || "sealed");
@@ -1495,6 +1657,8 @@
       spaKeyByTarget.clear();
       spaKeyByNavigation.clear();
       compactEvents.clear();
+      mediaCommands.clear();
+      audioInterruptions.clear();
       activeTrackToken = 0;
       activeSpaKey = "";
       if (!current.events.length) {
@@ -1628,6 +1792,7 @@
       const errorEvent = eventType === "play_rejected" ||
         eventType === "error" ||
         eventType === "prefetch_error" ||
+        (eventType === "media_command" && ["rejected", "no_progress", "recovery_failed", "incomplete"].includes(String(source.outcome || ""))) ||
         /_failed$/.test(eventType);
       const payload = Object.assign({}, source, getEnvironment(), getHealthSessionState(), {
         event: eventType,
@@ -1649,6 +1814,19 @@
           ? (source.error_name || "")
           : (source.reason || source.error_name || source.error_message || "")
       });
+
+      if (eventType === "media_command") {
+        processMediaCommand(payload, source, timestampMs);
+        return;
+      }
+      if (eventType === "media_capabilities") {
+        processMediaCapabilities(payload, source, timestampMs);
+        return;
+      }
+      if (eventType === "audio_interruption") {
+        processAudioInterruption(payload, source, timestampMs);
+        return;
+      }
 
       if (eventType.startsWith("prefetch_")) {
         processPrefetchRuntimeEvent(eventType, source, timestampMs);
@@ -1694,7 +1872,7 @@
     }
 
     function startHeartbeat() {
-      // Session v2 is event-driven; periodic telemetry is intentionally disabled.
+      // Session v3 is event-driven; periodic telemetry is intentionally disabled.
     }
 
     function stopHeartbeat() {

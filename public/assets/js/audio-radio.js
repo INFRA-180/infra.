@@ -92,6 +92,77 @@
     const isBlobObjectUrl = method(ctx, "isBlobObjectUrl", function () { return false; });
     const getQueuePreviewIndices = method(ctx, "getQueuePreviewIndices", function () { return []; });
 
+  function createExternalMediaCommand(action, surface, audio) {
+    audioState.mediaCommandSequence = Number(audioState.mediaCommandSequence || 0) + 1;
+    return {
+      id: `cmd-${String(action || "media")}-${Date.now().toString(36)}-${audioState.mediaCommandSequence}`,
+      sequence: audioState.mediaCommandSequence,
+      action: String(action || "play"),
+      at: Date.now(),
+      surface: String(surface || "media_session"),
+      beforePaused: Boolean(audio && audio.paused),
+      beforeCurrentTime: audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0
+    };
+  }
+
+  function getRemoteSurfaceHint(surface) {
+    if (String(surface || "") !== "media_session") return String(surface || "ui");
+    if (document.visibilityState === "hidden") return "remote_hidden";
+    if (document.visibilityState === "visible") return "remote_visible";
+    return "remote_unknown";
+  }
+
+  function emitExternalMediaCommand(command, details) {
+    if (!command || !command.id) return;
+    const audio = audioState.audio;
+    trackAudioRuntimeEvent("media_command", Object.assign(
+      buildAudioMonitorPayload(
+        getCurrentPlaylistTrack(),
+        audioState.currentIndex,
+        audioState.activeLogicalSrc || (audio && (audio.currentSrc || audio.src)) || ""
+      ),
+      {
+        command_token: command.id,
+        command_sequence: command.sequence || 0,
+        action: command.action || "play",
+        origin: command.surface === "media_session" ? "media_session" : "transport",
+        surface: command.surface || "media_session",
+        surface_hint: getRemoteSurfaceHint(command.surface),
+        before_paused: Boolean(command.beforePaused),
+        before_current_time: Number(command.beforeCurrentTime) || 0,
+        after_paused: Boolean(audio && audio.paused),
+        after_current_time: audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+        from_index: Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1,
+        to_index: Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1,
+        command_latency_ms: Math.max(0, Date.now() - command.at)
+      },
+      details || {}
+    ));
+  }
+
+  function emitAudioInterruption(guard, details) {
+    if (!guard || !guard.token) return;
+    const audio = audioState.audio;
+    trackAudioRuntimeEvent("audio_interruption", Object.assign(
+      buildAudioMonitorPayload(
+        getCurrentPlaylistTrack(),
+        audioState.currentIndex,
+        audioState.activeLogicalSrc || (audio && (audio.currentSrc || audio.src)) || ""
+      ),
+      {
+        interruption_token: guard.token,
+        interruption_kind: "system_midtrack",
+        origin: "system",
+        surface_hint: getRemoteSurfaceHint("media_session"),
+        before_current_time: Number(guard.currentTime) || 0,
+        before_paused: false,
+        after_current_time: audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+        after_paused: Boolean(audio && audio.paused)
+      },
+      details || {}
+    ));
+  }
+
   function resyncMediaSessionControls() {
     bindMediaSessionActions({ force: true, quiet: true });
     syncMediaSessionMetadata({ forcePosition: true });
@@ -170,11 +241,17 @@
 
   function rememberSystemInterruption(audio, pauseContext) {
     if (pauseContext !== "system_midtrack") return;
+    audioState.audioInterruptionSequence = Number(audioState.audioInterruptionSequence || 0) + 1;
     audioState.systemInterruptionGuard = {
+      token: `interruption-${Date.now().toString(36)}-${audioState.audioInterruptionSequence}`,
       at: Date.now(),
       src: getCurrentAudioResumeKey(audio),
       currentTime: audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0
     };
+    emitAudioInterruption(audioState.systemInterruptionGuard, {
+      phase: "paused",
+      outcome: "detected"
+    });
     audioState.resumeOnVisible = false;
   }
 
@@ -213,6 +290,13 @@
     }
 
     audioState.externalResumeRecoveryInFlight = true;
+    command.recoveryInFlight = true;
+    emitExternalMediaCommand(command, {
+      decision: "resume",
+      outcome: "no_progress",
+      recovery_attempted: true,
+      probe_1500_ms: Math.max(0, Math.round(((audio.currentTime || 0) - startTime) * 1000))
+    });
     const recoveryStartedAt = Date.now();
     const recoveryStartTime = Number.isFinite(audio.currentTime) ? audio.currentTime : startTime;
     const payload = Object.assign(
@@ -265,6 +349,16 @@
             }
           )
         );
+        activeCommand.recoveryInFlight = false;
+        activeCommand.finalOutcome = recovered ? "recovered" : "recovery_failed";
+        emitExternalMediaCommand(activeCommand, {
+          decision: "resume",
+          outcome: recovered ? "recovered" : "recovery_failed",
+          recovery_attempted: true,
+          recovery_reason: recovered ? "guarded_replay" : "no_progress",
+          advanced_ms: Math.round(advanced * 1000),
+          probe_stage: "recovery_900"
+        });
         audioState.externalResumeRecoveryInFlight = false;
       }, 900);
       audioState.externalResumeProbeTimers.push(timer);
@@ -286,6 +380,18 @@
           error_message: err && err.message ? err.message : "external_resume_recovery_rejected"
         }
       ));
+      const activeCommand = audioState.externalPlaybackCommand;
+      if (activeCommand) {
+        activeCommand.recoveryInFlight = false;
+        activeCommand.finalOutcome = "recovery_failed";
+      }
+      emitExternalMediaCommand(activeCommand, {
+        decision: "resume",
+        outcome: "recovery_failed",
+        recovery_attempted: true,
+        recovery_reason: err && err.name ? err.name : "play_rejected",
+        probe_stage: "recovery_rejected"
+      });
       audioState.externalResumeRecoveryInFlight = false;
     });
   }
@@ -314,6 +420,23 @@
             paused: Boolean(audio.paused)
           }
         ));
+        const probeField = delayMs === 600
+          ? "probe_600_ms"
+          : (delayMs === 1500 ? "probe_1500_ms" : "probe_3000_ms");
+        const confirmed = Boolean(!audio.paused && advanced >= (delayMs >= 3000 ? 1 : 0.2));
+        const commandUpdate = {
+          decision: "resume",
+          outcome: command.finalOutcome || (
+            command.recoveryInFlight
+              ? "no_progress"
+              : (delayMs === 3000 ? (confirmed ? "success" : "no_progress") : "dispatched")
+          ),
+          probe_stage: `probe_${delayMs}`,
+          confirmed,
+          advanced_ms: Math.round(advanced * 1000)
+        };
+        commandUpdate[probeField] = Math.round(advanced * 1000);
+        emitExternalMediaCommand(command, commandUpdate);
         if (delayMs === 1500 && !audio.paused && advanced < 0.35) {
           recoverStuckExternalResume(audio, commandId, surface, startTime);
         }
@@ -1805,6 +1928,7 @@
     const commandNow = Date.now();
     const previousCommand = audioState.externalPlaybackCommand;
     if (previousCommand && commandNow - previousCommand.at < 400) {
+      const duplicateCommand = createExternalMediaCommand("play", surface, audio);
       trackAudioRuntimeEvent("external_play_duplicate", Object.assign(
         buildAudioMonitorPayload(
           getCurrentPlaylistTrack(),
@@ -1813,30 +1937,47 @@
         ),
         getAudioRuntimeProbeState(),
         {
-          command_id: previousCommand.id,
+          command_id: duplicateCommand.id,
           surface: surface || "",
           duplicate_after_ms: Math.max(0, commandNow - previousCommand.at),
           paused: Boolean(audio.paused)
         }
       ));
+      emitExternalMediaCommand(duplicateCommand, {
+        decision: "resume",
+        outcome: "dedup",
+        reason: "command_window"
+      });
       return;
     }
-    if (!audio.paused) return;
+    if (!audio.paused) {
+      const noopCommand = createExternalMediaCommand("play", surface, audio);
+      emitExternalMediaCommand(noopCommand, {
+        decision: "resume",
+        outcome: "noop",
+        reason: "already_playing"
+      });
+      return;
+    }
     cancelExternalResumeCommand();
+    const interruptionGuard = audioState.systemInterruptionGuard;
+    const command = createExternalMediaCommand("play", surface, audio);
+    if (interruptionGuard && interruptionGuard.token) command.interruptionToken = interruptionGuard.token;
     clearSystemInterruptionGuard();
-    audioState.externalPlaybackCommandSeq = Number(audioState.externalPlaybackCommandSeq || 0) + 1;
-    const commandId = `external-${Date.now().toString(36)}-${audioState.externalPlaybackCommandSeq}`;
-    audioState.externalPlaybackCommand = {
-      id: commandId,
-      at: commandNow,
-      surface: surface || ""
-    };
+    const commandId = command.id;
+    audioState.externalPlaybackCommand = command;
 
     if (!getCurrentPlayableAudioSrc(audio)) {
+      command.coldStart = true;
       trackAudioRuntimeEvent("media_session_play", {
         command_id: commandId,
         surface: surface || "",
         mode: "cold_start"
+      });
+      emitExternalMediaCommand(command, {
+        decision: "resume",
+        outcome: "dispatched",
+        reason: "cold_start"
       });
       if (audioState.homeMode === "radio") {
         trackAudioRuntimeEvent("external_play_start", {
@@ -1865,7 +2006,17 @@
           mode: "playlist",
           index: startIndex
         });
-        startTrack(startIndex >= 0 ? startIndex : 0, { resume: true });
+        startTrack(startIndex >= 0 ? startIndex : 0, {
+          resume: true,
+          fromMediaSession: surface === "media_session",
+          fromTransportControl: surface !== "media_session",
+          surface: surface || "media_session",
+          commandToken: commandId,
+          commandSequence: command.sequence,
+          commandStartedAt: command.at,
+          mediaAction: "play",
+          mediaDecision: "resume"
+        });
       }
       return;
     }
@@ -1888,6 +2039,11 @@
         mode: "resume"
       }
     ));
+    emitExternalMediaCommand(command, {
+      decision: "resume",
+      outcome: "dispatched",
+      probe_stage: "command_received"
+    });
     const startTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
     scheduleExternalResumeProbes(audio, commandId, surface, startTime);
     audio.play().then(function () {
@@ -1907,6 +2063,12 @@
           paused: Boolean(audio.paused)
         }
       ));
+      emitExternalMediaCommand(command, {
+        decision: "resume",
+        outcome: "dispatched",
+        probe_stage: "play_promise",
+        confirmed: Boolean(!audio.paused)
+      });
     }).catch(function (err) {
       trackAudioRuntimeEvent("resume_probe", Object.assign(
         buildAudioMonitorPayload(
@@ -1926,6 +2088,14 @@
           error_message: err && err.message ? err.message : "external_play_rejected"
         }
       ));
+      command.finalOutcome = "rejected";
+      emitExternalMediaCommand(command, {
+        decision: "resume",
+        outcome: "rejected",
+        probe_stage: "play_rejected",
+        reason: err && err.name ? err.name : "Error",
+        confirmed: false
+      });
     });
   }
 
@@ -2047,6 +2217,25 @@
       syncMediaSessionMetadata({ forcePosition: true });
       startAudioRaf();
       startAudioTelemetryHeartbeat();
+      const activeExternalCommand = audioState.externalPlaybackCommand;
+      if (activeExternalCommand) {
+        emitExternalMediaCommand(activeExternalCommand, {
+          decision: "resume",
+          outcome: activeExternalCommand.coldStart ? "success" : "dispatched",
+          probe_stage: "audio_play_event",
+          confirmed: true
+        });
+        if (activeExternalCommand.interruptionToken) {
+          emitAudioInterruption({
+            token: activeExternalCommand.interruptionToken,
+            currentTime: activeExternalCommand.beforeCurrentTime
+          }, {
+            phase: "resumed",
+            outcome: "success",
+            command_token: activeExternalCommand.id
+          });
+        }
+      }
       trackAudioRuntimeEvent("audio_play", Object.assign(
         buildAudioMonitorPayload(
           getCurrentPlaylistTrack(),

@@ -178,7 +178,7 @@ function createTelemetry() {
     fineTelemetryEnabled: true,
     isTelemetryOriginAllowed: () => true,
     getWorkerUrl: () => "https://worker.test",
-    getRuntimeVersion: () => "audiofix-session-v2-test",
+    getRuntimeVersion: () => "audiofix-session-v3-test",
     getAudioState: () => audioState,
     getAudio: () => audioState.audio,
     getAudioSource: () => "r2dev",
@@ -205,7 +205,7 @@ async function settle(turns = 20) {
 
   telemetry.startHeartbeat();
   telemetry.trackRuntimeEvent("heartbeat", { track: "Must stay local", album: "Album" });
-  assert.strictEqual(intervalCalls, 0, "Session v2 must not install a heartbeat interval");
+  assert.strictEqual(intervalCalls, 0, "Session v3 must not install a heartbeat interval");
 
   for (let index = 0; index < 60; index += 1) {
     telemetry.enqueue({
@@ -237,7 +237,7 @@ async function settle(turns = 20) {
   const firstRequest = requests[0];
   assert.strictEqual(firstRequest.options.credentials, "omit");
   assert.strictEqual(firstRequest.options.keepalive, true);
-  assert.strictEqual(firstRequest.payload.schema_version, 2);
+  assert.strictEqual(firstRequest.payload.schema_version, 3);
   assert.strictEqual(firstRequest.payload.reports.length, 1);
   assert.strictEqual(firstRequest.payload.reports[0].events.length, 48, "Local journal must be capped at 48 events");
   assert.strictEqual(firstRequest.payload.reports[0].dropped_events, 13);
@@ -521,6 +521,66 @@ async function settle(turns = 20) {
   });
   telemetry.trackRuntimeEvent("mini_player_visibility", { state: "hidden", reason: "duplicate" });
   telemetry.trackRuntimeEvent("mini_player_visibility", { state: "visible", reason: "route_ready" });
+  telemetry.trackRuntimeEvent("media_capabilities", {
+    track: "media-session",
+    album: "session",
+    supported_actions: "play,pause,previoustrack,nexttrack,seekto",
+    unsupported_actions: "seekbackward,seekforward",
+    registration_result: "partial",
+    handler_play: true,
+    handler_pause: true,
+    handler_previous: true,
+    handler_next: true,
+    handler_seekto: true
+  });
+  const commandToken = "cmd-play-safe-1";
+  telemetry.trackRuntimeEvent("media_command", {
+    command_token: commandToken,
+    command_sequence: 1,
+    action: "play",
+    origin: "media_session",
+    surface_hint: "remote_hidden",
+    decision: "resume",
+    outcome: "dispatched",
+    before_paused: true,
+    before_current_time: 41.5
+  });
+  telemetry.trackRuntimeEvent("media_command", {
+    command_token: commandToken,
+    action: "play",
+    origin: "media_session",
+    surface_hint: "remote_hidden",
+    decision: "resume",
+    outcome: "no_progress",
+    probe_1500_ms: 120,
+    recovery_attempted: true
+  });
+  telemetry.trackRuntimeEvent("media_command", {
+    command_token: commandToken,
+    action: "play",
+    origin: "media_session",
+    surface_hint: "remote_hidden",
+    decision: "resume",
+    outcome: "recovered",
+    probe_3000_ms: 1400,
+    after_paused: false,
+    after_current_time: 42.9
+  });
+  telemetry.trackRuntimeEvent("audio_interruption", {
+    interruption_token: "interruption-safe-1",
+    interruption_kind: "system_midtrack",
+    phase: "paused",
+    outcome: "detected",
+    surface_hint: "remote_hidden"
+  });
+  telemetry.trackRuntimeEvent("audio_interruption", {
+    interruption_token: "interruption-safe-1",
+    interruption_kind: "system_midtrack",
+    phase: "resumed",
+    outcome: "success",
+    surface_hint: "remote_hidden",
+    command_token: commandToken
+  });
   await settle();
   const putsBeforePrefetchError = indexedDbPutCalls;
   telemetry.trackRuntimeEvent("prefetch_error", {
@@ -559,6 +619,15 @@ async function settle(turns = 20) {
     "Visualizer probes must update one compact event instead of appending per frame"
   );
   assert.strictEqual(compactEvents.filter((event) => event.event === "session_summary").length, 1);
+  assert.strictEqual(compactEvents.filter((event) => event.event === "media_capabilities").length, 1);
+  assert.strictEqual(compactEvents.filter((event) => event.event === "media_command").length, 1);
+  assert.strictEqual(compactEvents.filter((event) => event.event === "audio_interruption").length, 1);
+  const compactCommand = compactEvents.find((event) => event.event === "media_command");
+  assert.strictEqual(compactCommand.command_token, commandToken);
+  assert.strictEqual(compactCommand.outcome, "recovered");
+  assert.strictEqual(compactCommand.probe_1500_ms, 120);
+  assert.strictEqual(compactCommand.probe_3000_ms, 1400);
+  assert.strictEqual(compactCommand.surface_hint, "remote_hidden");
   assert.strictEqual(
     compactEvents.some((event) => [
       "startTrack_enter", "click_track", "source_assigned", "play_call", "playing",
@@ -627,6 +696,11 @@ async function settle(turns = 20) {
   assert.strictEqual(compactSummary.visualizer_context_running, 1);
   assert.strictEqual(compactSummary.visualizer_analyser_ready, 1);
   assert.strictEqual(compactSummary.visualizer_canvas_visible, 1);
+  assert.strictEqual(compactSummary.media_command_count, 1);
+  assert.strictEqual(compactSummary.media_play_count, 1);
+  assert.strictEqual(compactSummary.media_command_no_progress_count, 1);
+  assert.strictEqual(compactSummary.media_command_recovered_count, 1);
+  assert.strictEqual(compactSummary.audio_interruption_count, 1);
   const compactVisualizer = compactEvents.find((event) => event.event === "visualizer_health");
   assert.strictEqual(compactVisualizer.result, "ready");
   assert.strictEqual(compactVisualizer.state, "running");
@@ -691,7 +765,7 @@ async function settle(turns = 20) {
   await settle();
   assert.strictEqual(requests.length, 4, "pagehide must not duplicate the coalesced delivery");
 
-  console.log("Audio telemetry session v2 privacy checks passed.");
+  console.log("Audio telemetry session v3 privacy checks passed.");
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;

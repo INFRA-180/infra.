@@ -1,5 +1,24 @@
 # Implementation Notes
 
+## 2026-08-01 — audiofix376 commandes iPhone et télémétrie Media Session v3
+
+- `Previous` applique désormais la même règle sur le plein écran et Media Session : au-delà de
+  3 secondes, la piste courante repart à 0 sans nouveau chargement ni second `play()` ; avant
+  le seuil, la piste précédente est sélectionnée. Les bornes Album, Radio et historique
+  Shuffle redémarrent la piste courante sans boucler.
+- La télémétrie événementielle v3 conserve une seule entrée compacte par commande distante,
+  mise à jour par jeton avec l’action, la décision, l’état avant/après, les sondes à
+  600/1500/3000 ms, la récupération et l’issue finale. Les capacités Media Session et les
+  interruptions système sont également compactées, sans URL audio ni user-agent brut.
+- `remote_hidden` et `remote_visible` sont des indices issus de Page Visibility. Ils ne sont
+  jamais présentés comme une identification certaine de l’écran verrouillé ou du Control
+  Center, distinction que l’API Media Session ne fournit pas.
+- Le Worker accepte les sessions v2 et v3, stocke v3 sous `session3:`, rejette par `409` un
+  identifiant réutilisé avec un contenu différent et répond sans réécriture à un retry
+  identique. La limitation `/log` utilise le binding Rate Limiting Cloudflare au lieu d’un
+  compteur KV concurrent ; les logs d’ingestion structurés excluent toute donnée de piste.
+- Identifiants : `audiofix376-20260801`, `infra-shell-20260801-audio376`.
+
 ## 2026-07-24 — audiofix374 comparaison FFT pure
 
 - L’état complet précédent est figé par le tag Git annoté

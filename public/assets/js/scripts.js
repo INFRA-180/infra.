@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix374-20260724";
+window.INFRA_BUILD_TAG = "audiofix376-20260801";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -240,6 +240,8 @@ function openAppDownloadGatekeeper(appName, url) {
     mediaSessionPositionTs: 0,
     audioSessionTelemetryBound: false,
     externalPlaybackCommandSeq: 0,
+    mediaCommandSequence: 0,
+    audioInterruptionSequence: 0,
     externalPlaybackCommand: null,
     externalResumeProbeTimers: [],
     externalResumeRecoveryInFlight: false,
@@ -426,7 +428,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260724-audio374";
+  const SPA_SHELL_VERSION = "infra-shell-20260801-audio376";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -455,7 +457,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix374-20260724";
+  const runtimeVersion = "audiofix376-20260801";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -4983,6 +4985,51 @@ function openAppDownloadGatekeeper(appName, url) {
     reportState("init");
   }
 
+  function createScriptMediaCommand(action, surface, audio) {
+    audioState.mediaCommandSequence = Number(audioState.mediaCommandSequence || 0) + 1;
+    return {
+      id: `cmd-${String(action || "media")}-${Date.now().toString(36)}-${audioState.mediaCommandSequence}`,
+      sequence: audioState.mediaCommandSequence,
+      action: String(action || ""),
+      surface: String(surface || "media_session"),
+      at: Date.now(),
+      beforePaused: Boolean(audio && audio.paused),
+      beforeCurrentTime: audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0
+    };
+  }
+
+  function emitScriptMediaCommand(command, details) {
+    if (!command || !command.id) return;
+    const audio = audioState.audio;
+    const visibility = String(document.visibilityState || "");
+    const surfaceHint = command.surface === "media_session"
+      ? (visibility === "hidden" ? "remote_hidden" : (visibility === "visible" ? "remote_visible" : "remote_unknown"))
+      : command.surface;
+    trackAudioRuntimeEvent("media_command", Object.assign(
+      buildAudioMonitorPayload(
+        getCurrentPlaylistTrack(),
+        audioState.currentIndex,
+        audioState.activeLogicalSrc || (audio && (audio.currentSrc || audio.src)) || ""
+      ),
+      {
+        command_token: command.id,
+        command_sequence: command.sequence,
+        action: command.action,
+        origin: command.surface === "media_session" ? "media_session" : "transport",
+        surface: command.surface,
+        surface_hint: surfaceHint,
+        before_paused: command.beforePaused,
+        before_current_time: command.beforeCurrentTime,
+        after_paused: Boolean(audio && audio.paused),
+        after_current_time: audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+        from_index: Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1,
+        to_index: Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1,
+        command_latency_ms: Math.max(0, Date.now() - command.at)
+      },
+      details || {}
+    ));
+  }
+
   function bindMediaSessionActions(options) {
     const opts = options || {};
     if (audioState.mediaSessionBound && !opts.force) return;
@@ -4990,15 +5037,20 @@ function openAppDownloadGatekeeper(appName, url) {
       if (!mediaSessionApi.isAvailable()) return;
     } else if (!("mediaSession" in navigator)) return;
 
+    const actionResults = {};
     function safeSet(action, handler) {
       if (mediaSessionApi && typeof mediaSessionApi.setActionHandler === "function") {
-        return mediaSessionApi.setActionHandler(action, handler);
+        const registered = mediaSessionApi.setActionHandler(action, handler) !== false;
+        actionResults[action] = registered && handler === null ? "cleared" : registered;
+        return registered;
       }
       try {
         navigator.mediaSession.setActionHandler(action, handler);
+        actionResults[action] = handler === null ? "cleared" : true;
         return true;
       } catch (_err) {
         // Ignore unsupported action handlers.
+        actionResults[action] = false;
         return false;
       }
     }
@@ -5012,6 +5064,7 @@ function openAppDownloadGatekeeper(appName, url) {
     safeSet("pause", function () {
       const audio = audioState.audio;
       if (!audio) return;
+      const command = createScriptMediaCommand("pause", "media_session", audio);
       cancelExternalResumeCommand();
       trackAudioRuntimeEvent("media_session_pause", Object.assign(
         buildAudioMonitorPayload(
@@ -5025,12 +5078,23 @@ function openAppDownloadGatekeeper(appName, url) {
       if (!audio.paused) {
         markAudioPauseIntent("media_session", "media_session");
         audio.pause();
+        emitScriptMediaCommand(command, {
+          decision: "pause",
+          outcome: "success"
+        });
+      } else {
+        emitScriptMediaCommand(command, {
+          decision: "pause",
+          outcome: "noop",
+          reason: "already_paused"
+        });
       }
     });
 
     function applyMediaSessionSeek(nextTime, actionName) {
       const audio = audioState.audio;
       if (!audio || !Number.isFinite(nextTime)) return;
+      const command = createScriptMediaCommand(actionName, "media_session", audio);
       const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : Infinity;
       const clamped = Math.max(0, Math.min(duration, nextTime));
       const previous = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
@@ -5046,8 +5110,20 @@ function openAppDownloadGatekeeper(appName, url) {
             to_ms: Math.floor(clamped * 1000)
           }
         ));
+        emitScriptMediaCommand(command, {
+          decision: "seek",
+          outcome: "success",
+          from_ms: Math.floor(previous * 1000),
+          to_ms: Math.floor(clamped * 1000)
+        });
       } catch (_err) {
-        // Ignore unsupported OS-level seek attempts.
+        emitScriptMediaCommand(command, {
+          decision: "seek",
+          outcome: "rejected",
+          reason: "seek_assignment_failed",
+          from_ms: Math.floor(previous * 1000),
+          to_ms: Math.floor(clamped * 1000)
+        });
       }
     }
 
@@ -5086,6 +5162,25 @@ function openAppDownloadGatekeeper(appName, url) {
     safeSet("nexttrack", function () {
       console.info("[INFRA] mediaSession nexttrack");
       playNext({ seamless: true, fromMediaSession: true });
+    });
+
+    const supportedActions = Object.keys(actionResults).filter(function (action) { return actionResults[action] === true; });
+    const unsupportedActions = Object.keys(actionResults).filter(function (action) { return actionResults[action] === false; });
+    const clearedActions = Object.keys(actionResults).filter(function (action) { return actionResults[action] === "cleared"; });
+    trackAudioRuntimeEvent("media_capabilities", {
+      track: "media-session",
+      album: "session",
+      source: "capabilities",
+      supported_actions: supportedActions.join(","),
+      unsupported_actions: unsupportedActions.join(","),
+      cleared_actions: clearedActions.join(","),
+      registration_result: unsupportedActions.length ? "partial" : "complete",
+      handler_play: Boolean(actionResults.play),
+      handler_pause: Boolean(actionResults.pause),
+      handler_previous: Boolean(actionResults.previoustrack),
+      handler_next: Boolean(actionResults.nexttrack),
+      handler_seekto: Boolean(actionResults.seekto),
+      surface_hint: document.visibilityState === "hidden" ? "remote_hidden" : "remote_visible"
     });
 
     if (!opts.quiet) {

@@ -175,6 +175,9 @@ function createCoreHarness(options) {
   loadScript(sandbox, CORE_PATH);
   let playCalls = 0;
   const bindCalls = [];
+  const runtimeEvents = [];
+  let progressSyncCalls = 0;
+  let mediaPositionSyncCalls = 0;
   const playlist = opts.playlist || makeTracks(11);
   const audio = makeAudio(() => { playCalls += 1; });
   const state = {
@@ -225,7 +228,10 @@ function createCoreHarness(options) {
     clearTrackStatus() {},
     setTrackStatus() {},
     syncAudioUi() {},
-    syncMediaSessionMetadata() {},
+    syncMediaSessionMetadata(options) {
+      if (options && options.forcePosition) mediaPositionSyncCalls += 1;
+    },
+    updateProgressUi() { progressSyncCalls += 1; },
     scheduleMediaSessionResync() {},
     bindMediaSessionActions(options) { bindCalls.push(options); },
     startAudioRaf() {},
@@ -233,13 +239,126 @@ function createCoreHarness(options) {
     forceAudioFullVolume() {},
     fadeInAudio() {},
     buildAudioMonitorPayload: () => ({}),
-    trackAudioRuntimeEvent() {},
+    trackAudioRuntimeEvent(type, payload) { runtimeEvents.push({ type, payload }); },
     logAudioAuditEvent() {},
     extendAlbumPlaylistToNextAlbum: opts.extendAlbumPlaylistToNextAlbum || (() => -1),
     extendAlbumPlaylistToPreviousAlbum: opts.extendAlbumPlaylistToPreviousAlbum || (() => -1)
   });
 
-  return { api, audio, state, sandbox, getPlayCalls: () => playCalls, getBindCalls: () => bindCalls.slice() };
+  return {
+    api,
+    audio,
+    state,
+    sandbox,
+    getPlayCalls: () => playCalls,
+    getBindCalls: () => bindCalls.slice(),
+    getRuntimeEvents: () => runtimeEvents.slice(),
+    getProgressSyncCalls: () => progressSyncCalls,
+    getMediaPositionSyncCalls: () => mediaPositionSyncCalls
+  };
+}
+
+function testPreviousUsesSharedThreeSecondRestartRule() {
+  [
+    { name: "Media Session", options: { fromMediaSession: true, seamless: true } },
+    { name: "fullscreen transport", options: { fromTransportControl: true, seamless: true, surface: "fullscreen" } }
+  ].forEach((scenario) => {
+    const harness = createCoreHarness({ playlist: makeTracks(4), currentIndex: 2 });
+    harness.audio.currentTime = 17;
+    const playCallsBefore = harness.getPlayCalls();
+    harness.api.playPrevious(scenario.options);
+    assert.strictEqual(harness.state.currentIndex, 2, `${scenario.name} must keep the current track after 3 seconds`);
+    assert.strictEqual(harness.audio.currentTime, 0, `${scenario.name} must restart the current timeline`);
+    assert.strictEqual(harness.getPlayCalls(), playCallsBefore, `${scenario.name} restart must not call play()`);
+    assert.strictEqual(harness.getProgressSyncCalls(), 1, `${scenario.name} restart must refresh progress`);
+    assert(harness.getMediaPositionSyncCalls() >= 1, `${scenario.name} restart must refresh Media Session position`);
+    const command = harness.getRuntimeEvents().find((event) => event.type === "media_command");
+    assert(command, `${scenario.name} restart must emit one compact command`);
+    assert.strictEqual(command.payload.action, "previous");
+    assert.strictEqual(command.payload.decision, "restart");
+    assert.strictEqual(command.payload.outcome, "success");
+  });
+
+  const early = createCoreHarness({ playlist: makeTracks(4), currentIndex: 2 });
+  early.audio.currentTime = 1.5;
+  early.api.playPrevious({ fromMediaSession: true, seamless: true });
+  assert.strictEqual(early.state.currentIndex, 1, "Previous before 3 seconds must select the preceding track");
+  assert.strictEqual(early.getPlayCalls(), 1, "Previous before 3 seconds must start exactly one track");
+
+  const boundary = createCoreHarness({ playlist: makeTracks(4), currentIndex: 0 });
+  boundary.audio.currentTime = 1.5;
+  boundary.api.playPrevious({ fromTransportControl: true, seamless: true, surface: "fullscreen" });
+  assert.strictEqual(boundary.state.currentIndex, 0, "Album boundary must not wrap");
+  assert.strictEqual(boundary.audio.currentTime, 0, "Album boundary must restart the current track");
+  assert.strictEqual(boundary.getPlayCalls(), 0, "Album boundary restart must not create a play call");
+
+  const radioBoundary = createCoreHarness({ playlist: makeTracks(4), currentIndex: 0, homeMode: "radio" });
+  radioBoundary.state.radioQueue = radioBoundary.state.playlist;
+  radioBoundary.state.radioQueueCursor = 0;
+  radioBoundary.audio.currentTime = 1.5;
+  radioBoundary.api.playPrevious({ fromMediaSession: true, seamless: true });
+  assert.strictEqual(radioBoundary.state.currentIndex, 0, "Radio boundary must not wrap");
+  assert.strictEqual(radioBoundary.audio.currentTime, 0, "Radio boundary must restart the current track");
+  assert.strictEqual(radioBoundary.getPlayCalls(), 0, "Radio boundary restart must not call play()");
+}
+
+async function testExternalPlayCommandCarriesThreeProgressProbes() {
+  const scheduled = [];
+  const sandbox = createSandbox({
+    setTimeout(callback, delay) {
+      scheduled.push({ callback, delay: Number(delay) || 0 });
+      return scheduled.length;
+    },
+    clearTimeout() {}
+  });
+  loadScript(sandbox, RADIO_PATH);
+  const events = [];
+  const track = makeTracks(1)[0];
+  const audio = makeAudio();
+  audio.src = track.src;
+  audio.currentSrc = track.src;
+  audio.currentTime = 40;
+  audio.duration = 180;
+  const state = {
+    audio,
+    playlist: [track],
+    playlistKind: "album",
+    currentIndex: 0,
+    activeLogicalSrc: track.src,
+    homeMode: "album",
+    externalResumeProbeTimers: [],
+    externalPlaybackCommand: null,
+    externalResumeRecoveryInFlight: false
+  };
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    runtime: { baseUrl: new URL("https://site.test/") },
+    getCurrentPlayableAudioSrc: () => track.src,
+    getCurrentPlaylistTrack: () => track,
+    getAudioRuntimeProbeState: () => ({
+      current_time: audio.currentTime,
+      paused: audio.paused
+    }),
+    buildAudioMonitorPayload: () => ({ track: track.name, album: track.album }),
+    trackAudioRuntimeEvent(type, payload) { events.push({ type, payload }); }
+  });
+
+  radio.playFromExternalControl("media_session");
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.strictEqual(scheduled.filter((item) => [600, 1500, 3000].includes(item.delay)).length, 3);
+  for (const [delay, currentTime] of [[600, 40.3], [1500, 40.8], [3000, 41.5]]) {
+    audio.currentTime = currentTime;
+    scheduled.find((item) => item.delay === delay).callback();
+  }
+  const commands = events.filter((event) => event.type === "media_command");
+  assert(commands.length >= 5, "External Play must emit command receipt, promise and three probe updates");
+  assert.strictEqual(new Set(commands.map((event) => event.payload.command_token)).size, 1);
+  assert.strictEqual(commands.at(-1).payload.outcome, "success");
+  assert.strictEqual(commands.find((event) => event.payload.probe_600_ms === 300).payload.confirmed, true);
+  assert.strictEqual(commands.find((event) => event.payload.probe_1500_ms === 800).payload.confirmed, true);
+  assert.strictEqual(commands.at(-1).payload.probe_3000_ms, 1500);
+  assert.strictEqual(commands.at(-1).payload.surface_hint, "remote_visible");
 }
 
 function testRadioIdlePlayUsesSynchronousPreparedQueueAndDedupesPendingPlay() {
@@ -2157,6 +2276,8 @@ function testPersistentAlbumAndFullscreenContracts() {
   testPendingSourceShowsZeroTimeInMiniAndOverlay();
   await testIntegratedFivePreparedTransportSkips();
   testMaterializedShuffleOrder();
+  testPreviousUsesSharedThreeSecondRestartRule();
+  await testExternalPlayCommandCarriesThreeProgressProbes();
   await testPrefetchCacheRehydrationAndCorruptFallback();
   await testPrefetchCacheRehydrationRejectsStaleSnapshots();
   await testPrefetchCacheRehydrationSkipsSourceThatBecameCurrent();
@@ -2167,7 +2288,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix374 runtime checks passed.");
+  console.log("audiofix376 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

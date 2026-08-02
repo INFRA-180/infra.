@@ -7,10 +7,10 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = [
-  { slug: "infra-moon", name: "INFRA ☾", symbol: "☾", asset: "playlist-sign-moon-512.png", count: 108, first: "AIRE", last: "زيتون", covers: ["v-23pi56-cover-1200.webp", "anunnaki-cover-1200.webp", "kali-cover-1200.webp", "asase-yaa-cover-1200.webp"] },
-  { slug: "infra-sun", name: "INFRA ☀", symbol: "☀", asset: "playlist-sign-sun-512.png", count: 29, first: "LIBERTA", last: "ΜΑΣΣΑΛΙΑ", covers: ["ballades-cover-1200.webp", "h-1-008-cover-1200.webp", "he-4-0026-cover-1200.webp", "naviguer-cover-1200.webp"] },
-  { slug: "infra-snow", name: "INFRA ❄", symbol: "❄", asset: "playlist-sign-snow-512.png", count: 45, first: "Moteur", last: "VESTA", covers: ["adc-13-6e983f31-cover-1200.webp", "cyberpunk-cover-1200.webp", "h-1-008-cover-1200.webp", "ldc13-cover-1200.webp"] },
-  { slug: "infra-falcon", name: "INFRA 𓅃", symbol: "𓅃", asset: "playlist-sign-falcon-512.png", count: 52, first: "Haut", last: "RECONTRE", covers: ["abricot-cover-1200.webp", "black-stallion-cover-1200.webp", "cerises-cover-1200.webp", "impression-cover-1200.webp"] }
+  { slug: "infra-moon", name: "INFRA ☾", symbol: "☾", asset: "playlist-sign-moon-512.png", cover: "playlist-cover-moon-1200.webp", count: 108, first: "AIRE", last: "زيتون" },
+  { slug: "infra-sun", name: "INFRA ☀", symbol: "☀", asset: "playlist-sign-sun-512.png", cover: "playlist-cover-sun-1200.webp", count: 29, first: "LIBERTA", last: "ΜΑΣΣΑΛΙΑ" },
+  { slug: "infra-snow", name: "INFRA ❄", symbol: "❄", asset: "playlist-sign-snow-512.png", cover: "playlist-cover-snow-1200.webp", count: 45, first: "Moteur", last: "VESTA" },
+  { slug: "infra-falcon", name: "INFRA 𓅃", symbol: "𓅃", asset: "playlist-sign-falcon-512.png", cover: "playlist-cover-falcon-1200.webp", count: 52, first: "Haut", last: "RECONTRE" }
 ];
 
 function fail(message) {
@@ -62,22 +62,9 @@ for (let playlistIndex = 0; playlistIndex < expected.length; playlistIndex += 1)
   if (playlist.tracks[0].title !== contract.first || playlist.tracks.at(-1).title !== contract.last) {
     fail(`${contract.name} does not preserve Music.app ordering`);
   }
-
-  const firstDistinctCovers = [];
-  const seenAlbums = new Set();
-  for (const track of playlist.tracks) {
-    if (seenAlbums.has(track.albumSlug)) continue;
-    seenAlbums.add(track.albumSlug);
-    firstDistinctCovers.push(path.basename(track.artwork));
-    if (firstDistinctCovers.length === 4) break;
-  }
-  if (JSON.stringify(firstDistinctCovers) !== JSON.stringify(contract.covers)) {
-    fail(`${contract.name} does not select its first four distinct album covers`);
-  }
-  for (const cover of contract.covers) {
-    if (!fs.existsSync(path.join(publicRoot, "assets/music/responsive", cover))) {
-      fail(`${contract.name} references a missing cover: ${cover}`);
-    }
+  const coverPath = `assets/branding/${contract.cover}`;
+  if (playlist.cover !== coverPath || !fs.existsSync(path.join(publicRoot, coverPath))) {
+    fail(`${contract.name} does not reference its playlist cover: ${coverPath}`);
   }
   if (!fs.existsSync(path.join(publicRoot, "assets/branding", contract.asset))) {
     fail(`${contract.name} is missing its stable sign asset: ${contract.asset}`);
@@ -103,12 +90,15 @@ for (let playlistIndex = 0; playlistIndex < expected.length; playlistIndex += 1)
   if (!page.includes(`data-playlist-slug="${contract.slug}"`) || !page.includes(`<h1 class="playlist-visible-title" aria-label="${contract.name}">${contract.symbol}</h1>`)) {
     fail(`${pageRelative} has incorrect playlist metadata`);
   }
-  if (!page.includes("assets/css/playlists.css?v=playlist-signs-20260802")) {
-    fail(`${pageRelative} does not load the playlist collage styles`);
+  if (!page.includes("assets/css/playlists.css?v=playlist-covers-20260802")) {
+    fail(`${pageRelative} does not load the playlist cover styles`);
   }
-  const pageCovers = [...page.matchAll(/class="playlist-cover-tile" src="\.\.\/assets\/music\/responsive\/([^"]+)"/g)].map((match) => match[1]);
-  if (JSON.stringify(pageCovers) !== JSON.stringify(contract.covers)) {
-    fail(`${pageRelative} does not render the expected four-cover mosaic`);
+  if (!page.includes(`class="playlist-cover-image" src="../assets/branding/${contract.cover}"`) || page.includes("playlist-cover-tile")) {
+    fail(`${pageRelative} does not render its dedicated playlist cover`);
+  }
+  const publicCoverUrl = `https://infra-180.github.io/infra./assets/branding/${contract.cover}`;
+  if (!page.includes(`<meta property="og:image" content="${publicCoverUrl}"`) || !page.includes(`"image": "${publicCoverUrl}"`)) {
+    fail(`${pageRelative} does not expose its cover in social and schema metadata`);
   }
   const rows = page.match(/class="track-player playlist-track"/g) || [];
   if (rows.length !== contract.count) {
@@ -147,9 +137,8 @@ for (const contract of expected) {
   const cardStart = index.indexOf(`href="playlists/${contract.slug}.html"`);
   const cardEnd = index.indexOf("</a>", cardStart);
   const card = index.slice(cardStart, cardEnd);
-  const cardCovers = [...card.matchAll(/class="playlist-cover-tile" src="assets\/music\/responsive\/([^"]+)"/g)].map((match) => match[1]);
-  if (JSON.stringify(cardCovers) !== JSON.stringify(contract.covers)) {
-    fail(`home page mosaic is incorrect for ${contract.name}`);
+  if (!card.includes(`class="playlist-cover-image" src="assets/branding/${contract.cover}"`) || card.includes("playlist-cover-tile")) {
+    fail(`home page cover is incorrect for ${contract.name}`);
   }
   if (!card.includes(`<span class="playlist-card-title">${contract.symbol}</span>`) || card.includes(`<span class="playlist-card-title">${contract.name}</span>`)) {
     fail(`home page does not show only the sign for ${contract.name}`);
@@ -168,8 +157,8 @@ if (JSON.stringify(seoOrder) !== JSON.stringify(expected.map((contract) => contr
 }
 
 const playlistStyles = read("public/assets/css/playlists.css");
-if (!playlistStyles.includes("grid-template-columns: repeat(2")) {
-  fail("playlist mosaics are not styled correctly");
+if (!playlistStyles.includes(".playlist-cover-image") || playlistStyles.includes("grid-template-columns: repeat(2")) {
+  fail("dedicated playlist covers are not styled correctly");
 }
 for (const contract of expected) {
   if (!playlistStyles.includes(`background-image: url("../branding/${contract.asset}")`)) {
@@ -181,12 +170,15 @@ if (!playlistStyles.includes("@media (min-width: 981px)") || !playlistStyles.inc
 }
 
 const serviceWorker = read("public/sw.js");
-if (!serviceWorker.includes("assets/css/playlists.css?v=playlist-signs-20260802")) {
+if (!serviceWorker.includes("assets/css/playlists.css?v=playlist-covers-20260802")) {
   fail("the PWA does not cache the current playlist stylesheet");
 }
 for (const contract of expected) {
   if (!serviceWorker.includes(`assets/branding/${contract.asset}`)) {
     fail(`the PWA does not cache ${contract.asset}`);
+  }
+  if (!serviceWorker.includes(`assets/branding/${contract.cover}`)) {
+    fail(`the PWA does not cache ${contract.cover}`);
   }
 }
 

@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 2 août 2026
-Baseline : `audiofix381-20260802`
-Service Worker : `infra-shell-20260802-audio381`
+Baseline : `audiofix383-20260802`
+Service Worker : `infra-shell-20260802-audio383`
 
 ## État
 

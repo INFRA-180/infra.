@@ -7,8 +7,8 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix381-20260802`
-- Service Worker : `infra-shell-20260802-audio381`
+- Runtime : `audiofix383-20260802`
+- Service Worker : `infra-shell-20260802-audio383`
 - CSS : `audiofix381-20260802` — player restauré et Document PiP plein cadre adaptatif
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`

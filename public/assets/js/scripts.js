@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix381-20260802";
+window.INFRA_BUILD_TAG = "audiofix383-20260802";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -428,7 +428,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260802-audio381";
+  const SPA_SHELL_VERSION = "infra-shell-20260802-audio383";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -457,7 +457,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix381-20260802";
+  const runtimeVersion = "audiofix383-20260802";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -4788,10 +4788,18 @@ function openAppDownloadGatekeeper(appName, url) {
     return normalizeArtworkUrl(urlValue);
   }
 
+  function getMediaSessionAlbumArtwork(artworkEntries) {
+    const fallbackArtwork = getMediaSessionFallbackArtwork();
+    return (Array.isArray(artworkEntries) ? artworkEntries : []).find(function (entry) {
+      return Boolean(entry && entry.src && !srcMatches(entry.src, fallbackArtwork));
+    }) || null;
+  }
+
   function buildArtworkBlobAndSetMetadata(track, metadataArgs) {
     const artworkEntries = metadataArgs && Array.isArray(metadataArgs.artworkEntries)
       ? metadataArgs.artworkEntries
       : buildMediaSessionArtwork(track);
+    const albumArtwork = getMediaSessionAlbumArtwork(artworkEntries);
     const metadataKey = String(metadataArgs && metadataArgs.key ? metadataArgs.key : "");
 
     function isCurrentMetadataRequest() {
@@ -4808,13 +4816,12 @@ function openAppDownloadGatekeeper(appName, url) {
             type: "image/png"
           }];
       if (mediaSessionApi && typeof mediaSessionApi.setMetadata === "function") {
-        mediaSessionApi.setMetadata({
+        return mediaSessionApi.setMetadata({
           title: metadataArgs.title,
           artist: metadataArgs.artist,
           album: metadataArgs.album,
           artwork
-        });
-        return;
+        }) !== false;
       }
       try {
         navigator.mediaSession.metadata = new window.MediaMetadata({
@@ -4823,13 +4830,26 @@ function openAppDownloadGatekeeper(appName, url) {
           album: metadataArgs.album,
           artwork
         });
-      } catch (_err) {}
+        return true;
+      } catch (_err) {
+        return false;
+      }
     }
 
-    // Media Session can consume the canonical cover URLs directly. Avoiding an
-    // extra Image + canvas + blob pipeline removes a duplicate fetch/decode and
-    // keeps the metadata commit guarded by the current track key.
-    commitMetadata();
+    // Keep the previous real album metadata while a new canonical cover is
+    // unresolved. Preloading also warms the browser image cache before WebKit
+    // hands the same URL to the lock-screen Media Session surface.
+    if (!albumArtwork) return Promise.resolve(false);
+    return preloadImage(albumArtwork.src, { highPriority: true }).then(function (result) {
+      if (!isCurrentMetadataRequest()) return false;
+      if (!result || !result.ok) {
+        audioState.lastMediaSessionKey = "";
+        return false;
+      }
+      const committed = commitMetadata();
+      if (!committed && isCurrentMetadataRequest()) audioState.lastMediaSessionKey = "";
+      return committed;
+    });
   }
 
   function buildResponsiveCoverCandidate(urlValue, targetWidth) {
@@ -5210,6 +5230,7 @@ function openAppDownloadGatekeeper(appName, url) {
     ) || "INFRA.";
     const artist = String(track && track.artist ? track.artist : "INFRA.").trim() || "INFRA.";
     const artworkEntries = buildMediaSessionArtwork(track);
+    const hasAlbumArtwork = Boolean(getMediaSessionAlbumArtwork(artworkEntries));
     const artworkKey = artworkEntries.map((item) => item.src).join(",");
     const key = [title, album, artist, artworkKey].join("|");
 
@@ -5222,7 +5243,7 @@ function openAppDownloadGatekeeper(appName, url) {
       } catch (_err) {}
     }
 
-    if (key !== audioState.lastMediaSessionKey) {
+    if (hasAlbumArtwork && key !== audioState.lastMediaSessionKey) {
       audioState.lastMediaSessionKey = key;
       console.info(
         "[INFRA] media metadata",

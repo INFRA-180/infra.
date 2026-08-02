@@ -1,5 +1,17 @@
 # Implementation Notes
 
+## 2026-08-02 — pochette Media Session conservée jusqu'au décodage suivant
+
+- Media Session ne publie plus l'icône blanche générique lorsqu'aucune pochette d'album réelle
+  n'est encore résolue. La dernière métadonnée d'album valide reste en place pendant ce court
+  intervalle, y compris lors d'un changement de piste ou d'un handoff vers l'écran verrouillé.
+- Une nouvelle URL canonique 1200 WebP est préchargée et décodée par le cache d'images partagé
+  avant d'être confiée à WebKit. La garde par clé de piste empêche toujours une ancienne requête
+  asynchrone de remplacer la piste courante ; un échec reste retentable sans afficher le fallback.
+- Audio, ordre des files, commandes Media Session, prefetch et géométrie PWA restent inchangés.
+- Identifiants atomiques : runtime `audiofix383-20260802`, Service Worker
+  `infra-shell-20260802-audio383`; CSS inchangée `audiofix381-20260802`.
+
 ## 2026-08-02 — ordre des modules d'accueil conservé au runtime
 
 - L'ordre statique `Albums → Playlists → Clips → Applications` est désormais réappliqué tel

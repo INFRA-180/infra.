@@ -1,5 +1,23 @@
 # Implementation Notes
 
+## 2026-08-02 — audiofix381 Document PiP plein cadre
+
+- Le document PiP ne réserve plus de marge autour du lecteur : le player occupe toute la
+  surface située sous la barre de sécurité du navigateur, sans bordure, ombre ni rayon de carte.
+  Un padding strictement interne de 14 px conserve la respiration de la cover et des commandes.
+- L’ouverture demande `disallowReturnToOpener: true` afin de masquer le bouton de retour à
+  l’onglet lorsque Chrome l’accepte. L’origine, la fermeture et la barre de sécurité restent
+  contrôlées par le navigateur et ne sont ni masquées ni simulées.
+- Le fond minimal injecté utilise désormais la variable de thème dès l’ouverture afin d’éviter
+  un flash gris avant le chargement de la feuille de style.
+- La taille demandée reste issue du mini-player puis bornée à 320–560 px de large et
+  180–420 px de haut, avec un repli initial à 360×180. Les commandes suivent trois états
+  recalculés au resize : compact sous le seuil cover, intermédiaire sous 520×240, puis large.
+  Aucune commande n’est masquée ; seuls la grille, les espacements et les tailles s’adaptent.
+  Le lifecycle, la navigation SPA et toutes les actions audio sont inchangés.
+- Identifiants atomiques : runtime et CSS `audiofix381-20260802`, Service Worker
+  `infra-shell-20260802-audio381`.
+
 ## 2026-08-02 — restauration visuelle complète du player pré-audio377
 
 - Les deux surcharges `var(--accent)` introduites avec `audio377` sont retirées : le mini-player

@@ -1,15 +1,15 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 1er août 2026.
+État de référence : 2 août 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix377-20260801`
-- Service Worker : `infra-shell-20260802-audio380`
-- CSS : `audiofix380-20260802` — apparence complète du player restaurée à l’état pré-audio377
+- Runtime : `audiofix381-20260802`
+- Service Worker : `infra-shell-20260802-audio381`
+- CSS : `audiofix381-20260802` — player restauré et Document PiP plein cadre adaptatif
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -66,9 +66,13 @@ de son système ; le site ne force pas sa position.
 
 Le document PiP partage l’état et les commandes du lecteur global : lecture/pause,
 Previous/Next, Radio, Shuffle, favori et seek. Le mini-player de la page est masqué pendant
-l’ouverture, la navigation SPA conserve la fenêtre, puis `pagehide` restaure le lecteur. En
-dessous de 380×150 la vue reste compacte ; au-dessus, elle affiche aussi la cover. Sans support
-Document PiP, le drag reste strictement interne à la page.
+l’ouverture, la navigation SPA conserve la fenêtre, puis `pagehide` restaure le lecteur. Sa
+surface est plein cadre sous la barre de sécurité du navigateur, avec uniquement 14 px de
+respiration interne. La taille demandée est bornée à 320–560 px de large et 180–420 px de haut,
+avec un repli initial à 360×180 ; en dessous de 380×150 la vue reste compacte, au-dessus elle
+affiche aussi la cover. Les commandes restent toutes accessibles et passent automatiquement
+entre les dispositions compacte, intermédiaire et large au resize. Sans support Document PiP,
+le drag reste strictement interne à la page.
 
 Le diagnostic du visualiseur est agrégé localement : un événement compact
 `visualizer_health` par session décrit l’activation Web Audio, le signal détecté et la

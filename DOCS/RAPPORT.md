@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
-Date : 1er août 2026
-Baseline : `audiofix377-20260801`
-Service Worker : `infra-shell-20260802-audio380`
+Date : 2 août 2026
+Baseline : `audiofix381-20260802`
+Service Worker : `infra-shell-20260802-audio381`
 
 ## État
 
@@ -19,7 +19,9 @@ Service Worker : `infra-shell-20260802-audio380`
   sans rechargement ni second `play()`.
 - Mini-player desktop détachable par drag sur un bord en vraie fenêtre Document PiP. Le PiP
   reste au-dessus des applications, se déplace nativement, partage toutes les commandes et
-  l’état du lecteur, survit à la navigation SPA et révèle la cover quand il est agrandi.
+  l’état du lecteur, survit à la navigation SPA et révèle la cover quand il est agrandi. Le
+  player remplit toute la surface sous la barre de sécurité, sans double cadre, et réorganise
+  toutes ses commandes en dispositions compacte, intermédiaire ou large au resize.
 - Géométrie fullscreen stable restaurée ; la sonde observe le bug de status bar iOS 26 sans
   modifier le layout. Mini-player et Media Session restent inchangés.
 - Fullscreen desktop : titre, album et `À suivre` restent à leur opacité normale, sans timer
@@ -42,8 +44,8 @@ Service Worker : `infra-shell-20260802-audio380`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix380-20260802` : apparence du player restaurée à l’état pré-`audio377` ; modes
-  inactifs grisés, modes actifs blancs en plein écran et animation d’égaliseur d’origine.
+- CSS `audiofix381-20260802` : apparence du player restaurée à l’état pré-`audio377`, PiP
+  plein cadre adaptatif, modes actifs blancs en plein écran et animation d’égaliseur d’origine.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

@@ -129,7 +129,7 @@
     const minimalStyle = pipDocument.createElement("style");
     minimalStyle.textContent = [
       "html,body{width:100%;height:100%;margin:0;overflow:hidden;}",
-      "body{display:grid;place-items:stretch;background:#f4f4f4;}"
+      "body{display:grid;place-items:stretch;background:var(--bg-start,#f4f4f4);}"
     ].join("");
     pipDocument.head.appendChild(minimalStyle);
 
@@ -296,11 +296,20 @@
       viewport.width >= DESKTOP_TRANSPORT_COVER_MIN_WIDTH &&
       viewport.height >= DESKTOP_TRANSPORT_COVER_MIN_HEIGHT
     );
+    const compact = !expanded;
+    const narrow = Boolean(
+      expanded &&
+      (viewport.width < 520 || viewport.height < 240)
+    );
+    const wide = Boolean(expanded && !narrow);
 
     refs.root.classList.toggle("is-playing", Boolean(audio && !audio.paused));
     refs.root.classList.toggle("has-playback-session", hasPlaybackSessionActive);
     refs.root.classList.toggle("has-custom-layout", expanded);
     refs.root.classList.toggle("is-expanded", expanded);
+    refs.root.classList.toggle("is-compact", compact);
+    refs.root.classList.toggle("is-narrow", narrow);
+    refs.root.classList.toggle("is-wide", wide);
     if (refs.nowWrap) refs.nowWrap.hidden = !trackTitle;
     if (refs.nowTitle) refs.nowTitle.textContent = trackTitle;
     if (refs.nowAlbum) {
@@ -521,7 +530,11 @@
     try {
       // This call deliberately stays in the pointerup/click stack: Document PiP
       // requires transient user activation.
-      request = api.requestWindow({ width, height });
+      request = api.requestWindow({
+        width,
+        height,
+        disallowReturnToOpener: true
+      });
     } catch (_err) {
       audioState.transportPipOpening = false;
       return Promise.resolve(false);

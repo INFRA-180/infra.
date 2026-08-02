@@ -1,5 +1,14 @@
 # Implementation Notes
 
+## 2026-08-02 — retrait du Clear HUD du mini-player PWA
+
+- Le mini-player mobile est restauré à l’identique de la CSS publiée avant le Clear HUD :
+  dimensions, empilement titre/album/progression, icônes, blur, rayon et ombre d’origine.
+- Le rollback ne modifie ni le runtime audio `audiofix377-20260801`, ni les playlists publiées
+  le 2 août, ni le lot Document PiP encore local.
+- Identifiants de diffusion : Service Worker `infra-shell-20260802-audio379`, CSS
+  `audiofix379-20260802`. Le nouvel identifiant force l’iPhone à abandonner le cache audio378.
+
 ## 2026-08-01 — audiofix377 Play à froid contextuel
 
 - Le Play global sans source démarre désormais la première piste de la page album ou playlist

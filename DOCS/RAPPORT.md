@@ -2,7 +2,7 @@
 
 Date : 1er août 2026
 Baseline : `audiofix377-20260801`
-Service Worker : `infra-shell-20260801-audio378`
+Service Worker : `infra-shell-20260802-audio379`
 
 ## État
 
@@ -42,8 +42,8 @@ Service Worker : `infra-shell-20260801-audio378`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix378-20260801` : mini-player mobile Clear HUD plus compact et transparent,
-  avec cibles tactiles de 44 px et fallback sans transparence.
+- CSS `audiofix379-20260802` : mini-player mobile restauré à l’identique de la géométrie
+  `audiofix377`, avant le Clear HUD.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

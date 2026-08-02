@@ -428,7 +428,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260801-audio378";
+  const SPA_SHELL_VERSION = "infra-shell-20260802-audio379";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))

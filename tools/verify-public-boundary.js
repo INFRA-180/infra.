@@ -13,6 +13,7 @@ const allowedTrackedRoots = new Set([
   ".gitignore",
   "DOCS",
   "README.md",
+  "package.json",
   "public",
   "tools"
 ]);

@@ -2,13 +2,27 @@
 
 Site public et PWA audio INFRA.
 
+## Demarrage rapide
+
+Prérequis : Node.js 20 ou plus récent et Python 3. Aucune dépendance npm n'est à installer.
+
+```bash
+git clone https://github.com/INFRA-180/infra..git
+cd infra.
+npm test
+npm run dev
+```
+
+Le site est alors disponible sur `http://localhost:8080`. La politique de branches,
+validation, publication et sauvegarde est décrite dans `DOCS/GIT_WORKFLOW.md`.
+
 ## Référence
 
 - Site publié : `public/`
 - Branche : `codex/beta-site`
-- Baseline publiée : `audiofix377-20260801`
-- Service Worker : `infra-shell-20260802-audio380`
-- CSS publié : `audiofix380-20260802`
+- Baseline publiée : `audiofix381-20260802`
+- Service Worker : `infra-shell-20260802-audio381`
+- CSS publié : `audiofix381-20260802`
 - Catalogue : 31 albums, 283 pistes
 - Playlists : 4 pages, 234 occurrences, 225 pistes uniques
 - Play à froid contextuel : Radio sur l’accueil, piste 1 sur un album ou une playlist
@@ -26,11 +40,12 @@ restent des vérifications de code et ne remplacent pas ce test réel.
 - Service Worker : `public/sw.js`
 - Architecture actuelle : `DOCS/CURRENT_ARCHITECTURE.md`
 - Maintenance : `DOCS/MAINTENANCE_PLAN.md`
+- Hygiène Git : `DOCS/GIT_WORKFLOW.md`
 
 ## Vérification
 
 ```bash
-node tools/release-audit.js
+npm test
 ```
 
 Cette commande contrôle la syntaxe, le catalogue, les pochettes canoniques, les invariants

@@ -1,0 +1,13 @@
+{
+  "name": "infra-public-site",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "python3 -m http.server 8080 --directory public",
+    "test": "node tools/release-audit.js",
+    "audit:release": "node tools/release-audit.js",
+    "check:boundary": "node tools/verify-public-boundary.js"
+  }
+}

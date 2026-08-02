@@ -7,10 +7,10 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = [
-  { slug: "infra-sun", name: "INFRA ☀", symbol: "☀", count: 29, first: "LIBERTA", last: "ΜΑΣΣΑΛΙΑ", covers: ["ballades-cover-1200.webp", "h-1-008-cover-1200.webp", "he-4-0026-cover-1200.webp", "naviguer-cover-1200.webp"] },
-  { slug: "infra-moon", name: "INFRA ☾", symbol: "☾", count: 108, first: "AIRE", last: "زيتون", covers: ["v-23pi56-cover-1200.webp", "anunnaki-cover-1200.webp", "kali-cover-1200.webp", "asase-yaa-cover-1200.webp"] },
-  { slug: "infra-snow", name: "INFRA ❄", symbol: "❄", count: 45, first: "Moteur", last: "VESTA", covers: ["adc-13-6e983f31-cover-1200.webp", "cyberpunk-cover-1200.webp", "h-1-008-cover-1200.webp", "ldc13-cover-1200.webp"] },
-  { slug: "infra-falcon", name: "INFRA 𓅃", symbol: "𓅃", count: 52, first: "Haut", last: "RECONTRE", covers: ["abricot-cover-1200.webp", "black-stallion-cover-1200.webp", "cerises-cover-1200.webp", "impression-cover-1200.webp"] }
+  { slug: "infra-moon", name: "INFRA ☾", symbol: "☾", asset: "playlist-sign-moon-512.png", count: 108, first: "AIRE", last: "زيتون", covers: ["v-23pi56-cover-1200.webp", "anunnaki-cover-1200.webp", "kali-cover-1200.webp", "asase-yaa-cover-1200.webp"] },
+  { slug: "infra-sun", name: "INFRA ☀", symbol: "☀", asset: "playlist-sign-sun-512.png", count: 29, first: "LIBERTA", last: "ΜΑΣΣΑΛΙΑ", covers: ["ballades-cover-1200.webp", "h-1-008-cover-1200.webp", "he-4-0026-cover-1200.webp", "naviguer-cover-1200.webp"] },
+  { slug: "infra-snow", name: "INFRA ❄", symbol: "❄", asset: "playlist-sign-snow-512.png", count: 45, first: "Moteur", last: "VESTA", covers: ["adc-13-6e983f31-cover-1200.webp", "cyberpunk-cover-1200.webp", "h-1-008-cover-1200.webp", "ldc13-cover-1200.webp"] },
+  { slug: "infra-falcon", name: "INFRA 𓅃", symbol: "𓅃", asset: "playlist-sign-falcon-512.png", count: 52, first: "Haut", last: "RECONTRE", covers: ["abricot-cover-1200.webp", "black-stallion-cover-1200.webp", "cerises-cover-1200.webp", "impression-cover-1200.webp"] }
 ];
 
 function fail(message) {
@@ -79,6 +79,9 @@ for (let playlistIndex = 0; playlistIndex < expected.length; playlistIndex += 1)
       fail(`${contract.name} references a missing cover: ${cover}`);
     }
   }
+  if (!fs.existsSync(path.join(publicRoot, "assets/branding", contract.asset))) {
+    fail(`${contract.name} is missing its stable sign asset: ${contract.asset}`);
+  }
 
   playlist.tracks.forEach((playlistTrack, trackIndex) => {
     if (playlistTrack.position !== trackIndex + 1) {
@@ -100,7 +103,7 @@ for (let playlistIndex = 0; playlistIndex < expected.length; playlistIndex += 1)
   if (!page.includes(`data-playlist-slug="${contract.slug}"`) || !page.includes(`<h1 class="playlist-visible-title" aria-label="${contract.name}">${contract.symbol}</h1>`)) {
     fail(`${pageRelative} has incorrect playlist metadata`);
   }
-  if (!page.includes("assets/css/playlists.css?v=playlist-collage-20260801")) {
+  if (!page.includes("assets/css/playlists.css?v=playlist-signs-20260802")) {
     fail(`${pageRelative} does not load the playlist collage styles`);
   }
   const pageCovers = [...page.matchAll(/class="playlist-cover-tile" src="\.\.\/assets\/music\/responsive\/([^"]+)"/g)].map((match) => match[1]);
@@ -153,12 +156,38 @@ for (const contract of expected) {
   }
 }
 
+const homePlaylistSection = index.slice(index.indexOf("<!-- PLAYLIST_GRID_START -->"), index.indexOf("<!-- PLAYLIST_GRID_END -->"));
+const homeOrder = [...homePlaylistSection.matchAll(/href="playlists\/(infra-[^"]+)\.html"/g)].map((match) => match[1]);
+if (JSON.stringify(homeOrder) !== JSON.stringify(expected.map((contract) => contract.slug))) {
+  fail(`home playlist order is incorrect: ${homeOrder.join(" -> ")}`);
+}
+const seoPlaylistSection = index.slice(index.indexOf("<!-- PLAYLIST_SEO_LINKS_START -->"), index.indexOf("<!-- PLAYLIST_SEO_LINKS_END -->"));
+const seoOrder = [...seoPlaylistSection.matchAll(/href="playlists\/(infra-[^"]+)\.html"/g)].map((match) => match[1]);
+if (JSON.stringify(seoOrder) !== JSON.stringify(expected.map((contract) => contract.slug))) {
+  fail(`SEO playlist order is incorrect: ${seoOrder.join(" -> ")}`);
+}
+
 const playlistStyles = read("public/assets/css/playlists.css");
 if (!playlistStyles.includes("grid-template-columns: repeat(2")) {
   fail("playlist mosaics are not styled correctly");
 }
-if (!playlistStyles.includes("color: #000000") || !playlistStyles.includes("font-size: clamp(1.12rem, 1.8vw, 1.46rem)") || !playlistStyles.includes("font-size: clamp(2.8rem, 7vw, 5.6rem)")) {
-  fail("playlist mosaics or black signs are not styled correctly");
+for (const contract of expected) {
+  if (!playlistStyles.includes(`background-image: url("../branding/${contract.asset}")`)) {
+    fail(`${contract.name} does not use its stable sign asset`);
+  }
+}
+if (!playlistStyles.includes("@media (min-width: 981px)") || !playlistStyles.includes("--playlist-sign-size: 0.74rem") || !playlistStyles.includes("--playlist-sign-size: clamp(1.2rem, 3.8vw, 1.75rem)")) {
+  fail("desktop playlist titles do not follow the album title sizing");
+}
+
+const serviceWorker = read("public/sw.js");
+if (!serviceWorker.includes("assets/css/playlists.css?v=playlist-signs-20260802")) {
+  fail("the PWA does not cache the current playlist stylesheet");
+}
+for (const contract of expected) {
+  if (!serviceWorker.includes(`assets/branding/${contract.asset}`)) {
+    fail(`the PWA does not cache ${contract.asset}`);
+  }
 }
 
 const albumUi = read("public/assets/js/album-player-ui.js");

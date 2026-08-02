@@ -32,11 +32,12 @@
 }
 
 .playlist-card .playlist-card-title {
+  --playlist-sign-size: clamp(1.12rem, 1.8vw, 1.46rem);
   display: block;
   width: 100%;
   margin-top: 4px;
-  color: #000000;
-  font-size: clamp(1.12rem, 1.8vw, 1.46rem) !important;
+  color: transparent;
+  font-size: 0 !important;
   line-height: 1;
   letter-spacing: 0 !important;
   text-align: center;
@@ -44,12 +45,45 @@
 }
 
 .playlist-visible-title {
-  color: #000000;
-  font-size: clamp(2.8rem, 7vw, 5.6rem);
+  --playlist-sign-size: clamp(2.8rem, 7vw, 5.6rem);
+  color: transparent;
+  font-size: 0;
   line-height: 0.95;
   letter-spacing: 0;
   text-align: center;
   text-transform: none;
+}
+
+.playlist-card-title::before,
+.playlist-visible-title::before {
+  content: "";
+  display: block;
+  width: var(--playlist-sign-size);
+  height: var(--playlist-sign-size);
+  margin-inline: auto;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.playlist-card[href$="infra-moon.html"] .playlist-card-title::before,
+.playlist-screen[data-playlist-slug="infra-moon"] .playlist-visible-title::before {
+  background-image: url("../branding/playlist-sign-moon-512.png");
+}
+
+.playlist-card[href$="infra-sun.html"] .playlist-card-title::before,
+.playlist-screen[data-playlist-slug="infra-sun"] .playlist-visible-title::before {
+  background-image: url("../branding/playlist-sign-sun-512.png");
+}
+
+.playlist-card[href$="infra-snow.html"] .playlist-card-title::before,
+.playlist-screen[data-playlist-slug="infra-snow"] .playlist-visible-title::before {
+  background-image: url("../branding/playlist-sign-snow-512.png");
+}
+
+.playlist-card[href$="infra-falcon.html"] .playlist-card-title::before,
+.playlist-screen[data-playlist-slug="infra-falcon"] .playlist-visible-title::before {
+  background-image: url("../branding/playlist-sign-falcon-512.png");
 }
 
 .playlist-hero-art {
@@ -68,4 +102,28 @@
 .playlist-thumb-wordmark,
 .album-layout .playlist-cover {
   display: none !important;
+}
+
+@media (min-width: 981px) {
+  .playlist-card {
+    gap: 8px;
+  }
+
+  .playlist-card .playlist-card-title {
+    --playlist-sign-size: 0.74rem;
+    margin-top: 0;
+    text-align: left;
+  }
+
+  .playlist-visible-title {
+    --playlist-sign-size: clamp(1.2rem, 3.8vw, 1.75rem);
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    text-align: left;
+  }
+
+  .playlist-card-title::before,
+  .playlist-visible-title::before {
+    margin-inline: 0;
+  }
 }

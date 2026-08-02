@@ -7,10 +7,10 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = [
-  { slug: "infra-moon", name: "INFRA ☾", symbol: "☾", asset: "playlist-sign-moon-512.png", cover: "playlist-cover-moon-1200.webp", count: 108, first: "AIRE", last: "زيتون" },
-  { slug: "infra-sun", name: "INFRA ☀", symbol: "☀", asset: "playlist-sign-sun-512.png", cover: "playlist-cover-sun-1200.webp", count: 29, first: "LIBERTA", last: "ΜΑΣΣΑΛΙΑ" },
-  { slug: "infra-snow", name: "INFRA ❄", symbol: "❄", asset: "playlist-sign-snow-512.png", cover: "playlist-cover-snow-1200.webp", count: 45, first: "Moteur", last: "VESTA" },
-  { slug: "infra-falcon", name: "INFRA 𓅃", symbol: "𓅃", asset: "playlist-sign-falcon-512.png", cover: "playlist-cover-falcon-1200.webp", count: 52, first: "Haut", last: "RECONTRE" }
+  { slug: "infra-moon", name: "INFRA ☾", symbol: "☾", asset: "playlist-sign-moon-512.png", archivedCover: "playlist-cover-moon-1200.webp", covers: ["v-23pi56-cover-1200.webp", "anunnaki-cover-1200.webp", "kali-cover-1200.webp", "asase-yaa-cover-1200.webp"], count: 108, first: "AIRE", last: "زيتون" },
+  { slug: "infra-sun", name: "INFRA ☀", symbol: "☀", asset: "playlist-sign-sun-512.png", archivedCover: "playlist-cover-sun-1200.webp", covers: ["ballades-cover-1200.webp", "h-1-008-cover-1200.webp", "he-4-0026-cover-1200.webp", "naviguer-cover-1200.webp"], count: 29, first: "LIBERTA", last: "ΜΑΣΣΑΛΙΑ" },
+  { slug: "infra-snow", name: "INFRA ❄", symbol: "❄", asset: "playlist-sign-snow-512.png", archivedCover: "playlist-cover-snow-1200.webp", covers: ["adc-13-6e983f31-cover-1200.webp", "cyberpunk-cover-1200.webp", "h-1-008-cover-1200.webp", "ldc13-cover-1200.webp"], count: 45, first: "Moteur", last: "VESTA" },
+  { slug: "infra-falcon", name: "INFRA 𓅃", symbol: "𓅃", asset: "playlist-sign-falcon-512.png", archivedCover: "playlist-cover-falcon-1200.webp", covers: ["abricot-cover-1200.webp", "black-stallion-cover-1200.webp", "cerises-cover-1200.webp", "impression-cover-1200.webp"], count: 52, first: "Haut", last: "RECONTRE" }
 ];
 
 function fail(message) {
@@ -62,13 +62,30 @@ for (let playlistIndex = 0; playlistIndex < expected.length; playlistIndex += 1)
   if (playlist.tracks[0].title !== contract.first || playlist.tracks.at(-1).title !== contract.last) {
     fail(`${contract.name} does not preserve Music.app ordering`);
   }
-  const coverPath = `assets/branding/${contract.cover}`;
-  if (playlist.cover !== coverPath || !fs.existsSync(path.join(publicRoot, coverPath))) {
-    fail(`${contract.name} does not reference its playlist cover: ${coverPath}`);
+  if (Object.hasOwn(playlist, "cover")) {
+    fail(`${contract.name} still exposes a dedicated playlist cover`);
   }
   if (!fs.existsSync(path.join(publicRoot, "assets/branding", contract.asset))) {
     fail(`${contract.name} is missing its stable sign asset: ${contract.asset}`);
   }
+  if (!fs.existsSync(path.join(publicRoot, "assets/branding", contract.archivedCover))) {
+    fail(`${contract.name} archived cover was not preserved: ${contract.archivedCover}`);
+  }
+  const firstDistinctCovers = [];
+  const seenAlbums = new Set();
+  playlist.tracks.forEach((track) => {
+    if (seenAlbums.has(track.albumSlug) || firstDistinctCovers.length >= 4) return;
+    seenAlbums.add(track.albumSlug);
+    firstDistinctCovers.push(path.basename(track.artwork));
+  });
+  if (JSON.stringify(firstDistinctCovers) !== JSON.stringify(contract.covers)) {
+    fail(`${contract.name} first four distinct album covers changed: ${firstDistinctCovers.join(", ")}`);
+  }
+  contract.covers.forEach((cover) => {
+    if (!fs.existsSync(path.join(publicRoot, "assets/music/responsive", cover))) {
+      fail(`${contract.name} is missing an album cover: ${cover}`);
+    }
+  });
 
   playlist.tracks.forEach((playlistTrack, trackIndex) => {
     if (playlistTrack.position !== trackIndex + 1) {
@@ -90,15 +107,22 @@ for (let playlistIndex = 0; playlistIndex < expected.length; playlistIndex += 1)
   if (!page.includes(`data-playlist-slug="${contract.slug}"`) || !page.includes(`<h1 class="playlist-visible-title" aria-label="${contract.name}">${contract.symbol}</h1>`)) {
     fail(`${pageRelative} has incorrect playlist metadata`);
   }
-  if (!page.includes("assets/css/playlists.css?v=playlist-covers-20260802")) {
-    fail(`${pageRelative} does not load the playlist cover styles`);
+  if (!page.includes("assets/css/playlists.css?v=playlist-collage-20260802")) {
+    fail(`${pageRelative} does not load the playlist collage styles`);
   }
-  if (!page.includes(`class="playlist-cover-image" src="../assets/branding/${contract.cover}"`) || page.includes("playlist-cover-tile")) {
-    fail(`${pageRelative} does not render its dedicated playlist cover`);
+  const pageCovers = [...page.matchAll(/class="playlist-cover-tile" src="\.\.\/assets\/music\/responsive\/([^"]+)"/g)].map((match) => match[1]);
+  if (JSON.stringify(pageCovers) !== JSON.stringify(contract.covers) || page.includes("playlist-cover-image")) {
+    fail(`${pageRelative} does not render its four-album mosaic`);
   }
-  const publicCoverUrl = `https://infra-180.github.io/infra./assets/branding/${contract.cover}`;
-  if (!page.includes(`<meta property="og:image" content="${publicCoverUrl}"`) || !page.includes(`"image": "${publicCoverUrl}"`)) {
-    fail(`${pageRelative} does not expose its cover in social and schema metadata`);
+  if ((page.match(/class="playlist-cover-tile"[^>]+loading="eager"/g) || []).length !== 4 || (page.match(/class="playlist-cover-tile"[^>]+fetchpriority="high"/g) || []).length !== 1) {
+    fail(`${pageRelative} has incorrect hero mosaic loading priorities`);
+  }
+  const publicLogoUrl = "https://infra-180.github.io/infra./assets/pwa/icon-512-logo-white.png";
+  if (!page.includes(`<meta property="og:image" content="${publicLogoUrl}"`) || !page.includes(`<meta name="twitter:image" content="${publicLogoUrl}"`)) {
+    fail(`${pageRelative} does not expose the generic INFRA image in social metadata`);
+  }
+  if (page.includes(contract.archivedCover) || page.includes(`"image": "${publicLogoUrl}"`)) {
+    fail(`${pageRelative} still exposes a dedicated cover or schema image`);
   }
   const rows = page.match(/class="track-player playlist-track"/g) || [];
   if (rows.length !== contract.count) {
@@ -121,14 +145,14 @@ if (seenSources.size !== 225) {
 const index = read("public/index.html");
 const playlistsPosition = index.indexOf('data-module-id="playlists"');
 const albumsPosition = index.indexOf('data-module-id="albums"');
-if (playlistsPosition < 0 || albumsPosition < 0 || playlistsPosition > albumsPosition) {
-  fail("Playlists is not the first music section on the home page");
+if (playlistsPosition < 0 || albumsPosition < 0 || albumsPosition > playlistsPosition) {
+  fail("Albums is not the first music section on the home page");
 }
-if (!/<details class="albums-menu playlists-menu" open>/.test(index)) {
-  fail("Playlists is not open by default");
+if (!/<section class="module one-col" data-module-id="albums">\s*<details class="albums-menu" open>/.test(index)) {
+  fail("Albums is not open by default");
 }
-if (!/<section class="module one-col" data-module-id="albums">\s*<details class="albums-menu">/.test(index)) {
-  fail("Albums is not closed by default");
+if (!/<section class="module one-col" data-module-id="playlists">\s*<details class="albums-menu playlists-menu">/.test(index) || /<details class="albums-menu playlists-menu" open>/.test(index)) {
+  fail("Playlists is not closed by default");
 }
 for (const contract of expected) {
   if (!index.includes(`href="playlists/${contract.slug}.html"`) || !index.includes(contract.name)) {
@@ -137,8 +161,12 @@ for (const contract of expected) {
   const cardStart = index.indexOf(`href="playlists/${contract.slug}.html"`);
   const cardEnd = index.indexOf("</a>", cardStart);
   const card = index.slice(cardStart, cardEnd);
-  if (!card.includes(`class="playlist-cover-image" src="assets/branding/${contract.cover}"`) || card.includes("playlist-cover-tile")) {
-    fail(`home page cover is incorrect for ${contract.name}`);
+  const cardCovers = [...card.matchAll(/class="playlist-cover-tile" src="assets\/music\/responsive\/([^"]+)"/g)].map((match) => match[1]);
+  if (JSON.stringify(cardCovers) !== JSON.stringify(contract.covers) || card.includes("playlist-cover-image") || card.includes(contract.archivedCover)) {
+    fail(`home page mosaic is incorrect for ${contract.name}`);
+  }
+  if ((card.match(/class="playlist-cover-tile"[^>]+loading="lazy"/g) || []).length !== 4 || (card.match(/class="playlist-cover-tile"[^>]+fetchpriority="low"/g) || []).length !== 4) {
+    fail(`home page mosaic loading is incorrect for collapsed ${contract.name}`);
   }
   if (!card.includes(`<span class="playlist-card-title">${contract.symbol}</span>`) || card.includes(`<span class="playlist-card-title">${contract.name}</span>`)) {
     fail(`home page does not show only the sign for ${contract.name}`);
@@ -157,8 +185,8 @@ if (JSON.stringify(seoOrder) !== JSON.stringify(expected.map((contract) => contr
 }
 
 const playlistStyles = read("public/assets/css/playlists.css");
-if (!playlistStyles.includes(".playlist-cover-image") || playlistStyles.includes("grid-template-columns: repeat(2")) {
-  fail("dedicated playlist covers are not styled correctly");
+if (!playlistStyles.includes(".playlist-cover-tile") || !playlistStyles.includes("grid-template-columns: repeat(2") || playlistStyles.includes(".playlist-cover-image")) {
+  fail("playlist album mosaics are not styled correctly");
 }
 for (const contract of expected) {
   if (!playlistStyles.includes(`background-image: url("../branding/${contract.asset}")`)) {
@@ -170,15 +198,15 @@ if (!playlistStyles.includes("@media (min-width: 981px)") || !playlistStyles.inc
 }
 
 const serviceWorker = read("public/sw.js");
-if (!serviceWorker.includes("assets/css/playlists.css?v=playlist-covers-20260802")) {
+if (!serviceWorker.includes("assets/css/playlists.css?v=playlist-collage-20260802") || !serviceWorker.includes("data/playlists.json?v=playlist-collage-20260802")) {
   fail("the PWA does not cache the current playlist stylesheet");
 }
 for (const contract of expected) {
   if (!serviceWorker.includes(`assets/branding/${contract.asset}`)) {
     fail(`the PWA does not cache ${contract.asset}`);
   }
-  if (!serviceWorker.includes(`assets/branding/${contract.cover}`)) {
-    fail(`the PWA does not cache ${contract.cover}`);
+  if (serviceWorker.includes(`assets/branding/${contract.archivedCover}`)) {
+    fail(`the PWA still caches archived cover ${contract.archivedCover}`);
   }
 }
 

@@ -1,5 +1,15 @@
 # Implementation Notes
 
+## 2026-08-02 — retour Albums en ouverture et mosaïques de playlists
+
+- L’accueil présente de nouveau Albums en premier et ouvert par défaut ; Playlists reste juste
+  en dessous et replié au chargement, sans changer l’ordre ☾, ☀, ❄, 𓅃 ni les files audio.
+- Chaque carte et page de playlist affiche une mosaïque 2×2 calculée à partir des quatre
+  premiers albums distincts rencontrés dans l’ordre Music. Les quatre covers dédiées restent
+  archivées dans `public/assets/branding/`, mais ne sont plus référencées ni précachées.
+- Le générateur privé et `tools/test-music-playlists.js` protègent ce contrat. Identifiant de
+  feuille et données PWA : `playlist-collage-20260802`.
+
 ## 2026-08-02 — audiofix381 Document PiP plein cadre
 
 - Le document PiP ne réserve plus de marge autour du lecteur : le player occupe toute la

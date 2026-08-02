@@ -10,7 +10,6 @@
       "name": "INFRA ☾",
       "symbol": "☾",
       "page": "playlists/infra-moon.html",
-      "cover": "assets/branding/playlist-cover-moon-1200.webp",
       "count": 108,
       "seconds": 18864.843,
       "tracks": [
@@ -1209,7 +1208,6 @@
       "name": "INFRA ☀",
       "symbol": "☀",
       "page": "playlists/infra-sun.html",
-      "cover": "assets/branding/playlist-cover-sun-1200.webp",
       "count": 29,
       "seconds": 6545.792,
       "tracks": [
@@ -1539,7 +1537,6 @@
       "name": "INFRA ❄",
       "symbol": "❄",
       "page": "playlists/infra-snow.html",
-      "cover": "assets/branding/playlist-cover-snow-1200.webp",
       "count": 45,
       "seconds": 8042.55,
       "tracks": [
@@ -2045,7 +2042,6 @@
       "name": "INFRA 𓅃",
       "symbol": "𓅃",
       "page": "playlists/infra-falcon.html",
-      "cover": "assets/branding/playlist-cover-falcon-1200.webp",
       "count": 52,
       "seconds": 9848.582,
       "tracks": [

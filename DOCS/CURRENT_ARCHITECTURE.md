@@ -8,8 +8,8 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 ## Baseline
 
 - Runtime : `audiofix377-20260801`
-- Service Worker : `infra-shell-20260802-audio379`
-- CSS : `audiofix379-20260802` — géométrie du mini-player restaurée à l’identique d’audio377
+- Service Worker : `infra-shell-20260802-audio380`
+- CSS : `audiofix380-20260802` — apparence complète du player restaurée à l’état pré-audio377
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album

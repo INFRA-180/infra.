@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
   build: "audiofix377-20260801",
-  shell: "infra-shell-20260802-audio379",
+  shell: "infra-shell-20260802-audio380",
   albums: 31,
   tracks: 283
 });

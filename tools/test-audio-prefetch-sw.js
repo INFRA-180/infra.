@@ -119,8 +119,8 @@ const sandbox = {
       "infra-shell-20260724-audio373-runtime",
       "infra-shell-20260724-audio374-shell",
       "infra-shell-20260724-audio374-runtime",
-      "infra-shell-20260802-audio379-shell",
-      "infra-shell-20260802-audio379-runtime"
+      "infra-shell-20260802-audio380-shell",
+      "infra-shell-20260802-audio380-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -289,8 +289,8 @@ async function dispatchSiteFetch(request) {
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v9"));
   assert(!deletedCaches.includes("infra-covers-v2"));
-  assert(!deletedCaches.includes("infra-shell-20260802-audio379-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260802-audio379-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260802-audio380-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260802-audio380-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;
@@ -420,7 +420,7 @@ async function dispatchSiteFetch(request) {
     mode: "navigate",
     destination: "document"
   });
-  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260802-audio379");
+  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260802-audio380");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Strategy"), "shell_cache");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Cache"), "hit");
   assert.strictEqual(

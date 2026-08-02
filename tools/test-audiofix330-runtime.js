@@ -2278,13 +2278,14 @@ function testPersistentAlbumAndFullscreenContracts() {
 
   const modeStylesSource = fs.readFileSync(STYLES_PATH, "utf8");
   assert(
-    modeStylesSource.includes(".play-btn.is-current:not(.is-playing) .track-eq span"),
-    "A paused current track must not keep an animated equalizer"
+    !modeStylesSource.includes(".play-btn.is-current:not(.is-playing) .track-eq span"),
+    "The restored player must keep its historical equalizer animation"
   );
   assert(
-    modeStylesSource.includes(".now-playing-mode-btn.is-on") &&
-      /\.global-transport-mode\.is-on,[\s\S]*?color:\s*var\(--accent\)/.test(modeStylesSource),
-    "Radio and Shuffle active states must share the accent color"
+    !modeStylesSource.includes(".now-playing-mode-btn.is-on") &&
+      /\.global-transport-mode\.is-on,\s*\.global-transport-btn\[data-transport-shuffle\]\.is-on\s*\{[^}]*color:\s*var\(--ink\)/.test(modeStylesSource) &&
+      /\.now-playing-btn\.is-on\s*\{[^}]*color:\s*#fff/.test(modeStylesSource),
+    "Radio and Shuffle must retain the pre-audio377 gray/white visual states"
   );
 
   const nowPlayingSource = fs.readFileSync(NOW_PLAYING_PATH, "utf8");

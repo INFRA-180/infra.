@@ -1,5 +1,16 @@
 # Implementation Notes
 
+## 2026-08-02 — restauration visuelle complète du player pré-audio377
+
+- Les deux surcharges `var(--accent)` introduites avec `audio377` sont retirées : le mini-player
+  reprend sa couleur active `var(--ink)` et le plein écran retrouve son état actif blanc, avec
+  les modes inactifs grisés.
+- La règle qui figeait l’égaliseur courant en pause est également retirée afin de reproduire
+  exactement le comportement visuel antérieur. La logique Play contextuelle d’`audio377` reste
+  intégralement conservée.
+- Identifiants de diffusion : Service Worker `infra-shell-20260802-audio380`, CSS
+  `audiofix380-20260802`.
+
 ## 2026-08-02 — retrait du Clear HUD du mini-player PWA
 
 - Le mini-player mobile est restauré à l’identique de la CSS publiée avant le Clear HUD :

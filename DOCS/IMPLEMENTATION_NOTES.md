@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-08-02 — ordre des modules d'accueil conservé au runtime
+
+- L'ordre statique `Albums → Playlists → Clips → Applications` est désormais réappliqué tel
+  quel après l'hydratation et les retours SPA. Le helper runtime précédent ignorait Playlists et
+  déplaçait donc involontairement ce module avant Albums.
+- Albums reste ouvert par défaut et Playlists replié ; les quatre playlists, leurs mosaïques et
+  leurs files Music en lecture seule sont inchangées.
+
 ## 2026-08-02 — retour Albums en ouverture et mosaïques de playlists
 
 - L’accueil présente de nouveau Albums en premier et ouvert par défaut ; Playlists reste juste

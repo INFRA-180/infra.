@@ -154,6 +154,37 @@ if (!/<section class="module one-col" data-module-id="albums">\s*<details class=
 if (!/<section class="module one-col" data-module-id="playlists">\s*<details class="albums-menu playlists-menu">/.test(index) || /<details class="albums-menu playlists-menu" open>/.test(index)) {
   fail("Playlists is not closed by default");
 }
+
+const runtime = read("public/assets/js/scripts.js");
+const orderFunctionStart = runtime.indexOf("function enforceHomeModuleOrder()");
+const orderFunctionEnd = runtime.indexOf("function enforceHomeAppsCollapsed", orderFunctionStart);
+if (orderFunctionStart < 0 || orderFunctionEnd < 0) {
+  fail("home module order function is missing");
+}
+const orderFunctionSource = runtime.slice(orderFunctionStart, orderFunctionEnd);
+const moduleNodes = ["albums", "playlists", "clips", "apps"].map((id) => ({ id }));
+const container = {
+  children: moduleNodes.slice(),
+  querySelector(selector) {
+    const match = selector.match(/data-module-id="([^"]+)"/);
+    return match ? moduleNodes.find((node) => node.id === match[1]) || null : null;
+  },
+  appendChild(node) {
+    const currentIndex = this.children.indexOf(node);
+    if (currentIndex >= 0) this.children.splice(currentIndex, 1);
+    this.children.push(node);
+  }
+};
+const enforceHomeModuleOrder = Function("document", `${orderFunctionSource}; return enforceHomeModuleOrder;`)({
+  body: { classList: { contains: (name) => name === "home-screen" } },
+  querySelector: (selector) => selector === ".one-page-layout" ? container : null
+});
+enforceHomeModuleOrder();
+const runtimeHomeOrder = container.children.map((node) => node.id);
+if (JSON.stringify(runtimeHomeOrder) !== JSON.stringify(["albums", "playlists", "clips", "apps"])) {
+  fail(`runtime home order is incorrect: ${runtimeHomeOrder.join(" -> ")}`);
+}
+
 for (const contract of expected) {
   if (!index.includes(`href="playlists/${contract.slug}.html"`) || !index.includes(contract.name)) {
     fail(`home page is missing ${contract.name}`);

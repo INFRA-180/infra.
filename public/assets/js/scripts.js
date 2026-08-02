@@ -6006,19 +6006,15 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!container) return;
 
     const albums = container.querySelector('[data-module-id="albums"]');
+    const playlists = container.querySelector('[data-module-id="playlists"]');
     const clips = container.querySelector('[data-module-id="clips"]');
     const apps = container.querySelector('[data-module-id="apps"]');
-    if (!albums || !apps) return;
+    if (!albums || !playlists || !apps) return;
 
-    // Ensure public order stays stable: albums > clips > apps.
-    if (clips) {
-      container.appendChild(albums);
-      container.appendChild(clips);
-      container.appendChild(apps);
-      return;
-    }
-    container.appendChild(albums);
-    container.appendChild(apps);
+    // Keep the same music-first order after hydration and SPA restores.
+    [albums, playlists, clips, apps].filter(Boolean).forEach(function (module) {
+      container.appendChild(module);
+    });
   }
 
   function enforceHomeAppsCollapsed(adminMode) {

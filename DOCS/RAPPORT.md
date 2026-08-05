@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
-Date : 2 août 2026
-Baseline : `audiofix383-20260802`
-Service Worker : `infra-shell-20260802-audio383`
+Date : 5 août 2026
+Baseline : `audiofix384-20260805`
+Service Worker : `infra-shell-20260805-audio384`
 
 ## État
 
@@ -15,6 +15,10 @@ Service Worker : `infra-shell-20260802-audio383`
 - Radio globale, Shuffle album et lecture chronologique consolidés.
 - Play à froid contextuel : Radio sur l’accueil, première piste et ordre de la collection sur
   un album ou une playlist ; une session existante n’est jamais remplacée par la navigation.
+- La PWA demande le type Audio Session `playback` avant d’initialiser son lecteur global quand
+  le navigateur l’expose. Une reprise WebKit après appel n’est admise qu’après la transition
+  `interrupted → active`, dans une fenêtre de 8 secondes et sur la même piste ; une Pause
+  explicite annule cette autorisation et les navigateurs incompatibles conservent le repli.
 - `Previous` redémarre la piste courante après 3 secondes sur l’interface et Media Session,
   sans rechargement ni second `play()`.
 - Mini-player desktop détachable par drag sur un bord en vraie fenêtre Document PiP. Le PiP

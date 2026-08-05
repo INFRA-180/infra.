@@ -18,6 +18,18 @@
     return Boolean(getMediaSession());
   }
 
+  function configurePlaybackAudioSession() {
+    const nav = getNavigator();
+    const audioSession = nav && nav.audioSession ? nav.audioSession : null;
+    if (!audioSession) return false;
+    try {
+      audioSession.type = "playback";
+      return audioSession.type === "playback";
+    } catch (_err) {
+      return false;
+    }
+  }
+
   function hasMetadataSupport() {
     return Boolean(getMediaSession() && typeof globalObject.MediaMetadata === "function");
   }
@@ -82,6 +94,7 @@
 
   globalObject.InfraMediaSession = Object.freeze({
     isAvailable,
+    configurePlaybackAudioSession,
     hasMetadataSupport,
     isIOSStandalone,
     setActionHandler,

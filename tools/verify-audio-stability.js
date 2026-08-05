@@ -14,13 +14,14 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix383-20260802";
-const shellRelease = "infra-shell-20260802-audio383";
+const release = "audiofix384-20260805";
+const shellRelease = "infra-shell-20260805-audio384";
 const cssRelease = "audiofix381-20260802";
 const frozenCssSha256 = "286d183b1b08a33f510d094d314836a94e0680a4a4c263f98091171d2914ad3c";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");
+const mediaSession = read("public/assets/js/media-session.js");
 const prefetch = read("public/assets/js/audio-prefetch.js");
 const catalogLoader = read("public/assets/js/catalog-loader.js");
 const albumUi = read("public/assets/js/album-player-ui.js");
@@ -46,9 +47,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix383");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix383");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio383");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix384");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix384");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio384");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -199,6 +200,31 @@ expect(
 expect(
   core.includes("bindMediaSessionActions({ force: true, quiet: true })"),
   "Media Session playlist controls are not reasserted after each successful track start"
+);
+expect(
+  mediaSession.includes('audioSession.type = "playback"'),
+  "Audio Session does not request long-form playback on supporting browsers"
+);
+const ensureGlobalAudio = functionBody(radio, "ensureGlobalAudio", "stopAudioRaf");
+expect(
+  ensureGlobalAudio.indexOf("configurePlaybackAudioSession();") < ensureGlobalAudio.indexOf("if (!audioState.homeModeInitialized)"),
+  "Playback Audio Session is not configured before the global player initializes"
+);
+const audioSessionTelemetry = functionBody(scripts, "initAudioSessionTelemetry", "createScriptMediaCommand");
+expect(
+  audioSessionTelemetry.includes('currentState === "interrupted"') &&
+    audioSessionTelemetry.includes("audioState.audioSessionResumeAllowedUntil = now + 8000"),
+  "Audio Session does not authorize the bounded interrupted-to-active resume window"
+);
+expect(
+  ensureGlobalAudio.includes("consumeAuthorizedSystemInterruptionResume(audio)") &&
+    ensureGlobalAudio.indexOf("consumeAuthorizedSystemInterruptionResume(audio)") <
+      ensureGlobalAudio.indexOf("shouldBlockHiddenSystemAutoResume(audio)"),
+  "A legitimate WebKit interruption resume is still blocked before it can be recognized"
+);
+expect(
+  scripts.includes('cancelSystemInterruptionResume("media_session")'),
+  "An explicit Media Session pause does not cancel the pending system resume"
 );
 const visibilityHandler = radio.slice(
   radio.indexOf('document.addEventListener("visibilitychange"'),
@@ -428,4 +454,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix383.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix384.");

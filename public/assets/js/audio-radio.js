@@ -10,6 +10,22 @@
     };
   }
 
+  function canAllowSystemInterruptionResume(options) {
+    const args = options || {};
+    const guard = args.guard || null;
+    const now = Number.isFinite(Number(args.now)) ? Number(args.now) : Date.now();
+    const allowedUntil = Number(args.allowedUntil || 0);
+    if (!guard || !guard.token || !Number.isFinite(allowedUntil) || allowedUntil < now) return false;
+    if (String(args.audioSessionState || "") !== "active") return false;
+    const guardSrc = String(guard.src || "");
+    const currentSrc = String(args.currentSrc || "");
+    if (!guardSrc || !currentSrc) return false;
+    const matches = typeof args.srcMatches === "function"
+      ? args.srcMatches(guardSrc, currentSrc)
+      : guardSrc === currentSrc;
+    return Boolean(matches);
+  }
+
   function createAudioRadio(context) {
     const ctx = context || {};
     const audioState = ctx.audioState || {};
@@ -67,6 +83,7 @@
     const clearWaitingRecovery = method(ctx, "clearWaitingRecovery", function () {});
     const readNowPlayingVolumeVisible = method(ctx, "readNowPlayingVolumeVisible", function () { return false; });
     const getSpaPersistRoot = method(ctx, "getSpaPersistRoot", function () { return document.body; });
+    const configurePlaybackAudioSession = method(ctx, "configurePlaybackAudioSession", function () { return false; });
     const bindMediaSessionActions = method(ctx, "bindMediaSessionActions", function () {});
     const ensureGlobalTransportUi = method(ctx, "ensureGlobalTransportUi", function () {});
     const syncTransportUi = method(ctx, "syncTransportUi", function () {});
@@ -237,10 +254,29 @@
 
   function clearSystemInterruptionGuard() {
     audioState.systemInterruptionGuard = null;
+    audioState.audioSessionInterruptedAt = 0;
+    audioState.audioSessionResumeAllowedUntil = 0;
+  }
+
+  function cancelSystemInterruptionResume(reason) {
+    const guard = audioState.systemInterruptionGuard;
+    if (guard && guard.token) {
+      emitAudioInterruption(guard, {
+        phase: "resume_cancelled",
+        outcome: "explicit_pause",
+        reason: String(reason || "explicit_pause")
+      });
+    }
+    clearSystemInterruptionGuard();
   }
 
   function rememberSystemInterruption(audio, pauseContext) {
     if (pauseContext !== "system_midtrack") return;
+    const audioSession = navigator && navigator.audioSession ? navigator.audioSession : null;
+    if (audioSession && String(audioSession.state || "") === "interrupted") {
+      audioState.audioSessionInterruptedAt = Date.now();
+      audioState.audioSessionResumeAllowedUntil = 0;
+    }
     audioState.audioInterruptionSequence = Number(audioState.audioInterruptionSequence || 0) + 1;
     audioState.systemInterruptionGuard = {
       token: `interruption-${Date.now().toString(36)}-${audioState.audioInterruptionSequence}`,
@@ -274,6 +310,40 @@
       clearSystemInterruptionGuard();
       return false;
     }
+    return true;
+  }
+
+  function consumeAuthorizedSystemInterruptionResume(audio) {
+    const guard = audioState.systemInterruptionGuard;
+    const audioSession = navigator && navigator.audioSession ? navigator.audioSession : null;
+    const now = Date.now();
+    const sampledInterruptionFallback = Boolean(
+      !audioState.audioSessionTelemetryBound &&
+      audioSession &&
+      String(audioSession.state || "") === "active" &&
+      Number.isFinite(audioState.audioSessionInterruptedAt) &&
+      audioState.audioSessionInterruptedAt > 0 &&
+      guard &&
+      Number.isFinite(guard.at) &&
+      now - guard.at <= SYSTEM_INTERRUPTION_GUARD_MS
+    );
+    const currentSrc = getCurrentAudioResumeKey(audio);
+    const allowed = canAllowSystemInterruptionResume({
+      guard,
+      now,
+      allowedUntil: audioState.audioSessionResumeAllowedUntil || (sampledInterruptionFallback ? now + 1 : 0),
+      audioSessionState: audioSession && audioSession.state,
+      currentSrc,
+      srcMatches
+    });
+    if (!allowed) return false;
+    audioState.audioSessionResumeAllowedUntil = 0;
+    emitAudioInterruption(guard, {
+      phase: "resumed",
+      outcome: "system_resume_allowed",
+      audio_session_state: "active"
+    });
+    clearSystemInterruptionGuard();
     return true;
   }
 
@@ -2217,6 +2287,11 @@
 
 
   function ensureGlobalAudio() {
+    // Declaring the document as long-form playback lets supporting WebKit
+    // versions arbitrate the PWA like a media player once audio becomes audible.
+    // This does not start playback or claim focus while the player is idle.
+    configurePlaybackAudioSession();
+
     if (!audioState.homeModeInitialized) {
       audioState.homeMode = readHomePlayMode();
       audioState.nowPlayingVolumeVisible = readNowPlayingVolumeVisible();
@@ -2256,7 +2331,8 @@
     bindMediaSessionActions();
 
     audio.addEventListener("play", function () {
-      if (shouldBlockHiddenSystemAutoResume(audio)) {
+      const authorizedSystemResume = consumeAuthorizedSystemInterruptionResume(audio);
+      if (!authorizedSystemResume && shouldBlockHiddenSystemAutoResume(audio)) {
         const guard = audioState.systemInterruptionGuard || {};
         trackAudioRuntimeEvent("system_auto_resume_blocked", Object.assign(
           buildAudioMonitorPayload(
@@ -3611,6 +3687,7 @@
       restoreResumeState,
       ensurePlayablePlaylistContext,
       markAudioPauseIntent,
+      cancelSystemInterruptionResume,
       cancelExternalResumeCommand,
       playFromExternalControl,
       startCurrentPageCollectionFromIdle,
@@ -3675,6 +3752,7 @@
       restoreResumeState: function () {},
       ensurePlayablePlaylistContext: function () {},
       markAudioPauseIntent: function () {},
+      cancelSystemInterruptionResume: function () {},
       cancelExternalResumeCommand: function () {},
       playFromExternalControl: function () {},
       startCurrentPageCollectionFromIdle: function () { return false; },
@@ -3687,6 +3765,7 @@
 
   window.InfraAudioRadio = {
     createAudioRadio,
-    createNoopAudioRadio
+    createNoopAudioRadio,
+    canAllowSystemInterruptionResume
   };
 })();

@@ -14,6 +14,7 @@ const COVERS_PATH = path.join(ROOT, "public/assets/js/covers.js");
 const ALBUM_UI_PATH = path.join(ROOT, "public/assets/js/album-player-ui.js");
 const NOW_PLAYING_PATH = path.join(ROOT, "public/assets/js/now-playing.js");
 const TRANSPORT_UI_PATH = path.join(ROOT, "public/assets/js/transport-ui.js");
+const MEDIA_SESSION_PATH = path.join(ROOT, "public/assets/js/media-session.js");
 const STYLES_PATH = path.join(ROOT, "public/assets/css/styles.css");
 
 function createStorage() {
@@ -132,6 +133,62 @@ function testSameOriginRootArtworkRepair() {
       options
     ),
     "https://infra-180.github.io/infra./assets/music/v-23pi56-cover.jpg"
+  );
+}
+
+function testPlaybackAudioSessionConfiguration() {
+  const supported = createSandbox({
+    navigator: {
+      audioSession: { type: "auto" },
+      mediaSession: null
+    }
+  });
+  loadScript(supported, MEDIA_SESSION_PATH);
+  assert.strictEqual(supported.InfraMediaSession.configurePlaybackAudioSession(), true);
+  assert.strictEqual(supported.navigator.audioSession.type, "playback");
+
+  const unsupported = createSandbox({ navigator: { mediaSession: null } });
+  loadScript(unsupported, MEDIA_SESSION_PATH);
+  assert.strictEqual(unsupported.InfraMediaSession.configurePlaybackAudioSession(), false);
+}
+
+function testAudioSessionInterruptionResumeGate() {
+  const sandbox = createSandbox();
+  loadScript(sandbox, RADIO_PATH);
+  const canResume = sandbox.InfraAudioRadio.canAllowSystemInterruptionResume;
+  const guard = { token: "interruption-test", src: "https://media.test/track.m4a" };
+  const base = {
+    guard,
+    now: 1000,
+    allowedUntil: 9000,
+    audioSessionState: "active",
+    currentSrc: guard.src
+  };
+  assert.strictEqual(canResume(base), true, "a matching interrupted session may resume once active");
+  assert.strictEqual(
+    canResume(Object.assign({}, base, { audioSessionState: "interrupted" })),
+    false,
+    "an ongoing phone interruption must never resume audio"
+  );
+  assert.strictEqual(
+    canResume(Object.assign({}, base, { now: 9001 })),
+    false,
+    "an expired system-resume window must stay blocked"
+  );
+  assert.strictEqual(
+    canResume(Object.assign({}, base, { currentSrc: "https://media.test/other.m4a" })),
+    false,
+    "a system resume cannot switch to another track"
+  );
+  assert.strictEqual(
+    canResume(Object.assign({}, base, { currentSrc: "" })),
+    false,
+    "a system resume without an exact current track must stay blocked"
+  );
+  assert.strictEqual(
+    canResume(Object.assign({}, base, { guard: null })),
+    false,
+    "a hidden play without a recorded interruption must stay blocked"
   );
 }
 
@@ -2397,6 +2454,8 @@ function testPersistentAlbumAndFullscreenContracts() {
 
 (async function run() {
   testSameOriginRootArtworkRepair();
+  testPlaybackAudioSessionConfiguration();
+  testAudioSessionInterruptionResumeGate();
   testPreparedColdPlayIsSynchronous();
   testInMemoryColdPlayIsSynchronous();
   testColdCollectionPlayUsesCurrentAlbumOrPlaylist();
@@ -2426,7 +2485,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix381 runtime checks passed.");
+  console.log("audiofix384 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

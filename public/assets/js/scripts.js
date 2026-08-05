@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix383-20260802";
+window.INFRA_BUILD_TAG = "audiofix384-20260805";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -239,6 +239,9 @@ function openAppDownloadGatekeeper(appName, url) {
     mediaSessionResyncTimer: null,
     mediaSessionPositionTs: 0,
     audioSessionTelemetryBound: false,
+    audioSessionLastState: "",
+    audioSessionInterruptedAt: 0,
+    audioSessionResumeAllowedUntil: 0,
     externalPlaybackCommandSeq: 0,
     mediaCommandSequence: 0,
     audioInterruptionSequence: 0,
@@ -428,7 +431,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260802-audio383";
+  const SPA_SHELL_VERSION = "infra-shell-20260805-audio384";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -457,7 +460,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix383-20260802";
+  const runtimeVersion = "audiofix384-20260805";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -653,6 +656,7 @@ function openAppDownloadGatekeeper(appName, url) {
       clearWaitingRecovery,
       readNowPlayingVolumeVisible,
       getSpaPersistRoot,
+      configurePlaybackAudioSession,
       bindMediaSessionActions,
       ensureGlobalTransportUi,
       syncTransportUi,
@@ -738,6 +742,7 @@ function openAppDownloadGatekeeper(appName, url) {
       restoreResumeState: function () {},
       ensurePlayablePlaylistContext: function () {},
       markAudioPauseIntent: function () {},
+      cancelSystemInterruptionResume: function () {},
       cancelExternalResumeCommand: function () {},
       playFromExternalControl: function () {},
       handleGlobalTransportToggle: function () {},
@@ -4985,6 +4990,13 @@ function openAppDownloadGatekeeper(appName, url) {
     return Boolean(isIOS && (legacyStandalone || standaloneDisplay));
   }
 
+  function configurePlaybackAudioSession() {
+    if (!mediaSessionApi || typeof mediaSessionApi.configurePlaybackAudioSession !== "function") {
+      return false;
+    }
+    return mediaSessionApi.configurePlaybackAudioSession();
+  }
+
   function initAudioSessionTelemetry() {
     if (audioState.audioSessionTelemetryBound) return;
     const audioSession = navigator && navigator.audioSession ? navigator.audioSession : null;
@@ -4992,10 +5004,31 @@ function openAppDownloadGatekeeper(appName, url) {
     audioState.audioSessionTelemetryBound = true;
 
     const reportState = function (trigger) {
+      const now = Date.now();
+      const previousState = String(audioState.audioSessionLastState || "");
+      const currentState = String(audioSession.state || "unknown");
+      audioState.audioSessionLastState = currentState;
+      if (currentState === "interrupted") {
+        audioState.audioSessionInterruptedAt = now;
+        audioState.audioSessionResumeAllowedUntil = 0;
+      } else if (
+        currentState === "active" &&
+        Number.isFinite(audioState.audioSessionInterruptedAt) &&
+        audioState.audioSessionInterruptedAt > 0 &&
+        now - audioState.audioSessionInterruptedAt <= 4 * 60 * 60 * 1000
+      ) {
+        // The Audio Session spec resumes interrupted HTMLMediaElements when the
+        // session becomes active again. Give that exact system play event a
+        // short window through the hidden auto-resume guard.
+        audioState.audioSessionResumeAllowedUntil = now + 8000;
+      } else if (currentState !== "active") {
+        audioState.audioSessionResumeAllowedUntil = 0;
+      }
       trackAudioRuntimeEvent("audio_session_state", {
         trigger: trigger || "statechange",
-        audio_session_state: String(audioSession.state || "unknown"),
-        audio_session_type: String(audioSession.type || "auto")
+        audio_session_state: currentState,
+        audio_session_type: String(audioSession.type || "auto"),
+        reason: previousState ? `${previousState}->${currentState}` : "initial"
       });
     };
 
@@ -5085,6 +5118,7 @@ function openAppDownloadGatekeeper(appName, url) {
       const audio = audioState.audio;
       if (!audio) return;
       const command = createScriptMediaCommand("pause", "media_session", audio);
+      cancelSystemInterruptionResume("media_session");
       cancelExternalResumeCommand();
       trackAudioRuntimeEvent("media_session_pause", Object.assign(
         buildAudioMonitorPayload(
@@ -5767,6 +5801,9 @@ function openAppDownloadGatekeeper(appName, url) {
   }
   function markAudioPauseIntent() {
     return callAudioRadio("markAudioPauseIntent", arguments);
+  }
+  function cancelSystemInterruptionResume() {
+    return callAudioRadio("cancelSystemInterruptionResume", arguments);
   }
   function cancelExternalResumeCommand() {
     return callAudioRadio("cancelExternalResumeCommand", arguments);

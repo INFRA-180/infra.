@@ -1,14 +1,14 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 2 août 2026.
+État de référence : 5 août 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix383-20260802`
-- Service Worker : `infra-shell-20260802-audio383`
+- Runtime : `audiofix384-20260805`
+- Service Worker : `infra-shell-20260805-audio384`
 - CSS : `audiofix381-20260802` — player restauré et Document PiP plein cadre adaptatif
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
@@ -56,6 +56,11 @@ Principaux composants :
 - `audio-telemetry.js` : lot compact de session.
 
 Un seul élément `<audio>` global est autorisé.
+Sur les navigateurs exposant Audio Session, ce lecteur déclare le type `playback` avant son
+initialisation. La déclaration reste inactive tant qu’aucun son n’est joué ; Media Session
+continue de publier séparément les métadonnées et commandes système. Après une interruption
+téléphonique reconnue, seule la transition `interrupted → active` autorise la reprise interne
+WebKit, pendant 8 secondes et sur la même source ; les reprises cachées inconnues restent bloquées.
 
 ### Mini-player desktop et Document PiP
 

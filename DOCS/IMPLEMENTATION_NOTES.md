@@ -1,5 +1,20 @@
 # Implementation Notes
 
+## 2026-08-05 — audiofix384 reprise PWA après interruption téléphonique
+
+- Le lecteur global demande `navigator.audioSession.type = "playback"` avant son initialisation
+  lorsque WebKit expose Audio Session, sans démarrer de média ni prendre le focus à froid.
+- La transition système `interrupted → active` ouvre une fenêtre unique de 8 secondes pendant
+  laquelle la reprise interne WebKit est autorisée sur la même piste. Le garde-fou historique
+  continue de bloquer toute reprise cachée sans interruption reconnue, expirée ou sur une autre
+  source ; aucun `play()` aveugle n'est lancé en arrière-plan.
+- Une Pause explicite Media Session annule la reprise en attente. La télémétrie compacte conserve
+  l'état et la transition Audio Session, puis distingue `system_resume_allowed` des blocages.
+- Tests : API supportée/absente, état encore interrompu, fenêtre expirée, source différente,
+  absence de garde et ordre de contrôle avant le blocage caché.
+- Identifiants atomiques : runtime `audiofix384-20260805`, Service Worker
+  `infra-shell-20260805-audio384`, CSS inchangée `audiofix381-20260802`.
+
 ## 2026-08-02 — pochette Media Session conservée jusqu'au décodage suivant
 
 - Media Session ne publie plus l'icône blanche générique lorsqu'aucune pochette d'album réelle

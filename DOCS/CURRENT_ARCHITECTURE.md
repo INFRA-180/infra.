@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix384-20260805`
-- Service Worker : `infra-shell-20260805-audio384`
-- CSS : `audiofix381-20260802` — player restauré et Document PiP plein cadre adaptatif
+- Runtime : `audiofix385-20260805`
+- Service Worker : `infra-shell-20260805-audio385`
+- CSS : `audiofix385-20260805` — player restauré, Document PiP plein cadre et retour visuel du réordonnancement tactile
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -89,6 +89,10 @@ visibilité du canvas. Il rejoint le lot différé existant sans envoi par frame
 - Play à froid sur une page album ou playlist : Radio et Shuffle désactivés, première piste de
   la collection affichée. Une source existante reste prioritaire et reprend sans changement de file.
 - Page playlist : ordre Music complet conservé, même entre plusieurs albums.
+- File `À suivre` ouverte en plein écran : les pistes futures se réordonnent par drag/drop à la
+  souris ou par appui long tactile/stylet. Un mouvement avant 420 ms reste un scroll normal ;
+  après activation, la liste auto-défile aux bords. La piste en cours demeure fixe et la
+  playlist Music source reste en lecture seule.
 - Radio active : file globale matérialisée.
 - Radio inactive et Shuffle actif : album courant uniquement, avec historique.
 - Radio inactive et Shuffle inactif : ordre de l’album puis album chronologique adjacent.

@@ -680,7 +680,7 @@
       if (!isCurrent) {
         item.draggable = true;
         item.setAttribute("data-now-playing-queue-draggable", "true");
-        item.setAttribute("title", "Glisser pour réordonner À suivre");
+        item.setAttribute("title", "Glisser ou maintenir appuyé pour réordonner À suivre");
       }
 
       const numberEl = document.createElement("span");

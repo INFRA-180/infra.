@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
 Date : 5 août 2026
-Baseline : `audiofix384-20260805`
-Service Worker : `infra-shell-20260805-audio384`
+Baseline : `audiofix385-20260805`
+Service Worker : `infra-shell-20260805-audio385`
 
 ## État
 
@@ -30,6 +30,9 @@ Service Worker : `infra-shell-20260805-audio384`
   modifier le layout. Mini-player et Media Session restent inchangés.
 - Fullscreen desktop : titre, album et `À suivre` restent à leur opacité normale, sans timer
   dépendant des mouvements de souris.
+- Dans la file `À suivre`, le drag/drop souris reste actif et un appui long de 420 ms permet
+  désormais le même réordonnancement sur PWA tactile et desktop tactile, avec annulation sur
+  intention de scroll, repère de dépôt et auto-défilement. La piste en cours reste fixe.
 - Visualisation desktop comparative FFT pure : spectre réel 40 Hz–16 kHz sur axe logarithmique,
   contours rouge immédiat et blanc lissé, remplissage miroir et courbes quadratiques à 30 i/s
   maximum. La ligne médiane et les particules sont absentes ; aucun tableau de grains, aucune
@@ -48,8 +51,9 @@ Service Worker : `infra-shell-20260805-audio384`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix381-20260802` : apparence du player restaurée à l’état pré-`audio377`, PiP
-  plein cadre adaptatif, modes actifs blancs en plein écran et animation d’égaliseur d’origine.
+- CSS `audiofix385-20260805` : apparence du player restaurée à l’état pré-`audio377`, PiP
+  plein cadre adaptatif, modes actifs blancs, animation d’égaliseur d’origine et fantôme de
+  déplacement limité à la file tactile active.
 - Frontière de publication limitée à `public/`.
 
 ## Contrôles

@@ -14,10 +14,10 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix384-20260805";
-const shellRelease = "infra-shell-20260805-audio384";
-const cssRelease = "audiofix381-20260802";
-const frozenCssSha256 = "286d183b1b08a33f510d094d314836a94e0680a4a4c263f98091171d2914ad3c";
+const release = "audiofix385-20260805";
+const shellRelease = "infra-shell-20260805-audio385";
+const cssRelease = "audiofix385-20260805";
+const frozenCssSha256 = "3ea2b1d4eba608e4be4286ed12c15c936aff0b057c7e6fd341de42948592e3a8";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");
@@ -47,9 +47,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix384");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix384");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio384");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix385");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix385");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio385");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -415,7 +415,7 @@ expect(!nowPlaying.includes("ios-standalone-viewport-gap"), "ineffective iOS vie
 expect(!telemetry.includes('"fullscreen_compensated"'), "obsolete fullscreen compensation telemetry remains");
 
 const cssHash = crypto.createHash("sha256").update(styles).digest("hex");
-expect(cssHash === frozenCssSha256, "styles.css differs from the restored pre-audio377 player appearance");
+expect(cssHash === frozenCssSha256, "styles.css differs from the approved player appearance");
 expect(!styles.includes("100lvh"), "forbidden 100lvh geometry was introduced");
 expect(styles.includes(".share-dialog-close:focus-visible"), "QR close control does not keep the pure cross state");
 expect(styles.includes("transform: translateZ(0) scale(1.002)"), "WebKit cover seam guard is missing");
@@ -454,4 +454,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix384.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix385.");

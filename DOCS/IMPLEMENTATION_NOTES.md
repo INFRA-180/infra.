@@ -1,5 +1,18 @@
 # Implementation Notes
 
+## 2026-08-05 — réordonnancement tactile de la file « À suivre »
+
+- En plein écran, un appui long de 420 ms sur une piste future active désormais son
+  réordonnancement tactile dans la PWA et sur les écrans desktop tactiles. Le déplacement à la
+  souris par glisser-déposer reste inchangé et le stylet dispose du même parcours par Pointer Events.
+- Une intention de défilement avant l'activation annule le geste. Une fois la piste saisie, un
+  fantôme visuel, les repères avant/après et l'auto-défilement en bord de liste rendent le dépôt
+  explicite, sans autoriser le déplacement de la piste en cours.
+- Tests : contrat statique dédié, stabilité audio, glisser natif desktop et appui long tactile
+  validés dans Chromium aux largeurs 1280 px et 390 px. Validation matérielle iPhone encore à faire.
+- Identifiants atomiques : runtime et CSS `audiofix385-20260805`, Service Worker
+  `infra-shell-20260805-audio385`.
+
 ## 2026-08-05 — audiofix384 reprise PWA après interruption téléphonique
 
 - Le lecteur global demande `navigator.audioSession.type = "playback"` avant son initialisation

@@ -1645,16 +1645,30 @@
         });
       }
       if (overlayQueueList) {
+        const QUEUE_PRESS_HOLD_MS = 420;
+        const QUEUE_PRESS_MOVE_TOLERANCE_PX = 12;
+        const QUEUE_AUTO_SCROLL_EDGE_PX = 58;
+        const QUEUE_AUTO_SCROLL_MAX_PX = 18;
         let queueDragIndex = null;
         let queueDragSuppressClickUntil = 0;
+        let queuePressGesture = null;
+        let queueAutoScrollFrame = 0;
+
+        function clearQueueDropIndicators() {
+          overlayQueueList.querySelectorAll(".is-drop-before, .is-drop-after").forEach(function (node) {
+            node.classList.remove("is-drop-before", "is-drop-after");
+          });
+        }
 
         function clearQueueDragState(options) {
           if (options && options.suppressClick) {
             queueDragSuppressClickUntil = Date.now() + 350;
           }
           queueDragIndex = null;
+          overlayQueueList.classList.remove("is-pointer-reordering");
           overlayQueueList.querySelectorAll(".is-dragging, .is-drop-before, .is-drop-after").forEach(function (node) {
             node.classList.remove("is-dragging", "is-drop-before", "is-drop-after");
+            node.removeAttribute("aria-grabbed");
           });
         }
 
@@ -1663,34 +1677,233 @@
           return target.closest("[data-now-playing-queue-index]");
         }
 
-        function resolveQueueDrop(event) {
-          const item = getQueueDragItem(event.target);
-          if (!item || !overlayQueueList.contains(item)) {
-            return { index: audioState.playlist.length - 1, after: true, item: null };
-          }
+        function getQueueReorderIndex(item) {
+          if (!item || !overlayQueueList.contains(item) || item.classList.contains("is-current")) return null;
           const index = Number(item.getAttribute("data-now-playing-queue-index"));
-          if (!Number.isInteger(index)) return null;
-          const rect = item.getBoundingClientRect();
-          return {
+          if (!Number.isInteger(index) || index < 0 || index >= audioState.playlist.length) return null;
+          return index;
+        }
+
+        function resolveQueueDropAt(clientX, clientY) {
+          const rows = Array.from(overlayQueueList.querySelectorAll("[data-now-playing-queue-index]"));
+          if (!rows.length) return null;
+          const listRect = overlayQueueList.getBoundingClientRect();
+          if (
+            Number.isFinite(clientX) &&
+            (clientX < listRect.left - 72 || clientX > listRect.right + 72)
+          ) {
+            return null;
+          }
+
+          for (const item of rows) {
+            const index = Number(item.getAttribute("data-now-playing-queue-index"));
+            if (!Number.isInteger(index)) continue;
+            const rect = item.getBoundingClientRect();
+            if (clientY > rect.bottom) continue;
+            return {
+              index,
+              after: item.classList.contains("is-current") || clientY > rect.top + rect.height / 2,
+              item
+            };
+          }
+
+          const item = rows[rows.length - 1];
+          const index = Number(item.getAttribute("data-now-playing-queue-index"));
+          return Number.isInteger(index) ? { index, after: true, item } : null;
+        }
+
+        function resolveQueueDrop(event) {
+          return resolveQueueDropAt(event.clientX, event.clientY);
+        }
+
+        function previewQueueDrop(clientX, clientY) {
+          const drop = resolveQueueDropAt(clientX, clientY);
+          clearQueueDropIndicators();
+          if (drop && drop.item) {
+            drop.item.classList.add(drop.after ? "is-drop-after" : "is-drop-before");
+          }
+          return drop;
+        }
+
+        function cancelQueueAutoScroll() {
+          if (queueAutoScrollFrame) window.cancelAnimationFrame(queueAutoScrollFrame);
+          queueAutoScrollFrame = 0;
+          if (queuePressGesture) queuePressGesture.scrollVelocity = 0;
+        }
+
+        function runQueueAutoScroll() {
+          queueAutoScrollFrame = 0;
+          const gesture = queuePressGesture;
+          if (!gesture || !gesture.activated || !gesture.scrollVelocity) return;
+          const previousScrollTop = overlayQueueList.scrollTop;
+          overlayQueueList.scrollTop += gesture.scrollVelocity;
+          if (overlayQueueList.scrollTop !== previousScrollTop) {
+            previewQueueDrop(gesture.lastX, gesture.lastY);
+            queueAutoScrollFrame = window.requestAnimationFrame(runQueueAutoScroll);
+          } else {
+            gesture.scrollVelocity = 0;
+          }
+        }
+
+        function updateQueueAutoScroll(clientY) {
+          const gesture = queuePressGesture;
+          if (!gesture || !gesture.activated) return;
+          const rect = overlayQueueList.getBoundingClientRect();
+          let velocity = 0;
+          if (clientY < rect.top + QUEUE_AUTO_SCROLL_EDGE_PX) {
+            const ratio = Math.max(0, Math.min(1, (rect.top + QUEUE_AUTO_SCROLL_EDGE_PX - clientY) / QUEUE_AUTO_SCROLL_EDGE_PX));
+            velocity = -Math.max(3, QUEUE_AUTO_SCROLL_MAX_PX * ratio);
+          } else if (clientY > rect.bottom - QUEUE_AUTO_SCROLL_EDGE_PX) {
+            const ratio = Math.max(0, Math.min(1, (clientY - (rect.bottom - QUEUE_AUTO_SCROLL_EDGE_PX)) / QUEUE_AUTO_SCROLL_EDGE_PX));
+            velocity = Math.max(3, QUEUE_AUTO_SCROLL_MAX_PX * ratio);
+          }
+          gesture.scrollVelocity = velocity;
+          if (velocity && !queueAutoScrollFrame) {
+            queueAutoScrollFrame = window.requestAnimationFrame(runQueueAutoScroll);
+          } else if (!velocity) {
+            cancelQueueAutoScroll();
+          }
+        }
+
+        function updateQueueDragGhost(gesture, clientX, clientY) {
+          if (!gesture || !gesture.ghost) return;
+          gesture.ghost.style.left = `${Math.round(clientX - gesture.offsetX)}px`;
+          gesture.ghost.style.top = `${Math.round(clientY - gesture.offsetY)}px`;
+        }
+
+        function activateQueuePress(gesture) {
+          if (
+            queuePressGesture !== gesture ||
+            !gesture.item.isConnected ||
+            !audioState.nowPlayingQueueOpen ||
+            getQueueReorderIndex(gesture.item) !== gesture.index
+          ) {
+            finishQueuePress(false);
+            return;
+          }
+
+          gesture.activated = true;
+          queueDragIndex = gesture.index;
+          gesture.item.classList.add("is-dragging");
+          gesture.item.setAttribute("aria-grabbed", "true");
+          overlayQueueList.classList.add("is-pointer-reordering");
+
+          const rect = gesture.item.getBoundingClientRect();
+          const ghost = gesture.item.cloneNode(true);
+          ghost.classList.remove("is-dragging", "is-drop-before", "is-drop-after", "is-current");
+          ghost.classList.add("now-playing-queue-drag-ghost");
+          ghost.removeAttribute("id");
+          ghost.removeAttribute("title");
+          ghost.removeAttribute("aria-current");
+          ghost.removeAttribute("aria-grabbed");
+          ghost.removeAttribute("data-now-playing-queue-index");
+          ghost.removeAttribute("data-now-playing-queue-draggable");
+          ghost.setAttribute("aria-hidden", "true");
+          ghost.tabIndex = -1;
+          ghost.draggable = false;
+          ghost.style.width = `${Math.round(rect.width)}px`;
+          ghost.style.height = `${Math.round(rect.height)}px`;
+          gesture.offsetX = Math.max(0, Math.min(rect.width, gesture.startX - rect.left));
+          gesture.offsetY = Math.max(0, Math.min(rect.height, gesture.startY - rect.top));
+          gesture.ghost = ghost;
+          document.body.appendChild(ghost);
+          updateQueueDragGhost(gesture, gesture.lastX, gesture.lastY);
+          previewQueueDrop(gesture.lastX, gesture.lastY);
+
+          if (gesture.input === "pointer" && typeof gesture.item.setPointerCapture === "function") {
+            try { gesture.item.setPointerCapture(gesture.pointerId); } catch (_err) {}
+          }
+          if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+            try { navigator.vibrate(10); } catch (_err) {}
+          }
+        }
+
+        function beginQueuePress(item, index, clientX, clientY, details) {
+          if (queuePressGesture || Number.isInteger(queueDragIndex)) return false;
+          const opts = details || {};
+          const gesture = {
+            item,
             index,
-            after: event.clientY > rect.top + rect.height / 2,
-            item
+            input: opts.input || "touch",
+            identifier: opts.identifier,
+            pointerId: opts.pointerId,
+            startX: clientX,
+            startY: clientY,
+            lastX: clientX,
+            lastY: clientY,
+            offsetX: 0,
+            offsetY: 0,
+            activated: false,
+            ghost: null,
+            scrollVelocity: 0,
+            timer: 0
           };
+          queuePressGesture = gesture;
+          gesture.timer = window.setTimeout(function () {
+            activateQueuePress(gesture);
+          }, QUEUE_PRESS_HOLD_MS);
+          return true;
+        }
+
+        function moveQueuePress(clientX, clientY) {
+          const gesture = queuePressGesture;
+          if (!gesture) return false;
+          gesture.lastX = clientX;
+          gesture.lastY = clientY;
+          if (!gesture.activated) {
+            if (Math.hypot(clientX - gesture.startX, clientY - gesture.startY) > QUEUE_PRESS_MOVE_TOLERANCE_PX) {
+              finishQueuePress(false);
+            }
+            return false;
+          }
+          updateQueueDragGhost(gesture, clientX, clientY);
+          previewQueueDrop(clientX, clientY);
+          updateQueueAutoScroll(clientY);
+          return true;
+        }
+
+        function finishQueuePress(commit) {
+          const gesture = queuePressGesture;
+          if (!gesture) return false;
+          const activated = gesture.activated;
+          const fromIndex = gesture.index;
+          const drop = activated && commit ? resolveQueueDropAt(gesture.lastX, gesture.lastY) : null;
+          window.clearTimeout(gesture.timer);
+          cancelQueueAutoScroll();
+          if (gesture.ghost && gesture.ghost.parentNode) gesture.ghost.parentNode.removeChild(gesture.ghost);
+          gesture.item.classList.remove("is-dragging");
+          gesture.item.removeAttribute("aria-grabbed");
+          if (
+            gesture.input === "pointer" &&
+            typeof gesture.item.hasPointerCapture === "function" &&
+            gesture.item.hasPointerCapture(gesture.pointerId)
+          ) {
+            try { gesture.item.releasePointerCapture(gesture.pointerId); } catch (_err) {}
+          }
+          queuePressGesture = null;
+          clearQueueDragState({ suppressClick: activated });
+          if (drop) movePlaylistItem(fromIndex, drop.index, { after: drop.after });
+          return activated;
+        }
+
+        function findTouch(touchList, identifier) {
+          if (!touchList) return null;
+          for (let index = 0; index < touchList.length; index += 1) {
+            if (touchList[index].identifier === identifier) return touchList[index];
+          }
+          return null;
         }
 
         overlayQueueList.addEventListener("dragstart", function (event) {
           const item = getQueueDragItem(event.target);
-          if (!item || item.classList.contains("is-current")) {
-            event.preventDefault();
-            return;
-          }
-          const index = Number(item.getAttribute("data-now-playing-queue-index"));
-          if (!Number.isInteger(index) || index < 0 || index >= audioState.playlist.length) {
+          const index = getQueueReorderIndex(item);
+          if (queuePressGesture || !Number.isInteger(index)) {
             event.preventDefault();
             return;
           }
           queueDragIndex = index;
           item.classList.add("is-dragging");
+          item.setAttribute("aria-grabbed", "true");
           if (event.dataTransfer) {
             event.dataTransfer.effectAllowed = "move";
             event.dataTransfer.setData("text/plain", String(index));
@@ -1703,10 +1916,7 @@
           if (!drop) return;
           event.preventDefault();
           if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-          overlayQueueList.querySelectorAll(".is-drop-before, .is-drop-after").forEach(function (node) {
-            node.classList.remove("is-drop-before", "is-drop-after");
-          });
-          if (drop.item) drop.item.classList.add(drop.after ? "is-drop-after" : "is-drop-before");
+          previewQueueDrop(event.clientX, event.clientY);
         });
 
         overlayQueueList.addEventListener("drop", function (event) {
@@ -1724,6 +1934,99 @@
 
         overlayQueueList.addEventListener("dragend", function () {
           clearQueueDragState({ suppressClick: true });
+        });
+
+        overlayQueueList.addEventListener("touchstart", function (event) {
+          if (!event.touches || event.touches.length !== 1 || !event.changedTouches || !event.changedTouches.length) return;
+          const item = getQueueDragItem(event.target);
+          const index = getQueueReorderIndex(item);
+          if (!Number.isInteger(index)) return;
+          const touch = event.changedTouches[0];
+          beginQueuePress(item, index, touch.clientX, touch.clientY, {
+            input: "touch",
+            identifier: touch.identifier
+          });
+        }, { passive: true });
+
+        overlayQueueList.addEventListener("touchmove", function (event) {
+          const gesture = queuePressGesture;
+          if (!gesture || gesture.input !== "touch") return;
+          const touch = findTouch(event.touches, gesture.identifier);
+          if (!touch) return;
+          if (moveQueuePress(touch.clientX, touch.clientY)) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }, { passive: false });
+
+        overlayQueueList.addEventListener("touchend", function (event) {
+          const gesture = queuePressGesture;
+          if (!gesture || gesture.input !== "touch") return;
+          const touch = findTouch(event.changedTouches, gesture.identifier);
+          if (!touch) return;
+          gesture.lastX = touch.clientX;
+          gesture.lastY = touch.clientY;
+          const activated = gesture.activated;
+          if (activated) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          finishQueuePress(activated);
+        }, { passive: false });
+
+        overlayQueueList.addEventListener("touchcancel", function (event) {
+          const gesture = queuePressGesture;
+          if (!gesture || gesture.input !== "touch") return;
+          if (!findTouch(event.changedTouches, gesture.identifier)) return;
+          const activated = gesture.activated;
+          if (activated) event.preventDefault();
+          finishQueuePress(false);
+        }, { passive: false });
+
+        overlayQueueList.addEventListener("pointerdown", function (event) {
+          if (!event.isPrimary || event.pointerType !== "pen") return;
+          const item = getQueueDragItem(event.target);
+          const index = getQueueReorderIndex(item);
+          if (!Number.isInteger(index)) return;
+          beginQueuePress(item, index, event.clientX, event.clientY, {
+            input: "pointer",
+            pointerId: event.pointerId
+          });
+        });
+
+        overlayQueueList.addEventListener("pointermove", function (event) {
+          const gesture = queuePressGesture;
+          if (!gesture || gesture.input !== "pointer" || event.pointerId !== gesture.pointerId) return;
+          if (moveQueuePress(event.clientX, event.clientY)) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        });
+
+        overlayQueueList.addEventListener("pointerup", function (event) {
+          const gesture = queuePressGesture;
+          if (!gesture || gesture.input !== "pointer" || event.pointerId !== gesture.pointerId) return;
+          gesture.lastX = event.clientX;
+          gesture.lastY = event.clientY;
+          const activated = gesture.activated;
+          if (activated) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          finishQueuePress(activated);
+        });
+
+        overlayQueueList.addEventListener("pointercancel", function (event) {
+          const gesture = queuePressGesture;
+          if (!gesture || gesture.input !== "pointer" || event.pointerId !== gesture.pointerId) return;
+          finishQueuePress(false);
+        });
+
+        overlayQueueList.addEventListener("contextmenu", function (event) {
+          const gesture = queuePressGesture;
+          if (!gesture || !gesture.item.contains(event.target)) return;
+          event.preventDefault();
+          event.stopPropagation();
         });
 
         overlayQueueList.addEventListener("click", function (event) {

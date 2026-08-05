@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix384-20260805",
-  shell: "infra-shell-20260805-audio384",
+  build: "audiofix385-20260805",
+  shell: "infra-shell-20260805-audio385",
   albums: 31,
   tracks: 283
 });
@@ -276,6 +276,7 @@ function runRegressionSuite() {
     "tools/test-catalog-loader-startup.js",
     "tools/test-home-clips.js",
     "tools/test-music-playlists.js",
+    "tools/test-queue-reorder-input.js",
     "tools/test-favorites-page-ui.js",
     "tools/test-share-qr-ui.js",
     "tools/test-spa-page-cache.js",

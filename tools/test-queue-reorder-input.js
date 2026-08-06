@@ -33,6 +33,10 @@ includes(nowPlaying, "Glisser ou maintenir appuyé pour réordonner À suivre", 
 includes(audioCore, "if (currentIndex >= 0 && from <= currentIndex) return false", "the engine no longer protects the playing prefix");
 includes(styles, ".now-playing-up-next-list.is-pointer-reordering", "active touch reorder does not lock the queue surface");
 includes(styles, ".now-playing-queue-drag-ghost", "touch reorder has no moving visual proxy");
+includes(styles, ".now-playing-queue-drag-ghost {\n  position: fixed;\n  z-index: 10021", "the touch proxy is rendered behind the fullscreen player");
+includes(styles, "@keyframes now-playing-queue-pickup", "the touch proxy has no pickup animation");
+includes(styles, "translateY(-3px) scale(1.015)", "the touch proxy no longer lifts subtly from the queue");
+includes(styles, ".now-playing-queue-drag-ghost {\n    animation: none;", "reduced-motion users cannot disable the pickup animation");
 includes(styles, "-webkit-touch-callout: none", "iOS callout can still steal the long press");
 
 console.log("Queue reorder input checks passed: desktop drag, touch hold, pen, auto-scroll and current-track guard.");

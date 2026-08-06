@@ -4188,7 +4188,7 @@ body.now-playing-open {
 
 .now-playing-queue-drag-ghost {
   position: fixed;
-  z-index: 1002;
+  z-index: 10021;
   margin: 0;
   padding-right: 14px;
   padding-left: 14px;
@@ -4199,7 +4199,23 @@ body.now-playing-open {
   opacity: 0.98;
   pointer-events: none;
   cursor: grabbing;
-  transform: scale(1.015);
+  transform: translateY(-3px) scale(1.015);
+  transform-origin: center;
+  will-change: transform, opacity, box-shadow;
+  animation: now-playing-queue-pickup 150ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes now-playing-queue-pickup {
+  from {
+    opacity: 0.78;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.24), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+    transform: translateY(1px) scale(0.985);
+  }
+  to {
+    opacity: 0.98;
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    transform: translateY(-3px) scale(1.015);
+  }
 }
 
 .now-playing-up-next-item.is-drop-before,
@@ -4311,6 +4327,10 @@ body.now-playing-open {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .now-playing-queue-drag-ghost {
+    animation: none;
+  }
+
   .now-playing-up-next-eq span,
   .track-eq span {
     animation: none;

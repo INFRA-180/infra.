@@ -1,5 +1,19 @@
 # Implementation Notes
 
+## 2026-08-06 — levée visuelle de la piste saisie dans « À suivre »
+
+- Le geste tactile fiable d'audiofix385 reste strictement inchangé. Sa copie visuelle retrouve
+  une prise proche de l'aperçu natif WebKit observé avant le correctif : apparition adoucie,
+  montée de 4 px et échelle de `0.985` à `1.015` en 150 ms, avec ombre progressive.
+- Le fantôme est replacé juste au-dessus du stacking context fullscreen ; son ancien `z-index`
+  le laissait derrière l'overlay et ne montrait que la ligne source assombrie.
+- L'animation est limitée au fantôme tactile : drag/drop souris, ordre de file, piste courante,
+  auto-défilement, audio et navigation ne changent pas. `prefers-reduced-motion` la désactive.
+- Validation Chromium : animation effectivement en cours à mi-parcours puis stabilisée, fantôme
+  visible au-dessus de l'overlay en 1280 px et 390 px, dépôt tactile et ordre de file conservés.
+- Identifiants atomiques : runtime et CSS `audiofix386-20260806`, Service Worker
+  `infra-shell-20260806-audio386`.
+
 ## 2026-08-05 — réordonnancement tactile de la file « À suivre »
 
 - En plein écran, un appui long de 420 ms sur une piste future active désormais son

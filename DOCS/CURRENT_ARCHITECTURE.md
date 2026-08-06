@@ -1,15 +1,15 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 5 août 2026.
+État de référence : 6 août 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix385-20260805`
-- Service Worker : `infra-shell-20260805-audio385`
-- CSS : `audiofix385-20260805` — player restauré, Document PiP plein cadre et retour visuel du réordonnancement tactile
+- Runtime : `audiofix386-20260806`
+- Service Worker : `infra-shell-20260806-audio386`
+- CSS : `audiofix386-20260806` — player restauré, Document PiP plein cadre et retour visuel du réordonnancement tactile
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -91,8 +91,9 @@ visibilité du canvas. Il rejoint le lot différé existant sans envoi par frame
 - Page playlist : ordre Music complet conservé, même entre plusieurs albums.
 - File `À suivre` ouverte en plein écran : les pistes futures se réordonnent par drag/drop à la
   souris ou par appui long tactile/stylet. Un mouvement avant 420 ms reste un scroll normal ;
-  après activation, la liste auto-défile aux bords. La piste en cours demeure fixe et la
-  playlist Music source reste en lecture seule.
+  après activation, une copie légèrement surélevée apparaît au-dessus du fullscreen et la liste
+  auto-défile aux bords. La piste en cours demeure fixe et la playlist Music source reste en
+  lecture seule.
 - Radio active : file globale matérialisée.
 - Radio inactive et Shuffle actif : album courant uniquement, avec historique.
 - Radio inactive et Shuffle inactif : ordre de l’album puis album chronologique adjacent.

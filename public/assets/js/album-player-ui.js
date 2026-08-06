@@ -14,6 +14,8 @@
     const ctx = context || {};
     const audioState = ctx.audioState || {};
     const runtime = ctx.runtime || { baseUrl: window.location.href };
+    const PLAYER_ICON_PLAY = ctx.PLAYER_ICON_PLAY || "";
+    const PLAYER_ICON_STOP = ctx.PLAYER_ICON_STOP || "";
     const TRACK_CLICK_COOLDOWN_MS = Number.isFinite(Number(ctx.TRACK_CLICK_COOLDOWN_MS)) ? Number(ctx.TRACK_CLICK_COOLDOWN_MS) : 180;
     const getAudioAssetPathKey = method(ctx, "getAudioAssetPathKey", function () { return ""; });
     const fetchLiveCatalogDocument = method(ctx, "fetchLiveCatalogDocument", function () { return Promise.reject(new Error("missing live catalog loader")); });
@@ -27,6 +29,7 @@
     const savePlaybackQueueContext = method(ctx, "savePlaybackQueueContext");
     const syncMediaSessionMetadata = method(ctx, "syncMediaSessionMetadata");
     const ensureGlobalAudio = method(ctx, "ensureGlobalAudio", function () { return null; });
+    const ensureAlbumHeaderActions = method(ctx, "ensureAlbumHeaderActions", function () { return null; });
     const ensureAlbumFavoriteSelectionToolbar = method(ctx, "ensureAlbumFavoriteSelectionToolbar");
     const toAbsoluteUrl = method(ctx, "toAbsoluteUrl", function (value) { return String(value || ""); });
     const getCurrentAlbumTitle = method(ctx, "getCurrentAlbumTitle", function () { return ""; });
@@ -46,6 +49,7 @@
     const syncRadioQueueToPlaylist = method(ctx, "syncRadioQueueToPlaylist");
     const buildPreservedTrack = method(ctx, "buildPreservedTrack", function () { return null; });
     const injectCurrentTrackIntoRadioQueue = method(ctx, "injectCurrentTrackIntoRadioQueue", function () { return -1; });
+    const toggleCurrentPageCollection = method(ctx, "toggleCurrentPageCollection", function () { return false; });
 
   function formatTrackDuration(secondsValue) {
     const seconds = Number(secondsValue);
@@ -215,6 +219,15 @@
       }
     });
 
+    if (ui.albumPlayBtn) {
+      const albumPlaying = uiIndex >= 0 && (isPlaying || audioState.trackStartInFlight);
+      ui.albumPlayBtn.innerHTML = albumPlaying ? PLAYER_ICON_STOP : PLAYER_ICON_PLAY;
+      ui.albumPlayBtn.classList.toggle("is-on", albumPlaying);
+      ui.albumPlayBtn.setAttribute("aria-label", albumPlaying ? "Pause de l'album" : "Lire l'album");
+      ui.albumPlayBtn.setAttribute("aria-pressed", albumPlaying ? "true" : "false");
+      ui.albumPlayBtn.setAttribute("title", albumPlaying ? "Pause" : "Lire l'album");
+    }
+
     updateProgressUi();
   }
 
@@ -288,8 +301,26 @@
       return;
     }
 
-    // The persistent global transport owns previous/play/next/shuffle.
-    // Album pages only expose their track rows and favorite/download actions.
+    let albumPlayBtn = null;
+    if (!document.body.classList.contains("playlist-screen")) {
+      const actions = ensureAlbumHeaderActions(section);
+      const staleButton = section.querySelector("[data-album-play]");
+      if (staleButton) staleButton.remove();
+      if (actions) {
+        albumPlayBtn = document.createElement("button");
+        albumPlayBtn.className = "album-play-toggle";
+        albumPlayBtn.type = "button";
+        albumPlayBtn.setAttribute("data-album-play", "");
+        albumPlayBtn.setAttribute("aria-label", "Lire l'album");
+        albumPlayBtn.setAttribute("aria-pressed", "false");
+        albumPlayBtn.setAttribute("title", "Lire l'album");
+        albumPlayBtn.innerHTML = PLAYER_ICON_PLAY;
+        actions.insertBefore(albumPlayBtn, actions.firstChild);
+      }
+    }
+
+    // The persistent global transport owns previous/next/shuffle. Album pages
+    // expose one explicit Play/Pause action plus track, favorite and download actions.
     ensureAlbumFavoriteSelectionToolbar(section);
 
     const pageHref = toAbsoluteUrl(window.location.pathname);
@@ -300,6 +331,7 @@
 
     const ui = {
       section,
+      albumPlayBtn,
       albumTitle,
       albumArtwork,
       playlistKind,
@@ -583,6 +615,13 @@
     });
 
     updateAlbumTracksHeading(ui);
+
+    if (ui.albumPlayBtn) {
+      ui.albumPlayBtn.addEventListener("click", function () {
+        audioState.ui = ui;
+        toggleCurrentPageCollection();
+      });
+    }
 
     audioState.ui = ui;
     const activeSrc = getCurrentLogicalAudioSrc();

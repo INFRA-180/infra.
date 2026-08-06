@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
-Date : 5 août 2026
-Baseline : `audiofix386-20260806`
-Service Worker : `infra-shell-20260806-audio386`
+Date : 6 août 2026
+Baseline : `audiofix387-20260806`
+Service Worker : `infra-shell-20260806-audio387`
 
 ## État
 
@@ -15,6 +15,10 @@ Service Worker : `infra-shell-20260806-audio386`
 - Radio globale, Shuffle album et lecture chronologique consolidés.
 - Play à froid contextuel : Radio sur l’accueil, première piste et ordre de la collection sur
   un album ou une playlist ; une session existante n’est jamais remplacée par la navigation.
+- Sur l'accueil tactile, un swipe droit dominant sur une carte du module Albums ouvre la page
+  par la SPA sans voler le scroll vertical ni l'appui long QR. Chaque page album expose un seul
+  bouton Play/Pause qui adopte explicitement l'album affiché et démarre sa piste 1 depuis une
+  autre file ; les playlists conservent leur interface actuelle.
 - La PWA demande le type Audio Session `playback` avant d’initialiser son lecteur global quand
   le navigateur l’expose. Une reprise WebKit après appel n’est admise qu’après la transition
   `interrupted → active`, dans une fenêtre de 8 secondes et sur la même piste ; une Pause
@@ -52,7 +56,7 @@ Service Worker : `infra-shell-20260806-audio386`
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix386-20260806` : apparence du player restaurée à l’état pré-`audio377`, PiP
+- CSS `audiofix387-20260806` : apparence du player restaurée à l’état pré-`audio377`, PiP
   plein cadre adaptatif, modes actifs blancs, animation d’égaliseur d’origine et fantôme de
   déplacement tactile visible avec levée courte, désactivée en réduction des animations.
 - Frontière de publication limitée à `public/`.

@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix386-20260806`
-- Service Worker : `infra-shell-20260806-audio386`
-- CSS : `audiofix386-20260806` — player restauré, Document PiP plein cadre et retour visuel du réordonnancement tactile
+- Runtime : `audiofix387-20260806`
+- Service Worker : `infra-shell-20260806-audio387`
+- CSS : `audiofix387-20260806` — player restauré, swipe album, Play d'album et retour visuel du réordonnancement tactile
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -54,6 +54,7 @@ Principaux composants :
 - `audio-visualizer.js` : analyse Web Audio live et animation fullscreen desktop ;
 - `media-session.js` : commandes iOS, écran verrouillé et centre de contrôle ;
 - `audio-telemetry.js` : lot compact de session.
+- `home-catalog.js` : hydratation de l'accueil et geste droit d'ouverture des cartes album.
 
 Un seul élément `<audio>` global est autorisé.
 Sur les navigateurs exposant Audio Session, ce lecteur déclare le type `playback` avant son
@@ -88,6 +89,10 @@ visibilité du canvas. Il rejoint le lot différé existant sans envoi par frame
 - Play à froid sur l’accueil : Radio globale préparée.
 - Play à froid sur une page album ou playlist : Radio et Shuffle désactivés, première piste de
   la collection affichée. Une source existante reste prioritaire et reprend sans changement de file.
+- Bouton Play d'une page album : l'album affiché devient explicitement la file active ; une file
+  étrangère démarre sa piste 1, tandis qu'une piste déjà active du même album bascule Play/Pause.
+- Accueil tactile : un swipe droit dominant de 58 px sur une carte du module Albums ouvre cette
+  page ; le scroll vertical, le swipe gauche, les playlists et l'appui long QR restent distincts.
 - Page playlist : ordre Music complet conservé, même entre plusieurs albums.
 - File `À suivre` ouverte en plein écran : les pistes futures se réordonnent par drag/drop à la
   souris ou par appui long tactile/stylet. Un mouvement avant 420 ms reste un scroll normal ;

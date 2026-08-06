@@ -750,6 +750,115 @@ function testColdCollectionPlayUsesCurrentAlbumOrPlaylist() {
   assert.strictEqual(state.playlistKind, "radio");
 }
 
+function testAlbumButtonAdoptsDisplayedAlbum() {
+  const collection = makeTracks(4).map((track) => Object.assign({}, track, {
+    album: "Displayed album"
+  }));
+  const foreignTrack = Object.assign({}, makeTracks(1)[0], {
+    src: "https://media.test/foreign-track.m4a",
+    album: "Foreign album"
+  });
+  const sandbox = createSandbox();
+  sandbox.document.body.classList.contains = (name) => name === "album-screen";
+  loadScript(sandbox, RADIO_PATH);
+  const audio = makeAudio();
+  audio.paused = false;
+  audio.src = foreignTrack.src;
+  audio.currentSrc = foreignTrack.src;
+  const startCalls = [];
+  let toggleCalls = 0;
+  const state = {
+    audio,
+    activeLogicalSrc: foreignTrack.src,
+    homeModeInitialized: true,
+    homeMode: "radio",
+    homeModeStorageKey: "infra_home_mode_album_button",
+    queueStorageKey: "infra_queue_album_button",
+    resumeStorageKey: "infra_resume_album_button",
+    playlist: [foreignTrack],
+    playlistKind: "radio",
+    currentIndex: 0,
+    ui: { playlistKind: "album", playlist: collection.slice() },
+    radioPlaylist: [foreignTrack].concat(collection),
+    radioQueue: [foreignTrack],
+    radioQueueCursor: 0,
+    shuffleOn: true,
+    shuffleHistory: [foreignTrack.src],
+    shuffleHistoryCursor: 0,
+    initialRandomPlaylist: [foreignTrack],
+    initialRandomReady: true
+  };
+  const events = [];
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc,
+    getCurrentPlayableAudioSrc: (element) => element.currentSrc || element.src || "",
+    srcMatches: (left, right) => left === right,
+    syncPlaylistContext() {},
+    syncMediaSessionMetadata() {},
+    trackAudioRuntimeEvent(type, payload) { events.push({ type, payload }); },
+    togglePlayPause() { toggleCalls += 1; },
+    startTrack(index, options) { startCalls.push({ index, options }); }
+  });
+
+  assert.strictEqual(radio.toggleCurrentPageCollection(), true);
+  assert.strictEqual(toggleCalls, 0, "a foreign session must not be resumed by the album button");
+  assert.strictEqual(startCalls.length, 1);
+  assert.strictEqual(startCalls[0].index, 0);
+  assert.strictEqual(startCalls[0].options.surface, "album_button");
+  assert.strictEqual(startCalls[0].options.immediatePlay, true);
+  assert.strictEqual(startCalls[0].options.userGesture, true);
+  assert.strictEqual(state.homeMode, "album");
+  assert.strictEqual(state.playlistKind, "album");
+  assert.deepStrictEqual(Array.from(state.playlist, (track) => track.src), collection.map((track) => track.src));
+  assert.strictEqual(state.currentIndex, 0);
+  assert.strictEqual(state.radioQueue.length, 0);
+  assert.strictEqual(state.shuffleOn, false);
+  assert(events.some((entry) => entry.type === "collection_button_toggle" && entry.payload.decision === "start_first"));
+
+  const sameSandbox = createSandbox();
+  sameSandbox.document.body.classList.contains = (name) => name === "album-screen";
+  loadScript(sameSandbox, RADIO_PATH);
+  const sameAudio = makeAudio();
+  sameAudio.src = collection[2].src;
+  sameAudio.currentSrc = collection[2].src;
+  let sameToggleCalls = 0;
+  let sameStartCalls = 0;
+  const sameState = {
+    audio: sameAudio,
+    activeLogicalSrc: collection[2].src,
+    homeMode: "radio",
+    homeModeStorageKey: "infra_home_mode_album_button_same",
+    queueStorageKey: "infra_queue_album_button_same",
+    resumeStorageKey: "infra_resume_album_button_same",
+    playlist: [collection[2]],
+    playlistKind: "radio",
+    currentIndex: 0,
+    ui: { playlistKind: "album", playlist: collection.slice() },
+    radioPlaylist: collection.slice(),
+    radioQueue: [collection[2]],
+    radioQueueCursor: 0,
+    shuffleOn: true
+  };
+  const sameRadio = sameSandbox.InfraAudioRadio.createAudioRadio({
+    audioState: sameState,
+    getCurrentLogicalAudioSrc: () => sameState.activeLogicalSrc,
+    getCurrentPlayableAudioSrc: () => collection[2].src,
+    srcMatches: (left, right) => left === right,
+    syncPlaylistContext() {},
+    syncMediaSessionMetadata() {},
+    togglePlayPause() { sameToggleCalls += 1; },
+    startTrack() { sameStartCalls += 1; }
+  });
+
+  assert.strictEqual(sameRadio.toggleCurrentPageCollection(), true);
+  assert.strictEqual(sameToggleCalls, 1, "the displayed album's current track must toggle Play/Pause");
+  assert.strictEqual(sameStartCalls, 0, "the current album track must not reload");
+  assert.strictEqual(sameState.currentIndex, 2);
+  assert.strictEqual(sameState.playlistKind, "album");
+  assert.strictEqual(sameState.shuffleOn, false);
+}
+
 function createDeferredRadioNavigationHarness() {
   let resolveTracksData;
   const tracksDataPromise = new Promise((resolve) => {
@@ -2318,6 +2427,10 @@ function testPersistentAlbumAndFullscreenContracts() {
   assert(!albumUiSource.includes('className = "track-controls"'));
   assert(!albumUiSource.includes("data-track-prev"));
   assert(!albumUiSource.includes("data-track-next"));
+  assert(albumUiSource.includes('setAttribute("data-album-play", "")'));
+  assert(albumUiSource.includes('className = "album-play-toggle"'));
+  assert(albumUiSource.includes("toggleCurrentPageCollection()"));
+  assert(albumUiSource.includes('!document.body.classList.contains("playlist-screen")'));
   assert(
     albumUiSource.includes("audioState.playlistKind === ui.playlistKind"),
     "A collection page may rebind only its already-active album or playlist queue"
@@ -2459,6 +2572,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   testPreparedColdPlayIsSynchronous();
   testInMemoryColdPlayIsSynchronous();
   testColdCollectionPlayUsesCurrentAlbumOrPlaylist();
+  testAlbumButtonAdoptsDisplayedAlbum();
   testRadioIdlePlayUsesSynchronousPreparedQueueAndDedupesPendingPlay();
   await testQueuedRadioNavigationReplaysInOrderAndInvalidatesOnModeChange();
   await testCachedPrefixIsMaterializedBeforeColdTap();
@@ -2485,7 +2599,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix386 runtime checks passed.");
+  console.log("audiofix387 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

@@ -2177,8 +2177,7 @@
 
 
 
-  function startCurrentPageCollectionFromIdle(audioElement) {
-    const audio = audioElement || audioState.audio;
+  function getCurrentPageCollectionContext() {
     const isCollectionPage = Boolean(
       document.body && document.body.classList.contains("album-screen")
     );
@@ -2186,23 +2185,20 @@
     const collection = ui && Array.isArray(ui.playlist)
       ? ui.playlist.filter(function (track) { return track && track.src; })
       : [];
+    if (!isCollectionPage || !ui || !collection.length) return null;
+    return {
+      ui,
+      collection,
+      collectionKind: ui.playlistKind === "playlist" ? "playlist" : "album"
+    };
+  }
 
-    if (
-      !isCollectionPage ||
-      !audio ||
-      !audio.paused ||
-      audioState.trackStartInFlight ||
-      getCurrentPlayableAudioSrc(audio) ||
-      getCurrentLogicalAudioSrc() ||
-      !collection.length
-    ) {
-      return false;
-    }
-
-    const collectionKind = ui && ui.playlistKind === "playlist" ? "playlist" : "album";
-    const nextPlaylist = collection.map(function (track) {
+  function adoptCurrentPageCollection(context, startIndex) {
+    if (!context || !Array.isArray(context.collection) || !context.collection.length) return -1;
+    const nextPlaylist = context.collection.map(function (track) {
       return Object.assign({}, track);
     });
+    const nextIndex = Math.max(0, Math.min(Number(startIndex) || 0, nextPlaylist.length - 1));
 
     audioState.modeTransitionToken = Number(audioState.modeTransitionToken || 0) + 1;
     audioState.radioNavigationRequest = null;
@@ -2216,26 +2212,84 @@
     audioState.shuffleHistory = [];
     audioState.shuffleHistoryCursor = -1;
     audioState.upcomingTrackPlan = null;
-    audioState.playlistKind = collectionKind;
+    audioState.playlistKind = context.collectionKind;
     audioState.playlist = nextPlaylist;
-    audioState.currentIndex = 0;
-    audioState.albumPlaylistSnapshot = collectionKind === "album" ? nextPlaylist.slice() : [];
-    audioState.albumIndexSnapshot = collectionKind === "album" ? 0 : -1;
+    audioState.currentIndex = nextIndex;
+    audioState.albumPlaylistSnapshot = context.collectionKind === "album" ? nextPlaylist.slice() : [];
+    audioState.albumIndexSnapshot = context.collectionKind === "album" ? nextIndex : -1;
     syncPlaylistContext(audioState.playlist);
     savePlaybackQueueContext();
     syncMediaSessionMetadata({ forcePosition: true });
+    return nextIndex;
+  }
+
+  function startCurrentPageCollectionFromIdle(audioElement) {
+    const audio = audioElement || audioState.audio;
+    const context = getCurrentPageCollectionContext();
+
+    if (
+      !context ||
+      !audio ||
+      !audio.paused ||
+      audioState.trackStartInFlight ||
+      getCurrentPlayableAudioSrc(audio) ||
+      getCurrentLogicalAudioSrc()
+    ) {
+      return false;
+    }
+
+    const startIndex = adoptCurrentPageCollection(context, 0);
+    if (startIndex < 0) return false;
     trackAudioRuntimeEvent("collection_cold_start", {
-      collection_kind: collectionKind,
-      tracks_count: nextPlaylist.length,
-      start_index: 0,
+      collection_kind: context.collectionKind,
+      tracks_count: context.collection.length,
+      start_index: startIndex,
       source: "global_transport"
     });
-    startTrack(0, {
+    startTrack(startIndex, {
       seamless: true,
       immediatePlay: true,
       userGesture: true,
       coldStart: true,
-      surface: collectionKind === "playlist" ? "playlist_cold" : "album_cold"
+      surface: context.collectionKind === "playlist" ? "playlist_cold" : "album_cold"
+    });
+    return true;
+  }
+
+  function toggleCurrentPageCollection() {
+    const audio = audioState.audio || ensureGlobalAudio();
+    const context = getCurrentPageCollectionContext();
+    if (!audio || !context) return false;
+
+    const currentSrc = getCurrentLogicalAudioSrc() || getCurrentPlayableAudioSrc(audio);
+    const currentIndex = currentSrc
+      ? context.collection.findIndex(function (track) { return track && srcMatches(track.src, currentSrc); })
+      : -1;
+    const startIndex = adoptCurrentPageCollection(context, currentIndex >= 0 ? currentIndex : 0);
+    if (startIndex < 0) return false;
+
+    if (currentIndex >= 0) {
+      trackAudioRuntimeEvent("collection_button_toggle", {
+        collection_kind: context.collectionKind,
+        tracks_count: context.collection.length,
+        start_index: startIndex,
+        decision: audio.paused ? "resume_current" : "pause_current"
+      });
+      togglePlayPause();
+      return true;
+    }
+
+    trackAudioRuntimeEvent("collection_button_toggle", {
+      collection_kind: context.collectionKind,
+      tracks_count: context.collection.length,
+      start_index: startIndex,
+      decision: "start_first"
+    });
+    startTrack(startIndex, {
+      seamless: true,
+      immediatePlay: true,
+      userGesture: true,
+      surface: context.collectionKind === "playlist" ? "playlist_button" : "album_button"
     });
     return true;
   }
@@ -3691,6 +3745,7 @@
       cancelExternalResumeCommand,
       playFromExternalControl,
       startCurrentPageCollectionFromIdle,
+      toggleCurrentPageCollection,
       handleGlobalTransportToggle,
       ensureGlobalAudio,
       stopAudioRaf,
@@ -3756,6 +3811,7 @@
       cancelExternalResumeCommand: function () {},
       playFromExternalControl: function () {},
       startCurrentPageCollectionFromIdle: function () { return false; },
+      toggleCurrentPageCollection: function () { return false; },
       handleGlobalTransportToggle: function () {},
       ensureGlobalAudio: function () { return null; },
       stopAudioRaf: function () {},

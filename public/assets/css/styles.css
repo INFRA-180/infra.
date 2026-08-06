@@ -1591,6 +1591,20 @@ body.transport-pip-document .transport-pip-player.is-narrow .global-transport-bt
   max-width: 250px;
 }
 
+.home-screen .albums-grid .album-card:not(.playlist-card) {
+  touch-action: pan-y;
+}
+
+.home-screen .albums-grid .album-card.is-album-swipe-tracking {
+  transform: translate3d(var(--album-swipe-x, 0px), 0, 0);
+  transition: none;
+  will-change: transform, opacity;
+}
+
+.home-screen .albums-grid .album-card.is-album-swipe-ready {
+  opacity: 0.76;
+}
+
 .media-card:hover {
   opacity: 0.9;
   transform: translateY(-1px);
@@ -2413,6 +2427,30 @@ body.transport-pip-document .transport-pip-player.is-narrow .global-transport-bt
 .album-header-actions .album-selection-toolbar {
   height: 44px;
   align-items: center;
+}
+
+.album-play-toggle {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.album-play-toggle.is-on,
+.album-play-toggle:hover {
+  color: var(--ink);
+}
+
+.album-play-toggle .player-glyph {
+  width: 20px;
+  height: 20px;
 }
 
 .tracks h2 {
@@ -3336,6 +3374,7 @@ audio {
     }
 
     .album-screen .track-ctrl,
+    .album-screen .album-play-toggle,
     .album-header-actions .album-download-icon.btn-right,
     .album-header-actions .btn-right[data-download-url],
     .album-header-actions .album-selection-toggle {

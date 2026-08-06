@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix386-20260806";
+window.INFRA_BUILD_TAG = "audiofix387-20260806";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -431,7 +431,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260806-audio386";
+  const SPA_SHELL_VERSION = "infra-shell-20260806-audio387";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -460,7 +460,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix386-20260806";
+  const runtimeVersion = "audiofix387-20260806";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -594,13 +594,15 @@ function openAppDownloadGatekeeper(appName, url) {
       albumGridNextBatch: ALBUM_GRID_NEXT_BATCH,
       displayAlbumCardTitle,
       sanitizeCatalog,
-      loadCatalogData
+      loadCatalogData,
+      openAlbumCard: openHomeAlbumCard
     });
   }
 
   function createNoopHomeCatalogApi() {
     return {
-      hydrateHomeCatalog: function () { return Promise.resolve(); }
+      hydrateHomeCatalog: function () { return Promise.resolve(); },
+      initAlbumSwipeNavigation: function () {}
     };
   }
 
@@ -745,6 +747,7 @@ function openAppDownloadGatekeeper(appName, url) {
       cancelSystemInterruptionResume: function () {},
       cancelExternalResumeCommand: function () {},
       playFromExternalControl: function () {},
+      toggleCurrentPageCollection: function () { return false; },
       handleGlobalTransportToggle: function () {},
       ensureGlobalAudio: function () {},
       stopAudioRaf: function () {},
@@ -1034,7 +1037,8 @@ function openAppDownloadGatekeeper(appName, url) {
       bindGlobalKeyboardShortcuts,
       syncRadioQueueToPlaylist,
       buildPreservedTrack,
-      injectCurrentTrackIntoRadioQueue
+      injectCurrentTrackIntoRadioQueue,
+      toggleCurrentPageCollection
     });
   }
 
@@ -2053,6 +2057,10 @@ function openAppDownloadGatekeeper(appName, url) {
 
   async function hydrateHomeCatalog() {
     return homeCatalogApi.hydrateHomeCatalog();
+  }
+
+  function initAlbumSwipeNavigation() {
+    return homeCatalogApi.initAlbumSwipeNavigation();
   }
 
   function shouldInitAudioFeatures() {
@@ -5866,6 +5874,9 @@ function openAppDownloadGatekeeper(appName, url) {
   function handleGlobalTransportToggle() {
     return callAudioRadio("handleGlobalTransportToggle", arguments);
   }
+  function toggleCurrentPageCollection() {
+    return callAudioRadio("toggleCurrentPageCollection", arguments);
+  }
   function isAlbumOpenUrl(urlLike) {
     try {
       const url = new URL(String(urlLike || ""), window.location.href);
@@ -5873,6 +5884,24 @@ function openAppDownloadGatekeeper(appName, url) {
     } catch (_err) {
       return false;
     }
+  }
+
+  function openHomeAlbumCard(card) {
+    if (!card || !card.href) return false;
+    let url;
+    try {
+      url = new URL(card.href, window.location.href);
+    } catch (_err) {
+      return false;
+    }
+    if (!isAlbumOpenUrl(url.href)) return false;
+    primeLinkedAlbumCoverForPwa(card, url.href);
+    releasePwaCoverHold("replace");
+    navigateTo(url.href, {
+      history: "push",
+      trigger: "swipe_right"
+    });
+    return true;
   }
 
   function isTelemetryTimestampBetween(value, start, end) {
@@ -6188,6 +6217,7 @@ function openAppDownloadGatekeeper(appName, url) {
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    initAlbumSwipeNavigation();
     initSpaNavigation();
     registerServiceWorker();
     void initPage();

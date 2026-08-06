@@ -21,6 +21,15 @@
     };
     const albumGridInitialBatch = Math.max(1, Number(ctx.albumGridInitialBatch) || 8);
     const albumGridNextBatch = Math.max(1, Number(ctx.albumGridNextBatch) || 6);
+    const openAlbumCard = typeof ctx.openAlbumCard === "function"
+      ? ctx.openAlbumCard
+      : function () { return false; };
+    const ALBUM_SWIPE_AXIS_LOCK_PX = 10;
+    const ALBUM_SWIPE_OPEN_PX = 58;
+    const ALBUM_SWIPE_MAX_VISUAL_PX = 88;
+    const ALBUM_SWIPE_DOMINANCE = 1.2;
+    let albumSwipeGesture = null;
+    let suppressedAlbumSwipeClick = null;
 
     function displayAlbumCardTitle(title) {
       const formatted = call(ctx, "displayAlbumCardTitle", title);
@@ -29,6 +38,131 @@
       if (!cleaned) return "";
       if (/[\u0370-\u03ff]/u.test(cleaned) || /\b[A-Z][a-z]\b/.test(cleaned)) return cleaned;
       return cleaned.toLocaleUpperCase();
+    }
+
+    function findSwipeAlbumCard(target) {
+      if (!document.body.classList.contains("home-screen")) return null;
+      if (!target || typeof target.closest !== "function") return null;
+      return target.closest(
+        'body.home-screen [data-catalog-grid="albums"] a.album-card[href]:not(.playlist-card)'
+      );
+    }
+
+    function setAlbumSwipeVisual(card, deltaX, ready) {
+      if (!card) return;
+      card.classList.add("is-album-swipe-tracking");
+      card.classList.toggle("is-album-swipe-ready", Boolean(ready));
+      if (card.style && typeof card.style.setProperty === "function") {
+        const visualX = Math.max(0, Math.min(ALBUM_SWIPE_MAX_VISUAL_PX, Number(deltaX) || 0));
+        card.style.setProperty("--album-swipe-x", `${visualX}px`);
+      }
+    }
+
+    function clearAlbumSwipeVisual(card) {
+      if (!card) return;
+      card.classList.remove("is-album-swipe-tracking", "is-album-swipe-ready");
+      if (card.style && typeof card.style.removeProperty === "function") {
+        card.style.removeProperty("--album-swipe-x");
+      }
+    }
+
+    function cancelAlbumSwipe() {
+      if (!albumSwipeGesture) return;
+      clearAlbumSwipeVisual(albumSwipeGesture.card);
+      albumSwipeGesture = null;
+    }
+
+    function initAlbumSwipeNavigation() {
+      if (catalogState.albumSwipeBound) return;
+      catalogState.albumSwipeBound = true;
+
+      document.addEventListener("pointerdown", function (event) {
+        if (event.isPrimary === false) return;
+        if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+        if (event.button !== undefined && event.button !== 0) return;
+        const card = findSwipeAlbumCard(event.target);
+        if (!card) return;
+
+        cancelAlbumSwipe();
+        albumSwipeGesture = {
+          card,
+          pointerId: event.pointerId,
+          startX: Number(event.clientX) || 0,
+          startY: Number(event.clientY) || 0,
+          lastX: Number(event.clientX) || 0,
+          lastY: Number(event.clientY) || 0,
+          axis: ""
+        };
+      }, { capture: true, passive: true });
+
+      document.addEventListener("pointermove", function (event) {
+        const gesture = albumSwipeGesture;
+        if (!gesture || event.pointerId !== gesture.pointerId) return;
+        gesture.lastX = Number(event.clientX) || 0;
+        gesture.lastY = Number(event.clientY) || 0;
+        const deltaX = gesture.lastX - gesture.startX;
+        const deltaY = gesture.lastY - gesture.startY;
+        const absX = Math.abs(deltaX);
+        const absY = Math.abs(deltaY);
+
+        if (!gesture.axis && (absX > ALBUM_SWIPE_AXIS_LOCK_PX || absY > ALBUM_SWIPE_AXIS_LOCK_PX)) {
+          gesture.axis = absX > absY * ALBUM_SWIPE_DOMINANCE ? "x" : "y";
+        }
+        if (gesture.axis === "y" || (gesture.axis === "x" && deltaX < 0)) {
+          cancelAlbumSwipe();
+          return;
+        }
+        if (gesture.axis !== "x") return;
+
+        if (event.cancelable) event.preventDefault();
+        setAlbumSwipeVisual(gesture.card, deltaX, deltaX >= ALBUM_SWIPE_OPEN_PX);
+      }, { capture: true, passive: false });
+
+      function finishAlbumSwipe(event, cancelled) {
+        const gesture = albumSwipeGesture;
+        if (!gesture || event.pointerId !== gesture.pointerId) return;
+        const endX = Number(event.clientX);
+        const endY = Number(event.clientY);
+        const deltaX = (Number.isFinite(endX) ? endX : gesture.lastX) - gesture.startX;
+        const deltaY = (Number.isFinite(endY) ? endY : gesture.lastY) - gesture.startY;
+        const shouldOpen = !cancelled &&
+          gesture.axis === "x" &&
+          deltaX >= ALBUM_SWIPE_OPEN_PX &&
+          Math.abs(deltaX) > Math.abs(deltaY) * ALBUM_SWIPE_DOMINANCE;
+        const card = gesture.card;
+        clearAlbumSwipeVisual(card);
+        albumSwipeGesture = null;
+        if (!shouldOpen) return;
+
+        if (event.cancelable) event.preventDefault();
+        const opened = openAlbumCard(card, { trigger: "swipe_right" }) !== false;
+        if (opened) {
+          suppressedAlbumSwipeClick = {
+            card,
+            until: Date.now() + 900
+          };
+        }
+      }
+
+      document.addEventListener("pointerup", function (event) {
+        finishAlbumSwipe(event, false);
+      }, { capture: true, passive: false });
+      document.addEventListener("pointercancel", function (event) {
+        finishAlbumSwipe(event, true);
+      }, { capture: true, passive: true });
+      document.addEventListener("click", function (event) {
+        const suppressed = suppressedAlbumSwipeClick;
+        if (!suppressed) return;
+        if (Date.now() > suppressed.until) {
+          suppressedAlbumSwipeClick = null;
+          return;
+        }
+        const target = event.target;
+        if (target !== suppressed.card && !(suppressed.card.contains && suppressed.card.contains(target))) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        suppressedAlbumSwipeClick = null;
+      }, true);
     }
 
     function sanitizeCatalog(payload) {
@@ -532,6 +666,7 @@
       reconcileHomeAlbumGrid,
       hydrateStaticHomeAlbumGrid,
       renderClipsSection,
+      initAlbumSwipeNavigation,
       hydrateHomeCatalog
     };
   }

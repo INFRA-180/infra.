@@ -1,5 +1,23 @@
 # Implementation Notes
 
+## 2026-08-06 — ouverture d'album par swipe droit et Play d'album explicite
+
+- Sur l'accueil tactile, un glissement horizontal vers la droite commencé sur une carte du
+  module Albums ouvre désormais sa page par le routeur SPA existant. Le geste se verrouille
+  après 10 px, exige 58 px vers la droite et laisse les mouvements verticaux au scroll natif.
+- L'appui long QR reste prioritaire tant que le doigt ne bouge pas ; dès 12 px, son propre
+  garde-fou l'annule. Le clic synthétique suivant un swipe réussi est supprimé afin de ne jamais
+  lancer deux navigations concurrentes. Playlists, applications et glissements vers la gauche
+  restent inchangés.
+- Chaque page album affiche un unique bouton Play/Pause sur la ligne du résumé, sans restaurer
+  l'ancien transport Previous/Next/Shuffle. Un album étranger ou la Radio active est remplacé
+  explicitement par l'album affiché et sa piste 1 ; une piste du même album est reprise ou mise
+  en pause sans rechargement. Les pages playlist ne reçoivent pas ce bouton.
+- Tests dédiés : seuil/direction/scroll/dédoublonnage du swipe, adoption d'album depuis une file
+  étrangère, Play/Pause de la piste courante, QR, cache SPA, stabilité audio et audit de release.
+- Identifiants atomiques : runtime et CSS `audiofix387-20260806`, Service Worker
+  `infra-shell-20260806-audio387`.
+
 ## 2026-08-06 — levée visuelle de la piste saisie dans « À suivre »
 
 - Le geste tactile fiable d'audiofix385 reste strictement inchangé. Sa copie visuelle retrouve

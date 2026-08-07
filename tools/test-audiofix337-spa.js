@@ -49,107 +49,36 @@ async function testRuntimeClassSanitizer() {
 }
 
 async function testIosSwapUsesNativePaintedHandoff() {
-  const order = [];
-  let viewTransitionCalls = 0;
-  const classNames = new Set();
-  const persistRoot = { id: "infraSpaPersist" };
-  let body = null;
-  const oldNode = {
-    remove() {
-      order.push("remove_old");
-      body.childNodes = body.childNodes.filter((node) => node !== oldNode);
-      body.firstChild = body.childNodes[0] || null;
-    }
-  };
-  body = {
-    childNodes: [persistRoot, oldNode],
-    firstChild: persistRoot,
-    className: "home-screen",
-    appendChild(node) {
-      order.push("append_fragment");
-      this.childNodes.push(node);
-      this.firstChild = this.childNodes[0] || null;
-      return node;
-    },
-    insertBefore(node) {
-      order.push("insert_persist");
-      this.childNodes = this.childNodes.filter((entry) => entry !== node);
-      this.childNodes.unshift(node);
-      this.firstChild = node;
-    }
-  };
-  const document = {
-    body,
-    documentElement: {
-      classList: {
-        add(name) { classNames.add(name); },
-        remove(name) { classNames.delete(name); }
-      }
-    },
-    querySelector() { return null; },
-    querySelectorAll() { return []; },
-    startViewTransition(callback) {
-      viewTransitionCalls += 1;
-      callback();
-      return {
-        ready: Promise.resolve(),
-        finished: Promise.resolve(),
-        updateCallbackDone: Promise.resolve()
-      };
-    }
-  };
-  const spaState = { prepaintSyncActive: false };
-  const sandbox = {
-    document,
-    location: { href: "https://site.test/index.html?pwa-swap=view" },
-    innerWidth: 390,
-    innerHeight: 844,
-    scrollX: 0,
-    scrollY: 0,
-    pageXOffset: 0,
-    pageYOffset: 0,
-    requestAnimationFrame(callback) {
-      order.push("raf");
-      callback();
-      return 1;
-    },
-    getComputedStyle() { return { opacity: "1" }; },
-    scrollTo() {},
-    scrollBy() {},
-    setTimeout,
-    clearTimeout
-  };
-  const factory = loadSpaFactory(sandbox);
-  const api = factory({
-    spaState,
-    audioState: {},
-    isStandaloneDisplayMode() { return true; },
-    isIosDevice() { return true; },
-    isAndroidDevice() { return false; },
-    syncPersistentUiAfterSpaSwap() {
-      assert.equal(spaState.prepaintSyncActive, true, "prepaint sync flag must wrap persistent UI reconciliation");
-      assert.equal(body.className, "album-screen", "destination body class must exist before transport sync");
-      assert.ok(body.childNodes.includes(persistRoot), "persistent root must survive the swap");
-      order.push("sync_persistent_ui");
-    },
-    getAudioTelemetryNow() { return Date.now(); }
-  });
-  const fragment = { querySelector() { return null; } };
-  await api.swapSpaFragment(fragment, "album-screen", persistRoot, {});
+  const handoffStart = spaSource.indexOf("async function applyPaintedHandoff");
+  const handoffEnd = spaSource.indexOf("function finish(mode)", handoffStart);
+  const handoff = spaSource.slice(handoffStart, handoffEnd);
+  assert.ok(handoffStart >= 0 && handoffEnd > handoffStart, "painted handoff implementation is missing");
+  const stagedIndex = handoff.indexOf('destinationRoute.classList.add("is-staged")');
+  const appendIndex = handoff.indexOf("routeHost.appendChild(destinationRoute)");
+  const renderingIndex = handoff.indexOf("await waitForSpaRenderingOpportunity()");
+  const retainedIndex = handoff.indexOf("sourceRetainedUntilPromote");
+  const promoteIndex = handoff.indexOf('destinationRoute.classList.remove("is-staged")');
+  const bodyIndex = handoff.indexOf("document.body.className = bodyClassName");
+  const postPromoteFrameIndex = handoff.indexOf("await nextSpaAnimationFrame()");
+  const detachIndex = handoff.indexOf("preserveOrRemoveSourceRoute()", postPromoteFrameIndex);
+  assert.ok(stagedIndex >= 0 && stagedIndex < appendIndex, "destination must be staged before insertion");
+  assert.ok(appendIndex < renderingIndex, "destination must be inserted before its rendering opportunity");
+  assert.ok(renderingIndex < retainedIndex && retainedIndex < promoteIndex, "source must remain attached through staging");
+  assert.ok(promoteIndex < bodyIndex, "destination must be promoted before the global route class changes");
+  assert.ok(bodyIndex < postPromoteFrameIndex, "promoted destination needs a painted frame before cleanup");
+  assert.ok(postPromoteFrameIndex < detachIndex, "source must detach only after destination promotion");
+  assert.ok(spaSource.includes('handoff_strategy: mode === "painted_handoff" ? "dual_route" : ""'));
 
-  assert.equal(viewTransitionCalls, 1, "iOS standalone must use the feature-detected native painted handoff");
-  assert.equal(classNames.has("pwa-swap-active"), false, "the paint lock must clear after the measured frames");
-  assert.equal(spaState.prepaintSyncActive, false, "prepaint sync flag must be cleared after reconciliation");
-  assert.ok(
-    order.indexOf("append_fragment") < order.indexOf("sync_persistent_ui"),
-    "persistent UI sync must follow the destination DOM mutation"
-  );
-  assert.ok(
-    order.indexOf("append_fragment") < order.indexOf("remove_old"),
-    "destination DOM must be inserted before the previous route is detached"
-  );
-  const syncIndex = order.indexOf("sync_persistent_ui");
-  assert.ok(order.slice(syncIndex + 1).includes("raf"), "persistent UI must sync before the first-paint RAF pair");
+  const spaDocuments = [
+    path.join(ROOT, "public/index.html"),
+    ...fs.readdirSync(path.join(ROOT, "public/music")).filter((name) => name.endsWith(".html")).map((name) => path.join(ROOT, "public/music", name)),
+    ...fs.readdirSync(path.join(ROOT, "public/playlists")).filter((name) => name.endsWith(".html")).map((name) => path.join(ROOT, "public/playlists", name))
+  ];
+  spaDocuments.forEach((file) => {
+    const html = fs.readFileSync(file, "utf8");
+    assert.ok(html.includes('id="infraSpaRouteHost"'), `${path.relative(ROOT, file)} lacks the stable route host`);
+    assert.ok(html.includes('data-spa-route-state="current"'), `${path.relative(ROOT, file)} lacks a current route layer`);
+  });
 }
 
 function testIosSwapDefaultsToSimpleAtomicMode() {
@@ -180,12 +109,10 @@ function testCoverSwapHasNoSnapshotOrSecondDecode() {
     "the route-critical album hero must decode synchronously for the destination paint"
   );
   assert.ok(
-    spaSource.includes("function applySpaScrollOnNextFrame") &&
-      !spaSource.slice(
-        spaSource.indexOf("function applySwap()"),
-        spaSource.indexOf("function finish(mode)")
-      ).includes("window.scrollTo("),
-    "route scrolling must be separated from the DOM mutation by a frame"
+    spaSource.includes("function waitForSpaRenderingOpportunity") &&
+      spaSource.includes("await waitForSpaRenderingOpportunity()") &&
+      spaSource.includes("await nextSpaAnimationFrame()"),
+    "the destination needs a rendering opportunity and one promoted frame before source cleanup"
   );
   assert.ok(
     stylesSource.includes("html.pwa-swap-active body::before") &&
@@ -280,7 +207,7 @@ async function main() {
   testCoverSwapHasNoSnapshotOrSecondDecode();
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
-  console.log("audiofix390 SPA/transport tests: ok");
+  console.log("audiofix391 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

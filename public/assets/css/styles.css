@@ -165,7 +165,9 @@ main:not(.spa-page-entering) {
 }
 
 body.album-screen main:not(.spa-page-entering),
-body.album-screen .cover {
+body.album-screen .cover,
+.spa-route-layer.album-screen main:not(.spa-page-entering),
+.spa-route-layer.album-screen .cover {
   transition: none;
   animation: none;
 }
@@ -226,6 +228,31 @@ body::before {
   inset: 0;
   z-index: -1;
   pointer-events: none;
+  background-color: var(--pwa-status-bg);
+}
+
+#infraSpaRouteHost {
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.spa-route-layer {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.spa-route-layer::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-color: var(--bg-end);
   background-image:
     radial-gradient(1100px 520px at 80% -5%, var(--bg-glow-1), transparent 55%),
@@ -237,9 +264,47 @@ body::before {
 }
 
 body.app-screen::before,
-body.album-screen::before {
+.spa-route-layer.app-screen::before,
+.spa-route-layer.album-screen::before {
   background-image: none;
   background-color: var(--bg-mid);
+}
+
+#infraSpaRouteHost.is-handoff-active {
+  isolation: isolate;
+}
+
+.spa-route-layer.is-staged,
+.spa-route-layer.is-retained-source {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: none !important;
+}
+
+.spa-route-layer.is-staged {
+  z-index: 2;
+  opacity: 0.001;
+}
+
+.spa-route-layer.is-retained-source {
+  z-index: 1;
+  opacity: 1;
+}
+
+.spa-route-layer.is-promoted {
+  z-index: 2;
+}
+
+.spa-route-layer.is-staged > *,
+.spa-route-layer.is-retained-source > * {
+  transform: translate3d(0, var(--spa-route-offset-y, 0), 0);
+  transition: none !important;
 }
 
 body.album-screen {
@@ -249,6 +314,8 @@ body.album-screen {
 html.pwa-swap-active,
 html.pwa-swap-active body,
 html.pwa-swap-active body::before,
+html.pwa-swap-active .spa-route-layer,
+html.pwa-swap-active .spa-route-layer::before,
 html.pwa-home-restore-active,
 html.pwa-home-restore-active body,
 html.pwa-home-restore-active body::before {
@@ -1212,7 +1279,7 @@ body.transport-pip-document .transport-pip-player.is-narrow .global-transport-bt
   padding: 0 20px;
 }
 
-.home-screen {
+.spa-route-layer.home-screen {
   display: grid;
   grid-template-rows: auto 1fr;
   min-height: 100vh;
@@ -4227,7 +4294,7 @@ body.now-playing-open {
 }
 
 .now-playing-up-next-item.is-dragging {
-  opacity: 0.46;
+  opacity: 0;
   cursor: grabbing;
 }
 

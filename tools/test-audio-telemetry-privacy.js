@@ -338,6 +338,11 @@ async function settle(turns = 20) {
     flip_started: true,
     flip_finished: true,
     flip_animation_count: 3,
+    preview_target_change_count: 2,
+    preview_animation_restart_count: 0,
+    max_concurrent_animation_count: 2,
+    layout_hit_test: true,
+    source_hidden_while_ghost: true,
     result: "committed"
   });
   telemetry.trackRuntimeEvent("queue_reorder", {
@@ -586,11 +591,34 @@ async function settle(turns = 20) {
     cover_render_height_px: 358,
     cover_aspect_ratio_milli: 1000,
     cover_geometry_ok: true,
-    cover_object_fit: "contain"
+    cover_object_fit: "contain",
+    handoff_strategy: "dual_route",
+    handoff_stage_ms: 17,
+    source_retained_until_promote: true,
+    source_detached_after_promote: true
   }));
   telemetry.trackRuntimeEvent("spa_render_done", Object.assign({}, navBase, { duration_ms: 90 }));
   telemetry.trackRuntimeEvent("album_open_done", navBase);
   telemetry.trackRuntimeEvent("nav:album_done", navBase);
+
+  for (let index = 1; index <= 21; index += 1) {
+    const repeatedNav = Object.assign({}, navBase, {
+      navigation_token: 900 + index,
+      to_album: `Compact album ${index}`,
+      album: `Compact album ${index}`
+    });
+    telemetry.trackRuntimeEvent("nav:album_start", repeatedNav);
+    tick(1);
+    telemetry.trackRuntimeEvent("spa_swap_done", Object.assign({}, repeatedNav, {
+      duration_ms: 1,
+      route_kind: "album",
+      handoff_strategy: "dual_route",
+      handoff_stage_ms: 1,
+      source_retained_until_promote: true,
+      source_detached_after_promote: true
+    }));
+    telemetry.trackRuntimeEvent("nav:album_done", repeatedNav);
+  }
 
   telemetry.trackRuntimeEvent("mini_player_visibility", {
     state: "visible",
@@ -703,7 +731,7 @@ async function settle(turns = 20) {
     compactTrackTransitions.length,
     "Each request token must produce at most one compact track transition"
   );
-  assert.strictEqual(compactEvents.filter((event) => event.event === "spa_navigation").length, 1);
+  assert.strictEqual(compactEvents.filter((event) => event.event === "spa_navigation").length, 2);
   assert.strictEqual(compactEvents.filter((event) => event.event === "mini_player_visibility").length, 3);
   assert.strictEqual(
     compactEvents.filter((event) => event.event === "visualizer_health").length,
@@ -718,12 +746,18 @@ async function settle(turns = 20) {
   assert.strictEqual(compactEvents.filter((event) => event.event === "launch_summary").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "album_swipe").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "queue_reorder").length, 1);
-  const geometryNavigation = compactEvents.find((event) => event.event === "spa_navigation");
+  const geometryNavigation = compactEvents.find((event) =>
+    event.event === "spa_navigation" && event.cover_render_width_px === 358
+  );
   assert.strictEqual(geometryNavigation.cover_render_width_px, 358);
   assert.strictEqual(geometryNavigation.cover_render_height_px, 358);
   assert.strictEqual(geometryNavigation.cover_aspect_ratio_milli, 1000);
   assert.strictEqual(geometryNavigation.cover_geometry_ok, true);
   assert.strictEqual(geometryNavigation.cover_object_fit, "contain");
+  assert.strictEqual(geometryNavigation.handoff_strategy, "dual_route");
+  assert.strictEqual(geometryNavigation.handoff_stage_ms, 17);
+  assert.strictEqual(geometryNavigation.source_retained_until_promote, true);
+  assert.strictEqual(geometryNavigation.source_detached_after_promote, true);
   const compactInterruption = compactEvents.find((event) => event.event === "audio_interruption");
   assert.strictEqual(compactInterruption.resume_gate_reason, "sampled_active");
   assert.strictEqual(compactInterruption.position_delta_ms, 120);
@@ -733,6 +767,11 @@ async function settle(turns = 20) {
   assert.strictEqual(compactQueue.flip_started, true);
   assert.strictEqual(compactQueue.flip_finished, true);
   assert.strictEqual(compactQueue.flip_animation_count, 3);
+  assert.strictEqual(compactQueue.preview_target_change_count, 2);
+  assert.strictEqual(compactQueue.preview_animation_restart_count, 0);
+  assert.strictEqual(compactQueue.max_concurrent_animation_count, 2);
+  assert.strictEqual(compactQueue.layout_hit_test, true);
+  assert.strictEqual(compactQueue.source_hidden_while_ghost, true);
   const compactBackground = compactEvents.find((event) => event.event === "background_window");
   assert.strictEqual(compactBackground.progress_observed, true);
   assert.strictEqual(compactBackground.return_observed, true);
@@ -779,7 +818,8 @@ async function settle(turns = 20) {
   assert.strictEqual(compactSummary.served_from_prefetch_count, 1);
   assert.strictEqual(compactSummary.waiting_count, 2);
   assert.strictEqual(compactSummary.stalled_count, 1);
-  assert.strictEqual(compactSummary.spa_navigation_count, 1);
+  assert.strictEqual(compactSummary.spa_navigation_count, 22);
+  assert.strictEqual(compactSummary.spa_navigation_compacted_count, 21);
   assert.strictEqual(compactSummary.spa_cover_not_ready_count, 0);
   assert.strictEqual(compactSummary.spa_second_cover_not_ready_count, 0);
   assert.strictEqual(compactSummary.max_first_paint_ms, 18);
@@ -827,7 +867,9 @@ async function settle(turns = 20) {
   assert.strictEqual(compactVisualizer.result, "ready");
   assert.strictEqual(compactVisualizer.state, "running");
   assert.strictEqual(compactVisualizer.visualizer_frame_count, 42);
-  const compactNavigation = compactEvents.find((event) => event.event === "spa_navigation");
+  const compactNavigation = compactEvents.find((event) =>
+    event.event === "spa_navigation" && event.first_paint_ms === 18
+  );
   assert.strictEqual(compactNavigation.cover_ready_at_first_paint, true);
   assert.strictEqual(compactNavigation.first_paint_ms, 18);
   assert.strictEqual(compactNavigation.cover_ready_at_second_paint, true);

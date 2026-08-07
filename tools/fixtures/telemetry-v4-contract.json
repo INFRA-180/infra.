@@ -21,7 +21,7 @@
       "queue_token", "lifecycle_reason", "navigation_method", "navigation_result",
       "cancel_reason", "handler_state", "catalog_source", "service_worker_state",
       "cover_first_frame_state", "cover_second_frame_state", "cover_object_fit",
-      "resume_gate_reason"
+      "resume_gate_reason", "handoff_strategy"
     ],
     "number": [
       "navigation_token", "cover_natural_width", "cover_display_px", "launch_head_ms",
@@ -35,7 +35,9 @@
       "source_index", "target_index", "shifted_row_count", "ghost_created_ms",
       "lift_started_ms", "lift_finished_ms", "flip_started_ms", "flip_finished_ms",
       "cover_render_width_px", "cover_render_height_px", "cover_aspect_ratio_milli",
-      "position_delta_ms", "flip_animation_count"
+      "position_delta_ms", "flip_animation_count", "handoff_stage_ms",
+      "preview_target_change_count", "preview_animation_restart_count",
+      "max_concurrent_animation_count", "spa_navigation_compacted_count"
     ],
     "boolean": [
       "audio_was_playing", "audio_is_playing", "progress_observed", "return_observed",
@@ -43,7 +45,9 @@
       "handler_ready", "navigation_started", "navigation_completed", "lower_half",
       "scroll_restored", "dom_reused", "html_cache_hit", "cover_cache_hit", "ghost_created",
       "lift_animated", "flip_started", "flip_finished", "reduced_motion", "bfcache",
-      "lift_finished", "cover_geometry_ok", "native_play_observed"
+      "lift_finished", "cover_geometry_ok", "native_play_observed",
+      "source_retained_until_promote", "source_detached_after_promote",
+      "layout_hit_test", "source_hidden_while_ghost"
     ]
   },
   "protected_events": [

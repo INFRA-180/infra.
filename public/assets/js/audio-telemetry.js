@@ -118,7 +118,7 @@
     "event", "trace_id", "build", "track", "album", "source", "ua_class",
     "effective_type", "visibility_state", "trigger", "surface", "branch",
     "reason", "error_name", "action", "strategy", "cache_hint", "state",
-    "swap_mode", "swap_policy",
+    "swap_mode", "swap_policy", "handoff_strategy",
     "phase", "mode", "playlist_kind", "audio_session_state", "audio_session_type",
     "from_album", "to_album", "result", "recovery_reason", "intent_reason",
     "route_kind", "display_mode", "orientation", "command_token", "origin",
@@ -160,7 +160,9 @@
     "mini_visibility_change_count", "mini_hidden_count", "mini_unexpected_hidden_count",
     "navigation_token", "cover_natural_width", "cover_display_px",
     "cover_render_width_px", "cover_render_height_px", "cover_aspect_ratio_milli",
-    "position_delta_ms", "flip_animation_count",
+    "position_delta_ms", "flip_animation_count", "handoff_stage_ms",
+    "preview_target_change_count", "preview_animation_restart_count",
+    "max_concurrent_animation_count", "spa_navigation_compacted_count",
     "first_paint_ms", "visible_cover_count", "visible_cover_ready_count",
     "second_paint_ms", "second_visible_cover_count", "second_visible_cover_ready_count",
     "spa_cover_not_ready_count", "spa_second_cover_not_ready_count",
@@ -219,7 +221,9 @@
     "handler_ready", "navigation_started", "navigation_completed", "lower_half",
     "scroll_restored", "dom_reused", "html_cache_hit", "cover_cache_hit",
     "ghost_created", "lift_animated", "flip_started", "flip_finished", "reduced_motion",
-    "lift_finished", "cover_geometry_ok", "native_play_observed", "bfcache"
+    "lift_finished", "cover_geometry_ok", "native_play_observed", "bfcache",
+    "source_retained_until_promote", "source_detached_after_promote",
+    "layout_hit_test", "source_hidden_while_ghost"
   ]);
 
   function now() {
@@ -278,6 +282,7 @@
     "prefetch_error_count",
     "prefetch_cache_ready_count",
     "spa_navigation_count",
+    "spa_navigation_compacted_count",
     "spa_abort_count",
     "spa_slow_count",
     "max_spa_navigation_ms",
@@ -1874,6 +1879,10 @@
         route_kind: transition.route_kind || "",
         swap_mode: transition.swap_mode || "",
         swap_policy: transition.swap_policy || "",
+        handoff_strategy: transition.handoff_strategy || "",
+        handoff_stage_ms: transition.handoff_stage_ms || 0,
+        source_retained_until_promote: Boolean(transition.source_retained_until_promote),
+        source_detached_after_promote: Boolean(transition.source_detached_after_promote),
         result: transition.result || "done",
         reason: transition.reason || "",
         navigation_token: transition.navigation_token || 0,
@@ -1935,7 +1944,35 @@
         updateSummaryMax("max_first_paint_ms", event.first_paint_ms, session);
         updateSummaryMax("max_second_paint_ms", event.second_paint_ms, session);
       }
-      return upsertCompactEvent(`spa:${transition.key}`, event, session);
+      if (!session) return null;
+      const isHome = event.route_kind === "home" || event.dom_reused || event.scroll_restored;
+      const family = isHome ? "home" : "album";
+      const lastSlot = `spa-representative:${family}:last`;
+      const lastMapKey = `${session.session_id}|${lastSlot}`;
+      const previousLastRecord = compactEvents.get(lastMapKey);
+      const slowSlot = `spa-representative:${family}:slowest`;
+      const slowMapKey = `${session.session_id}|${slowSlot}`;
+      if (firstFinalization && previousLastRecord && previousLastRecord.event) {
+        incrementSummary("spa_navigation_compacted_count", 1, session);
+        const previousSlowRecord = compactEvents.get(slowMapKey);
+        const slowCandidates = [
+          previousSlowRecord && previousSlowRecord.event,
+          previousLastRecord.event,
+          event
+        ].filter(Boolean);
+        slowCandidates.sort(function (left, right) {
+          return Number(right.delta_ms || 0) - Number(left.delta_ms || 0);
+        });
+        if (slowCandidates.length) upsertCompactEvent(slowSlot, slowCandidates[0], session);
+      }
+      const retained = upsertCompactEvent(lastSlot, event, session);
+      if (/swipe/i.test(event.trigger)) {
+        upsertCompactEvent("spa-representative:swipe:last", event, session);
+      }
+      if (event.error || event.result !== "done") {
+        upsertCompactEvent("spa-representative:error:last", event, session);
+      }
+      return retained;
     }
 
     function processSpaRuntimeEvent(eventType, payload, source, timestampMs) {
@@ -1968,6 +2005,10 @@
         transition.swap_ms = Math.round(Number(source.duration_ms) || 0);
         transition.swap_mode = String(source.swap_mode || "");
         transition.swap_policy = String(source.swap_policy || "");
+        transition.handoff_strategy = String(source.handoff_strategy || "");
+        transition.handoff_stage_ms = Math.max(0, Math.round(Number(source.handoff_stage_ms) || 0));
+        transition.source_retained_until_promote = source.source_retained_until_promote === true;
+        transition.source_detached_after_promote = source.source_detached_after_promote === true;
         transition.route_kind = String(source.route_kind || "");
         transition.first_paint_ms = Math.max(0, Math.round(Number(source.first_paint_wait_ms) || 0));
         transition.visible_cover_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_count) || 0));

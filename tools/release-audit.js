@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix390-20260807",
-  shell: "infra-shell-20260807-audio390",
+  build: "audiofix391-20260807",
+  shell: "infra-shell-20260807-audio391",
   albums: 31,
   tracks: 283
 });

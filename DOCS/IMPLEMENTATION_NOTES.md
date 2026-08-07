@@ -1,5 +1,43 @@
 # Implementation Notes
 
+## 2026-08-07 — audiofix391 handoff SPA peint et file déterministe
+
+- Le swap PWA utilise désormais un hôte stable `#infraSpaRouteHost`. Chaque document Home,
+  album ou playlist fournit une `.spa-route-layer` autonome avec son fond ; le lecteur persistant
+  `#infraSpaPersist` reste hors de cet hôte et n'est jamais recréé pendant la navigation.
+- La destination est insérée au-dessus de la source, `inert` et presque transparente, puis attend
+  une opportunité de rendu complète. Elle est révélée sans transition avant que la source ne soit
+  détachée à la frame suivante. Les classes de route du `body` ne changent qu'à la promotion. La
+  Home vivante et son scroll restent réutilisés au retour, sans clone, snapshot, canvas, délai fixe
+  ni View Transition par défaut.
+- Le réordonnancement capture une géométrie immuable à l'activation et compense uniquement le
+  delta de scroll. Le hit-test n'interroge plus les rectangles transformés et applique une
+  hystérésis de 10 px. La preview utilise une seule transition CSS de 170 ms sans WAAPI persistante ;
+  la piste source est invisible dans le layout et le ghost reste son unique représentation.
+- Au commit, l'ordre est modifié une seule fois. Les positions visuelles pré-commit sont comparées
+  au DOM rerendu, un unique FLIP final sans `fill` persistant est attendu jusqu'à
+  `animation.finished`, puis ghost, opacité, transitions et transformations sont nettoyés ensemble.
+  La piste courante reste fixe et `prefers-reduced-motion` conserve le geste sans animation.
+- La télémétrie v4 conserve ses familles et son unique rapport réseau. `spa_navigation` expose la
+  stratégie `dual_route`, le temps de staging et l'ordre promotion/détachement ; `queue_reorder`
+  expose les changements de cible, les redémarrages de preview, la concurrence maximale,
+  `layout_hit_test` et la présence d'une source cachée. Les succès SPA sont agrégés en six
+  représentants ; cette compaction alimente `spa_navigation_compacted_count` et ne compte jamais
+  comme un `dropped_event`.
+- Validation navigateur à 390×844 : ouverture et retour PWA observés sous la séquence
+  source seule → destination stagée à `0.001` → source retenue + destination promue → destination
+  seule, lecteur toujours persistant et zéro erreur console. Le geste tactile de file produit un
+  ghost unique, une source invisible, trois lignes déplacées, l'ordre final attendu et aucun style
+  résiduel.
+- Validation automatisée : parité client/Worker v4, confidentialité, budget 32 Kio avec
+  `dropped_events=0`, structure des 36 routes SPA, Home vivante, swipe/covers/startup, touch/pen/mouse,
+  annulation, doublons, reduced motion, Service Worker, frontière publique et `npm test` — 19
+  contrôles réussis. Worker déployé avant le client :
+  `1300bf21-55ec-4fbd-b987-b2bed5038110`.
+- Identifiants atomiques : runtime/CSS `audiofix391-20260807`, Service Worker
+  `infra-shell-20260807-audio391`. La confirmation de l'absence de frame blanche au niveau des
+  pixels composés reste le critère visuel de la campagne iPhone finale.
+
 ## 2026-08-07 — audiofix390 correctifs PWR post-télémétrie
 
 - La campagne `audiofix389` a reproduit les quatre écarts signalés : le swipe gauche horizontal

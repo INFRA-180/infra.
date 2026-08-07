@@ -1654,6 +1654,7 @@
         let queueDragSuppressClickUntil = 0;
         let queuePressGesture = null;
         let queueAutoScrollFrame = 0;
+        let queueFinalizingGesture = null;
 
         function queueTelemetryToken(input) {
           return `queue-${String(input || "input")}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1674,11 +1675,33 @@
           return String(row && row.getAttribute("data-now-playing-queue-key") || "");
         }
 
-        function captureQueueRowRects() {
+        function captureQueueBaseGeometry(gesture) {
+          if (!gesture) return;
+          gesture.baseScrollTop = Math.max(0, Number(overlayQueueList.scrollTop) || 0);
+          gesture.baseGeometry = getQueueRows().map(function (row) {
+            return {
+              row,
+              key: getQueueRowKey(row),
+              index: Number(row.getAttribute("data-now-playing-queue-index")),
+              current: row.classList.contains("is-current"),
+              rect: row.getBoundingClientRect()
+            };
+          });
+          gesture.layoutHitTest = true;
+        }
+
+        function captureQueuePreviewRects(gesture) {
           const rects = new Map();
-          getQueueRows().forEach(function (row) {
-            const key = getQueueRowKey(row);
-            if (key) rects.set(key, row.getBoundingClientRect());
+          if (!gesture || !Array.isArray(gesture.baseGeometry)) return rects;
+          const scrollDelta = (Number(overlayQueueList.scrollTop) || 0) - Number(gesture.baseScrollTop || 0);
+          const shifts = gesture.previewShifts instanceof Map ? gesture.previewShifts : new Map();
+          gesture.baseGeometry.forEach(function (entry) {
+            if (!entry.key || !entry.rect) return;
+            const shift = Number(shifts.get(entry.key)) || 0;
+            rects.set(entry.key, {
+              left: entry.rect.left,
+              top: entry.rect.top - scrollDelta + shift
+            });
           });
           return rects;
         }
@@ -1686,15 +1709,11 @@
         function stopQueuePreviewAnimations(gesture) {
           if (!gesture) return;
           gesture.flipGeneration = Number(gesture.flipGeneration || 0) + 1;
-          const animations = gesture.previewAnimations instanceof Map
-            ? gesture.previewAnimations
-            : new Map();
-          animations.forEach(function (animation) {
-            try { animation.cancel(); } catch (_err) {}
-          });
           gesture.previewAnimations = new Map();
+          gesture.previewShifts = new Map();
           getQueueRows().forEach(function (row) {
             row.style.removeProperty("transform");
+            row.style.removeProperty("transition");
             row.style.removeProperty("will-change");
           });
         }
@@ -1716,7 +1735,12 @@
           if (finalPosition > sourcePosition) finalPosition -= 1;
           finalPosition = Math.max(0, Math.min(rows.length - 1, finalPosition));
 
-          const sourceRect = rows[sourcePosition].getBoundingClientRect();
+          const sourceEntry = Array.isArray(gesture.baseGeometry)
+            ? gesture.baseGeometry.find(function (entry) { return entry.row === rows[sourcePosition]; })
+            : null;
+          const sourceRect = sourceEntry && sourceEntry.rect
+            ? sourceEntry.rect
+            : rows[sourcePosition].getBoundingClientRect();
           const shiftDistance = Math.max(1, sourceRect.height);
           const desired = new Map();
           if (finalPosition > sourcePosition) {
@@ -1729,75 +1753,99 @@
             }
           }
 
-          const previousAnimations = gesture.previewAnimations instanceof Map
-            ? gesture.previewAnimations
-            : new Map();
-          const nextAnimations = new Map();
-          const animationPromises = [];
+          gesture.previewTargetChangeCount = Number(gesture.previewTargetChangeCount || 0) + 1;
+          gesture.maxConcurrentAnimationCount = Math.max(
+            Number(gesture.maxConcurrentAnimationCount || 0),
+            desired.size
+          );
+          gesture.previewShifts = new Map();
           rows.forEach(function (row) {
             if (row === rows[sourcePosition]) return;
-            const fromTransform = window.getComputedStyle(row).transform;
-            const previous = previousAnimations.get(row);
-            if (previous) {
-              try { previous.cancel(); } catch (_err) {}
-            }
             const shift = desired.get(row) || 0;
             const toTransform = shift ? `translateY(${Math.round(shift)}px)` : "none";
+            row.style.transition = `transform ${QUEUE_FLIP_DURATION_MS}ms ${QUEUE_FLIP_EASING}`;
+            row.style.willChange = shift ? "transform" : "auto";
             row.style.transform = toTransform;
-            if (fromTransform === toTransform || typeof row.animate !== "function") return;
-            row.style.willChange = "transform";
-            const animation = row.animate(
-              [{ transform: fromTransform }, { transform: toTransform }],
-              { duration: QUEUE_FLIP_DURATION_MS, easing: QUEUE_FLIP_EASING, fill: "both" }
-            );
-            nextAnimations.set(row, animation);
-            animationPromises.push(Promise.resolve(animation.finished).catch(function () {}));
+            const key = getQueueRowKey(row);
+            if (key) gesture.previewShifts.set(key, shift);
           });
-          gesture.previewAnimations = nextAnimations;
           gesture.shiftedRowCount = desired.size;
-          if (!animationPromises.length) return;
           gesture.flipGeneration = Number(gesture.flipGeneration || 0) + 1;
           const generation = gesture.flipGeneration;
-          gesture.flipStarted = true;
-          gesture.flipFinished = false;
-          gesture.flipAnimationCount = Number(gesture.flipAnimationCount || 0) + animationPromises.length;
+          gesture.flipStarted = desired.size > 0;
+          gesture.flipFinished = desired.size === 0;
+          gesture.flipAnimationCount = Number(gesture.flipAnimationCount || 0) + desired.size;
           emitQueueReorder(gesture, { result: "preview", handler_state: "active" });
-          Promise.all(animationPromises).then(function () {
+          window.requestAnimationFrame(function () {
             if (gesture.finished || gesture.flipGeneration !== generation) return;
-            gesture.flipFinished = true;
-            emitQueueReorder(gesture, { result: "preview", handler_state: "active" });
+            const animations = rows.flatMap(function (row) {
+              if (typeof row.getAnimations !== "function") return [];
+              return row.getAnimations().filter(function (animation) {
+                return !animation.effect || !animation.effect.getKeyframes ||
+                  animation.effect.getKeyframes().some(function (frame) { return frame.transform !== undefined; });
+              });
+            });
+            if (!animations.length) {
+              gesture.flipFinished = true;
+              emitQueueReorder(gesture, { result: "preview", handler_state: "active" });
+              return;
+            }
+            Promise.all(animations.map(function (animation) {
+              return Promise.resolve(animation.finished).catch(function () {});
+            })).then(function () {
+              if (gesture.finished || gesture.flipGeneration !== generation) return;
+              gesture.flipFinished = true;
+              emitQueueReorder(gesture, { result: "preview", handler_state: "active" });
+            });
           });
         }
 
         function animateQueueFinalFlip(gesture, beforeRects) {
-          if (!gesture || !(beforeRects instanceof Map) || queueReducedMotion()) return;
-          window.requestAnimationFrame(function () {
-            const animations = [];
-            getQueueRows().forEach(function (row) {
-              if (row.classList.contains("is-current") || typeof row.animate !== "function") return;
-              const before = beforeRects.get(getQueueRowKey(row));
-              if (!before) return;
-              const after = row.getBoundingClientRect();
-              const deltaX = before.left - after.left;
-              const deltaY = before.top - after.top;
-              if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
-              const animation = row.animate(
-                [
-                  { transform: `translate(${Math.round(deltaX)}px, ${Math.round(deltaY)}px)` },
-                  { transform: "none" }
-                ],
-                { duration: QUEUE_FLIP_DURATION_MS, easing: QUEUE_FLIP_EASING }
-              );
-              animations.push(Promise.resolve(animation.finished).catch(function () {}));
-            });
-            if (!animations.length) return;
-            gesture.flipStarted = true;
-            gesture.flipFinished = false;
-            gesture.flipAnimationCount = Number(gesture.flipAnimationCount || 0) + animations.length;
-            emitQueueReorder(gesture, { result: "committed", handler_state: "final_flip" });
-            Promise.all(animations).then(function () {
-              gesture.flipFinished = true;
-              emitQueueReorder(gesture, { result: "committed", handler_state: "finished" });
+          if (!gesture || !(beforeRects instanceof Map) || queueReducedMotion()) {
+            if (gesture) gesture.flipFinished = true;
+            return Promise.resolve();
+          }
+          return new Promise(function (resolve) {
+            window.requestAnimationFrame(function () {
+              const animations = [];
+              getQueueRows().forEach(function (row) {
+                if (
+                  row.classList.contains("is-current") ||
+                  row.classList.contains("is-dragging") ||
+                  typeof row.animate !== "function"
+                ) return;
+                const before = beforeRects.get(getQueueRowKey(row));
+                if (!before) return;
+                const after = row.getBoundingClientRect();
+                const deltaX = before.left - after.left;
+                const deltaY = before.top - after.top;
+                if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
+                const animation = row.animate(
+                  [
+                    { transform: `translate(${Math.round(deltaX)}px, ${Math.round(deltaY)}px)` },
+                    { transform: "none" }
+                  ],
+                  { duration: QUEUE_FLIP_DURATION_MS, easing: QUEUE_FLIP_EASING, fill: "none" }
+                );
+                animations.push(Promise.resolve(animation.finished).catch(function () {}).then(function () {
+                  try { animation.cancel(); } catch (_err) {}
+                }));
+              });
+              if (!animations.length) {
+                gesture.flipFinished = true;
+                emitQueueReorder(gesture, { result: "committed", handler_state: "finished" });
+                resolve();
+                return;
+              }
+              gesture.flipStarted = true;
+              gesture.flipFinished = false;
+              gesture.flipAnimationCount = Number(gesture.flipAnimationCount || 0) + animations.length;
+              emitQueueReorder(gesture, { result: "committed", handler_state: "final_flip" });
+              Promise.all(animations).then(function () {
+                gesture.flipFinished = true;
+                emitQueueReorder(gesture, { result: "committed", handler_state: "finished" });
+                resolve();
+              });
             });
           });
         }
@@ -1823,6 +1871,11 @@
             flip_started: Boolean(gesture.flipStarted),
             flip_finished: Boolean(gesture.flipFinished),
             flip_animation_count: Math.max(0, Number(gesture.flipAnimationCount) || 0),
+            preview_target_change_count: Math.max(0, Number(gesture.previewTargetChangeCount) || 0),
+            preview_animation_restart_count: Math.max(0, Number(gesture.previewAnimationRestartCount) || 0),
+            max_concurrent_animation_count: Math.max(0, Number(gesture.maxConcurrentAnimationCount) || 0),
+            layout_hit_test: gesture.layoutHitTest === true,
+            source_hidden_while_ghost: gesture.sourceHiddenWhileGhost === true,
             reduced_motion: queueReducedMotion()
           }, detailRecord));
         }
@@ -1843,8 +1896,42 @@
             node.classList.remove("is-dragging", "is-drop-before", "is-drop-after");
             node.removeAttribute("aria-grabbed");
             node.style.removeProperty("transform");
+            node.style.removeProperty("transition");
             node.style.removeProperty("will-change");
           });
+        }
+
+        function hideCommittedQueueSource(gesture) {
+          if (!gesture) return;
+          const committedIndex = gesture.movingTrack && Array.isArray(audioState.playlist)
+            ? audioState.playlist.indexOf(gesture.movingTrack)
+            : -1;
+          const committedSource = getQueueRows().find(function (row) {
+            return (
+              (committedIndex >= 0 && Number(row.getAttribute("data-now-playing-queue-index")) === committedIndex) ||
+              (gesture.sourceKey && getQueueRowKey(row) === gesture.sourceKey)
+            );
+          });
+          if (!committedSource || committedSource.classList.contains("is-current")) return;
+          committedSource.classList.add("is-dragging");
+          committedSource.setAttribute("aria-grabbed", "true");
+          gesture.committedSource = committedSource;
+          gesture.sourceHiddenWhileGhost = true;
+        }
+
+        function finishQueueReorderVisuals(gesture, options) {
+          if (!gesture) return;
+          if (gesture.ghost && gesture.ghost.parentNode) gesture.ghost.parentNode.removeChild(gesture.ghost);
+          [gesture.item, gesture.committedSource].forEach(function (row) {
+            if (!row) return;
+            row.classList.remove("is-dragging");
+            row.removeAttribute("aria-grabbed");
+            row.style.removeProperty("transform");
+            row.style.removeProperty("transition");
+            row.style.removeProperty("will-change");
+          });
+          if (queueFinalizingGesture === gesture) queueFinalizingGesture = null;
+          clearQueueDragState(options);
         }
 
         function getQueueDragItem(target) {
@@ -1859,9 +1946,19 @@
           return index;
         }
 
-        function resolveQueueDropAt(clientX, clientY) {
-          const rows = Array.from(overlayQueueList.querySelectorAll("[data-now-playing-queue-index]"));
-          if (!rows.length) return null;
+        function resolveQueueDropAt(clientX, clientY, gesture) {
+          const activeGesture = gesture || queuePressGesture || queueMouseTelemetry;
+          const geometry = activeGesture && Array.isArray(activeGesture.baseGeometry)
+            ? activeGesture.baseGeometry
+            : getQueueRows().map(function (row) {
+                return {
+                  row,
+                  index: Number(row.getAttribute("data-now-playing-queue-index")),
+                  current: row.classList.contains("is-current"),
+                  rect: row.getBoundingClientRect()
+                };
+              });
+          if (!geometry.length) return null;
           const listRect = overlayQueueList.getBoundingClientRect();
           if (
             Number.isFinite(clientX) &&
@@ -1870,29 +1967,60 @@
             return null;
           }
 
-          for (const item of rows) {
-            const index = Number(item.getAttribute("data-now-playing-queue-index"));
+          const scrollDelta = activeGesture
+            ? (Number(overlayQueueList.scrollTop) || 0) - Number(activeGesture.baseScrollTop || 0)
+            : 0;
+          let resolved = null;
+          for (const entry of geometry) {
+            const item = entry.row;
+            const index = Number(entry.index);
             if (!Number.isInteger(index)) continue;
-            const rect = item.getBoundingClientRect();
-            if (clientY > rect.bottom) continue;
-            return {
+            const rect = entry.rect;
+            const top = rect.top - scrollDelta;
+            const bottom = rect.bottom - scrollDelta;
+            if (clientY > bottom) continue;
+            const midpoint = top + rect.height / 2;
+            resolved = {
               index,
-              after: item.classList.contains("is-current") || clientY > rect.top + rect.height / 2,
-              item
+              after: entry.current || clientY > midpoint,
+              item,
+              midpoint
+            };
+            break;
+          }
+          if (!resolved) {
+            const entry = geometry[geometry.length - 1];
+            resolved = Number.isInteger(entry.index)
+              ? { index: entry.index, after: true, item: entry.row, midpoint: entry.rect.bottom - scrollDelta }
+              : null;
+          }
+          if (
+            resolved &&
+            activeGesture &&
+            activeGesture.lastResolvedDrop &&
+            (activeGesture.lastResolvedDrop.index !== resolved.index ||
+              activeGesture.lastResolvedDrop.after !== resolved.after) &&
+            Math.abs(clientY - resolved.midpoint) < 10
+          ) {
+            return activeGesture.lastResolvedDrop;
+          }
+          if (resolved && activeGesture) {
+            activeGesture.lastResolvedDrop = {
+              index: resolved.index,
+              after: resolved.after,
+              item: resolved.item,
+              midpoint: resolved.midpoint
             };
           }
-
-          const item = rows[rows.length - 1];
-          const index = Number(item.getAttribute("data-now-playing-queue-index"));
-          return Number.isInteger(index) ? { index, after: true, item } : null;
+          return resolved;
         }
 
         function resolveQueueDrop(event) {
-          return resolveQueueDropAt(event.clientX, event.clientY);
+          return resolveQueueDropAt(event.clientX, event.clientY, queuePressGesture || queueMouseTelemetry);
         }
 
         function previewQueueDrop(clientX, clientY) {
-          const drop = resolveQueueDropAt(clientX, clientY);
+          const drop = resolveQueueDropAt(clientX, clientY, queuePressGesture || queueMouseTelemetry);
           clearQueueDropIndicators();
           if (drop && drop.item) {
             drop.item.classList.add(drop.after ? "is-drop-after" : "is-drop-before");
@@ -2005,6 +2133,9 @@
           gesture.offsetX = Math.max(0, Math.min(rect.width, gesture.startX - rect.left));
           gesture.offsetY = Math.max(0, Math.min(rect.height, gesture.startY - rect.top));
           gesture.ghost = ghost;
+          gesture.sourceKey = getQueueRowKey(gesture.item);
+          gesture.sourceHiddenWhileGhost = true;
+          captureQueueBaseGeometry(gesture);
           document.body.appendChild(ghost);
           if (queueReducedMotion()) {
             gesture.liftFinished = true;
@@ -2065,6 +2196,15 @@
             flipFinished: false,
             flipAnimationCount: 0,
             previewAnimations: new Map(),
+            previewShifts: new Map(),
+            previewTargetChangeCount: 0,
+            previewAnimationRestartCount: 0,
+            maxConcurrentAnimationCount: 0,
+            baseGeometry: [],
+            baseScrollTop: 0,
+            layoutHitTest: false,
+            sourceHiddenWhileGhost: false,
+            movingTrack: Array.isArray(audioState.playlist) ? audioState.playlist[index] : null,
             scrollVelocity: 0,
             timer: 0
           };
@@ -2101,15 +2241,12 @@
           if (!gesture) return false;
           const activated = gesture.activated;
           const fromIndex = gesture.index;
-          const drop = activated && commit ? resolveQueueDropAt(gesture.lastX, gesture.lastY) : null;
+          const drop = activated && commit ? resolveQueueDropAt(gesture.lastX, gesture.lastY, gesture) : null;
           window.clearTimeout(gesture.timer);
           cancelQueueAutoScroll();
           gesture.finished = true;
+          const beforeRects = drop ? captureQueuePreviewRects(gesture) : null;
           stopQueuePreviewAnimations(gesture);
-          const beforeRects = drop ? captureQueueRowRects() : null;
-          if (gesture.ghost && gesture.ghost.parentNode) gesture.ghost.parentNode.removeChild(gesture.ghost);
-          gesture.item.classList.remove("is-dragging");
-          gesture.item.removeAttribute("aria-grabbed");
           if (
             gesture.input === "pointer" &&
             typeof gesture.item.hasPointerCapture === "function" &&
@@ -2118,10 +2255,19 @@
             try { gesture.item.releasePointerCapture(gesture.pointerId); } catch (_err) {}
           }
           queuePressGesture = null;
-          clearQueueDragState({ suppressClick: activated });
+          clearQueueDropIndicators();
           let moved = false;
           if (drop) moved = movePlaylistItem(fromIndex, drop.index, { after: drop.after }) !== false;
-          if (drop && moved) animateQueueFinalFlip(gesture, beforeRects);
+          gesture.targetIndex = drop ? drop.index : fromIndex;
+          if (drop && moved) {
+            queueFinalizingGesture = gesture;
+            hideCommittedQueueSource(gesture);
+            animateQueueFinalFlip(gesture, beforeRects).then(function () {
+              finishQueueReorderVisuals(gesture, { suppressClick: true });
+            });
+          } else {
+            finishQueueReorderVisuals(gesture, { suppressClick: activated });
+          }
           emitQueueReorder(gesture, {
             target_index: drop ? drop.index : fromIndex,
             result: drop && moved ? "committed" : "cancelled",
@@ -2162,9 +2308,20 @@
             flipFinished: false,
             flipAnimationCount: 0,
             previewAnimations: new Map(),
+            previewShifts: new Map(),
+            previewTargetChangeCount: 0,
+            previewAnimationRestartCount: 0,
+            maxConcurrentAnimationCount: 0,
+            baseGeometry: [],
+            baseScrollTop: 0,
+            layoutHitTest: false,
+            sourceHiddenWhileGhost: false,
+            sourceKey: getQueueRowKey(item),
+            movingTrack: Array.isArray(audioState.playlist) ? audioState.playlist[index] : null,
             committed: false,
             telemetryStarted: false
           };
+          captureQueueBaseGeometry(queueMouseTelemetry);
           emitQueueReorder(queueMouseTelemetry, {
             result: "activated",
             handler_state: "active",
@@ -2173,6 +2330,7 @@
           });
           item.classList.add("is-dragging");
           item.setAttribute("aria-grabbed", "true");
+          queueMouseTelemetry.sourceHiddenWhileGhost = true;
           if (event.dataTransfer) {
             event.dataTransfer.effectAllowed = "move";
             event.dataTransfer.setData("text/plain", String(index));
@@ -2206,24 +2364,35 @@
           event.preventDefault();
           event.stopPropagation();
           if (queueMouseTelemetry) queueMouseTelemetry.finished = true;
+          const gesture = queueMouseTelemetry;
+          const beforeRects = captureQueuePreviewRects(queueMouseTelemetry);
           stopQueuePreviewAnimations(queueMouseTelemetry);
-          const beforeRects = captureQueueRowRects();
           const moved = movePlaylistItem(queueDragIndex, drop.index, { after: drop.after }) !== false;
-          if (queueMouseTelemetry) {
-            queueMouseTelemetry.targetIndex = drop.index;
-            queueMouseTelemetry.committed = moved;
-            emitQueueReorder(queueMouseTelemetry, {
+          if (gesture) {
+            gesture.targetIndex = drop.index;
+            gesture.committed = moved;
+            if (moved) {
+              queueFinalizingGesture = gesture;
+              hideCommittedQueueSource(gesture);
+            }
+            emitQueueReorder(gesture, {
               result: moved ? "committed" : "cancelled",
               cancel_reason: moved ? "" : "move_rejected",
               handler_state: "finished"
             });
           }
-          if (moved) animateQueueFinalFlip(queueMouseTelemetry, beforeRects);
           queueMouseTelemetry = null;
-          clearQueueDragState({ suppressClick: true });
+          if (moved && gesture) {
+            animateQueueFinalFlip(gesture, beforeRects).then(function () {
+              finishQueueReorderVisuals(gesture, { suppressClick: true });
+            });
+          } else {
+            finishQueueReorderVisuals(gesture, { suppressClick: true });
+          }
         });
 
         overlayQueueList.addEventListener("dragend", function () {
+          if (queueFinalizingGesture && queueFinalizingGesture.input === "mouse") return;
           if (queueMouseTelemetry) queueMouseTelemetry.finished = true;
           if (queueMouseTelemetry && !queueMouseTelemetry.committed) {
             emitQueueReorder(queueMouseTelemetry, {

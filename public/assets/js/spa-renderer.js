@@ -163,6 +163,20 @@
     if (persistRoot) persistRoot.remove();
     const installModal = clone.querySelector("#infraPwaInstallModal");
     if (installModal) installModal.remove();
+    clone.querySelectorAll(".spa-route-layer").forEach(function (layer) {
+      const state = String(layer.getAttribute("data-spa-route-state") || "");
+      if (state && state !== "current") {
+        layer.remove();
+        return;
+      }
+      layer.classList.remove("is-staged", "is-retained-source", "is-promoted");
+      layer.removeAttribute("aria-hidden");
+      layer.removeAttribute("inert");
+      layer.style.removeProperty("--spa-route-offset-y");
+      layer.setAttribute("data-spa-route-state", "current");
+    });
+    const routeHost = clone.querySelector("#infraSpaRouteHost");
+    if (routeHost) routeHost.classList.remove("is-handoff-active");
     sanitizeSpaSnapshotRuntimeState(clone);
 
     return `<!DOCTYPE html>\n${clone.outerHTML}`;
@@ -808,6 +822,93 @@
     });
   }
 
+  function nextSpaAnimationFrame() {
+    if (typeof window.requestAnimationFrame !== "function") return Promise.resolve();
+    return new Promise(function (resolve) {
+      window.requestAnimationFrame(function () { resolve(); });
+    });
+  }
+
+  function waitForSpaRenderingOpportunity() {
+    if (typeof window.requestAnimationFrame !== "function") return Promise.resolve();
+    return new Promise(function (resolve) {
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(function () { resolve(); });
+      });
+    });
+  }
+
+  function getSpaRouteClassName(bodyClassName) {
+    return sanitizeSpaBodyClassName(bodyClassName)
+      .split(/\s+/)
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  function ensureSpaRouteHost(persistRoot) {
+    let host = document.getElementById("infraSpaRouteHost");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "infraSpaRouteHost";
+      host.className = "spa-route-host";
+      const routeLayer = document.createElement("div");
+      routeLayer.className = `spa-route-layer ${getSpaRouteClassName(document.body.className)}`.trim();
+      routeLayer.setAttribute("data-spa-route-state", "current");
+      const preferredNodes = Array.from(document.body.childNodes).filter(function (node) {
+        return node !== persistRoot && node !== host && node.nodeType === 1 &&
+          /^(HEADER|MAIN)$/.test(String(node.nodeName || ""));
+      });
+      const movableNodes = preferredNodes.length ? preferredNodes : Array.from(document.body.childNodes).filter(function (node) {
+        return node !== persistRoot && node !== host && String(node.nodeName || "") !== "SCRIPT";
+      });
+      movableNodes.forEach(function (node) { routeLayer.appendChild(node); });
+      host.appendChild(routeLayer);
+      if (persistRoot && persistRoot.parentNode === document.body) {
+        document.body.insertBefore(host, persistRoot.nextSibling);
+      } else {
+        document.body.insertBefore(host, document.body.firstChild);
+      }
+    }
+    host.classList.add("spa-route-host");
+    let current = host.querySelector(".spa-route-layer[data-spa-route-state='current']") ||
+      host.querySelector(".spa-route-layer");
+    if (current) {
+      current.classList.add("spa-route-layer");
+      current.setAttribute("data-spa-route-state", "current");
+    }
+    return { host, current };
+  }
+
+  function prepareSpaRouteLayer(fragment, bodyClassName) {
+    let layer = fragment && typeof fragment.querySelector === "function"
+      ? fragment.querySelector("#infraSpaRouteHost .spa-route-layer") || fragment.querySelector(".spa-route-layer")
+      : null;
+    const supplementalNodes = fragment && typeof fragment.querySelectorAll === "function"
+      ? Array.from(fragment.querySelectorAll("template[id]"))
+      : [];
+    if (layer) {
+      layer.remove();
+    } else {
+      layer = document.createElement("div");
+      Array.from(fragment && fragment.childNodes || []).forEach(function (node) {
+        if (node.nodeType === 1 && String(node.nodeName || "") === "TEMPLATE") return;
+        layer.appendChild(node);
+      });
+    }
+    layer.className = `spa-route-layer ${getSpaRouteClassName(bodyClassName)}`.trim();
+    layer.setAttribute("data-spa-route-state", "staged");
+    supplementalNodes.forEach(function (node) { node.remove(); });
+    return { layer, supplementalNodes };
+  }
+
+  function installSpaSupplementalNodes(nodes) {
+    (Array.isArray(nodes) ? nodes : []).forEach(function (node) {
+      const id = String(node && node.id || "");
+      if (!id || document.getElementById(id)) return;
+      document.body.appendChild(node);
+    });
+  }
+
   function swapSpaFragment(fragment, bodyClassName, persistRoot, options) {
     const opts = options || {};
     const entering = fragment && fragment.querySelector ? fragment.querySelector("main") : null;
@@ -823,48 +924,68 @@
     }
     if (instantPwaSwap) setSpaSwapPaintLock(true);
 
+    const routeHostState = ensureSpaRouteHost(persistRoot);
+    const routeHost = routeHostState.host;
+    const sourceRoute = routeHostState.current;
+    const preparedRoute = prepareSpaRouteLayer(fragment, bodyClassName);
+    const destinationRoute = preparedRoute.layer;
+
     let applied = false;
     let domMutationMs = 0;
     let appliedScrollX = null;
     let appliedScrollY = null;
+    let scrollAppliedDuringSwap = false;
+    let handoffStageMs = 0;
+    let sourceRetainedUntilPromote = false;
+    let sourceDetachedAfterPromote = false;
+
+    function freezeSourceRouteForCapture() {
+      const liveHomeCapture = opts.liveHomeCapture;
+      if (!liveHomeCapture || !sourceRoute || !sourceRoute.classList.contains("home-screen")) return;
+      liveHomeCapture.frozenResourceCount = freezeLiveHomeResourceUrls(
+        sourceRoute,
+        liveHomeCapture.url || window.location.href
+      );
+    }
+
+    function preserveOrRemoveSourceRoute() {
+      if (!sourceRoute || !sourceRoute.parentNode) return;
+      const liveHomeCapture = opts.liveHomeCapture;
+      const preserveHome = Boolean(
+        liveHomeCapture &&
+        sourceRoute.classList.contains("home-screen")
+      );
+      if (preserveHome) {
+        const liveHomeFragment = document.createDocumentFragment();
+        liveHomeFragment.appendChild(sourceRoute);
+        liveHomeCapture.fragment = liveHomeFragment;
+        spaState.liveHomeRoute = liveHomeCapture;
+      } else {
+        sourceRoute.remove();
+      }
+      sourceDetachedAfterPromote = true;
+    }
+
+    function applyRequestedScroll() {
+      if (!requestedScroll) return;
+      window.scrollTo(requestedScroll.x, requestedScroll.y);
+      if (typeof opts.afterScroll === "function") opts.afterScroll();
+      appliedScrollX = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
+      appliedScrollY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
+      scrollAppliedDuringSwap = true;
+    }
+
     function applySwap() {
       if (applied) return;
       applied = true;
       const mutationStartedAt = getAudioTelemetryNow();
-      const liveHomeCapture = opts.liveHomeCapture;
-      const preserveHome = Boolean(
-        liveHomeCapture &&
-        document.body.classList.contains("home-screen")
-      );
-      const liveHomeFragment = preserveHome ? document.createDocumentFragment() : null;
-      const previousNodes = Array.from(document.body.childNodes).filter(function (node) {
-        return node !== persistRoot;
-      });
-      if (preserveHome && liveHomeCapture) {
-        liveHomeCapture.frozenResourceCount = freezeLiveHomeResourceUrls(
-          document.body,
-          liveHomeCapture.url || window.location.href
-        );
-      }
-
-      // Append the complete destination before detaching the previous route.
-      // Both operations remain in the same synchronous rendering task, so
-      // WebKit never observes an empty body between the two pages.
+      freezeSourceRouteForCapture();
       document.body.className = bodyClassName;
-      document.body.appendChild(fragment);
-      previousNodes.forEach((node) => {
-        if (liveHomeFragment) liveHomeFragment.appendChild(node);
-        else node.remove();
-      });
-      if (liveHomeFragment && liveHomeCapture) {
-        liveHomeCapture.fragment = liveHomeFragment;
-        spaState.liveHomeRoute = liveHomeCapture;
-      }
-
-      if (document.body.firstChild !== persistRoot) {
-        document.body.insertBefore(persistRoot, document.body.firstChild);
-      }
-
+      routeHost.appendChild(destinationRoute);
+      destinationRoute.setAttribute("data-spa-route-state", "current");
+      installSpaSupplementalNodes(preparedRoute.supplementalNodes);
+      preserveOrRemoveSourceRoute();
+      applyRequestedScroll();
       runPersistentUiPrepaintSync();
 
       if (animateEntry) {
@@ -875,8 +996,55 @@
       domMutationMs = Math.max(0, Math.round(getAudioTelemetryNow() - mutationStartedAt));
     }
 
+    async function applyPaintedHandoff() {
+      if (applied) return;
+      applied = true;
+      const mutationStartedAt = getAudioTelemetryNow();
+      freezeSourceRouteForCapture();
+      const sourceScrollY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
+      const destinationScrollY = requestedScroll ? requestedScroll.y : 0;
+      destinationRoute.classList.add("is-staged");
+      destinationRoute.style.setProperty("--spa-route-offset-y", `${-destinationScrollY}px`);
+      destinationRoute.setAttribute("aria-hidden", "true");
+      destinationRoute.inert = true;
+      routeHost.classList.add("is-handoff-active");
+      routeHost.appendChild(destinationRoute);
+      installSpaSupplementalNodes(preparedRoute.supplementalNodes);
+
+      const stagedAt = getAudioTelemetryNow();
+      await waitForSpaRenderingOpportunity();
+      handoffStageMs = Math.max(0, Math.round(getAudioTelemetryNow() - stagedAt));
+      sourceRetainedUntilPromote = Boolean(sourceRoute && sourceRoute.isConnected);
+
+      if (sourceRoute) {
+        sourceRoute.classList.add("is-retained-source");
+        sourceRoute.style.setProperty("--spa-route-offset-y", `${-sourceScrollY}px`);
+        sourceRoute.setAttribute("data-spa-route-state", "outgoing");
+        sourceRoute.setAttribute("aria-hidden", "true");
+        sourceRoute.inert = true;
+      }
+      destinationRoute.classList.remove("is-staged");
+      destinationRoute.classList.add("is-promoted");
+      destinationRoute.style.removeProperty("--spa-route-offset-y");
+      destinationRoute.setAttribute("data-spa-route-state", "current");
+      destinationRoute.removeAttribute("aria-hidden");
+      destinationRoute.inert = false;
+      document.body.className = bodyClassName;
+      applyRequestedScroll();
+      runPersistentUiPrepaintSync();
+      domMutationMs = Math.max(0, Math.round(getAudioTelemetryNow() - mutationStartedAt));
+
+      await nextSpaAnimationFrame();
+      preserveOrRemoveSourceRoute();
+      destinationRoute.classList.remove("is-promoted");
+      routeHost.classList.remove("is-handoff-active");
+    }
+
     function finish(mode) {
-      return applySpaScrollOnNextFrame(requestedScroll).then(function (appliedScroll) {
+      const scrollPromise = scrollAppliedDuringSwap
+        ? Promise.resolve({ x: appliedScrollX, y: appliedScrollY })
+        : applySpaScrollOnNextFrame(requestedScroll);
+      return scrollPromise.then(function (appliedScroll) {
         if (appliedScroll) {
           appliedScrollX = appliedScroll.x;
           appliedScrollY = appliedScroll.y;
@@ -885,6 +1053,10 @@
         const base = {
           swap_mode: mode,
           swap_policy: swapPolicy,
+          handoff_strategy: mode === "painted_handoff" ? "dual_route" : "",
+          handoff_stage_ms: handoffStageMs,
+          source_retained_until_promote: sourceRetainedUntilPromote,
+          source_detached_after_promote: sourceDetachedAfterPromote,
           route_kind: routeClasses.includes("album-screen")
             ? "album"
             : (routeClasses.includes("home-screen") ? "home" : "other"),
@@ -943,6 +1115,12 @@
       }
     }
 
+    if (instantPwaSwap) {
+      return applyPaintedHandoff().then(function () {
+        return finish("painted_handoff");
+      });
+    }
+
     return new Promise(function (resolve) {
       const run = function () {
         applySwap();
@@ -974,85 +1152,32 @@
       return null;
     }
     const persistRoot = getSpaPersistRoot();
-    const previousNodes = Array.from(document.body.childNodes).filter(function (node) {
-      return node !== persistRoot;
-    });
-    let restoreApplied = false;
-    function applyRestore() {
-      if (restoreApplied) return;
-      restoreApplied = true;
-      document.body.className = sanitizeSpaBodyClassName(route.bodyClassName || "home-screen");
-      document.body.appendChild(route.fragment);
-      previousNodes.forEach(function (node) {
-        node.remove();
-      });
-      if (document.body.firstChild !== persistRoot) {
-        document.body.insertBefore(persistRoot, document.body.firstChild);
-      }
-      runPersistentUiPrepaintSync();
-      if (route.title) document.title = route.title;
-    }
-
-    const mobilePwaSwap = isMobilePwaCoverNavigation();
-    const swapPolicy = mobilePwaSwap ? getPwaSwapPolicy() : "standard";
-    if (mobilePwaSwap) setSpaSwapPaintLock(true);
-    let swapMode = "live_dom_restore";
-    const canUseNativeViewTransition = Boolean(
-      mobilePwaSwap &&
-      swapPolicy === "view_transition" &&
-      typeof document.startViewTransition === "function"
-    );
-    if (canUseNativeViewTransition) {
-      document.documentElement.classList.add("pwa-native-swap");
-      try {
-        const transition = document.startViewTransition(applyRestore);
-        if (transition.ready && typeof transition.ready.catch === "function") {
-          transition.ready.catch(function () {});
-        }
-        if (transition.finished && typeof transition.finished.then === "function") {
-          transition.finished.then(
-            function () { document.documentElement.classList.remove("pwa-native-swap"); },
-            function () { document.documentElement.classList.remove("pwa-native-swap"); }
-          );
-        }
-        if (transition.updateCallbackDone && typeof transition.updateCallbackDone.then === "function") {
-          await transition.updateCallbackDone.catch(function () {
-            applyRestore();
-          });
-        } else {
-          applyRestore();
-        }
-        swapMode = "live_view_transition";
-      } catch (_err) {
-        document.documentElement.classList.remove("pwa-native-swap");
-        applyRestore();
-      }
-    } else {
-      document.documentElement.classList.remove("pwa-native-swap");
-      applyRestore();
-    }
-
-    const appliedScroll = await applySpaScrollOnNextFrame(requested);
     let anchorCorrection = 0;
-    const anchor = findAlbumCardByUrl(document, route.anchorHref);
-    if (anchor && Number.isFinite(route.anchorViewportTop)) {
-      anchorCorrection = Math.round(anchor.getBoundingClientRect().top - route.anchorViewportTop);
-      if (Math.abs(anchorCorrection) > 0) {
-        window.scrollBy(0, anchorCorrection);
+    if (route.title) document.title = route.title;
+    const swapResult = await swapSpaFragment(
+      route.fragment,
+      sanitizeSpaBodyClassName(route.bodyClassName || "home-screen"),
+      persistRoot,
+      {
+        restoreScroll: requested,
+        afterScroll: function () {
+          const anchor = findAlbumCardByUrl(document, route.anchorHref);
+          if (!anchor || !Number.isFinite(route.anchorViewportTop)) return;
+          anchorCorrection = Math.round(anchor.getBoundingClientRect().top - route.anchorViewportTop);
+          if (Math.abs(anchorCorrection) > 0) window.scrollBy(0, anchorCorrection);
+        }
       }
-    }
+    );
 
     spaState.liveHomeRoute = null;
-    const appliedX = appliedScroll ? appliedScroll.x : Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
+    const appliedX = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
     const appliedY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
-    const paintState = await waitForSpaFirstPaint();
-    if (mobilePwaSwap) setSpaSwapPaintLock(false);
     // Defer non-visual Home maintenance until the retained route has produced
     // its first frames; cloning the whole route here previously delayed paint.
     resumeLiveHomeRoute();
-    const result = Object.assign({
-      swap_mode: swapMode,
-      swap_policy: swapPolicy,
+    const result = Object.assign({}, swapResult || {}, {
+      swap_mode: String(swapResult && swapResult.swap_mode || "live_dom_restore"),
+      swap_policy: String(swapResult && swapResult.swap_policy || "standard"),
       route_kind: "home",
       swap_schedule_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
       swap_dom_mutation_ms: 0,
@@ -1067,7 +1192,7 @@
       restore_cover_decoded_count: coverResult.decoded,
       restore_cover_timed_out: coverResult.timedOut,
       frozen_resource_url_count: Math.max(0, Number(route.frozenResourceCount) || 0)
-    }, paintState || {});
+    });
 
     trackAudioRuntimeEvent("spa_scroll_restore", Object.assign({}, telemetry || {}, result, {
       duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))

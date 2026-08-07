@@ -28,12 +28,20 @@ includes(transport, 'trackAudioRuntimeEvent("queue_reorder"', "queue gestures ar
 includes(transport, "queueTelemetryToken", "queue telemetry has no per-gesture token");
 includes(transport, 'input_type: gesture.input === "pointer" ? "pen"', "queue telemetry does not distinguish touch, pen and mouse");
 includes(transport, "ghost_created_ms", "queue telemetry does not expose ghost creation");
-includes(transport, "flip_started: false", "the pre-FLIP baseline is not measurable");
+includes(transport, "const QUEUE_FLIP_DURATION_MS = 170", "queue FLIP duration is not the approved 170 ms");
+includes(transport, 'const QUEUE_FLIP_EASING = "cubic-bezier(0.22, 1, 0.36, 1)"', "queue FLIP easing regressed");
+includes(transport, "animateQueuePreview", "intermediate rows are not animated while dragging");
+includes(transport, "animateQueueFinalFlip", "the final rerender has no FLIP reconciliation");
+includes(transport, "Promise.all(animationPromises)", "preview telemetry is not based on real animation completion");
+includes(transport, "Promise.all(animations)", "final FLIP telemetry is not based on real animation completion");
+includes(transport, "flip_animation_count", "queue telemetry does not count real animations");
+includes(transport, "lift_finished", "queue telemetry does not record pickup completion");
 includes(transport, "runQueueAutoScroll", "long queues need edge auto-scroll while reordering");
 includes(transport, "movePlaylistItem(fromIndex, drop.index, { after: drop.after })", "touch drop does not reach the queue engine");
 includes(transport, 'item.classList.contains("is-current")', "the playing track must stay fixed");
 
 includes(nowPlaying, "item.draggable = true", "future tracks must remain draggable on desktop");
+includes(nowPlaying, 'data-now-playing-queue-key', "queue rows lack stable track-occurrence keys");
 includes(nowPlaying, "Glisser ou maintenir appuyé pour réordonner À suivre", "the input hint does not describe touch reorder");
 includes(audioCore, "if (currentIndex >= 0 && from <= currentIndex) return false", "the engine no longer protects the playing prefix");
 includes(styles, ".now-playing-up-next-list.is-pointer-reordering", "active touch reorder does not lock the queue surface");

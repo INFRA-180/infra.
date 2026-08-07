@@ -655,6 +655,7 @@
     transport.overlayQueueList.replaceChildren();
 
     const fragment = document.createDocumentFragment();
+    const queueKeyOccurrences = new Map();
     indices.forEach(function (index, position) {
       const sourceTrack = list[index];
       if (!sourceTrack) return;
@@ -675,6 +676,17 @@
       item.className = "now-playing-up-next-item";
       item.classList.toggle("is-current", isCurrent);
       item.setAttribute("data-now-playing-queue-index", String(index));
+      const queueTrackIdentity = [
+        String(track && track.src || ""),
+        title,
+        album
+      ].join("\u001f");
+      const queueTrackOccurrence = (queueKeyOccurrences.get(queueTrackIdentity) || 0) + 1;
+      queueKeyOccurrences.set(queueTrackIdentity, queueTrackOccurrence);
+      item.setAttribute(
+        "data-now-playing-queue-key",
+        `${encodeURIComponent(queueTrackIdentity)}:${queueTrackOccurrence}`
+      );
       item.setAttribute("aria-label", isCurrent ? `En lecture ${title}` : `Lire ${title}`);
       if (isCurrent) item.setAttribute("aria-current", "true");
       if (!isCurrent) {

@@ -2284,7 +2284,9 @@ body.transport-pip-document .transport-pip-player.is-narrow .global-transport-bt
 
 .cover {
   width: 100%;
+  height: auto;
   aspect-ratio: 1 / 1;
+  object-fit: contain;
   max-width: none;
   border-radius: 16px;
   border: 0;
@@ -3781,6 +3783,7 @@ body.now-playing-open {
 
 .now-playing-cover {
   width: 100%;
+  height: auto;
   aspect-ratio: 1 / 1;
   display: block;
   object-fit: contain;
@@ -4677,6 +4680,15 @@ body.now-playing-open {
 
   .now-playing-cover-wrap {
     width: min(84vw, 390px);
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+
+  .now-playing-cover {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
   }
 
   .now-playing-controls,

@@ -124,7 +124,7 @@ function createHarness(options) {
   assert.equal(swipeEvents.at(-1).data.result, "navigation_started");
 })();
 
-(function testVerticalScrollAndLeftSwipeStayPassive() {
+(function testVerticalScrollStaysPassiveAndLeftSwipeOpens() {
   const vertical = createHarness();
   vertical.dispatch("pointerdown", { clientX: 20, clientY: 100 });
   const verticalMove = vertical.dispatch("pointermove", { clientX: 25, clientY: 145 });
@@ -136,11 +136,13 @@ function createHarness(options) {
   const left = createHarness();
   left.dispatch("pointerdown", { clientX: 90, clientY: 100 });
   const leftMove = left.dispatch("pointermove", { clientX: 20, clientY: 102 });
-  left.dispatch("pointerup", { clientX: 20, clientY: 102 });
-  assert.equal(leftMove.defaultPrevented, false, "left swipe is outside the requested navigation gesture");
-  assert.equal(left.opened.length, 0);
+  const leftEnd = left.dispatch("pointerup", { clientX: 20, clientY: 102 });
+  assert.equal(leftMove.defaultPrevented, true, "left swipe must own the horizontal gesture");
+  assert.equal(leftEnd.defaultPrevented, true);
+  assert.equal(left.opened.length, 1);
+  assert.equal(left.opened[0].options.trigger, "swipe_left");
   assert.equal(left.telemetry.at(-1).data.direction, "left");
-  assert.equal(left.telemetry.at(-1).data.cancel_reason, "unsupported_direction");
+  assert.equal(left.telemetry.at(-1).data.result, "navigation_started");
 })();
 
 (function testTapDoesNotConsumeSwipeTelemetryBudget() {
@@ -182,4 +184,4 @@ function createHarness(options) {
   assert.equal(harness.listeners.get("pointerdown").length, pointerDownCount);
 })();
 
-console.log("Home album swipe checks passed: right-open, cold/left diagnostics, vertical guard and click dedupe.");
+console.log("Home album swipe checks passed: left/right open, cold diagnostics, vertical guard and click dedupe.");

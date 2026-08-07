@@ -128,7 +128,7 @@
     "direction", "axis", "input_type", "gesture_token", "queue_token", "lifecycle_reason",
     "navigation_method", "navigation_result", "cancel_reason", "handler_state",
     "catalog_source", "service_worker_state", "cover_first_frame_state",
-    "cover_second_frame_state"
+    "cover_second_frame_state", "cover_object_fit", "resume_gate_reason"
   ]);
   const TELEMETRY_NUMBER_FIELDS = new Set([
     "timestamp_ms", "delta_ms", "duration_before_play_ms", "duration_ms", "delay_ms",
@@ -159,6 +159,8 @@
     "spa_abort_count", "spa_slow_count", "max_spa_navigation_ms",
     "mini_visibility_change_count", "mini_hidden_count", "mini_unexpected_hidden_count",
     "navigation_token", "cover_natural_width", "cover_display_px",
+    "cover_render_width_px", "cover_render_height_px", "cover_aspect_ratio_milli",
+    "position_delta_ms", "flip_animation_count",
     "first_paint_ms", "visible_cover_count", "visible_cover_ready_count",
     "second_paint_ms", "second_visible_cover_count", "second_visible_cover_ready_count",
     "spa_cover_not_ready_count", "spa_second_cover_not_ready_count",
@@ -217,7 +219,7 @@
     "handler_ready", "navigation_started", "navigation_completed", "lower_half",
     "scroll_restored", "dom_reused", "html_cache_hit", "cover_cache_hit",
     "ghost_created", "lift_animated", "flip_started", "flip_finished", "reduced_motion",
-    "bfcache"
+    "lift_finished", "cover_geometry_ok", "native_play_observed", "bfcache"
   ]);
 
   function now() {
@@ -368,7 +370,10 @@
     const events = Array.isArray(input) ? input.filter(Boolean) : [];
     if (events.length <= SESSION_EVENT_CAP) return events;
     const mandatoryIndexes = new Set();
-    ["session_summary", "launch_summary", "background_window"].forEach(function (eventName) {
+    [
+      "session_summary", "launch_summary", "background_window",
+      "spa_navigation", "album_swipe", "queue_reorder"
+    ].forEach(function (eventName) {
       const index = events.map(function (event) { return event && event.event; }).lastIndexOf(eventName);
       if (index >= 0) mandatoryIndexes.add(index);
     });
@@ -475,11 +480,31 @@
         if (!largest || report.events.length > largest.events.length) largest = report;
       });
       if (largest && largest.events.length > 1) {
-        const removableIndex = largest.events.findIndex(function (event) {
-          return !event || ![
-            "session_summary", "launch_summary", "background_window", "audio_interruption", "error"
-          ].includes(event.event);
+        const protectedIndexes = new Set();
+        [
+          "session_summary", "launch_summary", "background_window",
+          "spa_navigation", "album_swipe", "queue_reorder"
+        ].forEach(function (eventName) {
+          const index = largest.events.map(function (event) { return event && event.event; }).lastIndexOf(eventName);
+          if (index >= 0) protectedIndexes.add(index);
         });
+        largest.events.forEach(function (event, index) {
+          if (event && ["audio_interruption", "error"].includes(event.event)) protectedIndexes.add(index);
+        });
+        const ranked = largest.events.map(function (event, index) {
+          const eventName = String(event && event.event || "");
+          const result = String(event && event.result || "");
+          let priority = 4;
+          if (/prefetch|cache/.test(eventName) && !event.error) priority = 0;
+          else if (["album_swipe", "queue_reorder"].includes(eventName) && result === "cancelled") priority = 1;
+          else if (["media_command", "spa_navigation", "album_swipe", "queue_reorder"].includes(eventName) && !event.error) priority = 2;
+          else if (!event.error) priority = 3;
+          return { index, priority };
+        }).filter(function (candidate) { return !protectedIndexes.has(candidate.index); });
+        ranked.sort(function (left, right) {
+          return left.priority - right.priority || left.index - right.index;
+        });
+        const removableIndex = ranked.length ? ranked[0].index : -1;
         if (removableIndex < 0) return null;
         largest.events.splice(removableIndex, 1);
         largest.dropped_events += 1;
@@ -986,6 +1011,40 @@
       return true;
     }
 
+    function removeCompactCorrelation(session, mapKey, recordMap, token) {
+      if (!session || !token) return;
+      recordMap.delete(token);
+      const compactKey = `${session.session_id}|${mapKey}:${token}`;
+      const compact = compactEvents.get(compactKey);
+      if (compact && compact.event) {
+        session.events = session.events.filter(function (event) { return event !== compact.event; });
+      }
+      compactEvents.delete(compactKey);
+    }
+
+    function makeRoomForAlbumSwipe(session) {
+      if (albumSwipes.size < 6) return;
+      const entries = Array.from(albumSwipes.entries());
+      const protectedTokens = new Set();
+      ["opened", "cancelled:left", "cancelled:right"].forEach(function (kind) {
+        for (let index = entries.length - 1; index >= 0; index -= 1) {
+          const token = entries[index][0];
+          const record = entries[index][1] || {};
+          const direction = String(record.direction || "").toLowerCase() ||
+            (String(record.trigger || "").includes("left") ? "left" : "right");
+          const matches = kind === "opened"
+            ? String(record.result || "") === "opened"
+            : String(record.result || "") === "cancelled" && direction === kind.split(":")[1];
+          if (matches) {
+            protectedTokens.add(token);
+            break;
+          }
+        }
+      });
+      const removable = entries.find(function (entry) { return !protectedTokens.has(entry[0]); }) || entries[0];
+      if (removable) removeCompactCorrelation(session, "album-swipe", albumSwipes, removable[0]);
+    }
+
     function processAlbumSwipe(payload, source, timestampMs) {
       const token = String(source && source.gesture_token || payload.gesture_token || "").trim().slice(0, 120);
       if (!token) return false;
@@ -994,16 +1053,22 @@
       let record = albumSwipes.get(token);
       const firstObservation = !record;
       if (!record) {
-        if (albumSwipes.size >= 6) return true;
+        makeRoomForAlbumSwipe(session);
         record = { event: "album_swipe", gesture_token: token, counted_result: "" };
         albumSwipes.set(token, record);
         incrementSummary("album_swipe_count", 1, session);
       }
+      const previousTerminalResult = ["opened", "cancelled"].includes(String(record.result || ""))
+        ? String(record.result)
+        : "";
       Object.assign(record, payload, source || {}, {
         event: "album_swipe",
         gesture_token: token,
         timestamp_ms: Number(timestampMs) || Date.now()
       });
+      if (previousTerminalResult && !["opened", "cancelled"].includes(String(record.result || ""))) {
+        record.result = previousTerminalResult;
+      }
       const result = String(record.result || "");
       if (result === "opened" && record.counted_result !== "opened") {
         incrementSummary("album_swipe_success_count", 1, session);
@@ -1026,16 +1091,25 @@
       if (!session) return true;
       let record = queueReorders.get(token);
       if (!record) {
-        if (queueReorders.size >= 4) return true;
+        if (queueReorders.size >= 4) {
+          const oldestToken = queueReorders.keys().next().value;
+          if (oldestToken) removeCompactCorrelation(session, "queue-reorder", queueReorders, oldestToken);
+        }
         record = { event: "queue_reorder", queue_token: token, counted_result: "" };
         queueReorders.set(token, record);
         incrementSummary("queue_reorder_count", 1, session);
       }
+      const previousTerminalResult = ["committed", "cancelled"].includes(String(record.result || ""))
+        ? String(record.result)
+        : "";
       Object.assign(record, payload, source || {}, {
         event: "queue_reorder",
         queue_token: token,
         timestamp_ms: Number(timestampMs) || Date.now()
       });
+      if (previousTerminalResult && !["committed", "cancelled"].includes(String(record.result || ""))) {
+        record.result = previousTerminalResult;
+      }
       const result = String(record.result || "");
       if (result === "committed" && record.counted_result !== "committed") {
         incrementSummary("queue_reorder_success_count", 1, session);
@@ -1818,6 +1892,11 @@
         cache_hint: transition.cache_hint || "",
         cover_natural_width: transition.cover_natural_width || 0,
         cover_display_px: transition.cover_display_px || 0,
+        cover_render_width_px: transition.cover_render_width_px || 0,
+        cover_render_height_px: transition.cover_render_height_px || 0,
+        cover_aspect_ratio_milli: transition.cover_aspect_ratio_milli || 0,
+        cover_geometry_ok: transition.cover_geometry_ok !== false,
+        cover_object_fit: transition.cover_object_fit || "",
         first_paint_ms: transition.first_paint_ms || 0,
         visible_cover_count: transition.visible_cover_count || 0,
         visible_cover_ready_count: transition.visible_cover_ready_count || 0,
@@ -1908,6 +1987,11 @@
           : (transition.cover_ready_at_second_paint
               ? "ready"
               : (transition.second_visible_cover_ready_count > 0 ? "partial" : "empty"));
+        transition.cover_render_width_px = Math.max(0, Math.round(Number(source.cover_render_width_px) || 0));
+        transition.cover_render_height_px = Math.max(0, Math.round(Number(source.cover_render_height_px) || 0));
+        transition.cover_aspect_ratio_milli = Math.max(0, Math.round(Number(source.cover_aspect_ratio_milli) || 0));
+        transition.cover_geometry_ok = source.cover_geometry_ok !== false;
+        transition.cover_object_fit = String(source.cover_object_fit || "");
         if (typeof source.cover_cache_hit === "boolean") transition.cover_cache_hit = source.cover_cache_hit;
       }
       if (eventType === "spa_scroll_restore") {

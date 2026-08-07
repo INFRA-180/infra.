@@ -333,10 +333,22 @@ async function settle(turns = 20) {
     target_index: 2,
     ghost_created: true,
     lift_animated: true,
+    lift_finished: true,
     shifted_row_count: 2,
-    flip_started: false,
-    flip_finished: false,
+    flip_started: true,
+    flip_finished: true,
+    flip_animation_count: 3,
     result: "committed"
+  });
+  telemetry.trackRuntimeEvent("queue_reorder", {
+    queue_token: "queue-safe-1",
+    input_type: "touch",
+    source_index: 5,
+    target_index: 2,
+    flip_started: true,
+    flip_finished: true,
+    flip_animation_count: 3,
+    result: "preview"
   });
   await settle();
 
@@ -569,7 +581,12 @@ async function settle(turns = 20) {
     second_paint_wait_ms: 34,
     second_paint_relevant_cover_count: 1,
     second_paint_relevant_cover_ready_count: 1,
-    second_paint_relevant_cover_ready: true
+    second_paint_relevant_cover_ready: true,
+    cover_render_width_px: 358,
+    cover_render_height_px: 358,
+    cover_aspect_ratio_milli: 1000,
+    cover_geometry_ok: true,
+    cover_object_fit: "contain"
   }));
   telemetry.trackRuntimeEvent("spa_render_done", Object.assign({}, navBase, { duration_ms: 90 }));
   telemetry.trackRuntimeEvent("album_open_done", navBase);
@@ -649,7 +666,10 @@ async function settle(turns = 20) {
     phase: "resumed",
     outcome: "success",
     surface_hint: "remote_hidden",
-    command_token: commandToken
+    command_token: commandToken,
+    resume_gate_reason: "sampled_active",
+    position_delta_ms: 120,
+    native_play_observed: true
   });
   await settle();
   const putsBeforePrefetchError = indexedDbPutCalls;
@@ -675,6 +695,7 @@ async function settle(turns = 20) {
   assert.strictEqual(requests.length, 2);
   const compactReport = requests[1].payload.reports[0];
   const compactEvents = compactReport.events;
+  assert.strictEqual(compactReport.dropped_events, 0, "the representative iPhone campaign must fit without drops");
   const compactTrackTransitions = compactEvents.filter((event) => event.event === "track_transition");
   assert.strictEqual(compactTrackTransitions.length, 9);
   assert.strictEqual(
@@ -697,6 +718,21 @@ async function settle(turns = 20) {
   assert.strictEqual(compactEvents.filter((event) => event.event === "launch_summary").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "album_swipe").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "queue_reorder").length, 1);
+  const geometryNavigation = compactEvents.find((event) => event.event === "spa_navigation");
+  assert.strictEqual(geometryNavigation.cover_render_width_px, 358);
+  assert.strictEqual(geometryNavigation.cover_render_height_px, 358);
+  assert.strictEqual(geometryNavigation.cover_aspect_ratio_milli, 1000);
+  assert.strictEqual(geometryNavigation.cover_geometry_ok, true);
+  assert.strictEqual(geometryNavigation.cover_object_fit, "contain");
+  const compactInterruption = compactEvents.find((event) => event.event === "audio_interruption");
+  assert.strictEqual(compactInterruption.resume_gate_reason, "sampled_active");
+  assert.strictEqual(compactInterruption.position_delta_ms, 120);
+  assert.strictEqual(compactInterruption.native_play_observed, true);
+  const compactQueue = compactEvents.find((event) => event.event === "queue_reorder");
+  assert.strictEqual(compactQueue.lift_finished, true);
+  assert.strictEqual(compactQueue.flip_started, true);
+  assert.strictEqual(compactQueue.flip_finished, true);
+  assert.strictEqual(compactQueue.flip_animation_count, 3);
   const compactBackground = compactEvents.find((event) => event.event === "background_window");
   assert.strictEqual(compactBackground.progress_observed, true);
   assert.strictEqual(compactBackground.return_observed, true);

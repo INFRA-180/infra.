@@ -56,7 +56,10 @@
       card.classList.add("is-album-swipe-tracking");
       card.classList.toggle("is-album-swipe-ready", Boolean(ready));
       if (card.style && typeof card.style.setProperty === "function") {
-        const visualX = Math.max(0, Math.min(ALBUM_SWIPE_MAX_VISUAL_PX, Number(deltaX) || 0));
+        const visualX = Math.max(
+          -ALBUM_SWIPE_MAX_VISUAL_PX,
+          Math.min(ALBUM_SWIPE_MAX_VISUAL_PX, Number(deltaX) || 0)
+        );
         card.style.setProperty("--album-swipe-x", `${visualX}px`);
       }
     }
@@ -131,7 +134,8 @@
     function consumeEarlyAlbumSwipeProbe() {
       const probe = window.__infraEarlyAlbumSwipeProbe;
       if (!probe || typeof probe !== "object") return;
-      if (typeof probe.stop === "function") probe.stop();
+      if (typeof probe.handoff === "function") probe.handoff();
+      else if (typeof probe.stop === "function") probe.stop();
       const records = Array.isArray(probe.records) ? probe.records.slice(0, 6) : [];
       records.forEach(function (record) {
         trackAudioRuntimeEvent("album_swipe", Object.assign({
@@ -209,14 +213,14 @@
             navigation_completed: false
           });
         }
-        if (gesture.axis === "y" || (gesture.axis === "x" && deltaX < 0)) {
-          cancelAlbumSwipe(gesture.axis === "y" ? "vertical_scroll" : "unsupported_direction");
+        if (gesture.axis === "y") {
+          cancelAlbumSwipe("vertical_scroll");
           return;
         }
         if (gesture.axis !== "x") return;
 
         if (event.cancelable) event.preventDefault();
-        setAlbumSwipeVisual(gesture.card, deltaX, deltaX >= ALBUM_SWIPE_OPEN_PX);
+        setAlbumSwipeVisual(gesture.card, deltaX, absX >= ALBUM_SWIPE_OPEN_PX);
       }, { capture: true, passive: false });
 
       function finishAlbumSwipe(event, cancelled) {
@@ -228,7 +232,7 @@
         const deltaY = (Number.isFinite(endY) ? endY : gesture.lastY) - gesture.startY;
         const shouldOpen = !cancelled &&
           gesture.axis === "x" &&
-          deltaX >= ALBUM_SWIPE_OPEN_PX &&
+          Math.abs(deltaX) >= ALBUM_SWIPE_OPEN_PX &&
           Math.abs(deltaX) > Math.abs(deltaY) * ALBUM_SWIPE_DOMINANCE;
         const card = gesture.card;
         clearAlbumSwipeVisual(card);
@@ -251,7 +255,7 @@
           navigation_method: "spa"
         });
         const opened = openAlbumCard(card, {
-          trigger: "swipe_right",
+          trigger: deltaX < 0 ? "swipe_left" : "swipe_right",
           gestureToken: gesture.token
         }) !== false;
         if (opened) {

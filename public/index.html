@@ -8,6 +8,9 @@
       const records = [];
       const active = new Map();
       const options = { capture: true, passive: true };
+      const pendingStorageKey = "infra:pending-album-swipe";
+      let runtimeReady = false;
+      let detached = false;
       function albumCard(target) {
         return target && typeof target.closest === "function"
           ? target.closest('body.home-screen [data-catalog-grid="albums"] a.album-card[href]:not(.playlist-card)')
@@ -26,6 +29,8 @@
           album: String(card.getAttribute("aria-label") || "album").replace(/^Ouvrir l'album\s*/i, "").slice(0, 120),
           card_rank: rank,
           lower_half: Boolean(cards.length && rank > Math.ceil(cards.length / 2)),
+          href: String(card.href || card.getAttribute("href") || ""),
+          runtime_ready_at_start: runtimeReady,
           start_x: Number(event.clientX) || 0,
           start_y: Number(event.clientY) || 0,
           last_x: Number(event.clientX) || 0,
@@ -50,7 +55,7 @@
         const absX = Math.abs(dx);
         const absY = Math.abs(dy);
         if (absX <= 10 && absY <= 10) return;
-        records.push({
+        const record = {
           gesture_token: gesture.gesture_token,
           input_type: gesture.input_type,
           album: gesture.album,
@@ -62,8 +67,35 @@
           dy: Math.round(dy),
           gesture_duration_ms: Math.max(0, Date.now() - gesture.started_at_ms),
           finished_at_ms: Date.now()
-        });
+        };
+        records.push(record);
         while (records.length > 6) records.shift();
+        const opensAlbum = event.type === "pointerup" &&
+          absX >= 58 &&
+          absX > absY * 1.2;
+        if (opensAlbum && !gesture.runtime_ready_at_start && gesture.href) {
+          const pending = Object.assign({}, record, {
+            navigation_method: "native_fallback",
+            navigation_started: true,
+            navigation_completed: false,
+            result: "navigation_started"
+          });
+          try {
+            sessionStorage.setItem(pendingStorageKey, JSON.stringify(pending));
+          } catch (_err) {
+            // The native navigation still remains available without storage.
+          }
+          window.location.assign(gesture.href);
+        }
+        if (runtimeReady && active.size === 0) detach();
+      }
+      function detach() {
+        if (detached) return;
+        detached = true;
+        document.removeEventListener("pointerdown", onPointerDown, options);
+        document.removeEventListener("pointermove", onPointerMove, options);
+        document.removeEventListener("pointerup", finish, options);
+        document.removeEventListener("pointercancel", finish, options);
       }
       document.addEventListener("pointerdown", onPointerDown, options);
       document.addEventListener("pointermove", onPointerMove, options);
@@ -71,11 +103,15 @@
       document.addEventListener("pointercancel", finish, options);
       window.__infraEarlyAlbumSwipeProbe = {
         records,
-        stop: function () {
+        pending_storage_key: pendingStorageKey,
+        handoff: function () {
+          runtimeReady = true;
           document.removeEventListener("pointerdown", onPointerDown, options);
-          document.removeEventListener("pointermove", onPointerMove, options);
-          document.removeEventListener("pointerup", finish, options);
-          document.removeEventListener("pointercancel", finish, options);
+          if (active.size === 0) detach();
+        },
+        stop: function () {
+          runtimeReady = true;
+          detach();
           active.clear();
         }
       };
@@ -112,7 +148,7 @@
   <meta name="twitter:title" content="INFRA." />
   <meta name="twitter:description" content="Playlists, albums, applications et clips en telechargement direct." />
   <meta name="twitter:image" content="https://infra-180.github.io/infra./assets/pwa/icon-512-logo-white.png" />
-  <link rel="stylesheet" href="assets/css/styles.css?v=audiofix389-20260807" />
+  <link rel="stylesheet" href="assets/css/styles.css?v=audiofix390-20260807" />
   <link rel="stylesheet" href="assets/css/playlists.css?v=playlist-collage-20260802" />
 </head>
 <body class="home-screen">
@@ -520,26 +556,26 @@
     οὐ κλεὶς, οὐ χείρ· πνοὴ μόνη.
   </template>
 
-  <script src="assets/js/covers.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/favorites.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/favorites-ui.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/audio-visualizer.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/transport-ui.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/now-playing.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/album-player-ui.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/spa-renderer.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/audio-radio.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/media-session.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/audio-prefetch.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/spa-router.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/catalog-fallback.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/catalog-loader.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/audio-telemetry.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/downloads.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/home-catalog.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/audio-core.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/pwa-install.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/share-qr.js?v=audiofix389-20260807"></script>
-  <script src="assets/js/scripts.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/covers.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/favorites.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/favorites-ui.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/audio-visualizer.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/transport-ui.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/now-playing.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/album-player-ui.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/spa-renderer.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/audio-radio.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/media-session.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/audio-prefetch.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/spa-router.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/catalog-fallback.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/catalog-loader.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/audio-telemetry.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/downloads.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/home-catalog.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/audio-core.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/pwa-install.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/share-qr.js?v=audiofix390-20260807"></script>
+  <script src="assets/js/scripts.js?v=audiofix390-20260807"></script>
 </body>
 </html>

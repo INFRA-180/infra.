@@ -153,16 +153,27 @@ function testPlaybackAudioSessionConfiguration() {
 }
 
 function testAudioSessionInterruptionResumeGate() {
+  const radioSource = fs.readFileSync(RADIO_PATH, "utf8");
+  const scriptsSource = fs.readFileSync(path.join(ROOT, "public/assets/js/scripts.js"), "utf8");
+  assert(
+    !radioSource.includes("!audioState.audioSessionTelemetryBound &&"),
+    "a directly sampled active state must remain valid when a statechange was missed"
+  );
+  assert(radioSource.includes("function scheduleSystemInterruptionResumeAfterActive(trigger)"));
+  assert(radioSource.includes("}, 500);"), "the guarded fallback must wait 500 ms for native Play");
+  assert(radioSource.includes("guard.resumeAttempted = true"), "the fallback needs a one-attempt latch");
+  assert(scriptsSource.includes('callAudioRadio("scheduleSystemInterruptionResumeAfterActive", ["visibility_sample"])'));
   const sandbox = createSandbox();
   loadScript(sandbox, RADIO_PATH);
   const canResume = sandbox.InfraAudioRadio.canAllowSystemInterruptionResume;
-  const guard = { token: "interruption-test", src: "https://media.test/track.m4a" };
+  const guard = { token: "interruption-test", src: "https://media.test/track.m4a", currentTime: 42 };
   const base = {
     guard,
     now: 1000,
     allowedUntil: 9000,
     audioSessionState: "active",
-    currentSrc: guard.src
+    currentSrc: guard.src,
+    currentTime: 42.8
   };
   assert.strictEqual(canResume(base), true, "a matching interrupted session may resume once active");
   assert.strictEqual(
@@ -189,6 +200,21 @@ function testAudioSessionInterruptionResumeGate() {
     canResume(Object.assign({}, base, { guard: null })),
     false,
     "a hidden play without a recorded interruption must stay blocked"
+  );
+  assert.strictEqual(
+    canResume(Object.assign({}, base, { explicitPause: true })),
+    false,
+    "an explicit pause must cancel the guarded resume"
+  );
+  assert.strictEqual(
+    canResume(Object.assign({}, base, { currentTime: 44 })),
+    false,
+    "a position delta of two seconds must reject the resume"
+  );
+  assert.strictEqual(
+    canResume(Object.assign({}, base, { currentTime: 0, allowPositionReset: true })),
+    true,
+    "an iOS reset-to-zero may pass only through the explicit restoration path"
   );
 }
 
@@ -2599,7 +2625,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix389 runtime checks passed.");
+  console.log("audiofix390 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

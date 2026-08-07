@@ -1663,6 +1663,145 @@
           return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         }
 
+        const QUEUE_FLIP_DURATION_MS = 170;
+        const QUEUE_FLIP_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+
+        function getQueueRows() {
+          return Array.from(overlayQueueList.querySelectorAll("[data-now-playing-queue-index]"));
+        }
+
+        function getQueueRowKey(row) {
+          return String(row && row.getAttribute("data-now-playing-queue-key") || "");
+        }
+
+        function captureQueueRowRects() {
+          const rects = new Map();
+          getQueueRows().forEach(function (row) {
+            const key = getQueueRowKey(row);
+            if (key) rects.set(key, row.getBoundingClientRect());
+          });
+          return rects;
+        }
+
+        function stopQueuePreviewAnimations(gesture) {
+          if (!gesture) return;
+          gesture.flipGeneration = Number(gesture.flipGeneration || 0) + 1;
+          const animations = gesture.previewAnimations instanceof Map
+            ? gesture.previewAnimations
+            : new Map();
+          animations.forEach(function (animation) {
+            try { animation.cancel(); } catch (_err) {}
+          });
+          gesture.previewAnimations = new Map();
+          getQueueRows().forEach(function (row) {
+            row.style.removeProperty("transform");
+            row.style.removeProperty("will-change");
+          });
+        }
+
+        function animateQueuePreview(gesture, drop) {
+          if (!gesture || !gesture.activated || !drop || !drop.item) return;
+          if (queueReducedMotion()) {
+            stopQueuePreviewAnimations(gesture);
+            gesture.shiftedRowCount = 0;
+            return;
+          }
+          const rows = getQueueRows();
+          const sourcePosition = rows.findIndex(function (row) {
+            return Number(row.getAttribute("data-now-playing-queue-index")) === gesture.index;
+          });
+          const targetPosition = rows.indexOf(drop.item);
+          if (sourcePosition < 0 || targetPosition < 0) return;
+          let finalPosition = targetPosition + (drop.after ? 1 : 0);
+          if (finalPosition > sourcePosition) finalPosition -= 1;
+          finalPosition = Math.max(0, Math.min(rows.length - 1, finalPosition));
+
+          const sourceRect = rows[sourcePosition].getBoundingClientRect();
+          const shiftDistance = Math.max(1, sourceRect.height);
+          const desired = new Map();
+          if (finalPosition > sourcePosition) {
+            for (let position = sourcePosition + 1; position <= finalPosition; position += 1) {
+              if (!rows[position].classList.contains("is-current")) desired.set(rows[position], -shiftDistance);
+            }
+          } else if (finalPosition < sourcePosition) {
+            for (let position = finalPosition; position < sourcePosition; position += 1) {
+              if (!rows[position].classList.contains("is-current")) desired.set(rows[position], shiftDistance);
+            }
+          }
+
+          const previousAnimations = gesture.previewAnimations instanceof Map
+            ? gesture.previewAnimations
+            : new Map();
+          const nextAnimations = new Map();
+          const animationPromises = [];
+          rows.forEach(function (row) {
+            if (row === rows[sourcePosition]) return;
+            const fromTransform = window.getComputedStyle(row).transform;
+            const previous = previousAnimations.get(row);
+            if (previous) {
+              try { previous.cancel(); } catch (_err) {}
+            }
+            const shift = desired.get(row) || 0;
+            const toTransform = shift ? `translateY(${Math.round(shift)}px)` : "none";
+            row.style.transform = toTransform;
+            if (fromTransform === toTransform || typeof row.animate !== "function") return;
+            row.style.willChange = "transform";
+            const animation = row.animate(
+              [{ transform: fromTransform }, { transform: toTransform }],
+              { duration: QUEUE_FLIP_DURATION_MS, easing: QUEUE_FLIP_EASING, fill: "both" }
+            );
+            nextAnimations.set(row, animation);
+            animationPromises.push(Promise.resolve(animation.finished).catch(function () {}));
+          });
+          gesture.previewAnimations = nextAnimations;
+          gesture.shiftedRowCount = desired.size;
+          if (!animationPromises.length) return;
+          gesture.flipGeneration = Number(gesture.flipGeneration || 0) + 1;
+          const generation = gesture.flipGeneration;
+          gesture.flipStarted = true;
+          gesture.flipFinished = false;
+          gesture.flipAnimationCount = Number(gesture.flipAnimationCount || 0) + animationPromises.length;
+          emitQueueReorder(gesture, { result: "preview", handler_state: "active" });
+          Promise.all(animationPromises).then(function () {
+            if (gesture.finished || gesture.flipGeneration !== generation) return;
+            gesture.flipFinished = true;
+            emitQueueReorder(gesture, { result: "preview", handler_state: "active" });
+          });
+        }
+
+        function animateQueueFinalFlip(gesture, beforeRects) {
+          if (!gesture || !(beforeRects instanceof Map) || queueReducedMotion()) return;
+          window.requestAnimationFrame(function () {
+            const animations = [];
+            getQueueRows().forEach(function (row) {
+              if (row.classList.contains("is-current") || typeof row.animate !== "function") return;
+              const before = beforeRects.get(getQueueRowKey(row));
+              if (!before) return;
+              const after = row.getBoundingClientRect();
+              const deltaX = before.left - after.left;
+              const deltaY = before.top - after.top;
+              if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
+              const animation = row.animate(
+                [
+                  { transform: `translate(${Math.round(deltaX)}px, ${Math.round(deltaY)}px)` },
+                  { transform: "none" }
+                ],
+                { duration: QUEUE_FLIP_DURATION_MS, easing: QUEUE_FLIP_EASING }
+              );
+              animations.push(Promise.resolve(animation.finished).catch(function () {}));
+            });
+            if (!animations.length) return;
+            gesture.flipStarted = true;
+            gesture.flipFinished = false;
+            gesture.flipAnimationCount = Number(gesture.flipAnimationCount || 0) + animations.length;
+            emitQueueReorder(gesture, { result: "committed", handler_state: "final_flip" });
+            Promise.all(animations).then(function () {
+              gesture.flipFinished = true;
+              emitQueueReorder(gesture, { result: "committed", handler_state: "finished" });
+            });
+          });
+        }
+
         function emitQueueReorder(gesture, details) {
           if (!gesture || !gesture.telemetryToken) return;
           const detailRecord = details || {};
@@ -1679,9 +1818,11 @@
             gesture_duration_ms: Math.max(0, Date.now() - Number(gesture.startedAt || Date.now())),
             ghost_created: Boolean(gesture.ghost),
             lift_animated: Boolean(gesture.activated && !queueReducedMotion()),
-            shifted_row_count: Math.max(0, Math.abs(targetIndex - gesture.index) - 1),
-            flip_started: false,
-            flip_finished: false,
+            lift_finished: Boolean(gesture.liftFinished),
+            shifted_row_count: Math.max(0, Number(gesture.shiftedRowCount) || 0),
+            flip_started: Boolean(gesture.flipStarted),
+            flip_finished: Boolean(gesture.flipFinished),
+            flip_animation_count: Math.max(0, Number(gesture.flipAnimationCount) || 0),
             reduced_motion: queueReducedMotion()
           }, detailRecord));
         }
@@ -1701,6 +1842,8 @@
           overlayQueueList.querySelectorAll(".is-dragging, .is-drop-before, .is-drop-after").forEach(function (node) {
             node.classList.remove("is-dragging", "is-drop-before", "is-drop-after");
             node.removeAttribute("aria-grabbed");
+            node.style.removeProperty("transform");
+            node.style.removeProperty("will-change");
           });
         }
 
@@ -1754,15 +1897,25 @@
           if (drop && drop.item) {
             drop.item.classList.add(drop.after ? "is-drop-after" : "is-drop-before");
           }
-          if (queuePressGesture && drop && queuePressGesture.targetIndex !== drop.index) {
+          if (queuePressGesture && drop && (
+            queuePressGesture.targetIndex !== drop.index ||
+            queuePressGesture.targetAfter !== Boolean(drop.after)
+          )) {
             queuePressGesture.targetIndex = drop.index;
+            queuePressGesture.targetAfter = Boolean(drop.after);
+            animateQueuePreview(queuePressGesture, drop);
             emitQueueReorder(queuePressGesture, {
               result: "preview",
               handler_state: "active"
             });
           }
-          if (queueMouseTelemetry && drop && queueMouseTelemetry.targetIndex !== drop.index) {
+          if (queueMouseTelemetry && drop && (
+            queueMouseTelemetry.targetIndex !== drop.index ||
+            queueMouseTelemetry.targetAfter !== Boolean(drop.after)
+          )) {
             queueMouseTelemetry.targetIndex = drop.index;
+            queueMouseTelemetry.targetAfter = Boolean(drop.after);
+            animateQueuePreview(queueMouseTelemetry, drop);
             emitQueueReorder(queueMouseTelemetry, {
               result: "preview",
               handler_state: "active"
@@ -1853,6 +2006,23 @@
           gesture.offsetY = Math.max(0, Math.min(rect.height, gesture.startY - rect.top));
           gesture.ghost = ghost;
           document.body.appendChild(ghost);
+          if (queueReducedMotion()) {
+            gesture.liftFinished = true;
+          } else if (typeof ghost.getAnimations === "function") {
+            const liftAnimations = ghost.getAnimations();
+            if (liftAnimations.length) {
+              Promise.all(liftAnimations.map(function (animation) {
+                return Promise.resolve(animation.finished).catch(function () {});
+              })).then(function () {
+                if (gesture.finished) return;
+                gesture.liftFinished = true;
+                emitQueueReorder(gesture, {
+                  result: "lift_finished",
+                  handler_state: "active"
+                });
+              });
+            }
+          }
           emitQueueReorder(gesture, {
             result: "activated",
             handler_state: "active",
@@ -1889,6 +2059,12 @@
             offsetY: 0,
             activated: false,
             ghost: null,
+            liftFinished: false,
+            shiftedRowCount: 0,
+            flipStarted: false,
+            flipFinished: false,
+            flipAnimationCount: 0,
+            previewAnimations: new Map(),
             scrollVelocity: 0,
             timer: 0
           };
@@ -1928,6 +2104,9 @@
           const drop = activated && commit ? resolveQueueDropAt(gesture.lastX, gesture.lastY) : null;
           window.clearTimeout(gesture.timer);
           cancelQueueAutoScroll();
+          gesture.finished = true;
+          stopQueuePreviewAnimations(gesture);
+          const beforeRects = drop ? captureQueueRowRects() : null;
           if (gesture.ghost && gesture.ghost.parentNode) gesture.ghost.parentNode.removeChild(gesture.ghost);
           gesture.item.classList.remove("is-dragging");
           gesture.item.removeAttribute("aria-grabbed");
@@ -1942,6 +2121,7 @@
           clearQueueDragState({ suppressClick: activated });
           let moved = false;
           if (drop) moved = movePlaylistItem(fromIndex, drop.index, { after: drop.after }) !== false;
+          if (drop && moved) animateQueueFinalFlip(gesture, beforeRects);
           emitQueueReorder(gesture, {
             target_index: drop ? drop.index : fromIndex,
             result: drop && moved ? "committed" : "cancelled",
@@ -1976,6 +2156,12 @@
             startedAt: Date.now(),
             activated: true,
             ghost: null,
+            liftFinished: false,
+            shiftedRowCount: 0,
+            flipStarted: false,
+            flipFinished: false,
+            flipAnimationCount: 0,
+            previewAnimations: new Map(),
             committed: false,
             telemetryStarted: false
           };
@@ -2006,17 +2192,22 @@
           if (!Number.isInteger(queueDragIndex)) return;
           const drop = resolveQueueDrop(event);
           if (!drop) {
+            if (queueMouseTelemetry) queueMouseTelemetry.finished = true;
             emitQueueReorder(queueMouseTelemetry, {
               result: "cancelled",
               cancel_reason: "invalid_drop",
               handler_state: "finished"
             });
+            stopQueuePreviewAnimations(queueMouseTelemetry);
             queueMouseTelemetry = null;
             clearQueueDragState();
             return;
           }
           event.preventDefault();
           event.stopPropagation();
+          if (queueMouseTelemetry) queueMouseTelemetry.finished = true;
+          stopQueuePreviewAnimations(queueMouseTelemetry);
+          const beforeRects = captureQueueRowRects();
           const moved = movePlaylistItem(queueDragIndex, drop.index, { after: drop.after }) !== false;
           if (queueMouseTelemetry) {
             queueMouseTelemetry.targetIndex = drop.index;
@@ -2027,11 +2218,13 @@
               handler_state: "finished"
             });
           }
+          if (moved) animateQueueFinalFlip(queueMouseTelemetry, beforeRects);
           queueMouseTelemetry = null;
           clearQueueDragState({ suppressClick: true });
         });
 
         overlayQueueList.addEventListener("dragend", function () {
+          if (queueMouseTelemetry) queueMouseTelemetry.finished = true;
           if (queueMouseTelemetry && !queueMouseTelemetry.committed) {
             emitQueueReorder(queueMouseTelemetry, {
               result: "cancelled",
@@ -2039,6 +2232,7 @@
               handler_state: "finished"
             });
           }
+          stopQueuePreviewAnimations(queueMouseTelemetry);
           queueMouseTelemetry = null;
           clearQueueDragState({ suppressClick: true });
         });

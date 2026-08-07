@@ -1,5 +1,43 @@
 # Implementation Notes
 
+## 2026-08-07 — audiofix390 correctifs PWR post-télémétrie
+
+- La campagne `audiofix389` a reproduit les quatre écarts signalés : le swipe gauche horizontal
+  terminait en `unsupported_direction`, les deux réordonnancements tactiles étaient committés avec
+  `flip_started=false`, les interruptions restaient au stade `paused/detected`, tandis que les
+  navigations observées avaient leurs covers prêtes aux deux premières frames. La politique de
+  swap SPA reste donc inchangée.
+- Les covers d'album et la cover plein écran imposent maintenant `width:100%`, `height:auto`,
+  `aspect-ratio:1/1` et `object-fit:contain`. Les dimensions HTML `1200×1200` restent intrinsèques ;
+  `spa_navigation` enregistre désormais le rectangle rendu, son ratio au millième, la conformité à
+  1 % et l'`object-fit` réellement calculé.
+- Le swipe album accepte `dx` positif et négatif avec le même verrou d'axe à 10 px, le même seuil
+  absolu de 58 px et la dominance horizontale 1,2. `swipe_left` et `swipe_right` appellent la même
+  ouverture SPA et suppriment le clic synthétique pendant 900 ms. Un geste commencé avant le
+  runtime finit dans le probe de tête puis ouvre le lien natif une seule fois ; la destination
+  reprend le même token depuis `sessionStorage` et le clôt en `opened`.
+- La reprise après appel conserve token, source et position. Un état Audio Session directement
+  échantillonné à `active` est accepté même si `statechange` a été manqué ; la source doit être
+  identique et l'écart inférieur à deux secondes. Une position iOS remise à zéro est restaurée,
+  puis le runtime attend 500 ms un Play natif avant une seule tentative gardée dans la fenêtre de
+  huit secondes. Une Pause explicite, une source changée ou l'absence d'état `active` interdit la
+  reprise.
+- Le réordonnancement garde son ghost et anime les lignes intermédiaires, puis le DOM final, par
+  FLIP de 170 ms avec `cubic-bezier(0.22, 1, 0.36, 1)`. Les lignes utilisent une clé piste +
+  occurrence, la piste courante ne bouge jamais et toutes les transformations sont nettoyées.
+  `prefers-reduced-motion` applique l'ordre immédiatement. La télémétrie attend les promesses
+  réelles de fin et enregistre `lift_finished` et `flip_animation_count`.
+- Un `controllerchange` Service Worker survenant pendant le démarrage reste en attente : aucun
+  reload n'est planifié avant la fin de `initPage()`, la disponibilité du catalogue et deux frames
+  applicatives. Les rapports restent v4, sans heartbeat ni nouvelle requête, avec une seule écriture
+  KV par session. Le Worker compatible a été déployé avant le client sous la version
+  `110bf5bb-c3b0-4006-8a37-d528beedb097`.
+- Validation automatisée : Worker v2/v3/v4, confidentialité et déduplication, campagne représentative
+  sous 32 Kio avec `dropped_events=0`, swipe gauche/droite/vertical/froid, garde de reprise, carré
+  V-23π56, touch/pen/mouse, deux FLIP, reduced motion, startup readiness, audit public et `npm test`.
+  Identifiants atomiques : runtime/CSS `audiofix390-20260807`, Service Worker
+  `infra-shell-20260807-audio390`.
+
 ## 2026-08-07 — télémétrie PWR v4 avant correctifs UX
 
 - Le Worker accepte désormais les rapports de session 2, 3 et 4. Une session v4 utilise la clé

@@ -16,6 +16,7 @@
     const now = Number.isFinite(Number(args.now)) ? Number(args.now) : Date.now();
     const allowedUntil = Number(args.allowedUntil || 0);
     if (!guard || !guard.token || !Number.isFinite(allowedUntil) || allowedUntil < now) return false;
+    if (args.explicitPause === true) return false;
     if (String(args.audioSessionState || "") !== "active") return false;
     const guardSrc = String(guard.src || "");
     const currentSrc = String(args.currentSrc || "");
@@ -23,7 +24,14 @@
     const matches = typeof args.srcMatches === "function"
       ? args.srcMatches(guardSrc, currentSrc)
       : guardSrc === currentSrc;
-    return Boolean(matches);
+    if (!matches) return false;
+    const savedPosition = Number(guard.currentTime);
+    const currentPosition = Number(args.currentTime);
+    if (Number.isFinite(savedPosition) && Number.isFinite(currentPosition)) {
+      const resetToZero = args.allowPositionReset === true && savedPosition > 2 && currentPosition <= 0.75;
+      if (!resetToZero && Math.abs(currentPosition - savedPosition) >= 2) return false;
+    }
+    return true;
   }
 
   function createAudioRadio(context) {
@@ -271,9 +279,10 @@
   }
 
   function rememberSystemInterruption(audio, pauseContext) {
-    if (pauseContext !== "system_midtrack") return;
     const audioSession = navigator && navigator.audioSession ? navigator.audioSession : null;
-    if (audioSession && String(audioSession.state || "") === "interrupted") {
+    const audioSessionInterrupted = Boolean(audioSession && String(audioSession.state || "") === "interrupted");
+    if (pauseContext !== "system_midtrack" && !audioSessionInterrupted) return;
+    if (audioSessionInterrupted) {
       audioState.audioSessionInterruptedAt = Date.now();
       audioState.audioSessionResumeAllowedUntil = 0;
     }
@@ -318,7 +327,6 @@
     const audioSession = navigator && navigator.audioSession ? navigator.audioSession : null;
     const now = Date.now();
     const sampledInterruptionFallback = Boolean(
-      !audioState.audioSessionTelemetryBound &&
       audioSession &&
       String(audioSession.state || "") === "active" &&
       Number.isFinite(audioState.audioSessionInterruptedAt) &&
@@ -328,22 +336,152 @@
       now - guard.at <= SYSTEM_INTERRUPTION_GUARD_MS
     );
     const currentSrc = getCurrentAudioResumeKey(audio);
+    const savedPosition = Number(guard && guard.currentTime);
+    let currentPosition = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    let positionRestored = false;
+    const sampledActiveSourceMatch = Boolean(
+      guard &&
+      String(audioSession && audioSession.state || "") === "active" &&
+      guard.src &&
+      currentSrc &&
+      srcMatches(guard.src, currentSrc)
+    );
+    if (sampledActiveSourceMatch && Number.isFinite(savedPosition) && savedPosition > 2 && currentPosition <= 0.75) {
+      try {
+        audio.currentTime = savedPosition;
+        currentPosition = audio.currentTime;
+        positionRestored = Math.abs(currentPosition - savedPosition) < 2;
+      } catch (_err) {
+        positionRestored = false;
+      }
+    }
+    const positionDeltaMs = Number.isFinite(savedPosition) && Number.isFinite(currentPosition)
+      ? Math.round(Math.abs(currentPosition - savedPosition) * 1000)
+      : null;
     const allowed = canAllowSystemInterruptionResume({
       guard,
       now,
       allowedUntil: audioState.audioSessionResumeAllowedUntil || (sampledInterruptionFallback ? now + 1 : 0),
       audioSessionState: audioSession && audioSession.state,
       currentSrc,
+      currentTime: currentPosition,
+      allowPositionReset: positionRestored,
       srcMatches
     });
-    if (!allowed) return false;
+    if (!allowed) {
+      if (guard && guard.token) {
+        emitAudioInterruption(guard, {
+          phase: "resume_refused",
+          outcome: "guard_rejected",
+          resume_gate_reason: String(audioSession && audioSession.state || "") !== "active"
+            ? "audio_session_not_active"
+            : (!currentSrc || !guard.src || !srcMatches(guard.src, currentSrc) ? "source_changed" : "position_delta"),
+          position_delta_ms: positionDeltaMs,
+          native_play_observed: true
+        });
+      }
+      return false;
+    }
     audioState.audioSessionResumeAllowedUntil = 0;
     emitAudioInterruption(guard, {
       phase: "resumed",
       outcome: "system_resume_allowed",
-      audio_session_state: "active"
+      audio_session_state: "active",
+      resume_gate_reason: sampledInterruptionFallback ? "sampled_active" : "statechange_active",
+      position_delta_ms: positionDeltaMs,
+      native_play_observed: true
     });
     clearSystemInterruptionGuard();
+    return true;
+  }
+
+  function scheduleSystemInterruptionResumeAfterActive(trigger) {
+    const guard = audioState.systemInterruptionGuard;
+    const audio = audioState.audio;
+    const audioSession = navigator && navigator.audioSession ? navigator.audioSession : null;
+    const now = Date.now();
+    if (!guard || !guard.token || !audio || String(audioSession && audioSession.state || "") !== "active") return false;
+    if (!Number.isFinite(guard.at) || now - guard.at > SYSTEM_INTERRUPTION_GUARD_MS) return false;
+    if (guard.resumeScheduled || guard.resumeAttempted) return false;
+    const currentSrc = getCurrentAudioResumeKey(audio);
+    if (!guard.src || !currentSrc || !srcMatches(guard.src, currentSrc)) {
+      emitAudioInterruption(guard, {
+        phase: "resume_refused",
+        outcome: "guard_rejected",
+        resume_gate_reason: "source_changed",
+        native_play_observed: false
+      });
+      clearSystemInterruptionGuard();
+      return false;
+    }
+    audioState.audioSessionResumeAllowedUntil = Math.max(Number(audioState.audioSessionResumeAllowedUntil) || 0, now + 8000);
+    guard.resumeScheduled = true;
+    guard.activeObservedAt = now;
+    window.setTimeout(function () {
+      if (audioState.systemInterruptionGuard !== guard || guard.resumeAttempted) return;
+      guard.resumeScheduled = false;
+      if (!audio.paused) return;
+      const sampledState = String(audioSession && audioSession.state || "");
+      const sampledSrc = getCurrentAudioResumeKey(audio);
+      if (sampledState !== "active" || !sampledSrc || !srcMatches(guard.src, sampledSrc)) return;
+      const savedPosition = Number(guard.currentTime);
+      let currentPosition = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+      if (Number.isFinite(savedPosition) && savedPosition > 2 && currentPosition <= 0.75) {
+        try {
+          audio.currentTime = savedPosition;
+          currentPosition = audio.currentTime;
+        } catch (_err) {
+          // The position gate below rejects the resume if iOS refuses the seek.
+        }
+      }
+      const positionDeltaMs = Number.isFinite(savedPosition)
+        ? Math.round(Math.abs(currentPosition - savedPosition) * 1000)
+        : null;
+      if (!canAllowSystemInterruptionResume({
+        guard,
+        now: Date.now(),
+        allowedUntil: audioState.audioSessionResumeAllowedUntil,
+        audioSessionState: sampledState,
+        currentSrc: sampledSrc,
+        currentTime: currentPosition,
+        srcMatches
+      })) {
+        emitAudioInterruption(guard, {
+          phase: "resume_refused",
+          outcome: "guard_rejected",
+          resume_gate_reason: "position_delta",
+          position_delta_ms: positionDeltaMs,
+          native_play_observed: false
+        });
+        return;
+      }
+      guard.resumeAttempted = true;
+      emitAudioInterruption(guard, {
+        phase: "resume_attempt",
+        outcome: "guarded_play",
+        resume_gate_reason: String(trigger || "sampled_active"),
+        position_delta_ms: positionDeltaMs,
+        native_play_observed: false
+      });
+      let playPromise;
+      try {
+        playPromise = audio.play();
+      } catch (_err) {
+        playPromise = Promise.reject(_err);
+      }
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(function () {
+          if (audioState.systemInterruptionGuard !== guard) return;
+          emitAudioInterruption(guard, {
+            phase: "resume_refused",
+            outcome: "play_rejected",
+            resume_gate_reason: "play_promise_rejected",
+            position_delta_ms: positionDeltaMs,
+            native_play_observed: false
+          });
+        });
+      }
+    }, 500);
     return true;
   }
 
@@ -3748,6 +3886,7 @@
       ensurePlayablePlaylistContext,
       markAudioPauseIntent,
       cancelSystemInterruptionResume,
+      scheduleSystemInterruptionResumeAfterActive,
       cancelExternalResumeCommand,
       playFromExternalControl,
       startCurrentPageCollectionFromIdle,
@@ -3814,6 +3953,7 @@
       ensurePlayablePlaylistContext: function () {},
       markAudioPauseIntent: function () {},
       cancelSystemInterruptionResume: function () {},
+      scheduleSystemInterruptionResumeAfterActive: function () { return false; },
       cancelExternalResumeCommand: function () {},
       playFromExternalControl: function () {},
       startCurrentPageCollectionFromIdle: function () { return false; },

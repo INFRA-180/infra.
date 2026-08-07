@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix389-20260807";
+window.INFRA_BUILD_TAG = "audiofix390-20260807";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -431,7 +431,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260807-audio389";
+  const SPA_SHELL_VERSION = "infra-shell-20260807-audio390";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -460,7 +460,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix389-20260807";
+  const runtimeVersion = "audiofix390-20260807";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -746,6 +746,7 @@ function openAppDownloadGatekeeper(appName, url) {
       ensurePlayablePlaylistContext: function () {},
       markAudioPauseIntent: function () {},
       cancelSystemInterruptionResume: function () {},
+      scheduleSystemInterruptionResumeAfterActive: function () { return false; },
       cancelExternalResumeCommand: function () {},
       playFromExternalControl: function () {},
       toggleCurrentPageCollection: function () { return false; },
@@ -1413,6 +1414,7 @@ function openAppDownloadGatekeeper(appName, url) {
   let serviceWorkerControllerReloading = false;
   let serviceWorkerControllerReloadPending = false;
   let serviceWorkerControllerReloadTimer = 0;
+  let startupReady = false;
   let serviceWorkerRegistrationRef = null;
   let serviceWorkerReportedVersion = "";
   let serviceWorkerWaitingActivationWorker = null;
@@ -2062,6 +2064,37 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function initAlbumSwipeNavigation() {
     return homeCatalogApi.initAlbumSwipeNavigation();
+  }
+
+  function consumePendingEarlyAlbumSwipeNavigation() {
+    const storageKey = "infra:pending-album-swipe";
+    let record = null;
+    try {
+      record = JSON.parse(sessionStorage.getItem(storageKey) || "null");
+      sessionStorage.removeItem(storageKey);
+    } catch (_err) {
+      record = null;
+    }
+    if (!record || typeof record !== "object") return;
+    const finishedAt = Number(record.finished_at_ms) || 0;
+    if (!finishedAt || Date.now() - finishedAt > 2 * 60 * 1000) return;
+    const token = String(record.gesture_token || "").trim();
+    if (!token) return;
+    trackAudioRuntimeEvent("album_swipe", Object.assign({}, record, {
+      track: "gesture",
+      album: String(record.album || getCurrentAlbumTitle() || "album"),
+      gesture_token: token,
+      trigger: record.direction === "left" ? "swipe_left" : "swipe_right",
+      surface: "home_album_grid",
+      handler_ready: false,
+      handler_state: "native_fallback",
+      navigation_started: true,
+      navigation_completed: true,
+      navigation_method: "native_fallback",
+      navigation_result: "done",
+      result: "opened",
+      cancel_reason: ""
+    }));
   }
 
   function shouldInitAudioFeatures() {
@@ -2939,6 +2972,7 @@ function openAppDownloadGatekeeper(appName, url) {
   function attemptDeferredServiceWorkerReload() {
     clearDeferredServiceWorkerReloadTimer();
     if (!serviceWorkerControllerReloadPending || serviceWorkerControllerReloading) return;
+    if (!startupReady) return;
     if (!isServiceWorkerReloadSafe()) {
       const delay = getDeferredServiceWorkerReloadDelayMs();
       if (delay > 0) scheduleDeferredServiceWorkerReload(delay);
@@ -2956,6 +2990,7 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function scheduleDeferredServiceWorkerReload(delayMs) {
     if (!serviceWorkerControllerReloadPending || serviceWorkerControllerReloading) return;
+    if (!startupReady) return;
     clearDeferredServiceWorkerReloadTimer();
     serviceWorkerControllerReloadTimer = window.setTimeout(
       attemptDeferredServiceWorkerReload,
@@ -3087,6 +3122,7 @@ function openAppDownloadGatekeeper(appName, url) {
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState !== "visible") return;
     documentVisibleSinceAt = getAudioTelemetryNow();
+    callAudioRadio("scheduleSystemInterruptionResumeAfterActive", ["visibility_sample"]);
     requestServiceWorkerUpdateCheck("visible");
     if (serviceWorkerControllerReloadPending) {
       scheduleDeferredServiceWorkerReload(SERVICE_WORKER_RELOAD_MIN_VISIBLE_MS + 180);
@@ -5036,6 +5072,7 @@ function openAppDownloadGatekeeper(appName, url) {
         // session becomes active again. Give that exact system play event a
         // short window through the hidden auto-resume guard.
         audioState.audioSessionResumeAllowedUntil = now + 8000;
+        callAudioRadio("scheduleSystemInterruptionResumeAfterActive", [trigger || "statechange"]);
       } else if (currentState !== "active") {
         audioState.audioSessionResumeAllowedUntil = 0;
       }
@@ -5137,7 +5174,7 @@ function openAppDownloadGatekeeper(appName, url) {
         String(audioState.audioSessionLastState || "") === "interrupted"
         ? "system_interruption"
         : "explicit_remote";
-      cancelSystemInterruptionResume("media_session");
+      if (pauseIntentReason === "explicit_remote") cancelSystemInterruptionResume("media_session");
       cancelExternalResumeCommand();
       trackAudioRuntimeEvent("media_session_pause", Object.assign(
         buildAudioMonitorPayload(
@@ -5149,7 +5186,10 @@ function openAppDownloadGatekeeper(appName, url) {
         { surface: "media_session" }
       ));
       if (!audio.paused) {
-        markAudioPauseIntent("media_session", "media_session");
+        markAudioPauseIntent(
+          pauseIntentReason === "system_interruption" ? "system_suspected" : "media_session",
+          "media_session"
+        );
         audio.pause();
         emitScriptMediaCommand(command, {
           decision: "pause",
@@ -6294,6 +6334,8 @@ function openAppDownloadGatekeeper(appName, url) {
       ? performance.now()
       : 0;
     await nextApplicationFrames();
+    startupReady = true;
+    if (serviceWorkerControllerReloadPending) scheduleDeferredServiceWorkerReload();
     const firstAppFrameMs = typeof performance !== "undefined" && typeof performance.now === "function"
       ? performance.now()
       : initDoneMs;
@@ -6331,6 +6373,7 @@ function openAppDownloadGatekeeper(appName, url) {
       ? performance.now()
       : 0;
     initAlbumSwipeNavigation();
+    consumePendingEarlyAlbumSwipeNavigation();
     initSpaNavigation();
     registerServiceWorker();
     void initPage().then(function () {

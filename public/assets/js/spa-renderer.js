@@ -690,9 +690,40 @@
     };
   }
 
+  function getRenderedCoverGeometry(image) {
+    if (!image || typeof image.getBoundingClientRect !== "function") {
+      return {
+        cover_render_width_px: 0,
+        cover_render_height_px: 0,
+        cover_aspect_ratio_milli: 0,
+        cover_geometry_ok: true,
+        cover_object_fit: ""
+      };
+    }
+    const rect = image.getBoundingClientRect();
+    const width = Math.max(0, Math.round(Number(rect.width) || 0));
+    const height = Math.max(0, Math.round(Number(rect.height) || 0));
+    const ratioMilli = width > 0 && height > 0 ? Math.round((width / height) * 1000) : 0;
+    let objectFit = "";
+    try {
+      objectFit = String(window.getComputedStyle(image).objectFit || "");
+    } catch (_err) {
+      objectFit = "";
+    }
+    return {
+      cover_render_width_px: width,
+      cover_render_height_px: height,
+      cover_aspect_ratio_milli: ratioMilli,
+      cover_geometry_ok: !width || !height || Math.abs(ratioMilli - 1000) <= 10,
+      cover_object_fit: objectFit
+    };
+  }
+
   function captureSpaPaintState() {
     const main = document.querySelector("main");
-    const albumCover = getPaintImageState(document.querySelector(".album-layout .cover"));
+    const albumCoverImage = document.querySelector(".album-layout .cover");
+    const albumCover = getPaintImageState(albumCoverImage);
+    const albumCoverGeometry = getRenderedCoverGeometry(albumCoverImage);
     const homeCoverImages = Array.from(document.querySelectorAll("[data-catalog-grid='albums'] img.album-cover"));
     const homeCovers = homeCoverImages.slice(0, 4).map(getPaintImageState);
     const visibleHomeCovers = homeCoverImages.filter(function (image) {
@@ -709,7 +740,7 @@
     } catch (_err) {
       mainOpacity = null;
     }
-    return {
+    return Object.assign({
       paint_main_opacity: Number.isFinite(mainOpacity) ? mainOpacity : null,
       paint_album_cover_present: albumCover.present,
       paint_album_cover_complete: albumCover.complete,
@@ -726,7 +757,7 @@
       paint_relevant_cover_ready: relevantCoverCount === 0 || relevantCoverReadyCount === relevantCoverCount,
       paint_scroll_x: Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0)),
       paint_scroll_y: Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0))
-    };
+    }, albumCoverGeometry);
   }
 
   function waitForSpaFirstPaint() {

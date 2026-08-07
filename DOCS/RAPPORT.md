@@ -1,8 +1,8 @@
 # Rapport courant — SITE INFRA
 
-Date : 6 août 2026
-Baseline : `audiofix387-20260806`
-Service Worker : `infra-shell-20260806-audio387`
+Date : 7 août 2026
+Baseline : `audiofix388-20260807`
+Service Worker : `infra-shell-20260807-audio388`
 
 ## État
 
@@ -49,14 +49,16 @@ Service Worker : `infra-shell-20260806-audio387`
   user-agent brut ni affirmation abusive sur l’écran verrouillé.
 - Page Favoris simplifiée : titre stable, sélection ronde, fermeture `×` et retrait par
   poubelle.
-- Navigation SPA avec handoff peint WebKit feature-détecté, sans snapshot/canvas, scroll
-  séparé de la mutation DOM, retour Accueil par DOM conservé et cover hero synchrone.
+- Navigation SPA mobile par swap atomique simple sans snapshot compositeur, transitions de fond
+  neutralisées pendant les deux premières frames, scroll séparé de la mutation DOM, retour
+  Accueil par DOM conservé et cover hero 1200×1200 synchrone. La View Transition reste un
+  contrôle de comparaison activable par `?pwa-swap=view`.
 - Cache local PWA observable dans le lot de session existant, sans nouvel envoi Worker/KV.
 - Export Worker paginé puis trié globalement : les sessions réellement récentes sont de
   nouveau accessibles au diagnostic.
 - Partage QR redessiné en modale : disque rouge officiel, modules noirs, vrai logo, fermeture
   à gauche, copie à droite et toast temporaire accessible.
-- CSS `audiofix387-20260806` : apparence du player restaurée à l’état pré-`audio377`, PiP
+- CSS `audiofix388-20260807` : apparence du player restaurée à l’état pré-`audio377`, PiP
   plein cadre adaptatif, modes actifs blancs, animation d’égaliseur d’origine et fantôme de
   déplacement tactile visible avec levée courte, désactivée en réduction des animations.
 - Frontière de publication limitée à `public/`.

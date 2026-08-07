@@ -11,10 +11,12 @@ const SPA_PATH = path.join(ROOT, "public/assets/js/spa-renderer.js");
 const SCRIPTS_PATH = path.join(ROOT, "public/assets/js/scripts.js");
 const TRANSPORT_PATH = path.join(ROOT, "public/assets/js/transport-ui.js");
 const HOME_CATALOG_PATH = path.join(ROOT, "public/assets/js/home-catalog.js");
+const STYLES_PATH = path.join(ROOT, "public/assets/css/styles.css");
 const spaSource = fs.readFileSync(SPA_PATH, "utf8");
 const scriptsSource = fs.readFileSync(SCRIPTS_PATH, "utf8");
 const transportSource = fs.readFileSync(TRANSPORT_PATH, "utf8");
 const homeCatalogSource = fs.readFileSync(HOME_CATALOG_PATH, "utf8");
+const stylesSource = fs.readFileSync(STYLES_PATH, "utf8");
 
 function loadSpaFactory(overrides) {
   const sandbox = Object.assign({
@@ -99,7 +101,7 @@ async function testIosSwapUsesNativePaintedHandoff() {
   const spaState = { prepaintSyncActive: false };
   const sandbox = {
     document,
-    location: { href: "https://site.test/index.html" },
+    location: { href: "https://site.test/index.html?pwa-swap=view" },
     innerWidth: 390,
     innerHeight: 844,
     scrollX: 0,
@@ -136,6 +138,7 @@ async function testIosSwapUsesNativePaintedHandoff() {
   await api.swapSpaFragment(fragment, "album-screen", persistRoot, {});
 
   assert.equal(viewTransitionCalls, 1, "iOS standalone must use the feature-detected native painted handoff");
+  assert.equal(classNames.has("pwa-swap-active"), false, "the paint lock must clear after the measured frames");
   assert.equal(spaState.prepaintSyncActive, false, "prepaint sync flag must be cleared after reconciliation");
   assert.ok(
     order.indexOf("append_fragment") < order.indexOf("sync_persistent_ui"),
@@ -147,6 +150,16 @@ async function testIosSwapUsesNativePaintedHandoff() {
   );
   const syncIndex = order.indexOf("sync_persistent_ui");
   assert.ok(order.slice(syncIndex + 1).includes("raf"), "persistent UI must sync before the first-paint RAF pair");
+}
+
+function testIosSwapDefaultsToSimpleAtomicMode() {
+  const factory = loadSpaFactory({
+    document: { documentElement: { classList: { toggle() {} } } },
+    location: { href: "https://site.test/index.html" },
+    sessionStorage: { getItem() { return ""; }, setItem() {} }
+  });
+  const api = factory({ spaState: {}, audioState: {} });
+  assert.equal(api.getPwaSwapPolicy(), "simple", "iOS PWA swaps must default to the compositor-free path");
 }
 
 function testCoverSwapHasNoSnapshotOrSecondDecode() {
@@ -174,6 +187,14 @@ function testCoverSwapHasNoSnapshotOrSecondDecode() {
       ).includes("window.scrollTo("),
     "route scrolling must be separated from the DOM mutation by a frame"
   );
+  assert.ok(
+    stylesSource.includes("html.pwa-swap-active body::before") &&
+      stylesSource.includes("transition: none !important;") &&
+      stylesSource.includes("::view-transition-image-pair(root)") &&
+      stylesSource.includes("isolation: auto;"),
+    "the swap paint lock and the native comparison path must neutralize compositor transitions"
+  );
+  assert.ok(stylesSource.includes("aspect-ratio: 1 / 1;"), "album covers must reserve their square before decode");
   assert.ok(
     waitBody.includes('recordCacheObservation("cover", cached ? "hit" : "miss")'),
     "cover Cache Storage hit/miss must feed the compact session summary"
@@ -254,11 +275,12 @@ function testWebKitHistoryQuotaGuard() {
 async function main() {
   await testRuntimeClassSanitizer();
   await testIosSwapUsesNativePaintedHandoff();
+  testIosSwapDefaultsToSimpleAtomicMode();
   testFullscreenFinalizationAndSnapshotDedup();
   testCoverSwapHasNoSnapshotOrSecondDecode();
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
-  console.log("audiofix381 SPA/transport tests: ok");
+  console.log("audiofix388 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix387-20260806";
+window.INFRA_BUILD_TAG = "audiofix388-20260807";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -431,7 +431,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260806-audio387";
+  const SPA_SHELL_VERSION = "infra-shell-20260807-audio388";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -460,7 +460,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix387-20260806";
+  const runtimeVersion = "audiofix388-20260807";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -2161,6 +2161,12 @@ function openAppDownloadGatekeeper(appName, url) {
     const seen = new Set();
     const preferredWidth = 1200;
     Array.from(document.querySelectorAll("img.album-cover")).forEach(function (img) {
+      if (typeof img.getBoundingClientRect === "function") {
+        const rect = img.getBoundingClientRect();
+        const viewportWidth = Math.max(0, window.innerWidth || document.documentElement.clientWidth || 0);
+        const viewportHeight = Math.max(0, window.innerHeight || document.documentElement.clientHeight || 0);
+        if (rect.bottom <= 0 || rect.top >= viewportHeight || rect.right <= 0 || rect.left >= viewportWidth) return;
+      }
       const url = getImagePreferredSrc(img, window.location.href, { preferredWidth });
       if (!url || seen.has(url)) return;
       seen.add(url);

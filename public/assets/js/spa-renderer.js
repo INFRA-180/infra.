@@ -48,6 +48,7 @@
     const isIosDevice = method(ctx, "isIosDevice", function () { return false; });
     const isAndroidDevice = method(ctx, "isAndroidDevice", function () { return false; });
     const getServiceWorkerReportedVersion = method(ctx, "getServiceWorkerReportedVersion", function () { return ""; });
+    const PWA_SWAP_POLICY_STORAGE_KEY = "infra:pwa-swap-policy";
 
   const SPA_RUNTIME_BODY_CLASSES = new Set([
     "has-mobile-player",
@@ -83,7 +84,7 @@
       );
     });
     if (clone.classList) {
-      clone.classList.remove("now-playing-open", "pwa-native-swap", "pwa-home-restore-active");
+      clone.classList.remove("now-playing-open", "pwa-native-swap", "pwa-swap-active", "pwa-home-restore-active");
     }
   }
 
@@ -104,6 +105,51 @@
       ? window.matchMedia("(max-width: 980px)").matches
       : window.innerWidth <= 980;
     return Boolean(mobileDevice || mobileViewport);
+  }
+
+  function getPwaSwapPolicy() {
+    let requested = "";
+    try {
+      const current = new URL(window.location.href);
+      requested = String(current.searchParams.get("pwa-swap") || "").trim().toLowerCase();
+    } catch (_err) {
+      requested = "";
+    }
+    if (requested === "view" || requested === "view_transition") requested = "view_transition";
+    else if (requested === "simple" || requested === "instant") requested = "simple";
+    else requested = "";
+
+    if (requested) {
+      try {
+        window.sessionStorage.setItem(PWA_SWAP_POLICY_STORAGE_KEY, requested);
+      } catch (_err) {
+        // The explicit URL choice remains valid even when storage is unavailable.
+      }
+      return requested;
+    }
+
+    try {
+      const stored = String(window.sessionStorage.getItem(PWA_SWAP_POLICY_STORAGE_KEY) || "");
+      if (stored === "view_transition" || stored === "simple") return stored;
+    } catch (_err) {
+      // Default below.
+    }
+
+    // The simple atomic swap avoids an extra compositor snapshot on iOS. The
+    // native path remains available as a same-device comparison control.
+    return "simple";
+  }
+
+  function setSpaSwapPaintLock(active) {
+    const root = document.documentElement;
+    if (!root || !root.classList) return;
+    if (typeof root.classList.toggle === "function") {
+      root.classList.toggle("pwa-swap-active", Boolean(active));
+    } else if (active && typeof root.classList.add === "function") {
+      root.classList.add("pwa-swap-active");
+    } else if (!active && typeof root.classList.remove === "function") {
+      root.classList.remove("pwa-swap-active");
+    }
   }
 
   function buildSpaSnapshotHtml() {
@@ -740,9 +786,11 @@
       ? getScrollFromHistoryState(opts.restoreScroll)
       : (opts.resetScroll ? { x: 0, y: 0 } : null);
     const scheduledAt = getAudioTelemetryNow();
+    const swapPolicy = instantPwaSwap ? getPwaSwapPolicy() : "standard";
     if (entering) {
       entering.classList.toggle("spa-page-entering", animateEntry);
     }
+    if (instantPwaSwap) setSpaSwapPaintLock(true);
 
     let applied = false;
     let domMutationMs = 0;
@@ -802,8 +850,13 @@
           appliedScrollX = appliedScroll.x;
           appliedScrollY = appliedScroll.y;
         }
+        const routeClasses = String(document.body.className || "").split(/\s+/);
         const base = {
           swap_mode: mode,
+          swap_policy: swapPolicy,
+          route_kind: routeClasses.includes("album-screen")
+            ? "album"
+            : (routeClasses.includes("home-screen") ? "home" : "other"),
           swap_schedule_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - scheduledAt)),
           swap_dom_mutation_ms: domMutationMs,
           scroll_restore_requested_x: requestedScroll ? requestedScroll.x : null,
@@ -815,12 +868,19 @@
         return waitForSpaFirstPaint().then(function (paintState) {
           return Object.assign(base, paintState || {});
         });
+      }).then(function (result) {
+        if (instantPwaSwap) setSpaSwapPaintLock(false);
+        return result;
+      }, function (error) {
+        if (instantPwaSwap) setSpaSwapPaintLock(false);
+        throw error;
       });
     }
 
     const canUseNativeViewTransition = Boolean(
       instantPwaSwap &&
       !opts.avoidViewTransition &&
+      swapPolicy === "view_transition" &&
       typeof document.startViewTransition === "function"
     );
     if (canUseNativeViewTransition) {
@@ -902,9 +962,13 @@
       if (route.title) document.title = route.title;
     }
 
+    const mobilePwaSwap = isMobilePwaCoverNavigation();
+    const swapPolicy = mobilePwaSwap ? getPwaSwapPolicy() : "standard";
+    if (mobilePwaSwap) setSpaSwapPaintLock(true);
     let swapMode = "live_dom_restore";
     const canUseNativeViewTransition = Boolean(
-      isMobilePwaCoverNavigation() &&
+      mobilePwaSwap &&
+      swapPolicy === "view_transition" &&
       typeof document.startViewTransition === "function"
     );
     if (canUseNativeViewTransition) {
@@ -951,11 +1015,14 @@
     const appliedX = appliedScroll ? appliedScroll.x : Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
     const appliedY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
     const paintState = await waitForSpaFirstPaint();
+    if (mobilePwaSwap) setSpaSwapPaintLock(false);
     // Defer non-visual Home maintenance until the retained route has produced
     // its first frames; cloning the whole route here previously delayed paint.
     resumeLiveHomeRoute();
     const result = Object.assign({
       swap_mode: swapMode,
+      swap_policy: swapPolicy,
+      route_kind: "home",
       swap_schedule_wait_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
       swap_dom_mutation_ms: 0,
       home_dom_reused: true,
@@ -1432,6 +1499,7 @@
       buildSpaSnapshotHtml: buildSpaSnapshotHtml,
       snapshotCurrentSpaPage: snapshotCurrentSpaPage,
       sanitizeSpaBodyClassName: sanitizeSpaBodyClassName,
+      getPwaSwapPolicy: getPwaSwapPolicy,
       parseSpaDocument: parseSpaDocument,
       buildSpaDocumentFragment: buildSpaDocumentFragment,
       getSpaCriticalImages: getSpaCriticalImages,

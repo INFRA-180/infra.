@@ -1,15 +1,15 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 6 août 2026.
+État de référence : 7 août 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix387-20260806`
-- Service Worker : `infra-shell-20260806-audio387`
-- CSS : `audiofix387-20260806` — player restauré, swipe album, Play d'album et retour visuel du réordonnancement tactile
+- Runtime : `audiofix388-20260807`
+- Service Worker : `infra-shell-20260807-audio388`
+- CSS : `audiofix388-20260807` — navigation PWA sans transition de fond pendant le swap
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -156,7 +156,9 @@ Le contrat runtime est strict :
 - la même URL sur l’accueil, la page album, le mini-player, le fullscreen et Media Session.
 
 Les WebP 480/900 et les anciens JPG/PNG ne sont plus stockés dans `public/`. Une exception
-manuelle doit passer par `COVER_OVERRIDES` avec copie de la source et SHA-256.
+manuelle doit passer par `COVER_OVERRIDES` avec copie de la source et SHA-256. Le générateur
+conserve ses intermédiaires sous `_private/runtime` et refuse d'écraser une URL non versionnée
+avec des pixels différents.
 
 ## PWA et fullscreen
 
@@ -175,10 +177,12 @@ Le graphe Web Audio est créé une seule fois depuis le clic d’ouverture ; l�
 branche séparée de la sortie audio. Le rendu est limité à 30 i/s, s’arrête en pause, à la
 fermeture ou quand l’onglet est caché, et devient statique avec `prefers-reduced-motion`.
 
-Sur Safari compatible, le passage entre routes utilise le handoff peint natif des View
-Transitions sans animation visuelle. La mutation DOM et le repositionnement du scroll sont
-séparés d’une frame. La cover hero de l’album décode en mode synchrone ; les images de la
-grille Accueil restent paresseuses et asynchrones.
+En PWA mobile, le passage entre routes utilise par défaut le swap DOM atomique sans snapshot
+compositeur. Le contrôle de comparaison `?pwa-swap=view` active la View Transition native
+pendant la session quand Safari la fournit. Dans les deux modes, les transitions de fond sont
+neutralisées jusqu'aux deux premières frames, et mutation DOM/repositionnement du scroll restent
+séparés d’une frame. La cover hero réserve un carré 1200×1200 et décode en mode synchrone ; les
+images de la grille Accueil restent paresseuses et asynchrones.
 
 ## Partage par QR
 
@@ -205,7 +209,8 @@ bornées. La visibilité de page reste un indice et n’est jamais présentée c
 l’écran verrouillé ou du centre de contrôle.
 
 Ce même résumé contient un inventaire borné du stockage local, les hits/miss HTML et covers,
-ainsi que l’état de la cover aux première et deuxième frames peintes. Cette observabilité
+le mode de swap et le type de route, ainsi que l’état de la cover aux première et deuxième
+frames peintes. Cette observabilité
 n’ajoute ni requête Worker ni clé KV. La PWA demande le stockage persistant une seule fois,
 à la première interaction.
 

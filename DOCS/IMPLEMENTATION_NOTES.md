@@ -1,5 +1,31 @@
 # Implementation Notes
 
+## 2026-08-07 — audiofix388 navigation PWA sans frame de cover intermédiaire
+
+- Les 31 pages album réservent désormais leur hero en `1200×1200`, avec ratio carré,
+  `decoding="sync"`, priorité haute et preload déclaré dans le document. Le preload n'est pas
+  réinséré par la SPA et cible donc uniquement les ouvertures directes/fallback ; le routeur
+  conserve son verrou de décodage avant swap.
+- Le swap mobile/PWA reste atomique (destination ajoutée avant retrait de l'ancienne route) et
+  le scroll reste décalé à la frame suivante. Une classe de paint temporaire neutralise aussi
+  les transitions de `html`, `body` et `body::before` jusqu'aux deux premières frames mesurées,
+  afin qu'un changement de fond ne ressemble plus à un clignotement de pochette.
+- Le swap simple sans snapshot compositeur devient la voie par défaut. Le contrôle interne
+  `?pwa-swap=view` réactive la View Transition pour une comparaison sur le même iPhone pendant
+  la session ; son image-pair reçoit l'isolation recommandée par la spécification. Le mode
+  réellement exécuté, le type de route et les temps de première/deuxième frame rejoignent le
+  lot télémétrique compact existant, sans nouvelle requête.
+- Le warmup PWA classe maintenant seulement les covers réellement dans le viewport. Le
+  générateur privé ne produit plus de JPG/WebP 480/900 dans `public/` : son JPEG de travail
+  reste sous `_private/runtime`, et tout remplacement d'une URL non versionnée est refusé afin
+  d'imposer `COVER_OVERRIDES` et son SHA-256.
+- Références : [WHATWG — décodage et dimensions intrinsèques des images](https://html.spec.whatwg.org/multipage/images.html#decoding-images),
+  [W3C — View Transitions Level 1](https://www.w3.org/TR/css-view-transitions-1/) et
+  [web.dev — réserver l'espace des images](https://web.dev/articles/optimize-cls).
+- Identifiants atomiques : runtime et CSS `audiofix388-20260807`, Service Worker
+  `infra-shell-20260807-audio388`. Audio, prefetch de pistes, Media Session, fullscreen et
+  géométrie iPhone sont inchangés ; l'acceptation visuelle finale reste le test PWA sur iPhone.
+
 ## 2026-08-06 — ouverture d'album par swipe droit et Play d'album explicite
 
 - Sur l'accueil tactile, un glissement horizontal vers la droite commencé sur une carte du

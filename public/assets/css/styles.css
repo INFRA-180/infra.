@@ -191,6 +191,10 @@ html.pwa-native-swap::view-transition-new(root) {
   mix-blend-mode: normal;
 }
 
+html.pwa-native-swap::view-transition-image-pair(root) {
+  isolation: auto;
+}
+
 html,
 body {
   min-height: 100%;
@@ -242,6 +246,9 @@ body.album-screen {
   --pwa-status-bg: var(--bg-mid);
 }
 
+html.pwa-swap-active,
+html.pwa-swap-active body,
+html.pwa-swap-active body::before,
 html.pwa-home-restore-active,
 html.pwa-home-restore-active body,
 html.pwa-home-restore-active body::before {
@@ -2277,6 +2284,7 @@ body.transport-pip-document .transport-pip-player.is-narrow .global-transport-bt
 
 .cover {
   width: 100%;
+  aspect-ratio: 1 / 1;
   max-width: none;
   border-radius: 16px;
   border: 0;

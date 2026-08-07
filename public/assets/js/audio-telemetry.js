@@ -114,6 +114,7 @@
     "event", "trace_id", "build", "track", "album", "source", "ua_class",
     "effective_type", "visibility_state", "trigger", "surface", "branch",
     "reason", "error_name", "action", "strategy", "cache_hint", "state",
+    "swap_mode", "swap_policy",
     "phase", "mode", "playlist_kind", "audio_session_state", "audio_session_type",
     "from_album", "to_album", "result", "recovery_reason", "intent_reason",
     "route_kind", "display_mode", "orientation", "command_token", "origin",
@@ -1416,6 +1417,9 @@
         ua_class: getUaClass(),
         from_album: transition.from_album || "",
         to_album: transition.to_album || "",
+        route_kind: transition.route_kind || "",
+        swap_mode: transition.swap_mode || "",
+        swap_policy: transition.swap_policy || "",
         result: transition.result || "done",
         reason: transition.reason || "",
         navigation_token: transition.navigation_token || 0,
@@ -1499,6 +1503,9 @@
       if (eventType === "spa_render_done") transition.render_ms = Math.round(Number(source.duration_ms) || 0);
       if (eventType === "spa_swap_done") {
         transition.swap_ms = Math.round(Number(source.duration_ms) || 0);
+        transition.swap_mode = String(source.swap_mode || "");
+        transition.swap_policy = String(source.swap_policy || "");
+        transition.route_kind = String(source.route_kind || "");
         transition.first_paint_ms = Math.max(0, Math.round(Number(source.first_paint_wait_ms) || 0));
         transition.visible_cover_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_count) || 0));
         transition.visible_cover_ready_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_ready_count) || 0));

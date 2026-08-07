@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix387-20260806",
-  shell: "infra-shell-20260806-audio387",
+  build: "audiofix388-20260807",
+  shell: "infra-shell-20260807-audio388",
   albums: 31,
   tracks: 283
 });
@@ -82,6 +82,14 @@ function verifyCatalog() {
     const pagePath = path.join(publicRoot, album.page);
     if (!fs.existsSync(coverPath)) fail(`missing canonical cover: ${album.cover}`);
     if (!fs.existsSync(pagePath)) fail(`missing album document: ${album.page}`);
+    const pageSource = fs.readFileSync(pagePath, "utf8");
+    const pageCoverSrc = `../${album.cover}`;
+    if (!pageSource.includes(`<link rel="preload" href="${pageCoverSrc}" as="image" type="image/webp" fetchpriority="high" />`)) {
+      fail(`album cover preload is missing from ${album.page}`);
+    }
+    if (!pageSource.includes(`<img class="cover" width="1200" height="1200" src="${pageCoverSrc}" loading="eager" decoding="sync" fetchpriority="high"`)) {
+      fail(`album hero dimensions/decoding contract is missing from ${album.page}`);
+    }
     pages.add(album.page);
     covers.add(album.cover);
   }

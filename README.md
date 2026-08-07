@@ -20,13 +20,14 @@ validation, publication et sauvegarde est décrite dans `DOCS/GIT_WORKFLOW.md`.
 
 - Site publié : `public/`
 - Branche : `codex/beta-site`
-- Baseline publiée : `audiofix387-20260806`
-- Service Worker : `infra-shell-20260806-audio387`
-- CSS publié : `audiofix387-20260806`
+- Baseline publiée : `audiofix388-20260807`
+- Service Worker : `infra-shell-20260807-audio388`
+- CSS publié : `audiofix388-20260807`
 - Catalogue : 31 albums, 283 pistes
 - Playlists : 4 pages, 234 occurrences, 225 pistes uniques
 - Play à froid contextuel : Radio sur l’accueil, piste 1 sur un album ou une playlist
 - Accueil tactile : swipe droit sur une carte album ; page album : bouton Play/Pause dédié
+- Navigation PWA : swap atomique simple, cover hero 1200×1200 réservée avant le premier paint
 
 La validation UX finale est réalisée sur l’iPhone de l’utilisateur. Les contrôles locaux
 restent des vérifications de code et ne remplacent pas ce test réel.

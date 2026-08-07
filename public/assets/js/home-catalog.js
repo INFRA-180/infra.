@@ -24,6 +24,9 @@
     const openAlbumCard = typeof ctx.openAlbumCard === "function"
       ? ctx.openAlbumCard
       : function () { return false; };
+    const trackAudioRuntimeEvent = typeof ctx.trackAudioRuntimeEvent === "function"
+      ? ctx.trackAudioRuntimeEvent
+      : function () {};
     const ALBUM_SWIPE_AXIS_LOCK_PX = 10;
     const ALBUM_SWIPE_OPEN_PX = 58;
     const ALBUM_SWIPE_MAX_VISUAL_PX = 88;
@@ -66,15 +69,103 @@
       }
     }
 
-    function cancelAlbumSwipe() {
+    function albumSwipeToken() {
+      return `swipe-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+    }
+
+    function albumCardMetadata(card) {
+      const grid = card && card.closest ? card.closest('[data-catalog-grid="albums"]') : null;
+      const cards = grid ? Array.from(grid.querySelectorAll("a.album-card[href]:not(.playlist-card)")) : [];
+      const rank = Math.max(0, cards.indexOf(card) + 1);
+      const label = String(card && ((typeof card.getAttribute === "function" && card.getAttribute("aria-label")) || card.textContent) || "album")
+        .replace(/^Ouvrir l'album\s*/i, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      return {
+        album: label || "album",
+        card_rank: rank,
+        lower_half: Boolean(cards.length && rank > Math.ceil(cards.length / 2))
+      };
+    }
+
+    function emitAlbumSwipe(gesture, details) {
+      if (!gesture || !gesture.token) return;
+      const detailRecord = details || {};
+      if (!gesture.telemetryStarted && detailRecord.result !== "tracking") return;
+      gesture.telemetryStarted = true;
+      const deltaX = Number(gesture.lastX) - Number(gesture.startX);
+      const deltaY = Number(gesture.lastY) - Number(gesture.startY);
+      trackAudioRuntimeEvent("album_swipe", Object.assign(
+        {
+          track: "gesture",
+          gesture_token: gesture.token,
+          input_type: gesture.inputType || "touch",
+          direction: deltaX < 0 ? "left" : (deltaX > 0 ? "right" : "none"),
+          axis: gesture.axis === "x" ? "horizontal" : (gesture.axis === "y" ? "vertical" : "pending"),
+          dx: Math.round(deltaX || 0),
+          dy: Math.round(deltaY || 0),
+          abs_dx: Math.round(Math.abs(deltaX || 0)),
+          abs_dy: Math.round(Math.abs(deltaY || 0)),
+          threshold_px: ALBUM_SWIPE_OPEN_PX,
+          gesture_duration_ms: Math.max(0, Date.now() - Number(gesture.startedAt || Date.now())),
+          handler_ready: true,
+          surface: "home_album_grid"
+        },
+        albumCardMetadata(gesture.card),
+        detailRecord
+      ));
+    }
+
+    function cancelAlbumSwipe(reason) {
       if (!albumSwipeGesture) return;
+      emitAlbumSwipe(albumSwipeGesture, {
+        result: "cancelled",
+        cancel_reason: String(reason || "cancelled"),
+        navigation_started: false,
+        navigation_completed: false
+      });
       clearAlbumSwipeVisual(albumSwipeGesture.card);
       albumSwipeGesture = null;
+    }
+
+    function consumeEarlyAlbumSwipeProbe() {
+      const probe = window.__infraEarlyAlbumSwipeProbe;
+      if (!probe || typeof probe !== "object") return;
+      if (typeof probe.stop === "function") probe.stop();
+      const records = Array.isArray(probe.records) ? probe.records.slice(0, 6) : [];
+      records.forEach(function (record) {
+        trackAudioRuntimeEvent("album_swipe", Object.assign({
+          track: "gesture",
+          album: String(record.album || "album"),
+          gesture_token: String(record.gesture_token || albumSwipeToken()),
+          input_type: String(record.input_type || "touch"),
+          direction: String(record.direction || "none"),
+          axis: String(record.axis || "pending"),
+          dx: Math.round(Number(record.dx) || 0),
+          dy: Math.round(Number(record.dy) || 0),
+          abs_dx: Math.round(Math.abs(Number(record.dx) || 0)),
+          abs_dy: Math.round(Math.abs(Number(record.dy) || 0)),
+          threshold_px: ALBUM_SWIPE_OPEN_PX,
+          card_rank: Math.max(0, Math.round(Number(record.card_rank) || 0)),
+          lower_half: Boolean(record.lower_half),
+          gesture_duration_ms: Math.max(0, Math.round(Number(record.gesture_duration_ms) || 0)),
+          early_buffer_delay_ms: Math.max(0, Date.now() - Number(record.finished_at_ms || Date.now())),
+          handler_ready: false,
+          handler_state: "not_ready",
+          navigation_started: false,
+          navigation_completed: false,
+          surface: "home_album_grid",
+          result: "cancelled",
+          cancel_reason: "handler_not_ready"
+        }, record));
+      });
+      probe.records = [];
     }
 
     function initAlbumSwipeNavigation() {
       if (catalogState.albumSwipeBound) return;
       catalogState.albumSwipeBound = true;
+      consumeEarlyAlbumSwipeProbe();
 
       document.addEventListener("pointerdown", function (event) {
         if (event.isPrimary === false) return;
@@ -83,15 +174,19 @@
         const card = findSwipeAlbumCard(event.target);
         if (!card) return;
 
-        cancelAlbumSwipe();
+        cancelAlbumSwipe("superseded");
         albumSwipeGesture = {
           card,
+          token: albumSwipeToken(),
+          inputType: event.pointerType,
+          startedAt: Date.now(),
           pointerId: event.pointerId,
           startX: Number(event.clientX) || 0,
           startY: Number(event.clientY) || 0,
           lastX: Number(event.clientX) || 0,
           lastY: Number(event.clientY) || 0,
-          axis: ""
+          axis: "",
+          telemetryStarted: false
         };
       }, { capture: true, passive: true });
 
@@ -107,9 +202,15 @@
 
         if (!gesture.axis && (absX > ALBUM_SWIPE_AXIS_LOCK_PX || absY > ALBUM_SWIPE_AXIS_LOCK_PX)) {
           gesture.axis = absX > absY * ALBUM_SWIPE_DOMINANCE ? "x" : "y";
+          emitAlbumSwipe(gesture, {
+            result: "tracking",
+            handler_state: "ready",
+            navigation_started: false,
+            navigation_completed: false
+          });
         }
         if (gesture.axis === "y" || (gesture.axis === "x" && deltaX < 0)) {
-          cancelAlbumSwipe();
+          cancelAlbumSwipe(gesture.axis === "y" ? "vertical_scroll" : "unsupported_direction");
           return;
         }
         if (gesture.axis !== "x") return;
@@ -132,15 +233,39 @@
         const card = gesture.card;
         clearAlbumSwipeVisual(card);
         albumSwipeGesture = null;
-        if (!shouldOpen) return;
+        if (!shouldOpen) {
+          emitAlbumSwipe(gesture, {
+            result: "cancelled",
+            cancel_reason: cancelled ? "pointer_cancel" : "threshold_not_met",
+            navigation_started: false,
+            navigation_completed: false
+          });
+          return;
+        }
 
         if (event.cancelable) event.preventDefault();
-        const opened = openAlbumCard(card, { trigger: "swipe_right" }) !== false;
+        emitAlbumSwipe(gesture, {
+          result: "navigation_started",
+          navigation_started: true,
+          navigation_completed: false,
+          navigation_method: "spa"
+        });
+        const opened = openAlbumCard(card, {
+          trigger: "swipe_right",
+          gestureToken: gesture.token
+        }) !== false;
         if (opened) {
           suppressedAlbumSwipeClick = {
             card,
             until: Date.now() + 900
           };
+        } else {
+          emitAlbumSwipe(gesture, {
+            result: "cancelled",
+            cancel_reason: "navigation_rejected",
+            navigation_started: false,
+            navigation_completed: false
+          });
         }
       }
 

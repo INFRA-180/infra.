@@ -1,5 +1,31 @@
 # Implementation Notes
 
+## 2026-08-07 — télémétrie PWR v4 avant correctifs UX
+
+- Le Worker accepte désormais les rapports de session 2, 3 et 4. Une session v4 utilise la clé
+  déterministe `session4:<session_id>` ; la déduplication, la limite de 48 événements / 32 Kio,
+  la rétention de sept jours et l'unique `put` KV maximum par rapport restent inchangées. Les
+  allowlists couvrent aussi les champs de swap, token de navigation, dimensions de cover,
+  lancement, arrière-plan, swipe et file. Version Worker déployée :
+  `2d59e201-498e-4930-aa2f-1be53ed06661`.
+- Le passage en `hidden` ne clôt plus une lecture, un démarrage, une interruption ou une recovery.
+  Il ouvre un unique `background_window` local, mis à jour au plus toutes les 30 secondes de
+  progression réelle et envoyé seulement lors de la fin de session. `pagehide.persisted` distingue
+  BFCache et déchargement ; une session v3 abandonnée garde son schéma lors du retry v4.
+- Le lancement, les swipes d'album et les réordonnancements de file utilisent des composites
+  bornés et corrélés. Un observateur passif placé en tête de l'accueil transfère aussi les gestes
+  terminés avant que le handler soit prêt. La navigation SPA existante est enrichie avec le
+  déclencheur, la surface, le rang, la moitié basse, la restauration de scroll, la réutilisation du
+  DOM, le cache et l'état des covers aux deux premières frames.
+- Ce lot est strictement télémétrique : le swipe reste à droite seulement et conserve ses seuils,
+  le ghost de file garde son animation actuelle sans FLIP, et la politique de swap/covers n'est pas
+  modifiée. Les correctifs seront choisis après la campagne iPhone documentée dans
+  `DOCS/TELEMETRY_AND_UX_PLAN_2026-08-07.md`.
+- Validation : tests confidentialité/lifecycle client, Worker v2/v3/v4 avec retry/conflit/parité,
+  swipe froid et instrumentation de file, syntaxe JavaScript, audit public et `npm test` complets.
+  Identifiants atomiques : runtime/CSS `audiofix389-20260807`, Service Worker
+  `infra-shell-20260807-audio389`.
+
 ## 2026-08-07 — audiofix388 navigation PWA sans frame de cover intermédiaire
 
 - Les 31 pages album réservent désormais leur hero en `1200×1200`, avec ratio carré,

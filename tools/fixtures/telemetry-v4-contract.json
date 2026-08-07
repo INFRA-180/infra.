@@ -1,0 +1,48 @@
+{
+  "schema_version": 4,
+  "accepted_schema_versions": [2, 3, 4],
+  "storage_prefix": "session4:",
+  "budgets": {
+    "events_per_session": 48,
+    "envelope_bytes": 32768,
+    "local_sessions": 4,
+    "local_ttl_hours": 72,
+    "worker_ttl_days": 7
+  },
+  "composite_limits": {
+    "launch_summary": 1,
+    "background_window": 4,
+    "album_swipe": 6,
+    "queue_reorder": 4
+  },
+  "required_fields": {
+    "string": [
+      "swap_mode", "swap_policy", "direction", "axis", "input_type", "gesture_token",
+      "queue_token", "lifecycle_reason", "navigation_method", "navigation_result",
+      "cancel_reason", "handler_state", "catalog_source", "service_worker_state",
+      "cover_first_frame_state", "cover_second_frame_state"
+    ],
+    "number": [
+      "navigation_token", "cover_natural_width", "cover_display_px", "launch_head_ms",
+      "dom_ready_ms", "first_contentful_paint_ms", "first_app_frame_ms", "init_done_ms",
+      "catalog_ready_ms", "service_worker_activity_count", "background_window_count",
+      "background_sequence", "hidden_started_at_ms", "visible_return_at_ms",
+      "hidden_duration_ms", "start_current_time", "end_current_time", "advanced_ms",
+      "sample_count", "track_change_count", "waiting_count", "stalled_count", "error_count",
+      "interruption_count", "media_command_count", "resume_count", "dx", "dy", "abs_dx",
+      "abs_dy", "threshold_px", "card_rank", "gesture_duration_ms", "early_buffer_delay_ms",
+      "source_index", "target_index", "shifted_row_count", "ghost_created_ms",
+      "lift_started_ms", "lift_finished_ms", "flip_started_ms", "flip_finished_ms"
+    ],
+    "boolean": [
+      "audio_was_playing", "audio_is_playing", "progress_observed", "return_observed",
+      "catalog_ready", "service_worker_controlled", "document_was_discarded", "app_frame_ready",
+      "handler_ready", "navigation_started", "navigation_completed", "lower_half",
+      "scroll_restored", "dom_reused", "html_cache_hit", "cover_cache_hit", "ghost_created",
+      "lift_animated", "flip_started", "flip_finished", "reduced_motion", "bfcache"
+    ]
+  },
+  "protected_events": [
+    "session_summary", "launch_summary", "background_window", "audio_interruption", "error"
+  ]
+}

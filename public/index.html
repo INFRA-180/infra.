@@ -1,6 +1,86 @@
 <!doctype html>
 <html lang="fr">
 <head>
+  <script>window.__infraLaunchProbe={head_ms:(window.performance&&typeof performance.now==="function"?performance.now():0),service_worker_activity_count:0};if(navigator.serviceWorker){navigator.serviceWorker.addEventListener("controllerchange",function(){window.__infraLaunchProbe.service_worker_activity_count+=1;});}</script>
+  <script>
+    (function () {
+      "use strict";
+      const records = [];
+      const active = new Map();
+      const options = { capture: true, passive: true };
+      function albumCard(target) {
+        return target && typeof target.closest === "function"
+          ? target.closest('body.home-screen [data-catalog-grid="albums"] a.album-card[href]:not(.playlist-card)')
+          : null;
+      }
+      function onPointerDown(event) {
+        if (event.isPrimary === false || !["touch", "pen"].includes(event.pointerType)) return;
+        const card = albumCard(event.target);
+        if (!card) return;
+        const grid = card.closest('[data-catalog-grid="albums"]');
+        const cards = grid ? Array.from(grid.querySelectorAll("a.album-card[href]:not(.playlist-card)")) : [];
+        const rank = Math.max(0, cards.indexOf(card) + 1);
+        active.set(event.pointerId, {
+          gesture_token: `early-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+          input_type: event.pointerType,
+          album: String(card.getAttribute("aria-label") || "album").replace(/^Ouvrir l'album\s*/i, "").slice(0, 120),
+          card_rank: rank,
+          lower_half: Boolean(cards.length && rank > Math.ceil(cards.length / 2)),
+          start_x: Number(event.clientX) || 0,
+          start_y: Number(event.clientY) || 0,
+          last_x: Number(event.clientX) || 0,
+          last_y: Number(event.clientY) || 0,
+          started_at_ms: Date.now()
+        });
+      }
+      function onPointerMove(event) {
+        const gesture = active.get(event.pointerId);
+        if (!gesture) return;
+        gesture.last_x = Number(event.clientX) || gesture.last_x;
+        gesture.last_y = Number(event.clientY) || gesture.last_y;
+      }
+      function finish(event) {
+        const gesture = active.get(event.pointerId);
+        if (!gesture) return;
+        active.delete(event.pointerId);
+        const endX = Number.isFinite(Number(event.clientX)) ? Number(event.clientX) : gesture.last_x;
+        const endY = Number.isFinite(Number(event.clientY)) ? Number(event.clientY) : gesture.last_y;
+        const dx = endX - gesture.start_x;
+        const dy = endY - gesture.start_y;
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+        if (absX <= 10 && absY <= 10) return;
+        records.push({
+          gesture_token: gesture.gesture_token,
+          input_type: gesture.input_type,
+          album: gesture.album,
+          card_rank: gesture.card_rank,
+          lower_half: gesture.lower_half,
+          direction: dx < 0 ? "left" : (dx > 0 ? "right" : "none"),
+          axis: absX > 10 || absY > 10 ? (absX > absY * 1.2 ? "horizontal" : "vertical") : "pending",
+          dx: Math.round(dx),
+          dy: Math.round(dy),
+          gesture_duration_ms: Math.max(0, Date.now() - gesture.started_at_ms),
+          finished_at_ms: Date.now()
+        });
+        while (records.length > 6) records.shift();
+      }
+      document.addEventListener("pointerdown", onPointerDown, options);
+      document.addEventListener("pointermove", onPointerMove, options);
+      document.addEventListener("pointerup", finish, options);
+      document.addEventListener("pointercancel", finish, options);
+      window.__infraEarlyAlbumSwipeProbe = {
+        records,
+        stop: function () {
+          document.removeEventListener("pointerdown", onPointerDown, options);
+          document.removeEventListener("pointermove", onPointerMove, options);
+          document.removeEventListener("pointerup", finish, options);
+          document.removeEventListener("pointercancel", finish, options);
+          active.clear();
+        }
+      };
+    })();
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#ffffff" />
@@ -32,7 +112,7 @@
   <meta name="twitter:title" content="INFRA." />
   <meta name="twitter:description" content="Playlists, albums, applications et clips en telechargement direct." />
   <meta name="twitter:image" content="https://infra-180.github.io/infra./assets/pwa/icon-512-logo-white.png" />
-  <link rel="stylesheet" href="assets/css/styles.css?v=audiofix388-20260807" />
+  <link rel="stylesheet" href="assets/css/styles.css?v=audiofix389-20260807" />
   <link rel="stylesheet" href="assets/css/playlists.css?v=playlist-collage-20260802" />
 </head>
 <body class="home-screen">
@@ -440,26 +520,26 @@
     οὐ κλεὶς, οὐ χείρ· πνοὴ μόνη.
   </template>
 
-  <script src="assets/js/covers.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/favorites.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/favorites-ui.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/audio-visualizer.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/transport-ui.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/now-playing.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/album-player-ui.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/spa-renderer.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/audio-radio.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/media-session.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/audio-prefetch.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/spa-router.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/catalog-fallback.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/catalog-loader.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/audio-telemetry.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/downloads.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/home-catalog.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/audio-core.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/pwa-install.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/share-qr.js?v=audiofix388-20260807"></script>
-  <script src="assets/js/scripts.js?v=audiofix388-20260807"></script>
+  <script src="assets/js/covers.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/favorites.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/favorites-ui.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/audio-visualizer.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/transport-ui.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/now-playing.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/album-player-ui.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/spa-renderer.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/audio-radio.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/media-session.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/audio-prefetch.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/spa-router.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/catalog-fallback.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/catalog-loader.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/audio-telemetry.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/downloads.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/home-catalog.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/audio-core.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/pwa-install.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/share-qr.js?v=audiofix389-20260807"></script>
+  <script src="assets/js/scripts.js?v=audiofix389-20260807"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix388-20260807";
+window.INFRA_BUILD_TAG = "audiofix389-20260807";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -431,7 +431,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260807-audio388";
+  const SPA_SHELL_VERSION = "infra-shell-20260807-audio389";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -460,7 +460,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix388-20260807";
+  const runtimeVersion = "audiofix389-20260807";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -595,7 +595,8 @@ function openAppDownloadGatekeeper(appName, url) {
       displayAlbumCardTitle,
       sanitizeCatalog,
       loadCatalogData,
-      openAlbumCard: openHomeAlbumCard
+      openAlbumCard: openHomeAlbumCard,
+      trackAudioRuntimeEvent
     });
   }
 
@@ -5132,6 +5133,10 @@ function openAppDownloadGatekeeper(appName, url) {
       const audio = audioState.audio;
       if (!audio) return;
       const command = createScriptMediaCommand("pause", "media_session", audio);
+      const pauseIntentReason = audioState.systemInterruptionGuard ||
+        String(audioState.audioSessionLastState || "") === "interrupted"
+        ? "system_interruption"
+        : "explicit_remote";
       cancelSystemInterruptionResume("media_session");
       cancelExternalResumeCommand();
       trackAudioRuntimeEvent("media_session_pause", Object.assign(
@@ -5148,13 +5153,15 @@ function openAppDownloadGatekeeper(appName, url) {
         audio.pause();
         emitScriptMediaCommand(command, {
           decision: "pause",
-          outcome: "success"
+          outcome: "success",
+          intent_reason: pauseIntentReason
         });
       } else {
         emitScriptMediaCommand(command, {
           decision: "pause",
           outcome: "noop",
-          reason: "already_paused"
+          reason: "already_paused",
+          intent_reason: pauseIntentReason
         });
       }
     });
@@ -5892,8 +5899,9 @@ function openAppDownloadGatekeeper(appName, url) {
     }
   }
 
-  function openHomeAlbumCard(card) {
+  function openHomeAlbumCard(card, options) {
     if (!card || !card.href) return false;
+    const opts = options || {};
     let url;
     try {
       url = new URL(card.href, window.location.href);
@@ -5901,11 +5909,18 @@ function openAppDownloadGatekeeper(appName, url) {
       return false;
     }
     if (!isAlbumOpenUrl(url.href)) return false;
+    const grid = card.closest ? card.closest('[data-catalog-grid="albums"]') : null;
+    const cards = grid ? Array.from(grid.querySelectorAll("a.album-card[href]:not(.playlist-card)")) : [];
+    const cardRank = Math.max(0, cards.indexOf(card) + 1);
     primeLinkedAlbumCoverForPwa(card, url.href);
     releasePwaCoverHold("replace");
     navigateTo(url.href, {
       history: "push",
-      trigger: "swipe_right"
+      trigger: String(opts.trigger || "album_card"),
+      surface: "home_album_grid",
+      cardRank,
+      lowerHalf: Boolean(cards.length && cardRank > Math.ceil(cards.length / 2)),
+      gestureToken: String(opts.gestureToken || "")
     });
     return true;
   }
@@ -5926,6 +5941,11 @@ function openAppDownloadGatekeeper(appName, url) {
       fromAlbum: getCurrentAlbumTitle() || document.title || "",
       toAlbum: getAlbumNameFromUrlLike(url.href),
       navigationToken: Number(opts.navigationToken || 0),
+      trigger: String(opts.trigger || "album_card"),
+      surface: String(opts.surface || "home_album_grid"),
+      cardRank: Math.max(0, Math.round(Number(opts.cardRank) || 0)),
+      lowerHalf: Boolean(opts.lowerHalf),
+      gestureToken: String(opts.gestureToken || ""),
       controllerchangeAtStart: serviceWorkerControllerChangeAt,
       reloadExecutedAtStart: serviceWorkerReloadExecutedAt
     };
@@ -5938,7 +5958,12 @@ function openAppDownloadGatekeeper(appName, url) {
       to_url: context.toUrl,
       controllerchange: false,
       sw_reload_between: false,
-      navigation_token: context.navigationToken
+      navigation_token: context.navigationToken,
+      trigger: context.trigger,
+      surface: context.surface,
+      card_rank: context.cardRank,
+      lower_half: context.lowerHalf,
+      gesture_token: context.gestureToken
     });
     return context;
   }
@@ -5959,8 +5984,31 @@ function openAppDownloadGatekeeper(appName, url) {
       controllerchange: controllerBetween,
       sw_reload_between: Boolean(controllerBetween || reloadBetween),
       reload_executed: reloadBetween,
-      navigation_token: context.navigationToken
+      navigation_token: context.navigationToken,
+      trigger: context.trigger,
+      surface: context.surface,
+      card_rank: context.cardRank,
+      lower_half: context.lowerHalf,
+      gesture_token: context.gestureToken
     }, extra || {}));
+    if (context.gestureToken) {
+      const completed = eventName === "album_open_done";
+      trackAudioRuntimeEvent("album_swipe", {
+        track: "gesture",
+        album: context.toAlbum || "album",
+        gesture_token: context.gestureToken,
+        trigger: context.trigger,
+        surface: context.surface,
+        card_rank: context.cardRank,
+        lower_half: context.lowerHalf,
+        navigation_started: true,
+        navigation_completed: completed,
+        navigation_result: completed ? "done" : "failed",
+        navigation_method: "spa",
+        result: completed ? "opened" : "cancelled",
+        cancel_reason: completed ? "" : String(extra && extra.reason || "navigation_failed")
+      });
+    }
   }
 
 
@@ -6077,14 +6125,24 @@ function openAppDownloadGatekeeper(appName, url) {
       // until the destination document is ready. The former foreground cover
       // clone made a slow first visit look like a frozen application.
       releasePwaCoverHold("replace");
+      const albumCard = link.matches && link.matches("a.album-card[href]:not(.playlist-card)") ? link : null;
+      const albumGrid = albumCard && albumCard.closest ? albumCard.closest('[data-catalog-grid="albums"]') : null;
+      const albumCards = albumGrid ? Array.from(albumGrid.querySelectorAll("a.album-card[href]:not(.playlist-card)")) : [];
+      const cardRank = albumCard ? Math.max(0, albumCards.indexOf(albumCard) + 1) : 0;
       navigateTo(url.href, {
-        history: "push"
+        history: "push",
+        trigger: albumCard ? "tap" : "link",
+        surface: albumCard ? "home_album_grid" : "link",
+        cardRank,
+        lowerHalf: Boolean(albumCards.length && cardRank > Math.ceil(albumCards.length / 2))
       });
     }, true);
 
     window.addEventListener("popstate", function (event) {
       navigateTo(window.location.href, {
         history: "none",
+        trigger: "history_back",
+        surface: "browser_history",
         scroll: false,
         captureScroll: false,
         restoreScroll: event && event.state ? event.state : null
@@ -6222,10 +6280,73 @@ function openAppDownloadGatekeeper(appName, url) {
     initPwaInstallPrompt(adminMode);
   }
 
+  function nextApplicationFrames() {
+    return new Promise(function (resolve) {
+      const schedule = typeof window.requestAnimationFrame === "function"
+        ? window.requestAnimationFrame.bind(window)
+        : function (callback) { return setTimeout(callback, 16); };
+      schedule(function () { schedule(resolve); });
+    });
+  }
+
+  async function reportLaunchSummary(initStartedAt) {
+    const initDoneMs = typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : 0;
+    await nextApplicationFrames();
+    const firstAppFrameMs = typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : initDoneMs;
+    const probe = window.__infraLaunchProbe && typeof window.__infraLaunchProbe === "object"
+      ? window.__infraLaunchProbe
+      : {};
+    const paints = typeof performance !== "undefined" && typeof performance.getEntriesByType === "function"
+      ? performance.getEntriesByType("paint")
+      : [];
+    const fcp = paints.find(function (entry) { return entry && entry.name === "first-contentful-paint"; });
+    const navigation = typeof performance !== "undefined" && typeof performance.getEntriesByType === "function"
+      ? performance.getEntriesByType("navigation")[0]
+      : null;
+    const catalogReady = Boolean(catalogState.data || (fallbackCatalog && fallbackCatalog.albums && fallbackCatalog.albums.length));
+    trackAudioRuntimeEvent("launch_summary", {
+      launch_head_ms: Math.max(0, Math.round(Number(probe.head_ms) || 0)),
+      dom_ready_ms: Math.max(0, Math.round(Number(navigation && navigation.domContentLoadedEventEnd) || Number(initStartedAt) || 0)),
+      first_contentful_paint_ms: Math.max(0, Math.round(Number(fcp && fcp.startTime) || 0)),
+      first_app_frame_ms: Math.max(0, Math.round(firstAppFrameMs)),
+      init_done_ms: Math.max(0, Math.round(initDoneMs)),
+      catalog_ready_ms: catalogReady ? Math.max(0, Math.round(initDoneMs)) : 0,
+      service_worker_activity_count: Number(probe.service_worker_activity_count) || 0,
+      catalog_ready: catalogReady,
+      catalog_source: catalogState.data ? "runtime" : "fallback",
+      service_worker_controlled: Boolean(navigator.serviceWorker && navigator.serviceWorker.controller),
+      service_worker_state: navigator.serviceWorker && navigator.serviceWorker.controller ? "controlled" : "uncontrolled",
+      document_was_discarded: Boolean(document.wasDiscarded),
+      app_frame_ready: true,
+      reason: "init_complete"
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
+    const initStartedAt = typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : 0;
     initAlbumSwipeNavigation();
     initSpaNavigation();
     registerServiceWorker();
-    void initPage();
+    void initPage().then(function () {
+      return reportLaunchSummary(initStartedAt);
+    }).catch(function () {
+      trackAudioRuntimeEvent("launch_summary", {
+        launch_head_ms: Math.max(0, Math.round(Number(window.__infraLaunchProbe && window.__infraLaunchProbe.head_ms) || 0)),
+        dom_ready_ms: Math.max(0, Math.round(initStartedAt)),
+        init_done_ms: 0,
+        first_app_frame_ms: 0,
+        catalog_ready: false,
+        service_worker_controlled: Boolean(navigator.serviceWorker && navigator.serviceWorker.controller),
+        document_was_discarded: Boolean(document.wasDiscarded),
+        app_frame_ready: false,
+        reason: "init_failed"
+      });
+    });
   });
 })();

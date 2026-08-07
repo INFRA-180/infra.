@@ -2592,6 +2592,12 @@
     audio.addEventListener("timeupdate", function () {
       syncMediaSessionMetadata();
       audioState.lastAudioCurrentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+      if (document.visibilityState === "hidden" && !audio.paused) {
+        trackAudioRuntimeEvent("background_progress", {
+          current_time: audioState.lastAudioCurrentTime,
+          paused: false
+        });
+      }
       confirmAudioRecovery(audio);
       maybePrefetchNextTrack("timeupdate");
       const now = Date.now();

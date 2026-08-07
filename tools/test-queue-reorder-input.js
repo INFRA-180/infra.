@@ -24,6 +24,11 @@ includes(transport, 'overlayQueueList.addEventListener("touchcancel"', "touch re
 includes(transport, '}, { passive: false });', "active touch moves must be able to suppress page scrolling");
 includes(transport, 'event.pointerType !== "pen"', "pen input must keep a pointer-event path");
 includes(transport, 'overlayQueueList.addEventListener("dragstart"', "desktop HTML drag support regressed");
+includes(transport, 'trackAudioRuntimeEvent("queue_reorder"', "queue gestures are not correlated in telemetry");
+includes(transport, "queueTelemetryToken", "queue telemetry has no per-gesture token");
+includes(transport, 'input_type: gesture.input === "pointer" ? "pen"', "queue telemetry does not distinguish touch, pen and mouse");
+includes(transport, "ghost_created_ms", "queue telemetry does not expose ghost creation");
+includes(transport, "flip_started: false", "the pre-FLIP baseline is not measurable");
 includes(transport, "runQueueAutoScroll", "long queues need edge auto-scroll while reordering");
 includes(transport, "movePlaylistItem(fromIndex, drop.index, { after: drop.after })", "touch drop does not reach the queue engine");
 includes(transport, 'item.classList.contains("is-current")', "the playing track must stay fixed");

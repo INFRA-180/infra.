@@ -40,6 +40,10 @@
     "media_command",
     "media_capabilities",
     "audio_interruption",
+    "background_progress",
+    "launch_summary",
+    "album_swipe",
+    "queue_reorder",
     "transport_nexttrack",
     "transport_previoustrack",
     "play_request",
@@ -102,7 +106,7 @@
   const DB_NAME = "infra_audio_telemetry_v2";
   const DB_STORE = "sessions";
   const LEGACY_DB_NAME = "infra_audio_telemetry_v1";
-  const SESSION_SCHEMA_VERSION = 3;
+  const SESSION_SCHEMA_VERSION = 4;
   const SESSION_EVENT_CAP = 48;
   const SESSION_STORE_CAP = 4;
   const SESSION_TTL_MS = 72 * 60 * 60 * 1000;
@@ -120,7 +124,11 @@
     "route_kind", "display_mode", "orientation", "command_token", "origin",
     "surface_hint", "decision", "outcome", "probe_stage", "supported_actions",
     "unsupported_actions", "cleared_actions", "registration_result", "interruption_token",
-    "interruption_kind", "before_media_session_state", "after_media_session_state"
+    "interruption_kind", "before_media_session_state", "after_media_session_state",
+    "direction", "axis", "input_type", "gesture_token", "queue_token", "lifecycle_reason",
+    "navigation_method", "navigation_result", "cancel_reason", "handler_state",
+    "catalog_source", "service_worker_state", "cover_first_frame_state",
+    "cover_second_frame_state"
   ]);
   const TELEMETRY_NUMBER_FIELDS = new Set([
     "timestamp_ms", "delta_ms", "duration_before_play_ms", "duration_ms", "delay_ms",
@@ -179,7 +187,18 @@
     "media_command_no_progress_count", "media_command_recovered_count",
     "media_command_recovery_failed_count", "media_command_incomplete_count",
     "media_play_count", "media_pause_count", "media_previous_count", "media_next_count",
-    "media_seek_count", "media_restart_count", "audio_interruption_count"
+    "media_seek_count", "media_restart_count", "audio_interruption_count",
+    "launch_head_ms", "dom_ready_ms", "first_contentful_paint_ms", "first_app_frame_ms",
+    "init_done_ms", "catalog_ready_ms", "service_worker_activity_count",
+    "background_window_count", "background_sequence", "hidden_started_at_ms",
+    "visible_return_at_ms", "hidden_duration_ms", "start_current_time", "end_current_time",
+    "sample_count", "track_change_count", "error_count", "interruption_count",
+    "resume_count", "dx", "dy", "abs_dx", "abs_dy", "threshold_px", "card_rank",
+    "gesture_duration_ms", "early_buffer_delay_ms", "source_index", "target_index",
+    "shifted_row_count", "ghost_created_ms", "lift_started_ms", "lift_finished_ms",
+    "flip_started_ms", "flip_finished_ms", "album_swipe_count", "album_swipe_success_count",
+    "album_swipe_cancel_count", "queue_reorder_count", "queue_reorder_success_count",
+    "queue_reorder_cancel_count", "launch_summary_count"
   ]);
   const TELEMETRY_BOOLEAN_FIELDS = new Set([
     "fine_event", "navigator_on_line", "auto", "error", "health_session_active",
@@ -192,7 +211,13 @@
     "has_playback_session", "has_source", "is_home", "is_album",
     "cover_ready_at_first_paint", "cover_ready_at_second_paint",
     "before_paused", "after_paused", "confirmed", "recovery_attempted",
-    "handler_play", "handler_pause", "handler_previous", "handler_next", "handler_seekto"
+    "handler_play", "handler_pause", "handler_previous", "handler_next", "handler_seekto",
+    "audio_was_playing", "audio_is_playing", "progress_observed", "return_observed",
+    "catalog_ready", "service_worker_controlled", "document_was_discarded", "app_frame_ready",
+    "handler_ready", "navigation_started", "navigation_completed", "lower_half",
+    "scroll_restored", "dom_reused", "html_cache_hit", "cover_cache_hit",
+    "ghost_created", "lift_animated", "flip_started", "flip_finished", "reduced_motion",
+    "bfcache"
   ]);
 
   function now() {
@@ -312,7 +337,15 @@
     "media_next_count",
     "media_seek_count",
     "media_restart_count",
-    "audio_interruption_count"
+    "audio_interruption_count",
+    "launch_summary_count",
+    "background_window_count",
+    "album_swipe_count",
+    "album_swipe_success_count",
+    "album_swipe_cancel_count",
+    "queue_reorder_count",
+    "queue_reorder_success_count",
+    "queue_reorder_cancel_count"
   ];
 
   function createSessionSummary() {
@@ -334,13 +367,20 @@
   function capSessionEvents(input) {
     const events = Array.isArray(input) ? input.filter(Boolean) : [];
     if (events.length <= SESSION_EVENT_CAP) return events;
-    const summaryIndex = events.map(function (event) {
-      return event && event.event;
-    }).lastIndexOf("session_summary");
-    if (summaryIndex < 0) return events.slice(-SESSION_EVENT_CAP);
-    const summary = events[summaryIndex];
-    const details = events.filter(function (_event, index) { return index !== summaryIndex; });
-    return details.slice(-(SESSION_EVENT_CAP - 1)).concat(summary);
+    const mandatoryIndexes = new Set();
+    ["session_summary", "launch_summary", "background_window"].forEach(function (eventName) {
+      const index = events.map(function (event) { return event && event.event; }).lastIndexOf(eventName);
+      if (index >= 0) mandatoryIndexes.add(index);
+    });
+    const keep = new Set(Array.from(mandatoryIndexes));
+    for (let index = events.length - 1; index >= 0 && keep.size < SESSION_EVENT_CAP; index -= 1) {
+      const event = events[index];
+      if (event && ["audio_interruption", "error"].includes(event.event)) keep.add(index);
+    }
+    for (let index = events.length - 1; index >= 0 && keep.size < SESSION_EVENT_CAP; index -= 1) {
+      keep.add(index);
+    }
+    return events.filter(function (_event, index) { return keep.has(index); });
   }
 
   function sanitizeTelemetryEvent(input) {
@@ -371,13 +411,16 @@
       return null;
     }
     const status = input.status === "sealed" ? "sealed" : "active";
+    const storedSchemaVersion = [2, 3, 4].includes(Number(input.schema_version))
+      ? Number(input.schema_version)
+      : SESSION_SCHEMA_VERSION;
     const events = capSessionEvents((Array.isArray(input.events) ? input.events : [])
       .map(sanitizeTelemetryEvent)
       .filter(Boolean));
     const lastAt = Number(input.last_at_ms);
     const endedAt = Number(input.ended_at_ms);
     return {
-      schema_version: SESSION_SCHEMA_VERSION,
+      schema_version: storedSchemaVersion,
       session_id: sessionId,
       status,
       build: String(input.build || "").trim().slice(0, 120),
@@ -398,7 +441,7 @@
     if (!session || session.status !== "sealed" || !session.events.length) return null;
     const endedAt = session.ended_at_ms || session.last_at_ms || session.started_at_ms;
     return {
-      schema_version: SESSION_SCHEMA_VERSION,
+      schema_version: session.schema_version,
       session_id: session.session_id,
       build: session.build,
       ua_class: session.ua_class,
@@ -413,13 +456,18 @@
   }
 
   function buildSessionEnvelope(inputReports) {
-    const reports = (Array.isArray(inputReports) ? inputReports : [])
+    const candidates = Array.isArray(inputReports) ? inputReports : [];
+    const schemaVersion = [2, 3, 4].includes(Number(candidates[0] && candidates[0].schema_version))
+      ? Number(candidates[0].schema_version)
+      : SESSION_SCHEMA_VERSION;
+    const reports = candidates
+      .filter(function (report) { return Number(report && report.schema_version) === schemaVersion; })
       .map(toSessionReport)
       .filter(Boolean)
       .slice(0, SESSION_STORE_CAP);
     if (!reports.length) return null;
 
-    let envelope = { schema_version: SESSION_SCHEMA_VERSION, reports };
+    let envelope = { schema_version: schemaVersion, reports };
     let serialized = JSON.stringify(envelope);
     while (byteLength(serialized) > SESSION_ENVELOPE_MAX_BYTES && reports.length) {
       let largest = null;
@@ -428,7 +476,9 @@
       });
       if (largest && largest.events.length > 1) {
         const removableIndex = largest.events.findIndex(function (event) {
-          return !event || event.event !== "session_summary";
+          return !event || ![
+            "session_summary", "launch_summary", "background_window", "audio_interruption", "error"
+          ].includes(event.event);
         });
         if (removableIndex < 0) return null;
         largest.events.splice(removableIndex, 1);
@@ -438,7 +488,7 @@
       } else {
         return null;
       }
-      envelope = { schema_version: SESSION_SCHEMA_VERSION, reports };
+      envelope = { schema_version: schemaVersion, reports };
       serialized = JSON.stringify(envelope);
     }
     return byteLength(serialized) <= SESSION_ENVELOPE_MAX_BYTES
@@ -479,12 +529,17 @@
     const compactEvents = new Map();
     const mediaCommands = new Map();
     const audioInterruptions = new Map();
+    const albumSwipes = new Map();
+    const queueReorders = new Map();
     let activeTrackToken = 0;
     let activeSpaKey = "";
     let spaSequence = 0;
     let miniVisibilityState = "";
     let miniVisibilitySequence = 0;
     let mediaEventSequence = 0;
+    let backgroundSequence = 0;
+    let activeBackgroundWindow = null;
+    let launchSummaryRecorded = false;
 
     function getWorkerUrl() {
       if (call(ctx, "isTelemetryOriginAllowed") === false) return "";
@@ -501,6 +556,27 @@
 
     function getAudio() {
       return call(ctx, "getAudio") || getAudioState().audio || null;
+    }
+
+    function isDocumentHidden() {
+      return document.visibilityState === "hidden";
+    }
+
+    function hasHiddenAudioActivity() {
+      const audio = getAudio();
+      const state = getAudioState();
+      const sessionState = String(state.audioSessionLastState || "").toLowerCase();
+      return Boolean(
+        (audio && !audio.paused && !audio.ended) ||
+        state.trackStartInFlight ||
+        state.startTrackInFlight ||
+        state.mediaSessionAudioPlaying ||
+        sessionState === "interrupted" ||
+        state.systemInterruptionGuard ||
+        state.externalResumeRecoveryInFlight ||
+        state.externalPlaybackCommand ||
+        state.activeAudioRecovery
+      );
     }
 
     function getUaClass() {
@@ -817,7 +893,8 @@
     function processMediaCommand(payload, source, timestampMs) {
       const commandToken = String(source && source.command_token || payload.command_token || "").trim().slice(0, 120);
       if (!commandToken) return false;
-      const session = ensureActiveSession();
+      const action = String(source && source.action || payload.action || "").trim().toLowerCase();
+      const session = ensureActiveSession({ allowHidden: action === "play" || action === "pause" });
       if (!session) return true;
       let record = mediaCommands.get(commandToken);
       const firstObservation = !record;
@@ -863,6 +940,19 @@
       delete compact.restart_counted;
       upsertCompactEvent(`media-command:${commandToken}`, compact, session);
       pruneLocalMap(mediaCommands, LOCAL_CORRELATION_CAP);
+      if (
+        isDocumentHidden() &&
+        action === "pause" &&
+        ["success", "noop"].includes(String(record.outcome || "")) &&
+        String(record.intent_reason || "") === "explicit_remote"
+      ) {
+        finalizeBackgroundWindow("remote_pause", false);
+        const sealed = sealCurrentSession("remote_pause_hidden");
+        if (sealed && !lifecycleDeliveryAttempted) {
+          lifecycleDeliveryAttempted = true;
+          flushQueue({ keepalive: true });
+        }
+      }
       return true;
     }
 
@@ -878,11 +968,93 @@
       return true;
     }
 
+    function processLaunchSummary(payload, source, timestampMs) {
+      const session = ensureActiveSession();
+      if (!session) return true;
+      if (!launchSummaryRecorded) {
+        launchSummaryRecorded = true;
+        incrementSummary("launch_summary_count", 1, session);
+      }
+      upsertCompactEvent("launch-summary", Object.assign({}, payload, source || {}, {
+        event: "launch_summary",
+        timestamp_ms: Number(timestampMs) || Date.now(),
+        track: "launch",
+        album: "session",
+        source: "startup",
+        error: false
+      }), session);
+      return true;
+    }
+
+    function processAlbumSwipe(payload, source, timestampMs) {
+      const token = String(source && source.gesture_token || payload.gesture_token || "").trim().slice(0, 120);
+      if (!token) return false;
+      const session = ensureActiveSession();
+      if (!session) return true;
+      let record = albumSwipes.get(token);
+      const firstObservation = !record;
+      if (!record) {
+        if (albumSwipes.size >= 6) return true;
+        record = { event: "album_swipe", gesture_token: token, counted_result: "" };
+        albumSwipes.set(token, record);
+        incrementSummary("album_swipe_count", 1, session);
+      }
+      Object.assign(record, payload, source || {}, {
+        event: "album_swipe",
+        gesture_token: token,
+        timestamp_ms: Number(timestampMs) || Date.now()
+      });
+      const result = String(record.result || "");
+      if (result === "opened" && record.counted_result !== "opened") {
+        incrementSummary("album_swipe_success_count", 1, session);
+        record.counted_result = "opened";
+      } else if (result === "cancelled" && record.counted_result !== "cancelled") {
+        incrementSummary("album_swipe_cancel_count", 1, session);
+        record.counted_result = "cancelled";
+      }
+      const compact = Object.assign({}, record);
+      delete compact.counted_result;
+      upsertCompactEvent(`album-swipe:${token}`, compact, session);
+      if (firstObservation) pruneLocalMap(albumSwipes, 6);
+      return true;
+    }
+
+    function processQueueReorder(payload, source, timestampMs) {
+      const token = String(source && source.queue_token || payload.queue_token || "").trim().slice(0, 120);
+      if (!token) return false;
+      const session = ensureActiveSession();
+      if (!session) return true;
+      let record = queueReorders.get(token);
+      if (!record) {
+        if (queueReorders.size >= 4) return true;
+        record = { event: "queue_reorder", queue_token: token, counted_result: "" };
+        queueReorders.set(token, record);
+        incrementSummary("queue_reorder_count", 1, session);
+      }
+      Object.assign(record, payload, source || {}, {
+        event: "queue_reorder",
+        queue_token: token,
+        timestamp_ms: Number(timestampMs) || Date.now()
+      });
+      const result = String(record.result || "");
+      if (result === "committed" && record.counted_result !== "committed") {
+        incrementSummary("queue_reorder_success_count", 1, session);
+        record.counted_result = "committed";
+      } else if (result === "cancelled" && record.counted_result !== "cancelled") {
+        incrementSummary("queue_reorder_cancel_count", 1, session);
+        record.counted_result = "cancelled";
+      }
+      const compact = Object.assign({}, record);
+      delete compact.counted_result;
+      upsertCompactEvent(`queue-reorder:${token}`, compact, session);
+      return true;
+    }
+
     function processAudioInterruption(payload, source, timestampMs) {
       const interruptionToken = String(
         source && source.interruption_token || payload.interruption_token || "interruption"
       ).trim().slice(0, 120);
-      const session = ensureActiveSession();
+      const session = ensureActiveSession({ allowHidden: true });
       if (!session) return true;
       const firstObservation = !audioInterruptions.has(interruptionToken);
       const record = Object.assign(
@@ -977,11 +1149,189 @@
       return session;
     }
 
-    function ensureActiveSession() {
+    function ensureActiveSession(options) {
+      const opts = options || {};
       const current = currentSessionId ? sessions.get(currentSessionId) : null;
       if (current && current.status === "active") return current;
-      if (lifecycleInitialized && document.visibilityState === "hidden") return null;
+      if (lifecycleInitialized && isDocumentHidden() && !opts.allowHidden) return null;
       return createActiveSession();
+    }
+
+    function currentAudioPosition() {
+      const audio = getAudio();
+      return audio && Number.isFinite(audio.currentTime)
+        ? Math.round(audio.currentTime * 1000) / 1000
+        : 0;
+    }
+
+    function currentBackgroundLabels(source) {
+      const input = source && typeof source === "object" ? source : {};
+      const state = getAudioState();
+      const track = state.playlist && Number.isInteger(state.currentIndex)
+        ? state.playlist[state.currentIndex]
+        : null;
+      return {
+        track: String(input.track || (track && (track.title || track.name)) || "background"),
+        album: String(input.album || (track && track.album) || state.currentAlbum || "session").toLowerCase()
+      };
+    }
+
+    function backgroundEventPayload(windowRecord, timestampMs) {
+      if (!windowRecord) return null;
+      const at = Number(timestampMs) || Date.now();
+      const position = currentAudioPosition();
+      const audio = getAudio();
+      const endPosition = Number.isFinite(windowRecord.end_current_time)
+        ? windowRecord.end_current_time
+        : position;
+      const advancedMs = Math.max(0, Math.round(
+        Number(windowRecord.accumulated_advanced_ms || 0) +
+        Math.max(0, endPosition - Number(windowRecord.segment_start_position || 0)) * 1000
+      ));
+      return {
+        event: "background_window",
+        fine_event: true,
+        build: getRuntimeVersion(),
+        timestamp_ms: at,
+        track: windowRecord.track || "background",
+        album: windowRecord.album || "session",
+        source: "lifecycle",
+        ua_class: getUaClass(),
+        lifecycle_reason: windowRecord.lifecycle_reason || "visibility_hidden_audio",
+        background_sequence: windowRecord.sequence,
+        hidden_started_at_ms: windowRecord.hidden_started_at_ms,
+        visible_return_at_ms: windowRecord.visible_return_at_ms || 0,
+        hidden_duration_ms: Math.max(0, at - windowRecord.hidden_started_at_ms),
+        start_current_time: windowRecord.start_current_time,
+        end_current_time: endPosition,
+        advanced_ms: advancedMs,
+        sample_count: windowRecord.sample_count || 0,
+        track_change_count: windowRecord.track_change_count || 0,
+        waiting_count: windowRecord.waiting_count || 0,
+        stalled_count: windowRecord.stalled_count || 0,
+        error_count: windowRecord.error_count || 0,
+        interruption_count: windowRecord.interruption_tokens.size,
+        media_command_count: windowRecord.command_tokens.size,
+        resume_count: windowRecord.resume_count || 0,
+        audio_was_playing: Boolean(windowRecord.audio_was_playing),
+        audio_is_playing: Boolean(audio && !audio.paused && !audio.ended),
+        progress_observed: advancedMs > 250,
+        return_observed: Boolean(windowRecord.return_observed),
+        bfcache: Boolean(windowRecord.bfcache),
+        result: windowRecord.result || "hidden",
+        error: false
+      };
+    }
+
+    function persistBackgroundWindow(timestampMs) {
+      if (!activeBackgroundWindow) return null;
+      const payload = backgroundEventPayload(activeBackgroundWindow, timestampMs);
+      if (!payload) return null;
+      activeBackgroundWindow.end_current_time = payload.end_current_time;
+      return upsertCompactEvent(
+        `background:${activeBackgroundWindow.slot}`,
+        payload,
+        activeBackgroundWindow.session
+      );
+    }
+
+    function beginBackgroundWindow(reason, options) {
+      if (activeBackgroundWindow) return activeBackgroundWindow;
+      const opts = options || {};
+      const session = ensureActiveSession({ allowHidden: true });
+      if (!session) return null;
+      const labels = currentBackgroundLabels();
+      const audio = getAudio();
+      backgroundSequence += 1;
+      activeBackgroundWindow = {
+        session,
+        sequence: backgroundSequence,
+        slot: ((backgroundSequence - 1) % 4) + 1,
+        lifecycle_reason: String(reason || "visibility_hidden_audio"),
+        hidden_started_at_ms: Date.now(),
+        visible_return_at_ms: 0,
+        start_current_time: currentAudioPosition(),
+        end_current_time: currentAudioPosition(),
+        last_persisted_advanced_ms: 0,
+        accumulated_advanced_ms: 0,
+        segment_start_position: currentAudioPosition(),
+        last_observed_position: currentAudioPosition(),
+        track: labels.track,
+        album: labels.album,
+        track_identity: `${labels.album}|${labels.track}`,
+        sample_count: 0,
+        track_change_count: 0,
+        waiting_count: 0,
+        stalled_count: 0,
+        error_count: 0,
+        resume_count: 0,
+        interruption_tokens: new Set(),
+        command_tokens: new Set(),
+        audio_was_playing: Boolean(audio && !audio.paused && !audio.ended),
+        return_observed: false,
+        bfcache: Boolean(opts.bfcache),
+        result: "hidden"
+      };
+      incrementSummary("background_window_count", 1, session);
+      persistBackgroundWindow();
+      return activeBackgroundWindow;
+    }
+
+    function finalizeBackgroundWindow(reason, returnObserved, options) {
+      if (!activeBackgroundWindow) return null;
+      const opts = options || {};
+      activeBackgroundWindow.return_observed = Boolean(returnObserved);
+      activeBackgroundWindow.visible_return_at_ms = returnObserved ? Date.now() : 0;
+      activeBackgroundWindow.bfcache = Boolean(activeBackgroundWindow.bfcache || opts.bfcache);
+      const advanced = Math.max(0, currentAudioPosition() - activeBackgroundWindow.start_current_time);
+      activeBackgroundWindow.result = String(reason || (advanced > 0.25 ? "visible_progressed" : "visible_no_progress"));
+      const persisted = persistBackgroundWindow();
+      activeBackgroundWindow = null;
+      return persisted;
+    }
+
+    function observeBackgroundRuntimeEvent(eventType, payload, source, timestampMs) {
+      if (!activeBackgroundWindow || !isDocumentHidden()) return;
+      const record = activeBackgroundWindow;
+      const labels = currentBackgroundLabels(source);
+      const identity = `${labels.album}|${labels.track}`;
+      const observedPosition = Number(source && source.current_time);
+      const position = Number.isFinite(observedPosition) ? observedPosition : currentAudioPosition();
+      if (record.track === "background" && labels.track !== "background") {
+        record.track_identity = identity;
+        record.track = labels.track;
+        record.album = labels.album;
+      } else if (identity && record.track_identity && identity !== record.track_identity && labels.track !== "background") {
+        record.accumulated_advanced_ms += Math.max(
+          0,
+          Math.round((record.last_observed_position - record.segment_start_position) * 1000)
+        );
+        record.segment_start_position = position;
+        record.track_change_count += 1;
+        record.track_identity = identity;
+        record.track = labels.track;
+        record.album = labels.album;
+      }
+      record.last_observed_position = position;
+      if (eventType === "waiting") record.waiting_count += 1;
+      if (eventType === "stalled") record.stalled_count += 1;
+      if (eventType === "error" || /_failed$/.test(eventType)) record.error_count += 1;
+      if (eventType === "audio_interruption") {
+        const token = String(source && source.interruption_token || payload.interruption_token || "interruption");
+        record.interruption_tokens.add(token);
+      }
+      if (eventType === "media_command") {
+        const token = String(source && source.command_token || payload.command_token || "command");
+        record.command_tokens.add(token);
+      }
+      if (eventType === "playing" && record.interruption_tokens.size) record.resume_count = Math.max(1, record.resume_count);
+      if (eventType !== "background_progress") return;
+      record.end_current_time = position;
+      const advancedMs = Number(backgroundEventPayload(record, timestampMs).advanced_ms) || 0;
+      if (advancedMs < record.last_persisted_advanced_ms + 30000) return;
+      record.last_persisted_advanced_ms = advancedMs;
+      record.sample_count += 1;
+      persistBackgroundWindow(timestampMs);
     }
 
     function isSourcePrepared(sourceKey, source) {
@@ -1349,6 +1699,13 @@
           started_at_ms: Number(timestampMs) || Date.now(),
           from_album: String(payload.from_album || ""),
           to_album: String(payload.to_album || payload.album || ""),
+          trigger: String(payload.trigger || ""),
+          surface: String(payload.surface || ""),
+          card_rank: Math.max(0, Math.round(Number(payload.card_rank || payload.rank) || 0)),
+          lower_half: Boolean(payload.lower_half),
+          gesture_token: String(payload.gesture_token || ""),
+          scroll_restored: Boolean(payload.scroll_restored),
+          dom_reused: Boolean(payload.dom_reused),
           cached: Boolean(payload.cached),
           cover_wait_ms: 0,
           cover_timed_out: false,
@@ -1380,6 +1737,13 @@
           started_at_ms: Number(timestampMs) || Date.now(),
           from_album: String(payload.from_album || ""),
           to_album: String(payload.to_album || payload.album || ""),
+          trigger: String(payload.trigger || ""),
+          surface: String(payload.surface || ""),
+          card_rank: Math.max(0, Math.round(Number(payload.card_rank || payload.rank) || 0)),
+          lower_half: Boolean(payload.lower_half),
+          gesture_token: String(payload.gesture_token || ""),
+          scroll_restored: Boolean(payload.scroll_restored),
+          dom_reused: Boolean(payload.dom_reused),
           cached: Boolean(payload.cached),
           cover_wait_ms: 0,
           cover_timed_out: false,
@@ -1400,6 +1764,15 @@
       if (!transition) return null;
       if (payload.from_album) transition.from_album = String(payload.from_album);
       if (payload.to_album || payload.album) transition.to_album = String(payload.to_album || payload.album);
+      if (payload.trigger) transition.trigger = String(payload.trigger);
+      if (payload.surface) transition.surface = String(payload.surface);
+      if (Number.isFinite(Number(payload.card_rank || payload.rank))) {
+        transition.card_rank = Math.max(0, Math.round(Number(payload.card_rank || payload.rank)));
+      }
+      if (typeof payload.lower_half === "boolean") transition.lower_half = payload.lower_half;
+      if (payload.gesture_token) transition.gesture_token = String(payload.gesture_token);
+      if (typeof payload.scroll_restored === "boolean") transition.scroll_restored = payload.scroll_restored;
+      if (typeof payload.dom_reused === "boolean") transition.dom_reused = payload.dom_reused;
       if (typeof payload.cached === "boolean") transition.cached = payload.cached;
       return transition;
     }
@@ -1417,6 +1790,13 @@
         ua_class: getUaClass(),
         from_album: transition.from_album || "",
         to_album: transition.to_album || "",
+        trigger: transition.trigger || "",
+        surface: transition.surface || "",
+        card_rank: transition.card_rank || 0,
+        lower_half: Boolean(transition.lower_half),
+        gesture_token: transition.gesture_token || "",
+        scroll_restored: Boolean(transition.scroll_restored),
+        dom_reused: Boolean(transition.dom_reused),
         route_kind: transition.route_kind || "",
         swap_mode: transition.swap_mode || "",
         swap_policy: transition.swap_policy || "",
@@ -1424,6 +1804,8 @@
         reason: transition.reason || "",
         navigation_token: transition.navigation_token || 0,
         cached: Boolean(transition.cached),
+        html_cache_hit: Boolean(transition.cached),
+        cover_cache_hit: Boolean(transition.cover_cache_hit),
         error: transition.result !== "done",
         delta_ms: Math.max(0, Math.round(endedAt - transition.started_at_ms)),
         duration_ms: Math.max(0, Math.round(endedAt - transition.started_at_ms)),
@@ -1444,6 +1826,8 @@
         second_visible_cover_count: transition.second_visible_cover_count || 0,
         second_visible_cover_ready_count: transition.second_visible_cover_ready_count || 0,
         cover_ready_at_second_paint: transition.cover_ready_at_second_paint !== false,
+        cover_first_frame_state: transition.cover_first_frame_state || "unknown",
+        cover_second_frame_state: transition.cover_second_frame_state || "unknown",
         controllerchange: Boolean(transition.controllerchange),
         sw_reload_between: Boolean(transition.sw_reload_between)
       });
@@ -1479,7 +1863,7 @@
       const spaEvents = new Set([
         "album_open_tap", "album_open_done", "album_open_fail", "nav:album_start",
         "nav:album_done", "nav:album_abort", "spa_render_start", "spa_render_done",
-        "spa_swap_start", "spa_swap_done", "cover_decode_duration", "spa_html_response"
+        "spa_swap_start", "spa_swap_done", "spa_scroll_restore", "cover_decode_duration", "spa_html_response"
       ]);
       if (!spaEvents.has(eventType)) return;
       const transition = getOrCreateSpaTransition(eventType, payload, source, timestampMs);
@@ -1510,10 +1894,26 @@
         transition.visible_cover_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_count) || 0));
         transition.visible_cover_ready_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_ready_count) || 0));
         transition.cover_ready_at_first_paint = source.paint_relevant_cover_ready !== false;
+        transition.cover_first_frame_state = transition.visible_cover_count <= 0
+          ? "none"
+          : (transition.cover_ready_at_first_paint
+              ? "ready"
+              : (transition.visible_cover_ready_count > 0 ? "partial" : "empty"));
         transition.second_paint_ms = Math.max(0, Math.round(Number(source.second_paint_wait_ms) || 0));
         transition.second_visible_cover_count = Math.max(0, Math.round(Number(source.second_paint_relevant_cover_count) || 0));
         transition.second_visible_cover_ready_count = Math.max(0, Math.round(Number(source.second_paint_relevant_cover_ready_count) || 0));
         transition.cover_ready_at_second_paint = source.second_paint_relevant_cover_ready !== false;
+        transition.cover_second_frame_state = transition.second_visible_cover_count <= 0
+          ? "none"
+          : (transition.cover_ready_at_second_paint
+              ? "ready"
+              : (transition.second_visible_cover_ready_count > 0 ? "partial" : "empty"));
+        if (typeof source.cover_cache_hit === "boolean") transition.cover_cache_hit = source.cover_cache_hit;
+      }
+      if (eventType === "spa_scroll_restore") {
+        transition.scroll_restored = source.scroll_restored !== false;
+        if (typeof source.dom_reused === "boolean") transition.dom_reused = source.dom_reused;
+        if (typeof source.home_dom_reused === "boolean") transition.dom_reused = source.home_dom_reused;
       }
       if (eventType === "spa_html_response") {
         transition.strategy = String(source.strategy || "");
@@ -1654,6 +2054,9 @@
       const current = currentSessionId ? sessions.get(currentSessionId) : null;
       if (!current || current.status !== "active") return null;
       const endedAt = Date.now();
+      if (activeBackgroundWindow && activeBackgroundWindow.session === current) {
+        finalizeBackgroundWindow(String(reason || "sealed"), false);
+      }
       finalizeOpenTransitions("sealed", endedAt);
       if (current.events.length || sessionSummaryHasActivity(current)) {
         upsertSessionSummaryEvent(current, endedAt);
@@ -1666,8 +2069,12 @@
       compactEvents.clear();
       mediaCommands.clear();
       audioInterruptions.clear();
+      albumSwipes.clear();
+      queueReorders.clear();
       activeTrackToken = 0;
       activeSpaKey = "";
+      backgroundSequence = 0;
+      launchSummaryRecorded = false;
       if (!current.events.length) {
         sessions.delete(current.session_id);
         deleteStoredSessions([current.session_id]);
@@ -1708,20 +2115,31 @@
         .filter(function (session) { return session.status === "sealed" && session.events.length; })
         .sort(function (left, right) { return left.started_at_ms - right.started_at_ms; })
         .slice(0, SESSION_STORE_CAP);
-      const built = buildSessionEnvelope(sealed);
-      if (!built) return Promise.resolve(false);
-      const sentReports = built.envelope.reports;
-      return fetch(`${workerUrl.replace(/\/+$/, "")}/log`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: built.serialized,
-        credentials: "omit",
-        keepalive: Boolean(opts.keepalive)
-      }).then(function (response) {
-        if (!response || !response.ok) return false;
-        removeReports(sentReports);
-        return true;
-      }).catch(function () { return false; });
+      const grouped = [];
+      [2, 3, 4].forEach(function (schemaVersion) {
+        const group = sealed.filter(function (session) { return Number(session.schema_version) === schemaVersion; });
+        if (group.length) grouped.push(group);
+      });
+      let sentAny = false;
+      return grouped.reduce(function (pending, group) {
+        return pending.then(function () {
+          const built = buildSessionEnvelope(group);
+          if (!built) return false;
+          const sentReports = built.envelope.reports;
+          return fetch(`${workerUrl.replace(/\/+$/, "")}/log`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: built.serialized,
+            credentials: "omit",
+            keepalive: Boolean(opts.keepalive)
+          }).then(function (response) {
+            if (!response || !response.ok) return false;
+            removeReports(sentReports);
+            sentAny = true;
+            return true;
+          }).catch(function () { return false; });
+        });
+      }, Promise.resolve(false)).then(function () { return sentAny; });
     }
 
     function flushQueue(options) {
@@ -1822,6 +2240,34 @@
           : (source.reason || source.error_name || source.error_message || "")
       });
 
+      if (
+        isDocumentHidden() &&
+        !activeBackgroundWindow &&
+        (
+          eventType === "audio_interruption" ||
+          (eventType === "audio_session_state" && String(source.audio_session_state || "") === "interrupted") ||
+          (eventType === "media_command" && String(source.action || "") === "play") ||
+          (["background_progress", "playing", "waiting", "stalled"].includes(eventType) && hasHiddenAudioActivity())
+        )
+      ) {
+        beginBackgroundWindow(`${eventType}_hidden`, { bfcache: false });
+      }
+      observeBackgroundRuntimeEvent(eventType, payload, source, timestampMs);
+
+      if (eventType === "background_progress") return;
+      if (eventType === "launch_summary") {
+        processLaunchSummary(payload, source, timestampMs);
+        return;
+      }
+      if (eventType === "album_swipe") {
+        processAlbumSwipe(payload, source, timestampMs);
+        return;
+      }
+      if (eventType === "queue_reorder") {
+        processQueueReorder(payload, source, timestampMs);
+        return;
+      }
+
       if (eventType === "media_command") {
         processMediaCommand(payload, source, timestampMs);
         return;
@@ -1879,7 +2325,7 @@
     }
 
     function startHeartbeat() {
-      // Session v3 is event-driven; periodic telemetry is intentionally disabled.
+      // Session v4 is event-driven; periodic network telemetry is intentionally disabled.
     }
 
     function stopHeartbeat() {
@@ -1891,10 +2337,21 @@
     }
 
     function attemptLifecycleDelivery(reason) {
+      if (activeBackgroundWindow) finalizeBackgroundWindow(reason, false);
       const sealed = sealCurrentSession(reason);
       if (!sealed || lifecycleDeliveryAttempted) return;
       lifecycleDeliveryAttempted = true;
       flushQueue({ beacon: true });
+    }
+
+    function handleHiddenLifecycle(reason, options) {
+      const opts = options || {};
+      if (hasHiddenAudioActivity()) {
+        beginBackgroundWindow(reason, { bfcache: Boolean(opts.bfcache) });
+        return false;
+      }
+      attemptLifecycleDelivery(reason);
+      return true;
     }
 
     function initLifecycle() {
@@ -1912,13 +2369,26 @@
 
       document.addEventListener("visibilitychange", function () {
         if (document.visibilityState === "hidden") {
-          attemptLifecycleDelivery("hidden");
+          handleHiddenLifecycle("visibility_hidden", { bfcache: false });
           return;
         }
-        if (document.visibilityState === "visible") ensureActiveSession();
+        if (document.visibilityState === "visible") {
+          finalizeBackgroundWindow("visible_return", true);
+          ensureActiveSession();
+        }
       });
-      window.addEventListener("pagehide", function () {
-        if (!lifecycleDeliveryAttempted) attemptLifecycleDelivery("pagehide");
+      window.addEventListener("pagehide", function (event) {
+        if (event && event.persisted === true) {
+          handleHiddenLifecycle("pagehide_bfcache", { bfcache: true });
+          return;
+        }
+        if (!lifecycleDeliveryAttempted) attemptLifecycleDelivery("pagehide_unload");
+      });
+      window.addEventListener("pageshow", function (event) {
+        if (event && event.persisted === true) {
+          finalizeBackgroundWindow("pageshow_bfcache", true, { bfcache: true });
+          ensureActiveSession();
+        }
       });
     }
 

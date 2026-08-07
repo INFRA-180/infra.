@@ -1157,7 +1157,12 @@
       album: getAlbumNameFromUrlLike(url.href),
       from_url: rendered.href,
       to_url: url.href,
-      navigation_token: navToken
+      navigation_token: navToken,
+      trigger: String(opts.trigger || ""),
+      surface: String(opts.surface || ""),
+      card_rank: Math.max(0, Math.round(Number(opts.cardRank) || 0)),
+      lower_half: Boolean(opts.lowerHalf),
+      gesture_token: String(opts.gestureToken || "")
     });
 
     const audioSwitchContext = {

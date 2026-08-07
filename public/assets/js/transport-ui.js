@@ -1650,9 +1650,41 @@
         const QUEUE_AUTO_SCROLL_EDGE_PX = 58;
         const QUEUE_AUTO_SCROLL_MAX_PX = 18;
         let queueDragIndex = null;
+        let queueMouseTelemetry = null;
         let queueDragSuppressClickUntil = 0;
         let queuePressGesture = null;
         let queueAutoScrollFrame = 0;
+
+        function queueTelemetryToken(input) {
+          return `queue-${String(input || "input")}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        }
+
+        function queueReducedMotion() {
+          return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        }
+
+        function emitQueueReorder(gesture, details) {
+          if (!gesture || !gesture.telemetryToken) return;
+          const detailRecord = details || {};
+          if (!gesture.telemetryStarted && detailRecord.result !== "activated") return;
+          gesture.telemetryStarted = true;
+          const targetIndex = Number.isInteger(gesture.targetIndex) ? gesture.targetIndex : gesture.index;
+          trackAudioRuntimeEvent("queue_reorder", Object.assign({
+            track: "queue",
+            album: "session",
+            queue_token: gesture.telemetryToken,
+            input_type: gesture.input === "pointer" ? "pen" : String(gesture.input || "touch"),
+            source_index: gesture.index,
+            target_index: targetIndex,
+            gesture_duration_ms: Math.max(0, Date.now() - Number(gesture.startedAt || Date.now())),
+            ghost_created: Boolean(gesture.ghost),
+            lift_animated: Boolean(gesture.activated && !queueReducedMotion()),
+            shifted_row_count: Math.max(0, Math.abs(targetIndex - gesture.index) - 1),
+            flip_started: false,
+            flip_finished: false,
+            reduced_motion: queueReducedMotion()
+          }, detailRecord));
+        }
 
         function clearQueueDropIndicators() {
           overlayQueueList.querySelectorAll(".is-drop-before, .is-drop-after").forEach(function (node) {
@@ -1721,6 +1753,20 @@
           clearQueueDropIndicators();
           if (drop && drop.item) {
             drop.item.classList.add(drop.after ? "is-drop-after" : "is-drop-before");
+          }
+          if (queuePressGesture && drop && queuePressGesture.targetIndex !== drop.index) {
+            queuePressGesture.targetIndex = drop.index;
+            emitQueueReorder(queuePressGesture, {
+              result: "preview",
+              handler_state: "active"
+            });
+          }
+          if (queueMouseTelemetry && drop && queueMouseTelemetry.targetIndex !== drop.index) {
+            queueMouseTelemetry.targetIndex = drop.index;
+            emitQueueReorder(queueMouseTelemetry, {
+              result: "preview",
+              handler_state: "active"
+            });
           }
           return drop;
         }
@@ -1807,6 +1853,14 @@
           gesture.offsetY = Math.max(0, Math.min(rect.height, gesture.startY - rect.top));
           gesture.ghost = ghost;
           document.body.appendChild(ghost);
+          emitQueueReorder(gesture, {
+            result: "activated",
+            handler_state: "active",
+            ghost_created: true,
+            ghost_created_ms: Math.max(0, Date.now() - gesture.startedAt),
+            lift_started_ms: Math.max(0, Date.now() - gesture.startedAt),
+            lift_animated: !queueReducedMotion()
+          });
           updateQueueDragGhost(gesture, gesture.lastX, gesture.lastY);
           previewQueueDrop(gesture.lastX, gesture.lastY);
 
@@ -1838,6 +1892,10 @@
             scrollVelocity: 0,
             timer: 0
           };
+          gesture.telemetryToken = queueTelemetryToken(gesture.input);
+          gesture.startedAt = Date.now();
+          gesture.targetIndex = index;
+          gesture.telemetryStarted = false;
           queuePressGesture = gesture;
           gesture.timer = window.setTimeout(function () {
             activateQueuePress(gesture);
@@ -1882,7 +1940,15 @@
           }
           queuePressGesture = null;
           clearQueueDragState({ suppressClick: activated });
-          if (drop) movePlaylistItem(fromIndex, drop.index, { after: drop.after });
+          let moved = false;
+          if (drop) moved = movePlaylistItem(fromIndex, drop.index, { after: drop.after }) !== false;
+          emitQueueReorder(gesture, {
+            target_index: drop ? drop.index : fromIndex,
+            result: drop && moved ? "committed" : "cancelled",
+            cancel_reason: drop && moved ? "" : (activated ? "invalid_drop" : "hold_cancelled"),
+            handler_state: "finished",
+            navigation_completed: Boolean(drop && moved)
+          });
           return activated;
         }
 
@@ -1902,6 +1968,23 @@
             return;
           }
           queueDragIndex = index;
+          queueMouseTelemetry = {
+            index,
+            targetIndex: index,
+            input: "mouse",
+            telemetryToken: queueTelemetryToken("mouse"),
+            startedAt: Date.now(),
+            activated: true,
+            ghost: null,
+            committed: false,
+            telemetryStarted: false
+          };
+          emitQueueReorder(queueMouseTelemetry, {
+            result: "activated",
+            handler_state: "active",
+            ghost_created: false,
+            lift_animated: false
+          });
           item.classList.add("is-dragging");
           item.setAttribute("aria-grabbed", "true");
           if (event.dataTransfer) {
@@ -1923,16 +2006,40 @@
           if (!Number.isInteger(queueDragIndex)) return;
           const drop = resolveQueueDrop(event);
           if (!drop) {
+            emitQueueReorder(queueMouseTelemetry, {
+              result: "cancelled",
+              cancel_reason: "invalid_drop",
+              handler_state: "finished"
+            });
+            queueMouseTelemetry = null;
             clearQueueDragState();
             return;
           }
           event.preventDefault();
           event.stopPropagation();
-          movePlaylistItem(queueDragIndex, drop.index, { after: drop.after });
+          const moved = movePlaylistItem(queueDragIndex, drop.index, { after: drop.after }) !== false;
+          if (queueMouseTelemetry) {
+            queueMouseTelemetry.targetIndex = drop.index;
+            queueMouseTelemetry.committed = moved;
+            emitQueueReorder(queueMouseTelemetry, {
+              result: moved ? "committed" : "cancelled",
+              cancel_reason: moved ? "" : "move_rejected",
+              handler_state: "finished"
+            });
+          }
+          queueMouseTelemetry = null;
           clearQueueDragState({ suppressClick: true });
         });
 
         overlayQueueList.addEventListener("dragend", function () {
+          if (queueMouseTelemetry && !queueMouseTelemetry.committed) {
+            emitQueueReorder(queueMouseTelemetry, {
+              result: "cancelled",
+              cancel_reason: "drag_end",
+              handler_state: "finished"
+            });
+          }
+          queueMouseTelemetry = null;
           clearQueueDragState({ suppressClick: true });
         });
 

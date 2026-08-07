@@ -38,8 +38,8 @@ function addListener(registry, type, callback) {
   registry.get(type).push(callback);
 }
 
-function dispatch(registry, type) {
-  (registry.get(type) || []).slice().forEach((callback) => callback({ type }));
+function dispatch(registry, type, details) {
+  (registry.get(type) || []).slice().forEach((callback) => callback(Object.assign({ type }, details || {})));
 }
 
 function createIndexedDbMock() {
@@ -178,7 +178,7 @@ function createTelemetry() {
     fineTelemetryEnabled: true,
     isTelemetryOriginAllowed: () => true,
     getWorkerUrl: () => "https://worker.test",
-    getRuntimeVersion: () => "audiofix-session-v3-test",
+    getRuntimeVersion: () => "audiofix-session-v4-test",
     getAudioState: () => audioState,
     getAudio: () => audioState.audio,
     getAudioSource: () => "r2dev",
@@ -205,7 +205,7 @@ async function settle(turns = 20) {
 
   telemetry.startHeartbeat();
   telemetry.trackRuntimeEvent("heartbeat", { track: "Must stay local", album: "Album" });
-  assert.strictEqual(intervalCalls, 0, "Session v3 must not install a heartbeat interval");
+  assert.strictEqual(intervalCalls, 0, "Session v4 must not install a heartbeat interval");
 
   for (let index = 0; index < 60; index += 1) {
     telemetry.enqueue({
@@ -230,6 +230,7 @@ async function settle(turns = 20) {
   assert.strictEqual(requests.length, 0, "Active sessions must remain local");
   assert.strictEqual(await telemetry.flushQueue(), false, "Manual flush must not send an active session");
 
+  audioState.audio.paused = true;
   sandbox.document.visibilityState = "hidden";
   dispatch(documentListeners, "visibilitychange");
   await settle();
@@ -237,7 +238,7 @@ async function settle(turns = 20) {
   const firstRequest = requests[0];
   assert.strictEqual(firstRequest.options.credentials, "omit");
   assert.strictEqual(firstRequest.options.keepalive, true);
-  assert.strictEqual(firstRequest.payload.schema_version, 3);
+  assert.strictEqual(firstRequest.payload.schema_version, 4);
   assert.strictEqual(firstRequest.payload.reports.length, 1);
   assert.strictEqual(firstRequest.payload.reports[0].events.length, 48, "Local journal must be capped at 48 events");
   assert.strictEqual(firstRequest.payload.reports[0].dropped_events, 13);
@@ -269,6 +270,75 @@ async function settle(turns = 20) {
   dispatch(documentListeners, "visibilitychange");
   await settle();
   assert.strictEqual(requests.length, 1, "Visible must start locally without a network flush");
+
+  audioState.audio.paused = false;
+  audioState.audio.currentTime = 1;
+  sandbox.document.visibilityState = "hidden";
+  dispatch(documentListeners, "visibilitychange");
+  dispatch(windowListeners, "pagehide", { persisted: true });
+  await settle();
+  assert.strictEqual(requests.length, 1, "Hidden + playing and BFCache pagehide must remain local");
+  audioState.audio.currentTime = 31;
+  tick(30000);
+  telemetry.trackRuntimeEvent("background_progress", {
+    track: "Background track",
+    album: "Background album",
+    current_time: 31,
+    paused: false
+  });
+  telemetry.trackRuntimeEvent("audio_interruption", {
+    interruption_token: "interruption-safe-1",
+    interruption_kind: "system_midtrack",
+    phase: "paused",
+    outcome: "detected"
+  });
+  await settle();
+  assert.strictEqual(requests.length, 1, "Background progress and interruption must not hit the Worker");
+  audioState.audio.currentTime = 32;
+  sandbox.document.visibilityState = "visible";
+  dispatch(windowListeners, "pageshow", { persisted: true });
+  dispatch(documentListeners, "visibilitychange");
+  await settle();
+  assert.strictEqual(requests.length, 1, "Returning from BFCache must keep the same local session");
+
+  telemetry.trackRuntimeEvent("launch_summary", {
+    launch_head_ms: 2,
+    dom_ready_ms: 180,
+    first_contentful_paint_ms: 140,
+    first_app_frame_ms: 260,
+    init_done_ms: 230,
+    catalog_ready_ms: 220,
+    catalog_ready: true,
+    service_worker_controlled: true,
+    app_frame_ready: true
+  });
+  telemetry.trackRuntimeEvent("album_swipe", {
+    gesture_token: "swipe-safe-1",
+    album: "Target",
+    direction: "left",
+    axis: "horizontal",
+    input_type: "touch",
+    dx: -72,
+    dy: 4,
+    card_rank: 24,
+    handler_ready: false,
+    navigation_started: false,
+    result: "cancelled",
+    cancel_reason: "handler_not_ready"
+  });
+  telemetry.trackRuntimeEvent("queue_reorder", {
+    queue_token: "queue-safe-1",
+    input_type: "touch",
+    source_index: 5,
+    target_index: 2,
+    ghost_created: true,
+    lift_animated: true,
+    shifted_row_count: 2,
+    flip_started: false,
+    flip_finished: false,
+    result: "committed"
+  });
+  await settle();
 
   const preparedSrc = "https://audio.test/assets/album-one/04-favora.m4a";
   const sameBasenameOtherAlbum = "https://audio.test/assets/album-two/04-favora.m4a";
@@ -598,6 +668,7 @@ async function settle(turns = 20) {
 
   fetchOk = false;
   telemetry.trackRuntimeEvent("waiting", { track: "Retry track", album: "Album" });
+  audioState.audio.paused = true;
   sandbox.document.visibilityState = "hidden";
   dispatch(documentListeners, "visibilitychange");
   await settle();
@@ -622,6 +693,15 @@ async function settle(turns = 20) {
   assert.strictEqual(compactEvents.filter((event) => event.event === "media_capabilities").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "media_command").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "audio_interruption").length, 1);
+  assert.strictEqual(compactEvents.filter((event) => event.event === "background_window").length, 1);
+  assert.strictEqual(compactEvents.filter((event) => event.event === "launch_summary").length, 1);
+  assert.strictEqual(compactEvents.filter((event) => event.event === "album_swipe").length, 1);
+  assert.strictEqual(compactEvents.filter((event) => event.event === "queue_reorder").length, 1);
+  const compactBackground = compactEvents.find((event) => event.event === "background_window");
+  assert.strictEqual(compactBackground.progress_observed, true);
+  assert.strictEqual(compactBackground.return_observed, true);
+  assert.strictEqual(compactBackground.bfcache, true);
+  assert(compactBackground.advanced_ms >= 30000);
   const compactCommand = compactEvents.find((event) => event.event === "media_command");
   assert.strictEqual(compactCommand.command_token, commandToken);
   assert.strictEqual(compactCommand.outcome, "recovered");
@@ -701,6 +781,12 @@ async function settle(turns = 20) {
   assert.strictEqual(compactSummary.media_command_no_progress_count, 1);
   assert.strictEqual(compactSummary.media_command_recovered_count, 1);
   assert.strictEqual(compactSummary.audio_interruption_count, 1);
+  assert.strictEqual(compactSummary.launch_summary_count, 1);
+  assert.strictEqual(compactSummary.background_window_count, 1);
+  assert.strictEqual(compactSummary.album_swipe_count, 1);
+  assert.strictEqual(compactSummary.album_swipe_cancel_count, 1);
+  assert.strictEqual(compactSummary.queue_reorder_count, 1);
+  assert.strictEqual(compactSummary.queue_reorder_success_count, 1);
   const compactVisualizer = compactEvents.find((event) => event.event === "visualizer_health");
   assert.strictEqual(compactVisualizer.result, "ready");
   assert.strictEqual(compactVisualizer.state, "running");
@@ -745,7 +831,7 @@ async function settle(turns = 20) {
   assert.strictEqual(requests[2].options.keepalive, false);
   assert.strictEqual(requests[2].payload.reports.length, 1);
   assert.strictEqual(requests[2].payload.reports[0].session_id, failedSessionId);
-  assert.strictEqual(requests[2].payload.reports[0].close_reason, "hidden");
+  assert.strictEqual(requests[2].payload.reports[0].close_reason, "visibility_hidden");
 
   telemetryAfterRelaunch.trackRuntimeEvent("playing", { track: "Closing during retry", album: "Album" });
   sandbox.document.visibilityState = "hidden";
@@ -765,7 +851,41 @@ async function settle(turns = 20) {
   await settle();
   assert.strictEqual(requests.length, 4, "pagehide must not duplicate the coalesced delivery");
 
-  console.log("Audio telemetry session v3 privacy checks passed.");
+  databases.clear();
+  const legacyStartedAt = Date.now() - 5000;
+  const legacySessionId = `s-${legacyStartedAt.toString(36)}-legacy-v3-session`;
+  databases.set("infra_audio_telemetry_v2", {
+    stores: new Map([["sessions", new Map([[legacySessionId, {
+      schema_version: 3,
+      session_id: legacySessionId,
+      status: "active",
+      build: "audiofix388-20260807",
+      ua_class: "ios_pwa",
+      effective_type: "4g",
+      started_at_ms: legacyStartedAt,
+      last_at_ms: legacyStartedAt + 1000,
+      ended_at_ms: 0,
+      close_reason: "",
+      dropped_events: 0,
+      summary: {},
+      events: [{
+        event: "playing",
+        timestamp_ms: legacyStartedAt + 1000,
+        track: "Legacy v3",
+        album: "Legacy"
+      }]
+    }]])]])
+  });
+  sandbox.document.visibilityState = "visible";
+  const requestsBeforeLegacyRetry = requests.length;
+  const telemetryWithLegacyV3 = createTelemetry();
+  telemetryWithLegacyV3.initLifecycle();
+  await settle(40);
+  assert.strictEqual(requests.length, requestsBeforeLegacyRetry + 1, "An abandoned v3 session must retry on v4 startup");
+  assert.strictEqual(requests.at(-1).payload.schema_version, 3, "A v3 retry must keep its original envelope schema");
+  assert.strictEqual(requests.at(-1).payload.reports[0].session_id, legacySessionId);
+
+  console.log("Audio telemetry session v4 lifecycle/privacy checks passed.");
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;

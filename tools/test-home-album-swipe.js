@@ -21,10 +21,13 @@ function createClassList(initial) {
   };
 }
 
-function createHarness() {
+function createHarness(options) {
+  const opts = options || {};
   const listeners = new Map();
   const opened = [];
+  const telemetry = [];
   const styleValues = new Map();
+  const grid = { querySelectorAll() { return [card]; } };
   const card = {
     href: "https://site.test/music/v-23pi56-infra.html",
     classList: createClassList(["album-card"]),
@@ -32,7 +35,9 @@ function createHarness() {
       setProperty(name, value) { styleValues.set(name, value); },
       removeProperty(name) { styleValues.delete(name); }
     },
-    contains(target) { return target === cover; }
+    contains(target) { return target === cover; },
+    getAttribute(name) { return name === "aria-label" ? "Ouvrir l'album V-23PI56" : ""; },
+    closest(selector) { return selector.includes('data-catalog-grid="albums"') ? grid : null; }
   };
   const cover = {
     closest(selector) {
@@ -53,6 +58,13 @@ function createHarness() {
     setTimeout,
     clearTimeout
   };
+  if (Array.isArray(opts.earlyRecords)) {
+    sandbox.__infraEarlyAlbumSwipeProbe = {
+      records: opts.earlyRecords.slice(),
+      stopped: false,
+      stop() { this.stopped = true; }
+    };
+  }
   sandbox.window = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(SOURCE_PATH, "utf8"), sandbox, { filename: SOURCE_PATH });
@@ -61,7 +73,8 @@ function createHarness() {
     openAlbumCard(target, options) {
       opened.push({ target, options });
       return true;
-    }
+    },
+    trackAudioRuntimeEvent(type, data) { telemetry.push({ type, data }); }
   });
   catalog.initAlbumSwipeNavigation();
 
@@ -84,7 +97,7 @@ function createHarness() {
     return event;
   }
 
-  return { catalog, card, cover, opened, styleValues, listeners, dispatch };
+  return { catalog, card, cover, opened, telemetry, styleValues, listeners, dispatch, sandbox };
 }
 
 (function testRightSwipeOpensAlbumAndSuppressesResidualClick() {
@@ -100,11 +113,15 @@ function createHarness() {
   assert.equal(harness.opened.length, 1);
   assert.equal(harness.opened[0].target, harness.card);
   assert.equal(harness.opened[0].options.trigger, "swipe_right");
+  assert.match(harness.opened[0].options.gestureToken, /^swipe-/);
   assert.equal(harness.card.classList.contains("is-album-swipe-tracking"), false);
 
   const click = harness.dispatch("click");
   assert.equal(click.defaultPrevented, true, "the synthetic click after swipe must not navigate twice");
   assert.equal(click.immediateStopped, true);
+  const swipeEvents = harness.telemetry.filter((event) => event.type === "album_swipe");
+  assert.equal(new Set(swipeEvents.map((event) => event.data.gesture_token)).size, 1);
+  assert.equal(swipeEvents.at(-1).data.result, "navigation_started");
 })();
 
 (function testVerticalScrollAndLeftSwipeStayPassive() {
@@ -114,6 +131,7 @@ function createHarness() {
   vertical.dispatch("pointerup", { clientX: 90, clientY: 145 });
   assert.equal(verticalMove.defaultPrevented, false, "vertical scroll must remain native");
   assert.equal(vertical.opened.length, 0);
+  assert.equal(vertical.telemetry.at(-1).data.cancel_reason, "vertical_scroll");
 
   const left = createHarness();
   left.dispatch("pointerdown", { clientX: 90, clientY: 100 });
@@ -121,6 +139,40 @@ function createHarness() {
   left.dispatch("pointerup", { clientX: 20, clientY: 102 });
   assert.equal(leftMove.defaultPrevented, false, "left swipe is outside the requested navigation gesture");
   assert.equal(left.opened.length, 0);
+  assert.equal(left.telemetry.at(-1).data.direction, "left");
+  assert.equal(left.telemetry.at(-1).data.cancel_reason, "unsupported_direction");
+})();
+
+(function testTapDoesNotConsumeSwipeTelemetryBudget() {
+  const harness = createHarness();
+  harness.dispatch("pointerdown", { clientX: 40, clientY: 100 });
+  harness.dispatch("pointerup", { clientX: 43, clientY: 102 });
+  assert.equal(harness.telemetry.length, 0, "a tap must not be counted as an album swipe");
+})();
+
+(function testEarlyColdGestureIsTransferredWithoutNavigation() {
+  const harness = createHarness({
+    earlyRecords: [{
+      gesture_token: "early-safe-1",
+      input_type: "touch",
+      album: "COLD ALBUM",
+      direction: "left",
+      axis: "horizontal",
+      dx: -80,
+      dy: 5,
+      card_rank: 24,
+      lower_half: true,
+      gesture_duration_ms: 160,
+      finished_at_ms: Date.now()
+    }]
+  });
+  const event = harness.telemetry.find((entry) => entry.data.gesture_token === "early-safe-1");
+  assert(event, "cold swipe probe was not transferred to runtime telemetry");
+  assert.equal(event.data.handler_ready, false);
+  assert.equal(event.data.cancel_reason, "handler_not_ready");
+  assert.equal(event.data.lower_half, true);
+  assert.equal(harness.sandbox.__infraEarlyAlbumSwipeProbe.stopped, true);
+  assert.equal(harness.opened.length, 0);
 })();
 
 (function testBindingIsIdempotent() {
@@ -130,4 +182,4 @@ function createHarness() {
   assert.equal(harness.listeners.get("pointerdown").length, pointerDownCount);
 })();
 
-console.log("Home album swipe checks passed: right-open, vertical-scroll guard, left-ignore and click dedupe.");
+console.log("Home album swipe checks passed: right-open, cold/left diagnostics, vertical guard and click dedupe.");

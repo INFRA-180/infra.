@@ -264,6 +264,12 @@
       document.body ? document.body.scrollHeight : 0,
       window.innerHeight || 0
     );
+    const currentRoute = document.querySelector(
+      "#infraSpaRouteHost .spa-route-layer[data-spa-route-state='current']"
+    );
+    const frozenResourceCount = currentRoute
+      ? freezeLiveHomeResourceUrls(currentRoute, renderedUrl && renderedUrl.href)
+      : 0;
     return {
       url: getComparableSpaUrl(renderedUrl && renderedUrl.href),
       title: document.title,
@@ -274,7 +280,7 @@
       anchorHref: getComparableSpaUrl(targetUrl && targetUrl.href),
       anchorViewportTop: targetRect ? Math.round(targetRect.top) : null,
       coverStates,
-      frozenResourceCount: 0,
+      frozenResourceCount,
       fragment: null
     };
   }
@@ -838,6 +844,68 @@
     });
   }
 
+  const SPA_ROUTE_THEME_PROPERTIES = [
+    "--accent", "--ink", "--ink-soft", "--line",
+    "--bg-glow-1", "--bg-glow-2", "--bg-start", "--bg-mid", "--bg-end",
+    "--overlay-bg", "--panel-bg", "--panel-border", "--code-bg",
+    "--pill-bg", "--pill-ink", "--pwa-status-bg"
+  ];
+
+  function freezeSpaRouteTheme(layer, bodyClassName) {
+    if (!layer || !layer.style || typeof window.getComputedStyle !== "function") return false;
+    const computed = window.getComputedStyle(document.documentElement);
+    const values = new Map();
+    SPA_ROUTE_THEME_PROPERTIES.forEach(function (property) {
+      const value = String(computed.getPropertyValue(property) || "").trim();
+      if (value) values.set(property, value);
+    });
+    const classes = String(bodyClassName || layer.className || "").split(/\s+/);
+    if (classes.includes("album-screen") || classes.includes("app-screen")) {
+      const albumBackground = values.get("--bg-mid");
+      if (albumBackground) values.set("--pwa-status-bg", albumBackground);
+    }
+    values.forEach(function (value, property) {
+      layer.style.setProperty(property, value);
+    });
+    layer.setAttribute("data-spa-theme-frozen", "true");
+    return values.size > 0;
+  }
+
+  function clearSpaRouteTheme(layer) {
+    if (!layer || !layer.style) return;
+    SPA_ROUTE_THEME_PROPERTIES.forEach(function (property) {
+      layer.style.removeProperty(property);
+    });
+    layer.removeAttribute("data-spa-theme-frozen");
+  }
+
+  function getSpaRouteSafetyColor(layer) {
+    if (!layer || typeof window.getComputedStyle !== "function") return "";
+    try {
+      const pseudo = window.getComputedStyle(layer, "::before");
+      const color = String(pseudo && pseudo.backgroundColor || "").trim();
+      if (color && color !== "rgba(0, 0, 0, 0)" && color !== "transparent") return color;
+    } catch (_err) {
+      // Fall back to the frozen theme tokens below.
+    }
+    const computed = window.getComputedStyle(layer);
+    return String(
+      computed.getPropertyValue(layer.classList.contains("album-screen") ? "--bg-mid" : "--bg-end") || ""
+    ).trim();
+  }
+
+  function setSpaHandoffSafetyColor(color) {
+    const root = document.documentElement;
+    if (!root || !root.style) return;
+    const value = String(color || "").trim();
+    if (value) root.style.setProperty("--spa-handoff-safety-bg", value);
+  }
+
+  function clearSpaHandoffSafetyColor() {
+    const root = document.documentElement;
+    if (root && root.style) root.style.removeProperty("--spa-handoff-safety-bg");
+  }
+
   function getSpaRouteClassName(bodyClassName) {
     return sanitizeSpaBodyClassName(bodyClassName)
       .split(/\s+/)
@@ -938,6 +1006,10 @@
     let handoffStageMs = 0;
     let sourceRetainedUntilPromote = false;
     let sourceDetachedAfterPromote = false;
+    let themeTokensFrozen = false;
+    let routeLayersAtPromote = 0;
+    let routeLayersAfterDetach = 0;
+    let routeHostHasCurrent = false;
 
     function freezeSourceRouteForCapture() {
       const liveHomeCapture = opts.liveHomeCapture;
@@ -963,6 +1035,7 @@
       } else {
         sourceRoute.remove();
       }
+      clearSpaRouteTheme(sourceRoute);
       sourceDetachedAfterPromote = true;
     }
 
@@ -1001,6 +1074,12 @@
       applied = true;
       const mutationStartedAt = getAudioTelemetryNow();
       freezeSourceRouteForCapture();
+      const sourceThemeFrozen = sourceRoute
+        ? freezeSpaRouteTheme(sourceRoute, sourceRoute.className)
+        : true;
+      const destinationThemeFrozen = freezeSpaRouteTheme(destinationRoute, bodyClassName);
+      themeTokensFrozen = Boolean(sourceThemeFrozen && destinationThemeFrozen);
+      setSpaHandoffSafetyColor(getSpaRouteSafetyColor(sourceRoute || destinationRoute));
       const sourceScrollY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
       const destinationScrollY = requestedScroll ? requestedScroll.y : 0;
       destinationRoute.classList.add("is-staged");
@@ -1029,6 +1108,8 @@
       destinationRoute.setAttribute("data-spa-route-state", "current");
       destinationRoute.removeAttribute("aria-hidden");
       destinationRoute.inert = false;
+      routeLayersAtPromote = routeHost.querySelectorAll(".spa-route-layer").length;
+      setSpaHandoffSafetyColor(getSpaRouteSafetyColor(destinationRoute));
       document.body.className = bodyClassName;
       applyRequestedScroll();
       runPersistentUiPrepaintSync();
@@ -1038,6 +1119,10 @@
       preserveOrRemoveSourceRoute();
       destinationRoute.classList.remove("is-promoted");
       routeHost.classList.remove("is-handoff-active");
+      routeLayersAfterDetach = routeHost.querySelectorAll(".spa-route-layer").length;
+      routeHostHasCurrent = Boolean(
+        routeHost.querySelector(".spa-route-layer[data-spa-route-state='current']")
+      );
     }
 
     function finish(mode) {
@@ -1057,6 +1142,11 @@
           handoff_stage_ms: handoffStageMs,
           source_retained_until_promote: sourceRetainedUntilPromote,
           source_detached_after_promote: sourceDetachedAfterPromote,
+          theme_tokens_frozen: themeTokensFrozen,
+          route_layers_at_promote: routeLayersAtPromote,
+          route_layers_after_detach: routeLayersAfterDetach,
+          route_host_has_current: routeHostHasCurrent,
+          home_restore_mode: String(opts.homeRestoreMode || ""),
           route_kind: routeClasses.includes("album-screen")
             ? "album"
             : (routeClasses.includes("home-screen") ? "home" : "other"),
@@ -1065,17 +1155,30 @@
           scroll_restore_requested_x: requestedScroll ? requestedScroll.x : null,
           scroll_restore_requested_y: requestedScroll ? requestedScroll.y : null,
           scroll_restore_applied_x: appliedScrollX,
-          scroll_restore_applied_y: appliedScrollY
+          scroll_restore_applied_y: appliedScrollY,
+          scroll_restore_delta_y: requestedScroll && Number.isFinite(appliedScrollY)
+            ? appliedScrollY - requestedScroll.y
+            : null,
+          scroll_restore_anchor_correction: 0
         };
         if (!instantPwaSwap) return base;
         return waitForSpaFirstPaint().then(function (paintState) {
           return Object.assign(base, paintState || {});
         });
       }).then(function (result) {
-        if (instantPwaSwap) setSpaSwapPaintLock(false);
+        if (instantPwaSwap) {
+          clearSpaRouteTheme(destinationRoute);
+          clearSpaHandoffSafetyColor();
+          setSpaSwapPaintLock(false);
+        }
         return result;
       }, function (error) {
-        if (instantPwaSwap) setSpaSwapPaintLock(false);
+        if (instantPwaSwap) {
+          clearSpaRouteTheme(destinationRoute);
+          clearSpaRouteTheme(sourceRoute);
+          clearSpaHandoffSafetyColor();
+          setSpaSwapPaintLock(false);
+        }
         throw error;
       });
     }
@@ -1160,6 +1263,7 @@
       persistRoot,
       {
         restoreScroll: requested,
+        homeRestoreMode: "live_dom",
         afterScroll: function () {
           const anchor = findAlbumCardByUrl(document, route.anchorHref);
           if (!anchor || !Number.isFinite(route.anchorViewportTop)) return;
@@ -1237,7 +1341,10 @@
       liveHomeCapture: opts.liveHomeCapture,
       restoreScroll: opts.restoreScroll,
       resetScroll: Boolean(opts.resetScroll),
-      avoidViewTransition: Boolean(opts.avoidViewTransition)
+      avoidViewTransition: Boolean(opts.avoidViewTransition),
+      homeRestoreMode: isHomePage
+        ? String(opts.homeRestoreMode || (telemetry && telemetry.cached ? "cached_html" : "network_html"))
+        : ""
     });
     if (opts.restoreScroll) {
       trackAudioRuntimeEvent("spa_scroll_restore", Object.assign({}, telemetry || {}, swapResult || {}, {
@@ -1470,7 +1577,10 @@
           await renderSpaDocument(cachedDoc, url.href, cachedSpaTelemetry, {
             liveHomeCapture,
             restoreScroll: opts.restoreScroll,
-            resetScroll: opts.scroll !== false
+            resetScroll: opts.scroll !== false,
+            homeRestoreMode: cachedDoc.body && cachedDoc.body.classList.contains("home-screen")
+              ? "cached_html"
+              : ""
           });
         } catch (_err) {
           fallbackToDocumentNavigation("cached_render_error");
@@ -1612,7 +1722,10 @@
       await renderSpaDocument(doc, url.href, spaTelemetry, {
         liveHomeCapture,
         restoreScroll: opts.restoreScroll,
-        resetScroll: opts.scroll !== false
+        resetScroll: opts.scroll !== false,
+        homeRestoreMode: doc.body && doc.body.classList.contains("home-screen")
+          ? "network_html"
+          : ""
       });
     } catch (_err) {
       fallbackToDocumentNavigation("render_error");

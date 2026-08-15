@@ -162,6 +162,9 @@ function testAudioSessionInterruptionResumeGate() {
   assert(radioSource.includes("function scheduleSystemInterruptionResumeAfterActive(trigger)"));
   assert(radioSource.includes("}, 500);"), "the guarded fallback must wait 500 ms for native Play");
   assert(radioSource.includes("guard.resumeAttempted = true"), "the fallback needs a one-attempt latch");
+  assert(radioSource.includes("command.interruptionSrc = interruptionGuard.src"), "an external resume must retain the interrupted source locally");
+  assert(radioSource.includes('resume_gate_reason: "audio_play_event"'), "the native Play path must explain its interruption resume gate");
+  assert(radioSource.includes("native_play_observed: true"), "the interruption report must distinguish an observed native Play");
   assert(scriptsSource.includes('callAudioRadio("scheduleSystemInterruptionResumeAfterActive", ["visibility_sample"])'));
   const sandbox = createSandbox();
   loadScript(sandbox, RADIO_PATH);
@@ -439,7 +442,9 @@ async function testExternalPlayCommandCarriesThreeProgressProbes() {
   assert.strictEqual(new Set(commands.map((event) => event.payload.command_token)).size, 1);
   assert.strictEqual(commands.at(-1).payload.outcome, "success");
   assert.strictEqual(commands.find((event) => event.payload.probe_600_ms === 300).payload.confirmed, true);
+  assert.strictEqual(commands.find((event) => event.payload.probe_600_ms === 300).payload.outcome, "success");
   assert.strictEqual(commands.find((event) => event.payload.probe_1500_ms === 800).payload.confirmed, true);
+  assert.strictEqual(commands.find((event) => event.payload.probe_1500_ms === 800).payload.outcome, "success");
   assert.strictEqual(commands.at(-1).payload.probe_3000_ms, 1500);
   assert.strictEqual(commands.at(-1).payload.surface_hint, "remote_visible");
 }
@@ -2625,7 +2630,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix391 runtime checks passed.");
+  console.log("audiofix392 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

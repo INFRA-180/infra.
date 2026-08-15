@@ -1692,23 +1692,29 @@
 
         function captureQueuePreviewRects(gesture) {
           const rects = new Map();
-          if (!gesture || !Array.isArray(gesture.baseGeometry)) return rects;
-          const scrollDelta = (Number(overlayQueueList.scrollTop) || 0) - Number(gesture.baseScrollTop || 0);
-          const shifts = gesture.previewShifts instanceof Map ? gesture.previewShifts : new Map();
-          gesture.baseGeometry.forEach(function (entry) {
-            if (!entry.key || !entry.rect) return;
-            const shift = Number(shifts.get(entry.key)) || 0;
-            rects.set(entry.key, {
-              left: entry.rect.left,
-              top: entry.rect.top - scrollDelta + shift
+          if (!gesture) return rects;
+          getQueueRows().forEach(function (row) {
+            const key = getQueueRowKey(row);
+            if (!key) return;
+            const rect = row.getBoundingClientRect();
+            rects.set(key, {
+              left: rect.left,
+              top: rect.top
             });
           });
           return rects;
         }
 
+        function queuePreviewDropKey(drop) {
+          if (!drop) return "";
+          return `${Number(drop.index)}:${drop.after ? "after" : "before"}`;
+        }
+
         function stopQueuePreviewAnimations(gesture) {
           if (!gesture) return;
           gesture.flipGeneration = Number(gesture.flipGeneration || 0) + 1;
+          gesture.previewTransitionInFlight = false;
+          gesture.pendingPreviewDrop = null;
           gesture.previewAnimations = new Map();
           gesture.previewShifts = new Map();
           getQueueRows().forEach(function (row) {
@@ -1720,9 +1726,21 @@
 
         function animateQueuePreview(gesture, drop) {
           if (!gesture || !gesture.activated || !drop || !drop.item) return;
+          const dropKey = queuePreviewDropKey(drop);
+          if (gesture.previewTransitionInFlight) {
+            gesture.pendingPreviewDrop = {
+              index: drop.index,
+              after: Boolean(drop.after),
+              item: drop.item,
+              midpoint: drop.midpoint
+            };
+            return;
+          }
+          if (dropKey && dropKey === gesture.lastAppliedPreviewKey) return;
           if (queueReducedMotion()) {
             stopQueuePreviewAnimations(gesture);
             gesture.shiftedRowCount = 0;
+            gesture.lastAppliedPreviewKey = dropKey;
             return;
           }
           const rows = getQueueRows();
@@ -1754,6 +1772,8 @@
           }
 
           gesture.previewTargetChangeCount = Number(gesture.previewTargetChangeCount || 0) + 1;
+          gesture.lastAppliedPreviewKey = dropKey;
+          gesture.previewTransitionInFlight = true;
           gesture.maxConcurrentAnimationCount = Math.max(
             Number(gesture.maxConcurrentAnimationCount || 0),
             desired.size
@@ -1776,6 +1796,17 @@
           gesture.flipFinished = desired.size === 0;
           gesture.flipAnimationCount = Number(gesture.flipAnimationCount || 0) + desired.size;
           emitQueueReorder(gesture, { result: "preview", handler_state: "active" });
+          function finishPreviewTransition() {
+            if (gesture.finished || gesture.flipGeneration !== generation) return;
+            gesture.previewTransitionInFlight = false;
+            gesture.flipFinished = true;
+            emitQueueReorder(gesture, { result: "preview", handler_state: "active" });
+            const pending = gesture.pendingPreviewDrop;
+            gesture.pendingPreviewDrop = null;
+            if (pending && queuePreviewDropKey(pending) !== gesture.lastAppliedPreviewKey) {
+              animateQueuePreview(gesture, pending);
+            }
+          }
           window.requestAnimationFrame(function () {
             if (gesture.finished || gesture.flipGeneration !== generation) return;
             const animations = rows.flatMap(function (row) {
@@ -1786,16 +1817,17 @@
               });
             });
             if (!animations.length) {
-              gesture.flipFinished = true;
-              emitQueueReorder(gesture, { result: "preview", handler_state: "active" });
+              finishPreviewTransition();
               return;
             }
+            gesture.maxConcurrentAnimationCount = Math.max(
+              Number(gesture.maxConcurrentAnimationCount || 0),
+              animations.length
+            );
             Promise.all(animations.map(function (animation) {
               return Promise.resolve(animation.finished).catch(function () {});
             })).then(function () {
-              if (gesture.finished || gesture.flipGeneration !== generation) return;
-              gesture.flipFinished = true;
-              emitQueueReorder(gesture, { result: "preview", handler_state: "active" });
+              finishPreviewTransition();
             });
           });
         }
@@ -2199,6 +2231,9 @@
             previewShifts: new Map(),
             previewTargetChangeCount: 0,
             previewAnimationRestartCount: 0,
+            previewTransitionInFlight: false,
+            pendingPreviewDrop: null,
+            lastAppliedPreviewKey: "",
             maxConcurrentAnimationCount: 0,
             baseGeometry: [],
             baseScrollTop: 0,
@@ -2311,6 +2346,9 @@
             previewShifts: new Map(),
             previewTargetChangeCount: 0,
             previewAnimationRestartCount: 0,
+            previewTransitionInFlight: false,
+            pendingPreviewDrop: null,
+            lastAppliedPreviewKey: "",
             maxConcurrentAnimationCount: 0,
             baseGeometry: [],
             baseScrollTop: 0,

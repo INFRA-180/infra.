@@ -1,5 +1,42 @@
 # Implementation Notes
 
+## 2026-08-15 — audiofix392 télémétrie fidèle, handoff thématique et file sérialisée
+
+- La télémétrie v4 conserve le même schéma, les clés `session4:<session_id>`, les plafonds de
+  48 événements / 32 Kio et une seule écriture KV par session. En arrière-plan,
+  `track_change_count` suit maintenant exclusivement la source logique réellement active : un
+  prefetch ne peut plus être interprété comme une piste audible. Une transition encore ouverte
+  est clôturée `superseded` dès l'arrivée du token suivant et le résumé incrémente
+  `track_superseded_count`.
+- Les résultats `media_command` sont monotones. Une progression confirmée à 600 ou 1500 ms
+  suffit à produire `success`, qui ne peut plus être rétrogradé par une sonde `dispatched` ou par
+  le scellement. Le chemin `audio_play_event` rattache la reprise native à l'interruption et à la
+  commande existantes avec la même source, le delta de position et le même `command_token`.
+  `error_name` est désormais réservé aux erreurs réelles ; les états normaux restent dans
+  `reason`.
+- Le handoff `dual_route` fige avant staging les variables calculées de thème sur la source et la
+  destination. Le fond de sécurité global suit la couche supérieure sans transition, la
+  destination dispose de deux frames de rendu avant promotion et la source reste une frame de
+  plus avant détachement. Les tokens temporaires sont ensuite retirés, y compris sur une Home
+  vivante conservée. Les ressources relatives de cette Home sont aussi figées avant l'écriture
+  d'historique afin qu'un changement de base URL ne déclenche jamais `/music/assets/...`. La
+  restauration Home et du scroll ainsi que les nombres de couches sont exposés dans
+  `spa_navigation`.
+- La preview de la file n'autorise plus qu'une transition CSS de groupe à la fois. Les nouvelles
+  cibles sont coalescées vers la plus récente sans redémarrer l'animation ; le hit-test conserve
+  sa géométrie immuable. Au commit, les rectangles réellement affichés sont capturés, la preview
+  est annulée sans frame intermédiaire, `movePlaylistItem()` est appelé une seule fois et un
+  unique FLIP final est attendu avant de retirer le ghost et de révéler la source.
+- Le rapport privé expose une section `media_commands`, les latences de commande, les
+  contradictions historiques `confirmed + incomplete` et les transitions `superseded`.
+  `/status`, `/export`, la TTL et la déduplication restent compatibles. Worker déployé avant le
+  client : `dbaeecb1-d3fb-4ece-a17a-cd834f5324c1`.
+- Validation automatisée : Worker v2/v3/v4, confidentialité et déduplication, budget 32 Kio avec
+  `dropped_events=0`, prefetch caché, supersession, commandes confirmées à 600/1500 ms, reprise,
+  Home vivante/cache/réseau, scroll, invariants des couches, swipe/covers/startup, file
+  touch/pen/mouse et audit public. Les 19 contrôles `npm test` passent. Identifiants atomiques :
+  runtime/CSS `audiofix392-20260815`, Service Worker `infra-shell-20260815-audio392`.
+
 ## 2026-08-07 — audiofix391 handoff SPA peint et file déterministe
 
 - Le swap PWA utilise désormais un hôte stable `#infraSpaRouteHost`. Chaque document Home,

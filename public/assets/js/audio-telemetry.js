@@ -128,7 +128,8 @@
     "direction", "axis", "input_type", "gesture_token", "queue_token", "lifecycle_reason",
     "navigation_method", "navigation_result", "cancel_reason", "handler_state",
     "catalog_source", "service_worker_state", "cover_first_frame_state",
-    "cover_second_frame_state", "cover_object_fit", "resume_gate_reason"
+    "cover_second_frame_state", "cover_object_fit", "resume_gate_reason",
+    "home_restore_mode"
   ]);
   const TELEMETRY_NUMBER_FIELDS = new Set([
     "timestamp_ms", "delta_ms", "duration_before_play_ms", "duration_ms", "delay_ms",
@@ -163,6 +164,9 @@
     "position_delta_ms", "flip_animation_count", "handoff_stage_ms",
     "preview_target_change_count", "preview_animation_restart_count",
     "max_concurrent_animation_count", "spa_navigation_compacted_count",
+    "track_superseded_count", "scroll_restore_requested_x", "scroll_restore_requested_y",
+    "scroll_restore_applied_x", "scroll_restore_applied_y", "scroll_restore_delta_y",
+    "scroll_restore_anchor_correction", "route_layers_at_promote", "route_layers_after_detach",
     "first_paint_ms", "visible_cover_count", "visible_cover_ready_count",
     "second_paint_ms", "second_visible_cover_count", "second_visible_cover_ready_count",
     "spa_cover_not_ready_count", "spa_second_cover_not_ready_count",
@@ -223,7 +227,8 @@
     "ghost_created", "lift_animated", "flip_started", "flip_finished", "reduced_motion",
     "lift_finished", "cover_geometry_ok", "native_play_observed", "bfcache",
     "source_retained_until_promote", "source_detached_after_promote",
-    "layout_hit_test", "source_hidden_while_ghost"
+    "layout_hit_test", "source_hidden_while_ghost", "theme_tokens_frozen",
+    "route_host_has_current"
   ]);
 
   function now() {
@@ -269,6 +274,7 @@
     "track_playing_count",
     "track_rejected_count",
     "track_error_count",
+    "track_superseded_count",
     "prepared_count",
     "unprepared_count",
     "served_from_prefetch_count",
@@ -940,8 +946,20 @@
         };
         mediaCommands.set(commandToken, record);
       }
-      const previousOutcome = record.outcome;
-      Object.assign(record, payload, {
+      const previousOutcome = String(record.outcome || "");
+      const update = Object.assign({}, source || {}, payload);
+      const incomingOutcome = String(update.outcome || "");
+      if (isTerminalMediaCommandOutcome(previousOutcome)) {
+        const previousIsFinal = [
+          "success", "noop", "dedup", "rejected", "recovered", "recovery_failed"
+        ].includes(previousOutcome);
+        const incomingIsTerminal = isTerminalMediaCommandOutcome(incomingOutcome);
+        const incomingWouldDowngrade = previousOutcome === "no_progress" && incomingOutcome === "incomplete";
+        if (previousIsFinal || !incomingIsTerminal || incomingWouldDowngrade) {
+          update.outcome = previousOutcome;
+        }
+      }
+      Object.assign(record, update, {
         event: "media_command",
         command_token: commandToken,
         event_sequence: record.event_sequence,
@@ -1243,15 +1261,29 @@
         : 0;
     }
 
-    function currentBackgroundLabels(source) {
-      const input = source && typeof source === "object" ? source : {};
+    function currentBackgroundLabels() {
       const state = getAudioState();
       const track = state.playlist && Number.isInteger(state.currentIndex)
         ? state.playlist[state.currentIndex]
         : null;
+      const audio = getAudio();
+      const sourceIdentity = localSourceIdentity(
+        state.activeLogicalSrc ||
+        (audio && (audio.currentSrc || audio.src)) ||
+        (track && track.src) ||
+        ""
+      );
+      const trackLabel = String((track && (track.title || track.name)) || "background");
+      const albumLabel = String((track && track.album) || state.currentAlbum || "session").toLowerCase();
       return {
-        track: String(input.track || (track && (track.title || track.name)) || "background"),
-        album: String(input.album || (track && track.album) || state.currentAlbum || "session").toLowerCase()
+        track: trackLabel,
+        album: albumLabel,
+        identity: sourceIdentity || [
+          String(state.playlistKind || "playlist"),
+          Number.isInteger(state.currentIndex) ? state.currentIndex : -1,
+          albumLabel,
+          trackLabel
+        ].join("|")
       };
     }
 
@@ -1337,7 +1369,7 @@
         last_observed_position: currentAudioPosition(),
         track: labels.track,
         album: labels.album,
-        track_identity: `${labels.album}|${labels.track}`,
+        track_identity: labels.identity,
         sample_count: 0,
         track_change_count: 0,
         waiting_count: 0,
@@ -1372,10 +1404,9 @@
     function observeBackgroundRuntimeEvent(eventType, payload, source, timestampMs) {
       if (!activeBackgroundWindow || !isDocumentHidden()) return;
       const record = activeBackgroundWindow;
-      const labels = currentBackgroundLabels(source);
-      const identity = `${labels.album}|${labels.track}`;
-      const observedPosition = Number(source && source.current_time);
-      const position = Number.isFinite(observedPosition) ? observedPosition : currentAudioPosition();
+      const labels = currentBackgroundLabels();
+      const identity = labels.identity;
+      const position = currentAudioPosition();
       if (record.track === "background" && labels.track !== "background") {
         record.track_identity = identity;
         record.track = labels.track;
@@ -1538,6 +1569,10 @@
       }
       if (!transition) {
         const timestampMs = Number(payload && payload.timestamp_ms) || Date.now();
+        const previous = activeTrackToken ? trackTransitions.get(activeTrackToken) : null;
+        if (previous && previous.request_token !== token && !previous.finalized) {
+          finalizeTrackTransition(previous, "superseded", timestampMs);
+        }
         transition = {
           request_token: token,
           started_at_ms: timestampMs,
@@ -1660,6 +1695,7 @@
         if (transition.result === "playing") incrementSummary("track_playing_count", 1, session);
         if (transition.result === "rejected") incrementSummary("track_rejected_count", 1, session);
         if (transition.result === "error") incrementSummary("track_error_count", 1, session);
+        if (transition.result === "superseded") incrementSummary("track_superseded_count", 1, session);
         incrementSummary(transition.prepared ? "prepared_count" : "unprepared_count", 1, session);
         if (transition.result === "playing") {
           if (latency >= SLOW_TRACK_TRANSITION_MS) incrementSummary("slow_transition_count", 1, session);
@@ -1883,6 +1919,17 @@
         handoff_stage_ms: transition.handoff_stage_ms || 0,
         source_retained_until_promote: Boolean(transition.source_retained_until_promote),
         source_detached_after_promote: Boolean(transition.source_detached_after_promote),
+        theme_tokens_frozen: Boolean(transition.theme_tokens_frozen),
+        route_layers_at_promote: transition.route_layers_at_promote || 0,
+        route_layers_after_detach: transition.route_layers_after_detach || 0,
+        route_host_has_current: Boolean(transition.route_host_has_current),
+        home_restore_mode: transition.home_restore_mode || "",
+        scroll_restore_requested_x: transition.scroll_restore_requested_x,
+        scroll_restore_requested_y: transition.scroll_restore_requested_y,
+        scroll_restore_applied_x: transition.scroll_restore_applied_x,
+        scroll_restore_applied_y: transition.scroll_restore_applied_y,
+        scroll_restore_delta_y: transition.scroll_restore_delta_y,
+        scroll_restore_anchor_correction: transition.scroll_restore_anchor_correction,
         result: transition.result || "done",
         reason: transition.reason || "",
         navigation_token: transition.navigation_token || 0,
@@ -2009,6 +2056,29 @@
         transition.handoff_stage_ms = Math.max(0, Math.round(Number(source.handoff_stage_ms) || 0));
         transition.source_retained_until_promote = source.source_retained_until_promote === true;
         transition.source_detached_after_promote = source.source_detached_after_promote === true;
+        transition.theme_tokens_frozen = source.theme_tokens_frozen === true;
+        transition.route_layers_at_promote = Math.max(0, Math.round(Number(source.route_layers_at_promote) || 0));
+        transition.route_layers_after_detach = Math.max(0, Math.round(Number(source.route_layers_after_detach) || 0));
+        transition.route_host_has_current = source.route_host_has_current === true;
+        transition.home_restore_mode = String(source.home_restore_mode || "");
+        [
+          "scroll_restore_requested_x", "scroll_restore_requested_y",
+          "scroll_restore_applied_x", "scroll_restore_applied_y",
+          "scroll_restore_delta_y", "scroll_restore_anchor_correction"
+        ].forEach(function (field) {
+          if (source[field] === null || source[field] === undefined || source[field] === "") return;
+          const value = Number(source[field]);
+          if (Number.isFinite(value)) transition[field] = Math.round(value);
+        });
+        if (
+          source.scroll_restore_requested_y !== null &&
+          source.scroll_restore_requested_y !== undefined &&
+          source.scroll_restore_requested_y !== "" &&
+          Number.isFinite(Number(source.scroll_restore_requested_y))
+        ) {
+          transition.scroll_restored = true;
+        }
+        if (typeof source.home_dom_reused === "boolean") transition.dom_reused = source.home_dom_reused;
         transition.route_kind = String(source.route_kind || "");
         transition.first_paint_ms = Math.max(0, Math.round(Number(source.first_paint_wait_ms) || 0));
         transition.visible_cover_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_count) || 0));
@@ -2039,6 +2109,16 @@
         transition.scroll_restored = source.scroll_restored !== false;
         if (typeof source.dom_reused === "boolean") transition.dom_reused = source.dom_reused;
         if (typeof source.home_dom_reused === "boolean") transition.dom_reused = source.home_dom_reused;
+        transition.home_restore_mode = String(source.home_restore_mode || transition.home_restore_mode || "");
+        [
+          "scroll_restore_requested_x", "scroll_restore_requested_y",
+          "scroll_restore_applied_x", "scroll_restore_applied_y",
+          "scroll_restore_delta_y", "scroll_restore_anchor_correction"
+        ].forEach(function (field) {
+          if (source[field] === null || source[field] === undefined || source[field] === "") return;
+          const value = Number(source[field]);
+          if (Number.isFinite(value)) transition[field] = Math.round(value);
+        });
       }
       if (eventType === "spa_html_response") {
         transition.strategy = String(source.strategy || "");
@@ -2362,7 +2442,7 @@
         error: errorEvent,
         error_name: eventType === "visualizer_health"
           ? (source.error_name || "")
-          : (source.reason || source.error_name || source.error_message || "")
+          : (errorEvent ? (source.error_name || source.error_message || source.reason || "") : "")
       });
 
       if (

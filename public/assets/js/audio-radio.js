@@ -632,6 +632,7 @@
           ? "probe_600_ms"
           : (delayMs === 1500 ? "probe_1500_ms" : "probe_3000_ms");
         const confirmed = Boolean(!audio.paused && advanced >= (delayMs >= 3000 ? 1 : 0.2));
+        if (confirmed && !command.finalOutcome) command.finalOutcome = "success";
         const commandUpdate = {
           decision: "resume",
           outcome: command.finalOutcome || (
@@ -2176,7 +2177,11 @@
     cancelExternalResumeCommand();
     const interruptionGuard = audioState.systemInterruptionGuard;
     const command = createExternalMediaCommand("play", surface, audio);
-    if (interruptionGuard && interruptionGuard.token) command.interruptionToken = interruptionGuard.token;
+    if (interruptionGuard && interruptionGuard.token) {
+      command.interruptionToken = interruptionGuard.token;
+      command.interruptionSrc = interruptionGuard.src || getCurrentAudioResumeKey(audio);
+      command.interruptionCurrentTime = Number(interruptionGuard.currentTime) || 0;
+    }
     clearSystemInterruptionGuard();
     const commandId = command.id;
     audioState.externalPlaybackCommand = command;
@@ -2566,13 +2571,28 @@
           confirmed: true
         });
         if (activeExternalCommand.interruptionToken) {
+          const interruptionSource = String(activeExternalCommand.interruptionSrc || "");
+          const currentSource = getCurrentAudioResumeKey(audio);
+          const interruptionPosition = Number(activeExternalCommand.interruptionCurrentTime);
+          const currentPosition = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+          const sameTrack = Boolean(
+            interruptionSource && currentSource && srcMatches(interruptionSource, currentSource)
+          );
           emitAudioInterruption({
             token: activeExternalCommand.interruptionToken,
-            currentTime: activeExternalCommand.beforeCurrentTime
+            currentTime: Number.isFinite(interruptionPosition)
+              ? interruptionPosition
+              : activeExternalCommand.beforeCurrentTime
           }, {
             phase: "resumed",
             outcome: "success",
-            command_token: activeExternalCommand.id
+            command_token: activeExternalCommand.id,
+            native_play_observed: true,
+            resume_gate_reason: "audio_play_event",
+            same_track: sameTrack,
+            position_delta_ms: Number.isFinite(interruptionPosition)
+              ? Math.max(0, Math.round(Math.abs(currentPosition - interruptionPosition) * 1000))
+              : null
           });
         }
       }

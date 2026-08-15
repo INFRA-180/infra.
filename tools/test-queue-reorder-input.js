@@ -43,6 +43,10 @@ includes(transport, "Promise.all(animations)", "final FLIP telemetry is not base
 includes(transport, "flip_animation_count", "queue telemetry does not count real animations");
 includes(transport, "preview_target_change_count", "queue telemetry does not expose actual target changes");
 includes(transport, "preview_animation_restart_count", "queue telemetry does not prove preview restarts are gone");
+includes(transport, "previewTransitionInFlight", "queue previews need a single in-flight transition gate");
+includes(transport, "pendingPreviewDrop", "rapid target changes must coalesce to the latest drop");
+includes(transport, "finishPreviewTransition", "queue previews need one explicit completion boundary");
+includes(transport, "queuePreviewDropKey", "identical insertion targets must not restart a preview");
 includes(transport, "layout_hit_test", "queue telemetry does not prove stable layout hit testing");
 includes(transport, "lift_finished", "queue telemetry does not record pickup completion");
 includes(transport, "runQueueAutoScroll", "long queues need edge auto-scroll while reordering");
@@ -67,6 +71,7 @@ const previewEnd = transport.indexOf("function animateQueueFinalFlip", previewSt
 const previewBody = transport.slice(previewStart, previewEnd);
 assert(!previewBody.includes("row.animate("), "preview rows must not restart WAAPI animations");
 assert(!previewBody.includes('fill: "both"'), "preview rows must not retain filled animation effects");
+assert(!previewBody.includes("previewAnimationRestartCount +="), "serialized previews must never count an animation restart");
 
 const touchCommitStart = transport.indexOf("function finishQueuePress");
 const touchCommitEnd = transport.indexOf("function findTouch", touchCommitStart);

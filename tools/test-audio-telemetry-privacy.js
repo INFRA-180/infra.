@@ -273,6 +273,13 @@ async function settle(turns = 20) {
 
   audioState.audio.paused = false;
   audioState.audio.currentTime = 1;
+  audioState.playlist = [{
+    name: "Initial background",
+    album: "Background album",
+    src: "https://audio.test/assets/background/initial.m4a"
+  }];
+  audioState.currentIndex = 0;
+  audioState.activeLogicalSrc = audioState.playlist[0].src;
   sandbox.document.visibilityState = "hidden";
   dispatch(documentListeners, "visibilitychange");
   dispatch(windowListeners, "pagehide", { persisted: true });
@@ -291,6 +298,24 @@ async function settle(turns = 20) {
     interruption_kind: "system_midtrack",
     phase: "paused",
     outcome: "detected"
+  });
+  telemetry.trackRuntimeEvent("prefetch_start", {
+    src: "https://audio.test/assets/future/not-playing.m4a",
+    track: "Future prefetch",
+    album: "Future"
+  });
+  audioState.playlist = [{
+    name: "Actual background",
+    album: "Background album",
+    src: "https://audio.test/assets/background/actual.m4a"
+  }];
+  audioState.currentIndex = 0;
+  audioState.activeLogicalSrc = audioState.playlist[0].src;
+  telemetry.trackRuntimeEvent("background_progress", {
+    track: "Actual background",
+    album: "Background album",
+    current_time: 31,
+    paused: false
   });
   await settle();
   assert.strictEqual(requests.length, 1, "Background progress and interruption must not hit the Worker");
@@ -485,12 +510,32 @@ async function settle(turns = 20) {
   tick(2000);
   telemetry.trackRuntimeEvent("error", Object.assign({}, errorBase, { error_message: "MEDIA_ERR_NETWORK" }));
 
-  const sealedBase = Object.assign({}, rejectedBase, {
+  const supersededBase = Object.assign({}, rejectedBase, {
     request_token: 22,
+    src: "https://audio.test/assets/failures/superseded.m4a",
+    track: "Superseded"
+  });
+  audioState.playRequestToken = 22;
+  telemetry.trackRuntimeEvent("startTrack_enter", supersededBase);
+  telemetry.trackRuntimeEvent("play_call", supersededBase);
+  tick(2500);
+  const replacementBase = Object.assign({}, rejectedBase, {
+    request_token: 23,
+    src: "https://audio.test/assets/failures/replacement.m4a",
+    track: "Replacement"
+  });
+  audioState.playRequestToken = 23;
+  telemetry.trackRuntimeEvent("startTrack_enter", replacementBase);
+  telemetry.trackRuntimeEvent("play_call", replacementBase);
+  tick(50);
+  telemetry.trackRuntimeEvent("playing", replacementBase);
+
+  const sealedBase = Object.assign({}, rejectedBase, {
+    request_token: 24,
     src: "https://audio.test/assets/failures/sealed.m4a",
     track: "Sealed"
   });
-  audioState.playRequestToken = 22;
+  audioState.playRequestToken = 24;
   telemetry.trackRuntimeEvent("startTrack_enter", sealedBase);
   telemetry.trackRuntimeEvent("play_call", sealedBase);
   tick(2500);
@@ -595,7 +640,11 @@ async function settle(turns = 20) {
     handoff_strategy: "dual_route",
     handoff_stage_ms: 17,
     source_retained_until_promote: true,
-    source_detached_after_promote: true
+    source_detached_after_promote: true,
+    theme_tokens_frozen: true,
+    route_layers_at_promote: 2,
+    route_layers_after_detach: 1,
+    route_host_has_current: true
   }));
   telemetry.trackRuntimeEvent("spa_render_done", Object.assign({}, navBase, { duration_ms: 90 }));
   telemetry.trackRuntimeEvent("album_open_done", navBase);
@@ -619,6 +668,40 @@ async function settle(turns = 20) {
     }));
     telemetry.trackRuntimeEvent("nav:album_done", repeatedNav);
   }
+
+  const homeNav = Object.assign({}, navBase, {
+    navigation_token: 999,
+    album: "home",
+    to_album: "home",
+    to_url: "https://secret.example/index.html",
+    cached: true
+  });
+  telemetry.trackRuntimeEvent("nav:album_start", homeNav);
+  telemetry.trackRuntimeEvent("spa_scroll_restore", Object.assign({}, homeNav, {
+    home_dom_reused: true,
+    scroll_restored: true,
+    home_restore_mode: "live_dom",
+    scroll_restore_requested_x: 0,
+    scroll_restore_requested_y: 1200,
+    scroll_restore_applied_x: 0,
+    scroll_restore_applied_y: 1200,
+    scroll_restore_delta_y: 0,
+    scroll_restore_anchor_correction: 0
+  }));
+  telemetry.trackRuntimeEvent("spa_swap_done", Object.assign({}, homeNav, {
+    duration_ms: 12,
+    route_kind: "home",
+    home_dom_reused: true,
+    home_restore_mode: "live_dom",
+    theme_tokens_frozen: true,
+    route_layers_at_promote: 2,
+    route_layers_after_detach: 1,
+    route_host_has_current: true,
+    scroll_restore_requested_y: 1200,
+    scroll_restore_applied_y: 1200,
+    scroll_restore_delta_y: 0
+  }));
+  telemetry.trackRuntimeEvent("nav:album_done", homeNav);
 
   telemetry.trackRuntimeEvent("mini_player_visibility", {
     state: "visible",
@@ -681,6 +764,24 @@ async function settle(turns = 20) {
     after_paused: false,
     after_current_time: 42.9
   });
+  const confirmedCommandToken = "cmd-play-confirmed-600";
+  telemetry.trackRuntimeEvent("media_command", {
+    command_token: confirmedCommandToken,
+    action: "play",
+    outcome: "success",
+    probe_stage: "probe_600",
+    probe_600_ms: 250,
+    advanced_ms: 250,
+    confirmed: true,
+    command_latency_ms: 620
+  });
+  telemetry.trackRuntimeEvent("media_command", {
+    command_token: confirmedCommandToken,
+    action: "play",
+    outcome: "dispatched",
+    probe_stage: "late_non_terminal_update",
+    confirmed: true
+  });
   telemetry.trackRuntimeEvent("audio_interruption", {
     interruption_token: "interruption-safe-1",
     interruption_kind: "system_midtrack",
@@ -725,13 +826,13 @@ async function settle(turns = 20) {
   const compactEvents = compactReport.events;
   assert.strictEqual(compactReport.dropped_events, 0, "the representative iPhone campaign must fit without drops");
   const compactTrackTransitions = compactEvents.filter((event) => event.event === "track_transition");
-  assert.strictEqual(compactTrackTransitions.length, 9);
+  assert.strictEqual(compactTrackTransitions.length, 11);
   assert.strictEqual(
     new Set(compactTrackTransitions.map((event) => event.request_token)).size,
     compactTrackTransitions.length,
     "Each request token must produce at most one compact track transition"
   );
-  assert.strictEqual(compactEvents.filter((event) => event.event === "spa_navigation").length, 2);
+  assert.strictEqual(compactEvents.filter((event) => event.event === "spa_navigation").length, 3);
   assert.strictEqual(compactEvents.filter((event) => event.event === "mini_player_visibility").length, 3);
   assert.strictEqual(
     compactEvents.filter((event) => event.event === "visualizer_health").length,
@@ -740,7 +841,7 @@ async function settle(turns = 20) {
   );
   assert.strictEqual(compactEvents.filter((event) => event.event === "session_summary").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "media_capabilities").length, 1);
-  assert.strictEqual(compactEvents.filter((event) => event.event === "media_command").length, 1);
+  assert.strictEqual(compactEvents.filter((event) => event.event === "media_command").length, 2);
   assert.strictEqual(compactEvents.filter((event) => event.event === "audio_interruption").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "background_window").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "launch_summary").length, 1);
@@ -758,6 +859,18 @@ async function settle(turns = 20) {
   assert.strictEqual(geometryNavigation.handoff_stage_ms, 17);
   assert.strictEqual(geometryNavigation.source_retained_until_promote, true);
   assert.strictEqual(geometryNavigation.source_detached_after_promote, true);
+  assert.strictEqual(geometryNavigation.theme_tokens_frozen, true);
+  assert.strictEqual(geometryNavigation.route_layers_at_promote, 2);
+  assert.strictEqual(geometryNavigation.route_layers_after_detach, 1);
+  assert.strictEqual(geometryNavigation.route_host_has_current, true);
+  const restoredHome = compactEvents.find((event) => (
+    event.event === "spa_navigation" && event.home_restore_mode === "live_dom"
+  ));
+  assert(restoredHome, "Home restoration telemetry must survive representative compaction");
+  assert.strictEqual(restoredHome.dom_reused, true);
+  assert.strictEqual(restoredHome.scroll_restored, true);
+  assert.strictEqual(restoredHome.scroll_restore_requested_y, 1200);
+  assert.strictEqual(restoredHome.scroll_restore_applied_y, 1200);
   const compactInterruption = compactEvents.find((event) => event.event === "audio_interruption");
   assert.strictEqual(compactInterruption.resume_gate_reason, "sampled_active");
   assert.strictEqual(compactInterruption.position_delta_ms, 120);
@@ -777,12 +890,19 @@ async function settle(turns = 20) {
   assert.strictEqual(compactBackground.return_observed, true);
   assert.strictEqual(compactBackground.bfcache, true);
   assert(compactBackground.advanced_ms >= 30000);
-  const compactCommand = compactEvents.find((event) => event.event === "media_command");
+  assert.strictEqual(compactBackground.track_change_count, 1, "Prefetch labels must not count as audible track changes");
+  const compactCommand = compactEvents.find((event) => (
+    event.event === "media_command" && event.command_token === commandToken
+  ));
   assert.strictEqual(compactCommand.command_token, commandToken);
   assert.strictEqual(compactCommand.outcome, "recovered");
   assert.strictEqual(compactCommand.probe_1500_ms, 120);
   assert.strictEqual(compactCommand.probe_3000_ms, 1400);
   assert.strictEqual(compactCommand.surface_hint, "remote_hidden");
+  const confirmedCommand = compactEvents.find((event) => (
+    event.event === "media_command" && event.command_token === confirmedCommandToken
+  ));
+  assert.strictEqual(confirmedCommand.outcome, "success", "A terminal success cannot be downgraded by a late dispatched update");
   assert.strictEqual(
     compactEvents.some((event) => [
       "startTrack_enter", "click_track", "source_assigned", "play_call", "playing",
@@ -801,24 +921,28 @@ async function settle(turns = 20) {
   assert.strictEqual(cachePrepared.prepared, true);
   const rejectedTransition = compactEvents.find((event) => event.track === "Rejected");
   const errorTransition = compactEvents.find((event) => event.track === "Error");
+  const supersededTransition = compactEvents.find((event) => event.track === "Superseded");
   const sealedTransition = compactEvents.find((event) => event.track === "Sealed");
   assert.strictEqual(rejectedTransition.error, true);
   assert.strictEqual(rejectedTransition.error_name, "NotAllowedError");
   assert.strictEqual(errorTransition.error, true);
   assert.strictEqual(errorTransition.error_name, "MEDIA_ERR_NETWORK");
+  assert.strictEqual(supersededTransition.result, "superseded");
+  assert(supersededTransition.delta_ms < 3000, "Superseded latency must stop when the replacement token starts");
   assert.strictEqual(sealedTransition.result, "sealed");
   assert.strictEqual(sealedTransition.error, false);
   const compactSummary = compactEvents.find((event) => event.event === "session_summary");
-  assert.strictEqual(compactSummary.track_transition_count, 9);
-  assert.strictEqual(compactSummary.track_playing_count, 6);
+  assert.strictEqual(compactSummary.track_transition_count, 11);
+  assert.strictEqual(compactSummary.track_playing_count, 7);
   assert.strictEqual(compactSummary.track_rejected_count, 1);
   assert.strictEqual(compactSummary.track_error_count, 2);
+  assert.strictEqual(compactSummary.track_superseded_count, 1);
   assert.strictEqual(compactSummary.prepared_count, 2);
-  assert.strictEqual(compactSummary.unprepared_count, 7);
+  assert.strictEqual(compactSummary.unprepared_count, 9);
   assert.strictEqual(compactSummary.served_from_prefetch_count, 1);
   assert.strictEqual(compactSummary.waiting_count, 2);
   assert.strictEqual(compactSummary.stalled_count, 1);
-  assert.strictEqual(compactSummary.spa_navigation_count, 22);
+  assert.strictEqual(compactSummary.spa_navigation_count, 23);
   assert.strictEqual(compactSummary.spa_navigation_compacted_count, 21);
   assert.strictEqual(compactSummary.spa_cover_not_ready_count, 0);
   assert.strictEqual(compactSummary.spa_second_cover_not_ready_count, 0);
@@ -852,8 +976,9 @@ async function settle(turns = 20) {
   assert.strictEqual(compactSummary.visualizer_context_running, 1);
   assert.strictEqual(compactSummary.visualizer_analyser_ready, 1);
   assert.strictEqual(compactSummary.visualizer_canvas_visible, 1);
-  assert.strictEqual(compactSummary.media_command_count, 1);
-  assert.strictEqual(compactSummary.media_play_count, 1);
+  assert.strictEqual(compactSummary.media_command_count, 2);
+  assert.strictEqual(compactSummary.media_play_count, 2);
+  assert.strictEqual(compactSummary.media_command_success_count, 1);
   assert.strictEqual(compactSummary.media_command_no_progress_count, 1);
   assert.strictEqual(compactSummary.media_command_recovered_count, 1);
   assert.strictEqual(compactSummary.audio_interruption_count, 1);
@@ -874,6 +999,10 @@ async function settle(turns = 20) {
   assert.strictEqual(compactNavigation.first_paint_ms, 18);
   assert.strictEqual(compactNavigation.cover_ready_at_second_paint, true);
   assert.strictEqual(compactNavigation.second_paint_ms, 34);
+  const normalMiniVisibility = compactEvents.find((event) => (
+    event.event === "mini_player_visibility" && event.reason === "route_swap"
+  ));
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(normalMiniVisibility, "error_name"), false);
   const playingLatencies = compactEvents
     .filter((event) => event.event === "track_transition" && event.result === "playing")
     .map((event) => Number(event.delta_ms));

@@ -68,6 +68,20 @@ async function testIosSwapUsesNativePaintedHandoff() {
   assert.ok(bodyIndex < postPromoteFrameIndex, "promoted destination needs a painted frame before cleanup");
   assert.ok(postPromoteFrameIndex < detachIndex, "source must detach only after destination promotion");
   assert.ok(spaSource.includes('handoff_strategy: mode === "painted_handoff" ? "dual_route" : ""'));
+  assert.ok(spaSource.includes("SPA_ROUTE_THEME_PROPERTIES"), "route themes must be frozen during the painted handoff");
+  assert.ok(spaSource.includes("freezeSpaRouteTheme(sourceRoute"), "the outgoing route theme is not frozen");
+  assert.ok(spaSource.includes("freezeSpaRouteTheme(destinationRoute"), "the destination route theme is not frozen");
+  assert.ok(spaSource.includes("clearSpaRouteTheme(destinationRoute)"), "temporary destination theme tokens are not cleaned up");
+  const liveCaptureStart = spaSource.indexOf("function captureLiveHomeRoute");
+  const liveCaptureEnd = spaSource.indexOf("function canRestoreLiveHomeRoute", liveCaptureStart);
+  const liveCaptureBody = spaSource.slice(liveCaptureStart, liveCaptureEnd);
+  assert.ok(
+    liveCaptureBody.includes("freezeLiveHomeResourceUrls(currentRoute"),
+    "Home resource URLs must be frozen before navigation changes the document base URL"
+  );
+  assert.ok(spaSource.includes("route_layers_at_promote"), "the promoted two-layer state is not measured");
+  assert.ok(spaSource.includes("route_layers_after_detach"), "the post-handoff layer state is not measured");
+  assert.ok(spaSource.includes("route_host_has_current"), "the route host invariant is not measured");
 
   const spaDocuments = [
     path.join(ROOT, "public/index.html"),
@@ -115,7 +129,8 @@ function testCoverSwapHasNoSnapshotOrSecondDecode() {
     "the destination needs a rendering opportunity and one promoted frame before source cleanup"
   );
   assert.ok(
-    stylesSource.includes("html.pwa-swap-active body::before") &&
+      stylesSource.includes("html.pwa-swap-active body::before") &&
+      stylesSource.includes("--spa-handoff-safety-bg") &&
       stylesSource.includes("transition: none !important;") &&
       stylesSource.includes("::view-transition-image-pair(root)") &&
       stylesSource.includes("isolation: auto;"),
@@ -207,7 +222,7 @@ async function main() {
   testCoverSwapHasNoSnapshotOrSecondDecode();
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
-  console.log("audiofix391 SPA/transport tests: ok");
+  console.log("audiofix392 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

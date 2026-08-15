@@ -1,15 +1,15 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 7 août 2026.
+État de référence : 15 août 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix388-20260807`
-- Service Worker : `infra-shell-20260807-audio388`
-- CSS : `audiofix388-20260807` — navigation PWA sans transition de fond pendant le swap
+- Runtime : `audiofix392-20260815`
+- Service Worker : `infra-shell-20260815-audio392`
+- CSS : `audiofix392-20260815` — handoff SPA à thème figé et file sérialisée
 - Catalogue : 31 albums et 283 pistes
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -53,15 +53,16 @@ Principaux composants :
 - `transport-ui.js`, `now-playing.js`, `album-player-ui.js` : interfaces du lecteur ;
 - `audio-visualizer.js` : analyse Web Audio live et animation fullscreen desktop ;
 - `media-session.js` : commandes iOS, écran verrouillé et centre de contrôle ;
-- `audio-telemetry.js` : lot compact de session.
-- `home-catalog.js` : hydratation de l'accueil et geste droit d'ouverture des cartes album.
+- `audio-telemetry.js` : lot compact v4 de session.
+- `home-catalog.js` : hydratation de l'accueil et swipe gauche/droite des cartes album.
 
 Un seul élément `<audio>` global est autorisé.
 Sur les navigateurs exposant Audio Session, ce lecteur déclare le type `playback` avant son
 initialisation. La déclaration reste inactive tant qu’aucun son n’est joué ; Media Session
 continue de publier séparément les métadonnées et commandes système. Après une interruption
 téléphonique reconnue, seule la transition `interrupted → active` autorise la reprise interne
-WebKit, pendant 8 secondes et sur la même source ; les reprises cachées inconnues restent bloquées.
+WebKit, pendant 8 secondes, sur la même source et autour de la position gardée. Une reprise native
+observée conserve le même token ; les reprises cachées inconnues restent bloquées.
 
 ### Mini-player desktop et Document PiP
 
@@ -91,14 +92,15 @@ visibilité du canvas. Il rejoint le lot différé existant sans envoi par frame
   la collection affichée. Une source existante reste prioritaire et reprend sans changement de file.
 - Bouton Play d'une page album : l'album affiché devient explicitement la file active ; une file
   étrangère démarre sa piste 1, tandis qu'une piste déjà active du même album bascule Play/Pause.
-- Accueil tactile : un swipe droit dominant de 58 px sur une carte du module Albums ouvre cette
-  page ; le scroll vertical, le swipe gauche, les playlists et l'appui long QR restent distincts.
+- Accueil tactile : un swipe horizontal gauche ou droit dominant de 58 px sur une carte du module
+  Albums ouvre cette page ; le scroll vertical, les playlists et l'appui long QR restent distincts.
 - Page playlist : ordre Music complet conservé, même entre plusieurs albums.
 - File `À suivre` ouverte en plein écran : les pistes futures se réordonnent par drag/drop à la
   souris ou par appui long tactile/stylet. Un mouvement avant 420 ms reste un scroll normal ;
-  après activation, une copie légèrement surélevée apparaît au-dessus du fullscreen et la liste
-  auto-défile aux bords. La piste en cours demeure fixe et la playlist Music source reste en
-  lecture seule.
+  après activation, un ghost unique apparaît au-dessus du fullscreen et la source reste invisible
+  dans le layout. Les previews de 170 ms sont sérialisées et coalescées, puis un unique FLIP final
+  est attendu après le rerender. La liste auto-défile aux bords, la piste en cours demeure fixe et
+  la playlist Music source reste en lecture seule.
 - Radio active : file globale matérialisée.
 - Radio inactive et Shuffle actif : album courant uniquement, avec historique.
 - Radio inactive et Shuffle inactif : ordre de l’album puis album chronologique adjacent.
@@ -177,11 +179,13 @@ Le graphe Web Audio est créé une seule fois depuis le clic d’ouverture ; l�
 branche séparée de la sortie audio. Le rendu est limité à 30 i/s, s’arrête en pause, à la
 fermeture ou quand l’onglet est caché, et devient statique avec `prefers-reduced-motion`.
 
-En PWA mobile, le passage entre routes utilise par défaut le swap DOM atomique sans snapshot
-compositeur. Le contrôle de comparaison `?pwa-swap=view` active la View Transition native
-pendant la session quand Safari la fournit. Dans les deux modes, les transitions de fond sont
-neutralisées jusqu'aux deux premières frames, et mutation DOM/repositionnement du scroll restent
-séparés d’une frame. La cover hero réserve un carré 1200×1200 et décode en mode synchrone ; les
+En PWA mobile, le passage entre routes utilise par défaut un handoff `dual_route` sans snapshot
+compositeur. La source visible et la destination stagée portent chacune leurs variables de thème
+calculées ; le fond de sécurité global suit atomiquement la couche supérieure. La destination
+dispose de deux frames de rendu avant promotion, puis la source reste une frame complète avant
+détachement. Le DOM Home vivant est conservé hors écran et son scroll est restauré avant de
+reprendre ses mises à jour. Le contrôle `?pwa-swap=view` reste disponible pour comparer une View
+Transition native. La cover hero réserve un carré 1200×1200 et décode en mode synchrone ; les
 images de la grille Accueil restent paresseuses et asynchrones.
 
 ## Partage par QR
@@ -195,24 +199,31 @@ si Safari le refuse.
 
 ## Télémétrie
 
-Un seul lot compact v3 est produit par session :
+Un seul lot compact v4 est produit par session :
 
 - 48 événements maximum ;
 - 32 Kio maximum ;
 - quatre sessions locales sur 72 heures ;
-- un envoi à `hidden/pagehide` ;
+- un envoi final lorsque la session est réellement close ;
 - reprise IndexedDB en cas d’échec ;
 - aucun heartbeat ou envoi continu.
 
-Les commandes Media Session sont regroupées par jeton avec leur décision et trois sondes
-bornées. La visibilité de page reste un indice et n’est jamais présentée comme une preuve de
-l’écran verrouillé ou du centre de contrôle.
+Une lecture ou une interruption active en arrière-plan reste dans la même session et ne provoque
+aucun envoi réseau. Les fenêtres cachées sont agrégées localement ; leur compteur de pistes repose
+uniquement sur la source logique réellement audible, jamais sur le prefetch. Une transition
+remplacée est clôturée `superseded` à l'arrivée du nouveau token.
+
+Les commandes Media Session sont regroupées par jeton avec leur décision et trois sondes bornées.
+Leur résultat est monotone : 200 ms de progression confirmée suffisent à conserver `success` au
+scellement. Interruption, reprise native ou gardée et commande partagent leurs tokens existants.
+La visibilité de page reste un indice et n’est jamais présentée comme une preuve de l’écran
+verrouillé ou du centre de contrôle.
 
 Ce même résumé contient un inventaire borné du stockage local, les hits/miss HTML et covers,
-le mode de swap et le type de route, ainsi que l’état de la cover aux première et deuxième
-frames peintes. Cette observabilité
-n’ajoute ni requête Worker ni clé KV. La PWA demande le stockage persistant une seule fois,
-à la première interaction.
+le mode de swap, le type de route, la restauration Home/scroll, les invariants de couches et
+l’état de la cover aux première et deuxième frames peintes. La file rapporte ses vraies fins de
+preview/FLIP sans événement supplémentaire. Cette observabilité n’ajoute ni requête Worker ni clé
+KV. La PWA demande le stockage persistant une seule fois, à la première interaction.
 
 Les URLs complètes, chemins privés et identifiants personnels ne quittent pas le navigateur.
 

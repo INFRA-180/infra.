@@ -322,6 +322,12 @@ html.pwa-home-restore-active body::before {
   transition: none !important;
 }
 
+html.pwa-swap-active,
+html.pwa-swap-active body,
+html.pwa-swap-active body::before {
+  background-color: var(--spa-handoff-safety-bg, var(--pwa-status-bg)) !important;
+}
+
 body.home-screen {
   overflow-x: hidden;
   overflow-y: auto;

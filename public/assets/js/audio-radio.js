@@ -2880,20 +2880,31 @@
         // MEDIA_ERR_ABORTED can happen during normal source switches.
         return;
       }
+      const mediaErrorCode = mediaErr && Number.isFinite(mediaErr.code) ? mediaErr.code : 0;
+      const mediaErrorNames = {
+        1: "MEDIA_ERR_ABORTED",
+        2: "MEDIA_ERR_NETWORK",
+        3: "MEDIA_ERR_DECODE",
+        4: "MEDIA_ERR_SRC_NOT_SUPPORTED"
+      };
+      const mediaErrorName = mediaErrorNames[mediaErrorCode] || "MEDIA_ERR_UNKNOWN";
+      const mediaErrorMessage = mediaErr && mediaErr.message ? mediaErr.message : mediaErrorName;
       suspendNextTrackPrefetch("media_error");
       trackAudioRuntimeEvent("error", Object.assign(
         buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
         {
-          error_code: mediaErr && Number.isFinite(mediaErr.code) ? mediaErr.code : 0,
-          error_message: mediaErr && mediaErr.message ? mediaErr.message : "unknown",
+          error_code: mediaErrorCode,
+          error_name: mediaErrorName,
+          error_message: mediaErrorMessage,
           ready_state: audio.readyState,
           network_state: audio.networkState
         }
       ));
       sendAudioMonitoringLog(getCurrentPlaylistTrack(), audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src, {
         error: true,
-        error_code: mediaErr && Number.isFinite(mediaErr.code) ? mediaErr.code : 0,
-        error_message: mediaErr && mediaErr.message ? mediaErr.message : "unknown"
+        error_code: mediaErrorCode,
+        error_name: mediaErrorName,
+        error_message: mediaErrorMessage
       });
       stopAudioTelemetryHeartbeat();
       clearWaitingRecovery();

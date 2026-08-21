@@ -1,6 +1,6 @@
 {
-  "version": "audiofix366-20260722",
-  "generatedAt": "2026-07-17",
+  "version": "audiofix393-20260821",
+  "generatedAt": "2026-08-21",
   "source": "Music macOS masters AAC 320 R2",
   "audioPrefix": "mixed",
   "audioPrefixes": [
@@ -12,7 +12,9 @@
     "assets/music/streams/v20260627T000443Z-4c7beed7fb",
     "assets/music/streams/v20260627T001059Z-5a2620b3bb",
     "assets/music/streams/v20260709T225421Z-e03d7535fa",
-    "assets/music/streams/v20260717T112959Z-30b7200f03"
+    "assets/music/streams/v20260717T112959Z-30b7200f03",
+    "assets/music/streams/v20260801T185702Z-9b0202f2f9",
+    "assets/music/streams/v20260802T183541Z-53dd6082c0"
   ],
   "albums": [
     {
@@ -179,9 +181,16 @@
         {
           "index": 11,
           "title": "H2o",
-          "src": "assets/music/streams/v20260717T112959Z-30b7200f03/he-4-0026/11-h2o.m4a",
+          "src": "assets/music/streams/v20260801T185702Z-9b0202f2f9/he-4-0026/11-h2o.m4a",
           "duration": "2:57",
           "seconds": 177.238
+        },
+        {
+          "index": 12,
+          "title": "LUNE DE SANG",
+          "src": "assets/music/streams/v20260802T183541Z-53dd6082c0/he-4-0026/12-lune-de-sang.m4a",
+          "duration": "3:00",
+          "seconds": 179.676
         }
       ]
     },

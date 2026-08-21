@@ -67,6 +67,9 @@
     const beginAudioRecovery = method(ctx, "beginAudioRecovery");
     const failAudioRecovery = method(ctx, "failAudioRecovery");
     const maybePrefetchNextTrack = method(ctx, "maybePrefetchNextTrack");
+    const probeAudioSourceForRecovery = method(ctx, "probeAudioSourceForRecovery", function () {
+      return Promise.resolve({ ok: true, result: "probe_unavailable" });
+    });
 
     function createMediaCommandToken(action) {
       audioState.mediaCommandSequence = Number(audioState.mediaCommandSequence || 0) + 1;
@@ -481,25 +484,105 @@
       beginAudioRecovery({
         request_token: activeRequestToken,
         reason: "playback_failure",
-        strategy: "reset_source"
+        strategy: "range_probe_reset"
       });
+
+      function failRecovery(reason, details) {
+        if (audioState.trackFailureRecovery === recoveryRecord) {
+          audioState.trackFailureRecovery = null;
+        }
+        const diagnostic = details && typeof details === "object" ? details : {};
+        failAudioRecovery({
+          request_token: activeRequestToken,
+          reason: String(reason || "recovery_failed"),
+          strategy: "range_probe_reset",
+          error_name: diagnostic.error_name || diagnostic.errorName || "",
+          status: Number.isFinite(Number(diagnostic.status)) ? Number(diagnostic.status) : null,
+          result: diagnostic.result || ""
+        });
+        setTrackStatus(track, "Chargement du fichier audio, réessaie dans quelques secondes.", { retry: true });
+        clearFadeTimer();
+        syncAudioUi();
+      }
+
+      function clearRecoveryRecord() {
+        if (audioState.trackFailureRecovery === recoveryRecord) {
+          audioState.trackFailureRecovery = null;
+        }
+      }
+
       recoveryRecord.timer = setTimeout(function () {
         if (audioState.trackFailureRecovery !== recoveryRecord) return;
-        audioState.trackFailureRecovery = null;
-        if (activeRequestToken !== audioState.startRequestToken) return;
-        if (audioState.currentIndex !== index) return;
-        if (!audio.paused) return;
-        resetAudioElementForSource(audio, src);
-        audio.play().catch(function () {
+        if (activeRequestToken !== audioState.startRequestToken) {
+          clearRecoveryRecord();
+          return;
+        }
+        if (audioState.currentIndex !== index || !audio.paused) {
+          clearRecoveryRecord();
+          return;
+        }
+        recoveryRecord.timer = 0;
+        Promise.resolve(probeAudioSourceForRecovery(src, {
+          request_token: activeRequestToken,
+          reason: "playback_failure",
+          monitor_payload: buildAudioMonitorPayload(audioState.playlist[index], index, src)
+        })).then(function (probe) {
+          if (audioState.trackFailureRecovery !== recoveryRecord) return;
           if (activeRequestToken !== audioState.startRequestToken) return;
-          failAudioRecovery({
-            request_token: activeRequestToken,
-            reason: "reset_play_rejected",
-            strategy: "reset_source"
+          if (audioState.currentIndex !== index || !audio.paused) {
+            clearRecoveryRecord();
+            return;
+          }
+          const diagnostic = probe && typeof probe === "object" ? probe : { ok: false, result: "probe_invalid" };
+          if (!diagnostic.ok) {
+            failRecovery(diagnostic.reason || diagnostic.result || "probe_failed", diagnostic);
+            return;
+          }
+          if (!resetAudioElementForSource(audio, src)) {
+            failRecovery("source_reset_failed", diagnostic);
+            return;
+          }
+          waitForAudioReadiness(audio, activeRequestToken, isIosDevice() ? 1200 : 900).then(function (ready) {
+            if (audioState.trackFailureRecovery !== recoveryRecord) return;
+            if (activeRequestToken !== audioState.startRequestToken) return;
+            if (audioState.currentIndex !== index || !audio.paused) {
+              clearRecoveryRecord();
+              return;
+            }
+            if (!ready) {
+              failRecovery("readiness_timeout", diagnostic);
+              return;
+            }
+            let playResult = null;
+            try {
+              playResult = audio.play();
+            } catch (playErr) {
+              failRecovery("reset_play_rejected", {
+                error_name: playErr && playErr.name ? playErr.name : "Error",
+                result: "play_threw"
+              });
+              return;
+            }
+            Promise.resolve(playResult).then(function () {
+              if (audioState.trackFailureRecovery === recoveryRecord) {
+                audioState.trackFailureRecovery = null;
+              }
+            }).catch(function (playErr) {
+              if (activeRequestToken !== audioState.startRequestToken) return;
+              failRecovery("reset_play_rejected", {
+                error_name: playErr && playErr.name ? playErr.name : "Error",
+                result: "play_rejected"
+              });
+            });
           });
-          setTrackStatus(track, "Chargement du fichier audio, réessaie dans quelques secondes.", { retry: true });
+        }).catch(function (probeErr) {
+          if (activeRequestToken !== audioState.startRequestToken) return;
+          failRecovery("probe_rejected", {
+            error_name: probeErr && probeErr.name ? probeErr.name : "Error",
+            result: "network_error"
+          });
         });
-      }, 360);
+      }, 800);
     }
 
     function startTrack(index, options) {
@@ -741,12 +824,17 @@
             reason: "AbortError",
             strategy: "wait_retry"
           });
-          waitForAudioReadiness(audio, requestToken, isIosDevice() ? 900 : 700).then(function () {
+          waitForAudioReadiness(audio, requestToken, isIosDevice() ? 900 : 700).then(function (ready) {
             if (requestToken !== audioState.startRequestToken) return;
             if (audioState.playAbortRetryToken !== requestToken) return;
             if (audioState.trackFailureRecovery) return;
             audioState.playAbortRetryToken = 0;
-            attemptPlay({ retry: true, sync: isFastSkip });
+            if (ready) {
+              attemptPlay({ retry: true, sync: isFastSkip });
+              return;
+            }
+            audioState.trackStartInFlight = false;
+            recoverFromTrackFailure(index, target.src, requestToken);
           });
           return;
         }
@@ -759,11 +847,17 @@
           });
           const reset = resetAudioElementForSource(audio, nextSrc);
           if (reset) {
-            waitForAudioReadiness(audio, requestToken, isIosDevice() ? 650 : 450).then(function () {
+            waitForAudioReadiness(audio, requestToken, isIosDevice() ? 900 : 650).then(function (ready) {
               if (requestToken !== audioState.startRequestToken) return;
               if (audioState.playAbortRetryToken !== requestToken) return;
               audioState.playAbortRetryToken = 0;
-              attemptPlay({ retry: true, sync: isFastSkip, recovery: "not_supported_reset" });
+              if (ready) {
+                attemptPlay({ retry: true, sync: isFastSkip, recovery: "not_supported_reset" });
+                return;
+              }
+              audioState.trackStartInFlight = false;
+              clearWaitingRecovery();
+              recoverFromTrackFailure(index, target.src, requestToken);
             });
             return;
           }

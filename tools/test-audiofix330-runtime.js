@@ -257,7 +257,7 @@ function makeAudio(onPlay) {
 
 function createCoreHarness(options) {
   const opts = options || {};
-  const sandbox = createSandbox();
+  const sandbox = createSandbox(opts.sandboxOverrides);
   loadScript(sandbox, CORE_PATH);
   let playCalls = 0;
   const bindCalls = [];
@@ -265,7 +265,14 @@ function createCoreHarness(options) {
   let progressSyncCalls = 0;
   let mediaPositionSyncCalls = 0;
   const playlist = opts.playlist || makeTracks(11);
-  const audio = makeAudio(() => { playCalls += 1; });
+  const audio = opts.audio || makeAudio(() => { playCalls += 1; });
+  if (opts.audio) {
+    const originalPlay = audio.play.bind(audio);
+    audio.play = function () {
+      playCalls += 1;
+      return originalPlay();
+    };
+  }
   const state = {
     audio,
     playlist,
@@ -327,6 +334,11 @@ function createCoreHarness(options) {
     buildAudioMonitorPayload: () => ({}),
     trackAudioRuntimeEvent(type, payload) { runtimeEvents.push({ type, payload }); },
     logAudioAuditEvent() {},
+    registerTrackFailure: opts.registerTrackFailure,
+    beginAudioRecovery: opts.beginAudioRecovery,
+    failAudioRecovery: opts.failAudioRecovery,
+    probeAudioSourceForRecovery: opts.probeAudioSourceForRecovery,
+    isIosDevice: opts.isIosDevice,
     extendAlbumPlaylistToNextAlbum: opts.extendAlbumPlaylistToNextAlbum || (() => -1),
     extendAlbumPlaylistToPreviousAlbum: opts.extendAlbumPlaylistToPreviousAlbum || (() => -1)
   });
@@ -342,6 +354,52 @@ function createCoreHarness(options) {
     getProgressSyncCalls: () => progressSyncCalls,
     getMediaPositionSyncCalls: () => mediaPositionSyncCalls
   };
+}
+
+async function testNotSupportedTimeoutDoesNotBlindlyReplay() {
+  let probeCalls = 0;
+  const failedRecoveries = [];
+  const audio = makeAudio();
+  audio.play = function () {
+    this.paused = true;
+    return Promise.reject(Object.assign(new Error("source unsupported"), {
+      name: "NotSupportedError"
+    }));
+  };
+  const harness = createCoreHarness({
+    audio,
+    currentIndex: 0,
+    isIosDevice: () => true,
+    sandboxOverrides: {
+      setTimeout(callback) {
+        queueMicrotask(callback);
+        return 1;
+      },
+      clearTimeout() {}
+    },
+    registerTrackFailure: () => 1,
+    probeAudioSourceForRecovery() {
+      probeCalls += 1;
+      return Promise.resolve({
+        ok: false,
+        result: "invalid_response",
+        reason: "http_error",
+        status: 503
+      });
+    },
+    beginAudioRecovery() {},
+    failAudioRecovery(details) { failedRecoveries.push(details); }
+  });
+
+  harness.api.startTrack(0, { immediatePlay: true, userGesture: true });
+  await flushAsyncWork();
+  await flushAsyncWork();
+
+  assert.strictEqual(harness.getPlayCalls(), 1, "A readiness timeout must not trigger a blind second play() call");
+  assert.strictEqual(probeCalls, 1, "The bounded recovery must verify the 0-1 byte Range before replaying");
+  assert.strictEqual(failedRecoveries.length, 1);
+  assert.strictEqual(failedRecoveries[0].reason, "http_error");
+  assert.strictEqual(failedRecoveries[0].status, 503);
 }
 
 function testPreviousUsesSharedThreeSecondRestartRule() {
@@ -2599,6 +2657,7 @@ function testPersistentAlbumAndFullscreenContracts() {
 (async function run() {
   testSameOriginRootArtworkRepair();
   testPlaybackAudioSessionConfiguration();
+  await testNotSupportedTimeoutDoesNotBlindlyReplay();
   testAudioSessionInterruptionResumeGate();
   testPreparedColdPlayIsSynchronous();
   testInMemoryColdPlayIsSynchronous();
@@ -2630,7 +2689,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   await testPrefetchNPlusOneRetriesAfterTwoTransientFailures();
   testNoGlobalPrefetchClear();
   testPersistentAlbumAndFullscreenContracts();
-  console.log("audiofix392 runtime checks passed.");
+  console.log("audiofix393 runtime checks passed.");
 })().catch(function (error) {
   console.error(error);
   process.exitCode = 1;

@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix392-20260815";
+window.INFRA_BUILD_TAG = "audiofix393-20260821";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -431,7 +431,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260815-audio392";
+  const SPA_SHELL_VERSION = "infra-shell-20260821-audio393";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -439,7 +439,7 @@ function openAppDownloadGatekeeper(appName, url) {
     : 240;
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix366-20260722";
+  const LOCAL_CATALOG_VERSION = "audiofix393-20260821";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -460,7 +460,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix392-20260815";
+  const runtimeVersion = "audiofix393-20260821";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -827,7 +827,8 @@ function openAppDownloadGatekeeper(appName, url) {
       extendAlbumPlaylistToPreviousAlbum,
       beginAudioRecovery,
       failAudioRecovery,
-      maybePrefetchNextTrack
+      maybePrefetchNextTrack,
+      probeAudioSourceForRecovery
     });
   }
 
@@ -5448,6 +5449,128 @@ function openAppDownloadGatekeeper(appName, url) {
     };
   }
 
+  async function probeAudioSourceForRecovery(srcLike, details) {
+    const source = normalizeAudioSourceUrl(srcLike || "");
+    const context = details && typeof details === "object" ? details : {};
+    const requestToken = Number(context.request_token) || audioState.startRequestToken;
+    const monitorPayload = context.monitor_payload && typeof context.monitor_payload === "object"
+      ? context.monitor_payload
+      : buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, source);
+    const startedAt = Date.now();
+    let responseStatus = 0;
+    let responseBytes = 0;
+    let rangeStart = null;
+    let rangeEnd = null;
+    let branch = "probe_unavailable";
+    let result = "network_error";
+    let errorName = "";
+
+    try {
+      if (!source || typeof fetch !== "function") throw new Error("audio_probe_unavailable");
+      const response = await fetch(source, {
+        method: "GET",
+        mode: "cors",
+        credentials: "omit",
+        cache: "no-store",
+        headers: { "Range": "bytes=0-1" }
+      });
+      responseStatus = Number(response.status) || 0;
+      const contentRange = String(response.headers.get("Content-Range") || "");
+      const contentType = String(response.headers.get("Content-Type") || "").toLowerCase();
+      const rangeMatch = contentRange.match(/^bytes\s+(\d+)-(\d+)\/(\d+)$/i);
+      rangeStart = rangeMatch ? Number(rangeMatch[1]) : null;
+      rangeEnd = rangeMatch ? Number(rangeMatch[2]) : null;
+      const validRange = Boolean(
+        responseStatus === 206 &&
+        rangeMatch &&
+        rangeStart === 0 &&
+        rangeEnd === 1 &&
+        Number(rangeMatch[3]) > 1
+      );
+      const validType = /^audio\/(?:mp4|mpeg|aac|x-m4a)\b/i.test(contentType);
+      let validBody = false;
+      if (response.ok && validRange && validType) {
+        const body = await response.arrayBuffer();
+        responseBytes = body ? body.byteLength : 0;
+        validBody = responseBytes === 2;
+      } else if (response.body && typeof response.body.cancel === "function") {
+        try {
+          await response.body.cancel();
+        } catch (_err) {
+          // Invalid headers already make the probe fail; body cleanup is best-effort.
+        }
+      }
+      if (!response.ok) branch = "http_error";
+      else if (!validRange) branch = "range_invalid";
+      else if (!validType) branch = "type_invalid";
+      else if (!validBody) branch = "body_invalid";
+      else branch = "range_ok";
+      result = branch === "range_ok" ? "ok" : "invalid_response";
+
+      const payload = Object.assign(
+        {},
+        monitorPayload,
+        {
+          request_token: requestToken,
+          reason: context.reason || "playback_recovery",
+          strategy: "range_probe_no_store",
+          branch,
+          result,
+          status: responseStatus,
+          response_ms: Math.max(0, Date.now() - startedAt),
+          range: true,
+          range_start: rangeStart,
+          range_end: rangeEnd,
+          bytes: responseBytes,
+          cached: false,
+          cache_hint: "network_no_store",
+          audio_fetch: true
+        }
+      );
+      trackAudioRuntimeEvent("audio_network_result", payload);
+      return {
+        ok: result === "ok",
+        result,
+        reason: branch,
+        status: responseStatus,
+        bytes: responseBytes,
+        range_start: rangeStart,
+        range_end: rangeEnd
+      };
+    } catch (error) {
+      errorName = error && error.name ? error.name : "Error";
+      branch = error && error.message === "audio_probe_unavailable" ? "probe_unavailable" : "fetch_rejected";
+      trackAudioRuntimeEvent("audio_network_result", Object.assign(
+        {},
+        monitorPayload,
+        {
+          request_token: requestToken,
+          reason: context.reason || "playback_recovery",
+          strategy: "range_probe_no_store",
+          branch,
+          result: "network_error",
+          error_name: errorName,
+          status: responseStatus,
+          response_ms: Math.max(0, Date.now() - startedAt),
+          range: true,
+          range_start: rangeStart,
+          range_end: rangeEnd,
+          bytes: responseBytes,
+          cached: false,
+          cache_hint: "network_no_store",
+          audio_fetch: true
+        }
+      ));
+      return {
+        ok: false,
+        result: "network_error",
+        reason: branch,
+        error_name: errorName,
+        status: responseStatus
+      };
+    }
+  }
+
   function getAudioRuntimeProbeState() {
     return audioTelemetryApi.getRuntimeProbeState();
   }
@@ -5560,7 +5683,10 @@ function openAppDownloadGatekeeper(appName, url) {
     recovery.reason = String(source.reason || recovery.reason || "recovery_failed");
     recovery.strategy = String(source.strategy || recovery.strategy || "retry");
     trackAudioRuntimeEvent("recovery_failed", buildAudioRecoveryPayload(recovery, {
-      paused: Boolean(audioState.audio && audioState.audio.paused)
+      paused: Boolean(audioState.audio && audioState.audio.paused),
+      error_name: source.error_name || "",
+      status: Number.isFinite(Number(source.status)) ? Number(source.status) : null,
+      result: source.result || ""
     }));
     if (
       audioState.stallRecovery &&
@@ -5613,6 +5739,31 @@ function openAppDownloadGatekeeper(appName, url) {
       if (!data) return;
       if (data.type === "INFRA_SW_VERSION") {
         serviceWorkerReportedVersion = String(data.version || "").slice(0, 80);
+        return;
+      }
+      if (data.type === "INFRA_AUDIO_NETWORK") {
+        const src = normalizeAudioSourceUrl(data.url || "");
+        if (!src) return;
+        trackAudioRuntimeEvent("audio_network_result", Object.assign(
+          buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, src),
+          {
+            request_token: audioState.startRequestToken,
+            reason: data.reason || "service_worker_network",
+            strategy: data.strategy || "network_fallback",
+            branch: data.branch || "unknown_response",
+            result: data.result || "unknown",
+            error_name: data.error_name || "",
+            status: Number.isFinite(Number(data.status)) ? Number(data.status) : 0,
+            response_ms: Number.isFinite(Number(data.response_ms)) ? Number(data.response_ms) : null,
+            range: true,
+            range_start: Number.isFinite(Number(data.range_start)) ? Number(data.range_start) : null,
+            range_end: Number.isFinite(Number(data.range_end)) ? Number(data.range_end) : null,
+            bytes: Number.isFinite(Number(data.bytes)) ? Number(data.bytes) : null,
+            cached: false,
+            cache_hint: "network",
+            audio_fetch: true
+          }
+        ));
         return;
       }
       if (data.type !== "INFRA_PREFETCH_HIT") return;
@@ -6359,7 +6510,8 @@ function openAppDownloadGatekeeper(appName, url) {
       catalog_ready_ms: catalogReady ? Math.max(0, Math.round(initDoneMs)) : 0,
       service_worker_activity_count: Number(probe.service_worker_activity_count) || 0,
       catalog_ready: catalogReady,
-      catalog_source: catalogState.data ? "runtime" : "fallback",
+      catalog_source: catalogState.catalogBundleSource || (catalogState.data ? "embedded-fallback" : "unavailable"),
+      state: catalogState.catalogBundleReleaseId || `local-${LOCAL_CATALOG_VERSION}`,
       service_worker_controlled: Boolean(navigator.serviceWorker && navigator.serviceWorker.controller),
       service_worker_state: navigator.serviceWorker && navigator.serviceWorker.controller ? "controlled" : "uncontrolled",
       document_was_discarded: Boolean(document.wasDiscarded),

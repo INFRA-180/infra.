@@ -1,5 +1,42 @@
 # Implementation Notes
 
+## 2026-08-21 — audiofix393 récupération audio observable et catalogue aligné
+
+- L'analyse des sessions des 18–19 août a isolé quatre tentatives réelles `FUJIN`/`NYQUIST`
+  rejetées par WebKit avec `NotSupportedError`, puis `MEDIA_ERR_SRC_NOT_SUPPORTED` (`code=4`,
+  `readyState=0`, `networkState=3`). Les objets R2 et leurs métadonnées audio sont restés
+  inchangés ; la cause exacte côté livraison n'était pas prouvable car le client ne conservait
+  ni statut HTTP ni validité de `Content-Range`.
+- Un résultat négatif de `waitForAudioReadiness()` n'autorise plus un nouvel appel aveugle à
+  `play()`. Après le reset unique, le fallback attend 800 ms, effectue une sonde réseau
+  `Range: bytes=0-1` hors cache, exige `206`, un `Content-Range` 0–1 cohérent, un type audio et
+  exactement deux octets, puis attend de nouveau la readiness avant lecture. Une réponse
+  invalide laisse la piste explicitement retentable par l'utilisateur sans boucle automatique.
+- Le Service Worker classe les sondes et replis R2 en `range_ok`, `http_error`, `range_invalid`,
+  `type_invalid` ou `fetch_rejected`, sans lire le corps audio. Statut, durée, bornes Range,
+  taille, stratégie et vraie erreur de `play()` sont corrélés au `request_token` de la transition.
+- `play_rejected`, le `MediaError` consécutif et `recovery_failed` sont maintenant fusionnés dans
+  un seul `track_transition`. Le résumé ne recompte plus le même essai comme rejet + erreur
+  média ; les erreurs survenant après une lecture réellement démarrée restent distinctes.
+- `launch_summary.catalog_source` expose désormais `local`, `live-cache`, `live` ou
+  `embedded-fallback`, et le champ existant `state` porte l'identifiant de release. Aucun
+  changement de schéma Worker ni déploiement Worker n'est requis.
+- Le fallback public est aligné sur le contenu de
+  `catalog-20260802T183541Z-53dd6082c0` : 31 albums / 284 pistes, ajout de `LUNE DE SANG` et
+  source immuable `v20260801...` pour `H2o`. Le gabarit ancien du générateur n'a pas été retenu ;
+  les wrappers SPA et la sonde de lancement des pages courantes sont préservés.
+- Le host audio reste `pub-…r2.dev` : aucun domaine R2 custom utilisable n'est configuré dans le
+  projet. La migration vers un domaine Cloudflare de production reste l'action infrastructure
+  prioritaire pour supprimer l'exposition aux limites variables du endpoint de développement.
+- Identifiants atomiques : runtime/CSS `audiofix393-20260821`, Service Worker
+  `infra-shell-20260821-audio393`. Rollback : restaurer `audiofix392`/`audio392`, les trois modules
+  de récupération/télémétrie et les 283 pistes ; le cache audio segmenté v9 et les objets R2 ne
+  sont pas modifiés.
+- Validation automatisée : syntaxe des 24 scripts, cache/Range Service Worker, récupération
+  `NotSupportedError`, déduplication et confidentialité v4, catalogue local-first, 39 documents
+  sur la release atomique, 31 albums / 284 pistes, frontières publiques et les 19 contrôles
+  `npm test` passent. La validation tactile finale dans la PWA iPhone reste à effectuer.
+
 ## 2026-08-15 — audiofix392 télémétrie fidèle, handoff thématique et file sérialisée
 
 - La télémétrie v4 conserve le même schéma, les clés `session4:<session_id>`, les plafonds de

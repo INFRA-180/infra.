@@ -14,9 +14,9 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix392-20260815";
-const shellRelease = "infra-shell-20260815-audio392";
-const cssRelease = "audiofix392-20260815";
+const release = "audiofix393-20260821";
+const shellRelease = "infra-shell-20260821-audio393";
+const cssRelease = "audiofix393-20260821";
 const frozenCssSha256 = "c7074dd413cc2a03bae103d398a63af82dc33d425ada617f328851b96c45c2a4";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
@@ -47,9 +47,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix392");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix392");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio392");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix393");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix393");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio393");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -174,12 +174,24 @@ expect(!coldStart.includes("setTimeout"), "cold Play must not wait on a timer be
 const startTrack = functionBody(core, "startTrack", "getRandomIndex");
 expect(startTrack.includes("opts.immediatePlay && opts.userGesture"), "startTrack lacks the guarded immediate user-gesture path");
 expect(startTrack.includes('playErr.name === "NotSupportedError"') && startTrack.includes('strategy: "single_source_reset"'), "immediate NotSupportedError lacks its single guarded source reset");
+expect(startTrack.includes("waitForAudioReadiness(audio, requestToken") && startTrack.includes("if (ready) {"), "playback recovery ignores the readiness result");
+expect(startTrack.includes("recoverFromTrackFailure(index, target.src, requestToken)"), "a readiness timeout has no bounded fallback recovery");
 expect(startTrack.includes("isFromTransportControl || hasPreparedTransportTarget"), "transport skips are not always on the synchronous path");
 expect(startTrack.includes("attemptPlay({ sync: true, immediate: isImmediateUserGesture })"), "immediate Play does not call audio.play() directly");
 const beginPlaybackStart = startTrack.indexOf("function beginPlayback");
 const beginPlaybackEnd = startTrack.indexOf("if (sameTrack)", beginPlaybackStart);
 const beginPlayback = startTrack.slice(beginPlaybackStart, beginPlaybackEnd);
 expect(beginPlayback.indexOf("attemptPlay({ sync: true, immediate: isImmediateUserGesture })") < beginPlayback.indexOf("waitForAudioReadiness(audio"), "immediate Play is ordered after the readiness wait");
+const failureRecovery = functionBody(core, "recoverFromTrackFailure", "startTrack");
+expect(failureRecovery.includes("probeAudioSourceForRecovery"), "playback recovery does not verify the audio Range response");
+expect(failureRecovery.includes('strategy: "range_probe_reset"'), "playback recovery does not expose its diagnostic strategy");
+expect(failureRecovery.includes("waitForAudioReadiness(audio, activeRequestToken"), "playback recovery calls play() before media readiness");
+expect(failureRecovery.includes('failRecovery("reset_play_rejected"'), "playback recovery drops the actual play rejection");
+expect(scripts.includes("if (response.ok && validRange && validType)"), "an invalid recovery response can still download a complete audio body");
+expect(sw.includes('type: "INFRA_AUDIO_NETWORK"'), "Service Worker does not expose audio network diagnostics");
+expect(sw.includes('branch = "range_invalid"'), "Service Worker does not classify invalid Range responses");
+expect(telemetry.includes('eventType === "audio_network_result"'), "audio network diagnostics are not correlated to the track transition");
+expect(telemetry.includes('transition.result === "rejected"'), "MediaError events are not deduplicated after a rejected play");
 
 const mediaSessionActions = functionBody(scripts, "bindMediaSessionActions", "syncMediaSessionMetadata");
 for (const action of ["seekbackward", "seekforward"]) {
@@ -454,4 +466,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix392.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix393.");

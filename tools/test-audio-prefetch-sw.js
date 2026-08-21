@@ -124,7 +124,9 @@ const sandbox = {
       "infra-shell-20260802-audio383-shell",
       "infra-shell-20260802-audio383-runtime",
       "infra-shell-20260815-audio392-shell",
-      "infra-shell-20260815-audio392-runtime"
+      "infra-shell-20260815-audio392-runtime",
+      "infra-shell-20260821-audio393-shell",
+      "infra-shell-20260821-audio393-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -229,7 +231,7 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(installedAlbumPages.length, 31, "all album documents must be installed with the PWA shell");
   assert(installedAlbumPages.includes("https://site.test/music/salam-infra.html"));
   assert(installedAlbumPages.includes("https://site.test/music/trou-noir-infra.html"));
-  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix392-20260815"));
+  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix393-20260821"));
   assert(
     installedOptionalShellAssets.includes("./assets/vendor/qr-creator.min.js?v=1.0.0"),
     "optional shell resources must still be attempted"
@@ -293,12 +295,14 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260802-audio381-runtime",
     "infra-shell-20260802-audio381-shell",
     "infra-shell-20260802-audio383-runtime",
-    "infra-shell-20260802-audio383-shell"
+    "infra-shell-20260802-audio383-shell",
+    "infra-shell-20260815-audio392-runtime",
+    "infra-shell-20260815-audio392-shell"
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v9"));
   assert(!deletedCaches.includes("infra-covers-v2"));
-  assert(!deletedCaches.includes("infra-shell-20260815-audio392-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260815-audio392-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260821-audio393-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260821-audio393-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;
@@ -344,6 +348,28 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(clientMessages[1].message.range_start, 0);
   assert.strictEqual(clientMessages[1].message.range_end, 1);
   assert.strictEqual(clientMessages[1].message.bytes, 2);
+
+  const messagesBeforeNetworkProbe = clientMessages.length;
+  cachedAudio = null;
+  fetchOverride = () => Promise.resolve(new Response(new Uint8Array([0, 0]), {
+    status: 206,
+    headers: {
+      "Content-Type": "audio/mp4",
+      "Content-Range": "bytes 0-1/8192",
+      "Content-Length": "2"
+    }
+  }));
+  response = await dispatchAudioFetch({ Range: "bytes=0-1" }, "client-network-probe");
+  assert.strictEqual(response.status, 206);
+  assert.strictEqual((await response.arrayBuffer()).byteLength, 2);
+  assert.strictEqual(clientMessages.length, messagesBeforeNetworkProbe + 1);
+  assert.strictEqual(clientMessages.at(-1).clientId, "client-network-probe");
+  assert.strictEqual(clientMessages.at(-1).message.type, "INFRA_AUDIO_NETWORK");
+  assert.strictEqual(clientMessages.at(-1).message.branch, "range_ok");
+  assert.strictEqual(clientMessages.at(-1).message.status, 206);
+  assert.strictEqual(clientMessages.at(-1).message.range_start, 0);
+  assert.strictEqual(clientMessages.at(-1).message.range_end, 1);
+  fetchOverride = null;
 
   cachedAudioArrayBufferCalls = 0;
   cachedAudio = validCachedSegment({
@@ -428,7 +454,7 @@ async function dispatchSiteFetch(request) {
     mode: "navigate",
     destination: "document"
   });
-  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260815-audio392");
+  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260821-audio393");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Strategy"), "shell_cache");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Cache"), "hit");
   assert.strictEqual(

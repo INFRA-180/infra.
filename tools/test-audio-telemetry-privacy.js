@@ -498,6 +498,30 @@ async function settle(turns = 20) {
   telemetry.trackRuntimeEvent("play_call", rejectedBase);
   tick(1500);
   telemetry.trackRuntimeEvent("play_rejected", Object.assign({}, rejectedBase, { reason: "NotAllowedError" }));
+  telemetry.trackRuntimeEvent("audio_network_result", Object.assign({}, rejectedBase, {
+    branch: "http_error",
+    result: "invalid_response",
+    status: 503,
+    response_ms: 87,
+    range: true,
+    range_start: 0,
+    range_end: 1,
+    bytes: 0,
+    cached: false,
+    audio_fetch: true
+  }));
+  telemetry.trackRuntimeEvent("error", Object.assign({}, rejectedBase, {
+    error_code: 4,
+    error_name: "MEDIA_ERR_SRC_NOT_SUPPORTED",
+    ready_state: 0,
+    network_state: 3
+  }));
+  telemetry.trackRuntimeEvent("recovery_failed", Object.assign({}, rejectedBase, {
+    reason: "reset_play_rejected",
+    strategy: "range_probe_reset",
+    error_name: "NotSupportedError",
+    status: 503
+  }));
 
   const errorBase = Object.assign({}, rejectedBase, {
     request_token: 21,
@@ -925,6 +949,20 @@ async function settle(turns = 20) {
   const sealedTransition = compactEvents.find((event) => event.track === "Sealed");
   assert.strictEqual(rejectedTransition.error, true);
   assert.strictEqual(rejectedTransition.error_name, "NotAllowedError");
+  assert.strictEqual(rejectedTransition.error_code, 4);
+  assert.strictEqual(rejectedTransition.ready_state, 0);
+  assert.strictEqual(rejectedTransition.network_state, 3);
+  assert.strictEqual(rejectedTransition.status, 503);
+  assert.strictEqual(rejectedTransition.branch, "http_error");
+  assert.strictEqual(rejectedTransition.audio_fetch, true);
+  assert.strictEqual(rejectedTransition.recovery_reason, "reset_play_rejected");
+  assert.strictEqual(rejectedTransition.strategy, "range_probe_reset");
+  assert.strictEqual(rejectedTransition.outcome, "NotSupportedError");
+  assert.strictEqual(
+    compactEvents.some((event) => event.event === "recovery_failed" && event.request_token === 20),
+    false,
+    "A rejected play, its MediaError and its recovery failure must remain one compact incident"
+  );
   assert.strictEqual(errorTransition.error, true);
   assert.strictEqual(errorTransition.error_name, "MEDIA_ERR_NETWORK");
   assert.strictEqual(supersededTransition.result, "superseded");

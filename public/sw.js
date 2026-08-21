@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20260815-audio392";
+const VERSION = "infra-shell-20260821-audio393";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers-v2";
@@ -10,33 +10,33 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix392-20260815",
-  "./assets/js/covers.js?v=audiofix392-20260815",
-  "./assets/js/favorites.js?v=audiofix392-20260815",
-  "./assets/js/favorites-ui.js?v=audiofix392-20260815",
-  "./assets/js/audio-visualizer.js?v=audiofix392-20260815",
-  "./assets/js/transport-ui.js?v=audiofix392-20260815",
-  "./assets/js/now-playing.js?v=audiofix392-20260815",
-  "./assets/js/album-player-ui.js?v=audiofix392-20260815",
-  "./assets/js/spa-renderer.js?v=audiofix392-20260815",
-  "./assets/js/audio-radio.js?v=audiofix392-20260815",
-  "./assets/js/media-session.js?v=audiofix392-20260815",
-  "./assets/js/audio-prefetch.js?v=audiofix392-20260815",
-  "./assets/js/spa-router.js?v=audiofix392-20260815",
-  "./assets/js/catalog-fallback.js?v=audiofix392-20260815",
-  "./assets/js/catalog-loader.js?v=audiofix392-20260815",
-  "./assets/js/audio-telemetry.js?v=audiofix392-20260815",
-  "./assets/js/downloads.js?v=audiofix392-20260815",
-  "./assets/js/home-catalog.js?v=audiofix392-20260815",
-  "./assets/js/audio-core.js?v=audiofix392-20260815",
-  "./assets/js/pwa-install.js?v=audiofix392-20260815",
-  "./assets/js/share-qr.js?v=audiofix392-20260815",
-  "./assets/js/scripts.js?v=audiofix392-20260815",
+  "./assets/css/styles.css?v=audiofix393-20260821",
+  "./assets/js/covers.js?v=audiofix393-20260821",
+  "./assets/js/favorites.js?v=audiofix393-20260821",
+  "./assets/js/favorites-ui.js?v=audiofix393-20260821",
+  "./assets/js/audio-visualizer.js?v=audiofix393-20260821",
+  "./assets/js/transport-ui.js?v=audiofix393-20260821",
+  "./assets/js/now-playing.js?v=audiofix393-20260821",
+  "./assets/js/album-player-ui.js?v=audiofix393-20260821",
+  "./assets/js/spa-renderer.js?v=audiofix393-20260821",
+  "./assets/js/audio-radio.js?v=audiofix393-20260821",
+  "./assets/js/media-session.js?v=audiofix393-20260821",
+  "./assets/js/audio-prefetch.js?v=audiofix393-20260821",
+  "./assets/js/spa-router.js?v=audiofix393-20260821",
+  "./assets/js/catalog-fallback.js?v=audiofix393-20260821",
+  "./assets/js/catalog-loader.js?v=audiofix393-20260821",
+  "./assets/js/audio-telemetry.js?v=audiofix393-20260821",
+  "./assets/js/downloads.js?v=audiofix393-20260821",
+  "./assets/js/home-catalog.js?v=audiofix393-20260821",
+  "./assets/js/audio-core.js?v=audiofix393-20260821",
+  "./assets/js/pwa-install.js?v=audiofix393-20260821",
+  "./assets/js/share-qr.js?v=audiofix393-20260821",
+  "./assets/js/scripts.js?v=audiofix393-20260821",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix366-20260722",
-  "./data/track-durations.json?v=audiofix366-20260722",
-  "./data/tracks.json?v=audiofix366-20260722",
+  "./data/catalog.json?v=audiofix393-20260821",
+  "./data/track-durations.json?v=audiofix393-20260821",
+  "./data/tracks.json?v=audiofix393-20260821",
   "./data/playlists.json?v=playlist-collage-20260802",
   "./assets/css/playlists.css?v=playlist-collage-20260802",
   "./assets/branding/infra-logo-white-photoroom-title.png",
@@ -56,7 +56,7 @@ const SHELL_ASSETS = [
 // audio. A missing admin/QR/Sphragis file must therefore never invalidate the
 // complete shell installation.
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/scripts.admin.js?v=audiofix392-20260815",
+  "./assets/js/scripts.admin.js?v=audiofix393-20260821",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./sphragis/",
   "./sphragis/index.html",
@@ -390,6 +390,83 @@ function notifyPrefetchHit(event, url, details) {
   }
 }
 
+function notifyAudioNetworkResult(event, url, details) {
+  if (!event || !event.clientId || !self.clients || typeof self.clients.get !== "function") return;
+  const payload = Object.assign({
+    type: "INFRA_AUDIO_NETWORK",
+    url
+  }, details || {});
+  const notification = self.clients.get(event.clientId)
+    .then((client) => {
+      if (!client) return;
+      try {
+        client.postMessage(payload);
+      } catch (_err) {
+        // Ignore telemetry message failures.
+      }
+    })
+    .catch(() => undefined);
+  if (typeof event.waitUntil === "function") {
+    try {
+      event.waitUntil(notification);
+    } catch (_err) {
+      // The response remains independent from telemetry delivery.
+    }
+  }
+}
+
+function fetchAudioNetworkWithDiagnostics(request, url, event, reason) {
+  const startedAt = Date.now();
+  const rangeHeader = request.headers.get("Range") || request.headers.get("range") || "";
+  const requestRange = String(rangeHeader).match(/^bytes=(\d+)-(\d*)$/i);
+  const isStartupProbe = rangeHeader === "bytes=0-1";
+  return fetch(request).then((response) => {
+    const contentRange = String(response.headers.get("Content-Range") || "");
+    const responseRange = contentRange.match(/^bytes\s+(\d+)-(\d+)\/(\d+)$/i);
+    const contentType = String(response.headers.get("Content-Type") || "").toLowerCase();
+    const rangeStart = responseRange ? Number(responseRange[1]) : null;
+    const rangeEnd = responseRange ? Number(responseRange[2]) : null;
+    const rangeValid = Boolean(
+      response.status === 206 &&
+      responseRange &&
+      Number(responseRange[3]) > rangeEnd &&
+      (!requestRange || Number(requestRange[1]) === rangeStart)
+    );
+    const typeValid = /^audio\/(?:mp4|mpeg|aac|x-m4a)\b/i.test(contentType);
+    let branch = "range_ok";
+    if (!response.ok) branch = "http_error";
+    else if (!rangeValid) branch = "range_invalid";
+    else if (!typeValid) branch = "type_invalid";
+    const result = branch === "range_ok" ? "ok" : "invalid_response";
+
+    if (isStartupProbe || result !== "ok") {
+      notifyAudioNetworkResult(event, url.href, {
+        reason: String(reason || "network_fallback"),
+        strategy: isStartupProbe ? "startup_probe_network" : "range_network",
+        branch,
+        result,
+        status: Number(response.status) || 0,
+        response_ms: Math.max(0, Date.now() - startedAt),
+        range_start: rangeStart,
+        range_end: rangeEnd,
+        bytes: Number(response.headers.get("Content-Length") || 0)
+      });
+    }
+    return response;
+  }).catch((error) => {
+    notifyAudioNetworkResult(event, url.href, {
+      reason: String(reason || "network_fallback"),
+      strategy: isStartupProbe ? "startup_probe_network" : "range_network",
+      branch: "fetch_rejected",
+      result: "network_error",
+      error_name: error && error.name ? error.name : "Error",
+      status: 0,
+      response_ms: Math.max(0, Date.now() - startedAt)
+    });
+    throw error;
+  });
+}
+
 function parseRangeHeader(rangeHeader, total) {
   const match = String(rangeHeader || "").match(/^bytes=(\d*)-(\d*)$/);
   if (!match || !Number.isFinite(total) || total <= 0) return null;
@@ -529,18 +606,23 @@ async function buildRangeResponseFromCachedAudio(cached, rangeHeader) {
 async function servePrefetchedAudioOrNetwork(request, url, event) {
   const rangeHeader = request.headers.get("Range") || request.headers.get("range") || "";
   if (!rangeHeader) return fetch(request);
+  if (request.cache === "no-store" || request.cache === "reload") {
+    return fetchAudioNetworkWithDiagnostics(request, url, event, "cache_bypass");
+  }
 
   const cache = await caches.open(NEXT_TRACK_CACHE);
   let cached = null;
   try {
     cached = await cache.match(request, { ignoreVary: true }) || await cache.match(url.href, { ignoreVary: true });
   } catch (_err) {
-    return fetch(request);
+    return fetchAudioNetworkWithDiagnostics(request, url, event, "cache_read_failed");
   }
-  if (!cached) return fetch(request);
+  if (!cached) return fetchAudioNetworkWithDiagnostics(request, url, event, "cache_miss");
 
   const ifRangeHeader = request.headers.get("If-Range") || request.headers.get("if-range") || "";
-  if (!cachedValidatorMatchesIfRange(cached, ifRangeHeader)) return fetch(request);
+  if (!cachedValidatorMatchesIfRange(cached, ifRangeHeader)) {
+    return fetchAudioNetworkWithDiagnostics(request, url, event, "validator_mismatch");
+  }
 
   try {
     const partial = await buildRangeResponseFromCachedAudio(cached.clone(), rangeHeader);
@@ -561,9 +643,9 @@ async function servePrefetchedAudioOrNetwork(request, url, event) {
     if (error && error.code === "cached_audio_corrupt") {
       await deletePrefetchedAudio(cache, request, url);
     }
-    return fetch(request);
+    return fetchAudioNetworkWithDiagnostics(request, url, event, "cache_invalid");
   }
-  return fetch(request);
+  return fetchAudioNetworkWithDiagnostics(request, url, event, "range_cache_miss");
 }
 
 self.addEventListener("fetch", (event) => {

@@ -5,6 +5,7 @@
   // transitions assembled below are written to the session journal.
   const RAW_EVENTS = new Set([
     "album_switch",
+    "audio_network_result",
     "audio_pause",
     "audio_play",
     "audio_session_state",
@@ -97,7 +98,6 @@
     "fullscreen_viewport",
     "mini_player_visibility",
     "prefetch_error",
-    "recovery_failed",
     "sw_controllerchange",
     "sw_reload_executed",
     "system_auto_resume_blocked"
@@ -1662,19 +1662,36 @@
         play_resolved_ms: relativeStageMs(transition, transition.play_resolved_at_ms),
         playing_ms: relativeStageMs(transition, transition.playing_at_ms),
         waiting_count: transition.waiting_count,
-        stalled_count: transition.stalled_count
+        stalled_count: transition.stalled_count,
+        recovery_reason: transition.recovery_reason || "",
+        strategy: transition.recovery_strategy || "",
+        outcome: transition.recovery_error_name || "",
+        branch: transition.delivery_branch || "",
+        status: transition.delivery_status,
+        response_ms: transition.delivery_response_ms,
+        range_start: transition.delivery_range_start,
+        range_end: transition.delivery_range_end,
+        bytes: transition.delivery_bytes,
+        cached: Boolean(transition.delivery_cached),
+        range: Boolean(transition.delivery_range),
+        audio_fetch: Boolean(transition.delivery_observed),
+        error_code: transition.error_code,
+        ready_state: transition.ready_state,
+        network_state: transition.network_state
       };
       if (prefetch) {
         event.prefetch_age_ms = prefetch.completed_at_ms
           ? Math.max(0, Math.round(transition.started_at_ms - prefetch.completed_at_ms))
           : null;
-        event.response_ms = prefetch.response_ms;
         event.body_ms = prefetch.body_ms;
         event.queue_ms = prefetch.queue_ms;
         event.cache_ms = prefetch.cache_ms;
         event.attempt = prefetch.attempt;
         event.rank = prefetch.rank;
-        event.cached = Boolean(prefetch.cached);
+        if (!transition.delivery_observed) {
+          event.response_ms = prefetch.response_ms;
+          event.cached = Boolean(prefetch.cached);
+        }
       }
       return Object.assign(event, getEnvironment());
     }
@@ -1759,7 +1776,7 @@
         "startTrack_enter", "click_track", "source_resolved", "source_assigned",
         "play_request", "load_called", "ready_wait_start", "ready_wait_end",
         "play_call", "first_byte", "canplay", "playable", "play_resolved",
-        "play_rejected", "playing", "error"
+        "play_rejected", "playing", "error", "audio_network_result", "recovery_failed"
       ]);
       if (!stageEvents.has(eventType) || !token) return false;
       const transition = getOrCreateTrackTransition(token, payload, source);
@@ -1772,6 +1789,29 @@
         transition.canplay_at_ms = at;
       }
       if (eventType === "play_resolved" && !transition.play_resolved_at_ms) transition.play_resolved_at_ms = at;
+      if (eventType === "audio_network_result") {
+        transition.delivery_observed = true;
+        transition.delivery_branch = String(source.branch || source.result || "unknown");
+        transition.delivery_status = Number.isFinite(Number(source.status)) ? Number(source.status) : null;
+        transition.delivery_response_ms = Number.isFinite(Number(source.response_ms)) ? Number(source.response_ms) : null;
+        transition.delivery_range_start = Number.isFinite(Number(source.range_start)) ? Number(source.range_start) : null;
+        transition.delivery_range_end = Number.isFinite(Number(source.range_end)) ? Number(source.range_end) : null;
+        transition.delivery_bytes = Number.isFinite(Number(source.bytes)) ? Number(source.bytes) : null;
+        transition.delivery_cached = Boolean(source.cached);
+        transition.delivery_range = Boolean(source.range);
+        if (source.error_name && !transition.error_name) transition.error_name = String(source.error_name);
+        if (transition.finalized) finalizeTrackTransition(transition, transition.result, at);
+        return false;
+      }
+      if (eventType === "recovery_failed") {
+        transition.recovery_reason = String(source.reason || source.recovery_reason || "recovery_failed");
+        transition.recovery_strategy = String(source.strategy || "retry");
+        transition.recovery_error_name = String(source.error_name || "");
+        if (source.error_name && !transition.error_name) transition.error_name = String(source.error_name);
+        if (!wasFinalized) finalizeTrackTransition(transition, "error", at);
+        else finalizeTrackTransition(transition, transition.result, at);
+        return false;
+      }
       if (eventType === "playing") {
         if (wasFinalized) return false;
         transition.playing_at_ms = at;
@@ -1781,11 +1821,21 @@
         transition.error_name = String(source.reason || source.error_name || source.error_message || "play_rejected");
         finalizeTrackTransition(transition, "rejected", at);
       } else if (eventType === "error") {
-        transition.error_name = String(source.reason || source.error_name || source.error_message || "media_error");
+        const mediaErrorName = String(source.reason || source.error_name || source.error_message || "media_error");
+        if (!wasFinalized || !transition.error_name) transition.error_name = mediaErrorName;
+        transition.error_code = Number.isFinite(Number(source.error_code)) ? Number(source.error_code) : null;
+        transition.ready_state = Number.isFinite(Number(source.ready_state)) ? Number(source.ready_state) : null;
+        transition.network_state = Number.isFinite(Number(source.network_state)) ? Number(source.network_state) : null;
         if (!wasFinalized) finalizeTrackTransition(transition, "error", at);
+        if (wasFinalized && transition.result === "rejected") {
+          transition.media_error_recorded = true;
+          finalizeTrackTransition(transition, transition.result, at);
+          return false;
+        }
         if (wasFinalized && !transition.media_error_recorded) {
           transition.media_error_recorded = true;
           incrementSummary("track_error_count", 1);
+          finalizeTrackTransition(transition, transition.result, at);
           return true;
         }
         return false;

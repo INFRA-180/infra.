@@ -1,5 +1,22 @@
 # Implementation Notes
 
+## 2026-08-21 — audiofix395 démarrage PWA sans dépendance CSS tierce
+
+- La télémétrie a isolé une session lente `audiofix392` : premier rendu à 11 944 ms,
+  `DOMContentLoaded` à 11 993 ms et première frame applicative à 13 766 ms, sans
+  `controllerchange` ni reload Service Worker. Les autres lancements iOS PWA observés restent
+  entre 312 et 947 ms ; le catalogue et les caches HTML étaient sains.
+- La feuille critique ne charge plus Google Fonts par `@import`. L'interface publique utilise
+  désormais la pile système locale Avenir/San Francisco/Helvetica, avec Antique Olive auto-hébergée
+  inchangée. Un réseau tiers lent ne peut donc plus retenir le premier rendu de toute la PWA.
+- Les scripts runtime externes des 39 documents joueur sont `defer` et restent dans leur ordre
+  historique. Le générateur privé reproduit ce contrat lors d'une future génération.
+- Le garde de release refuse désormais tout import CSS distant dans `styles.css` et tout script
+  runtime joueur qui redeviendrait bloquant pour le parseur. Audio, catalogue, R2, Worker, file,
+  fullscreen et géométrie iPhone restent inchangés.
+- Identifiants atomiques : runtime/CSS `audiofix395-20260821`, Service Worker
+  `infra-shell-20260821-audio395`.
+
 ## 2026-08-21 — audiofix394 proxy audio Worker sans domaine
 
 - Le compte Cloudflare ne contient actuellement aucune zone DNS compatible avec un domaine R2

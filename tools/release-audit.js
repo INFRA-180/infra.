@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix394-20260821",
-  shell: "infra-shell-20260821-audio394",
+  build: "audiofix395-20260821",
+  shell: "infra-shell-20260821-audio395",
   albums: 31,
   tracks: 284
 });
@@ -144,6 +144,28 @@ function verifyVersions() {
     fail(`only ${playerDocuments} player documents reference the current runtime`);
   }
   console.log(`Version checks passed across ${playerDocuments} player documents.`);
+}
+
+function verifyCriticalStartupPath() {
+  const styles = fs.readFileSync(path.join(publicRoot, "assets/css/styles.css"), "utf8");
+  if (/^\s*@import\s+/im.test(styles) || /fonts\.googleapis\.com/i.test(styles)) {
+    fail("critical stylesheet must not depend on a remote CSS import");
+  }
+
+  const htmlFiles = walk(publicRoot, (filePath) => filePath.endsWith(".html"));
+  let playerDocuments = 0;
+  for (const filePath of htmlFiles) {
+    const source = fs.readFileSync(filePath, "utf8");
+    if (!source.includes("assets/js/scripts.js?v=")) continue;
+    playerDocuments += 1;
+    const blockingRuntimeScript = source.match(/<script\s+src="[^"]*assets\/js\/[^"]+"(?![^>]*\bdefer\b)[^>]*><\/script>/i);
+    if (blockingRuntimeScript) {
+      fail(`parser-blocking runtime script in ${path.relative(root, filePath)}: ${blockingRuntimeScript[0]}`);
+    }
+  }
+  if (!playerDocuments) fail("no player document found for startup-path verification");
+
+  console.log(`Critical startup path passed: local CSS and deferred scripts across ${playerDocuments} player documents.`);
 }
 
 function verifyAudioVisuals() {
@@ -307,6 +329,7 @@ function runRegressionSuite() {
 
 function main() {
   verifyVersions();
+  verifyCriticalStartupPath();
   verifyCatalog();
   verifyAudioVisuals();
   verifyNoLegacyRuntimeCovers();

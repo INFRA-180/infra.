@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix394-20260821`
-- Service Worker : `infra-shell-20260821-audio394`
-- CSS : `audiofix394-20260821` — handoff SPA à thème figé et file sérialisée
+- Runtime : `audiofix395-20260821`
+- Service Worker : `infra-shell-20260821-audio395`
+- CSS : `audiofix395-20260821` — démarrage local sans import CSS tiers bloquant
 - Catalogue : 31 albums et 284 pistes
 - Origine audio : proxy R2 Range `https://infra180-api.pages.dev/audio/`
 - Cache audio : `infra-next-track-segments-v9`

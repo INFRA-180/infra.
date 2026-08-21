@@ -126,7 +126,9 @@ const sandbox = {
       "infra-shell-20260815-audio392-shell",
       "infra-shell-20260815-audio392-runtime",
       "infra-shell-20260821-audio393-shell",
-      "infra-shell-20260821-audio393-runtime"
+      "infra-shell-20260821-audio393-runtime",
+      "infra-shell-20260821-audio394-shell",
+      "infra-shell-20260821-audio394-runtime"
     ]),
     delete: (name) => {
       deletedCaches.push(name);
@@ -192,7 +194,7 @@ async function dispatchAudioFetch(headers, clientId, mode) {
   let responsePromise = null;
   const lifetimePromises = [];
   const request = {
-    url: "https://pub-e477c478bcb148fc93749cc86b3d39fa.r2.dev/test.m4a",
+    url: "https://infra180-api.pages.dev/audio/assets/music/streams/vtest/test/test.m4a",
     method: "GET",
     mode: mode || "cors",
     destination: "audio",
@@ -231,7 +233,7 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(installedAlbumPages.length, 31, "all album documents must be installed with the PWA shell");
   assert(installedAlbumPages.includes("https://site.test/music/salam-infra.html"));
   assert(installedAlbumPages.includes("https://site.test/music/trou-noir-infra.html"));
-  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix393-20260821"));
+  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix394-20260821"));
   assert(
     installedOptionalShellAssets.includes("./assets/vendor/qr-creator.min.js?v=1.0.0"),
     "optional shell resources must still be attempted"
@@ -297,12 +299,14 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260802-audio383-runtime",
     "infra-shell-20260802-audio383-shell",
     "infra-shell-20260815-audio392-runtime",
-    "infra-shell-20260815-audio392-shell"
+    "infra-shell-20260815-audio392-shell",
+    "infra-shell-20260821-audio393-runtime",
+    "infra-shell-20260821-audio393-shell"
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v9"));
   assert(!deletedCaches.includes("infra-covers-v2"));
-  assert(!deletedCaches.includes("infra-shell-20260821-audio393-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260821-audio393-runtime"));
+  assert(!deletedCaches.includes("infra-shell-20260821-audio394-shell"));
+  assert(!deletedCaches.includes("infra-shell-20260821-audio394-runtime"));
 
   assert(fetchHandler, "Service Worker fetch handler missing");
   const fetchesBeforeBypass = fetchCalls;
@@ -454,7 +458,7 @@ async function dispatchSiteFetch(request) {
     mode: "navigate",
     destination: "document"
   });
-  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260821-audio393");
+  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260821-audio394");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Strategy"), "shell_cache");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Cache"), "hit");
   assert.strictEqual(

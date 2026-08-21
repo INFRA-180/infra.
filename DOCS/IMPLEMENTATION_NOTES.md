@@ -1,5 +1,58 @@
 # Implementation Notes
 
+## 2026-08-21 — audiofix394 proxy audio Worker sans domaine
+
+- Le compte Cloudflare ne contient actuellement aucune zone DNS compatible avec un domaine R2
+  personnalise. Le runtime public ne depend donc plus du endpoint de developpement `r2.dev` :
+  les 284 pistes passent par `https://infra180-api.pages.dev/audio/`, deja lie au bucket
+  `infra-audio` par le Worker.
+- Le chemin Worker conserve les contrats indispensables au lecteur iOS : requetes `GET`/`HEAD`,
+  plages simples, reponses `206`, `Content-Range`, `Content-Length`, `audio/mp4`, ETag, CORS et
+  cache immutable. Le Service Worker n'intercepte que le prefixe
+  `/audio/assets/music/streams/`; le catalogue et la telemetrie du meme host restent hors de ce
+  chemin.
+- Les pages album/playlist et l'accueil preconnectent maintenant l'origine Worker. Le generateur
+  Music/R2 et l'audit distant utilisent le meme proxy par defaut afin que les prochaines
+  synchronisations ne reintroduisent pas `r2.dev`.
+- Identifiants atomiques : runtime/CSS `audiofix394-20260821`, Service Worker
+  `infra-shell-20260821-audio394`. Le nouveau shell supprime les anciens caches 393 mais conserve
+  le cache audio segmente v9 ; ses entrees sont separees par URL et ne peuvent donc pas servir
+  une ancienne origine a la nouvelle release.
+- Validation requise apres publication : lecture reelle dans la PWA iPhone, notamment Clay,
+  changement de piste, arriere-plan/ecran verrouille et bascule Wi-Fi/4G.
+
+## 2026-08-21 — purge R2 conservatrice et plafond gratuit
+
+- L'inventaire API initial de `infra-audio` comptait 8 498 objets / 41,293 Go. La cause etait
+  la boucle du 11–17 juillet deja corrigee dans le synchroniseur : MARSELHA, CDM et H2o avaient
+  ete republies sous de nouveaux prefixes apres publication live mais avant le snapshot SQLite.
+- Le plan de purge a protege les 284 cles du catalogue live
+  `catalog-20260802T183541Z-53dd6082c0` et toutes les references du depot. Une cle n'etait
+  supprimable que si une autre cle R2 presentait simultanement le meme chemin audio logique,
+  la meme taille et le meme ETag.
+- 4 402 copies strictement identiques, soit 37,557 Go, ont ete supprimees. Le bucket intermediaire
+  contenait 4 096 objets / 3,736 Go ; aucun candidat ne subsistait, aucun objet protege ou
+  survivant ne manque et les 284 sources publiques repondent toutes `206 bytes 0-1`.
+- L'inventaire, les catalogues, le plan avec `restore_from`, la progression et le resultat sont
+  conserves hors Git sous
+  `/Users/infra/CODEX_APP/SITE_INFRA./BACKUPS/r2-dedup-20260821/`.
+- Le synchroniseur prive execute desormais un inventaire R2 exact avant chaque upload audio.
+  Il avertit a 8 Go et bloque seulement une projection au-dessus de 9 Go : il n'existe aucun
+  plafond artificiel a 3 Go ni limite fixe de nombre de pistes. Un objet audio deja present avec
+  le meme hash est reutilise au lieu d'etre reuploade ; `audit-r2-budget` expose le controle en
+  lecture seule.
+- La retention minimale finale conserve exclusivement les 284 cles audio du catalogue live et
+  `catalog/latest.json` : 285 objets / 2 097 539 929 octets. Les 209 audios inactifs et 3 602 JSON
+  historiques restants ont ete verifies localement puis supprimes de R2, soit 3 811 objets /
+  1 638 652 102 octets. Les 284 lectures partielles publiques repondent `206`, sans erreur.
+- Le tampon local de 3 811 fichiers a ete supprime apres cette verification : aucun ancien audio
+  ne reste dans `BACKUPS` ou `_private/runtime`. Seuls les inventaires et rapports d'audit legers
+  restent sous `/Users/infra/CODEX_APP/SITE_INFRA./BACKUPS/r2-minimal-retention-20260821/`.
+- Le Worker `61010afd-f21c-4d2e-ab4c-e1a2e39f6223` n'ecrit plus de
+  `catalog/releases/*` et efface chaque candidat apres publication. Le LaunchAgent Music reste
+  actif ; apres chaque publication et toutes les six heures, il retire les audios devenus
+  orphelins sans bloquer la synchronisation si le menage doit etre retente.
+
 ## 2026-08-21 — audiofix393 récupération audio observable et catalogue aligné
 
 - L'analyse des sessions des 18–19 août a isolé quatre tentatives réelles `FUJIN`/`NYQUIST`

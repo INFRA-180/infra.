@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix393-20260821",
-  shell: "infra-shell-20260821-audio393",
+  build: "audiofix394-20260821",
+  shell: "infra-shell-20260821-audio394",
   albums: 31,
   tracks: 284
 });
@@ -117,6 +117,12 @@ function verifyVersions() {
   }
   if (!sw.includes(`const VERSION = "${expected.shell}"`)) {
     fail(`Service Worker is not ${expected.shell}`);
+  }
+  if (!scripts.includes('const AUDIO_BASE = "https://infra180-api.pages.dev/audio"')) {
+    fail("runtime audio origin is not the Worker R2 proxy");
+  }
+  if (scripts.includes(".r2.dev") || sw.includes(".r2.dev")) {
+    fail("non-production r2.dev audio endpoint remains in the active runtime");
   }
 
   const htmlFiles = walk(publicRoot, (filePath) => filePath.endsWith(".html"));

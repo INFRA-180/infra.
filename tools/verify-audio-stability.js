@@ -14,9 +14,9 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix393-20260821";
-const shellRelease = "infra-shell-20260821-audio393";
-const cssRelease = "audiofix393-20260821";
+const release = "audiofix394-20260821";
+const shellRelease = "infra-shell-20260821-audio394";
+const cssRelease = "audiofix394-20260821";
 const frozenCssSha256 = "c7074dd413cc2a03bae103d398a63af82dc33d425ada617f328851b96c45c2a4";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
@@ -47,8 +47,8 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix393");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix393");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix394");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix394");
 expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio393");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
@@ -391,6 +391,10 @@ expect(!telemetry.includes("local_time:"), "local time is still transmitted");
 expect(telemetry.includes("session_id: createSessionId()"), "session telemetry lacks its random retry-deduplication identifier");
 expect(scripts.includes('window.location.origin === "https://infra-180.github.io"'), "telemetry is not restricted to the official origin client-side");
 expect(scripts.includes('https://infra180-api.pages.dev'), "runtime does not use the neutral API hostname");
+expect(scripts.includes('const AUDIO_BASE = "https://infra180-api.pages.dev/audio"'), "audio runtime does not use the Worker R2 proxy");
+expect(!scripts.includes('.r2.dev'), "audio runtime still uses the non-production r2.dev endpoint");
+expect(sw.includes('const AUDIO_PROXY_HOST = "infra180-api.pages.dev"'), "Service Worker does not recognize the audio proxy host");
+expect(sw.includes('const AUDIO_PROXY_PATH_PREFIX = "/audio/assets/music/streams/"'), "Service Worker audio proxy scope is too broad or missing");
 expect(sphragis.includes('https://infra180-api.pages.dev'), "Sphragis does not use the neutral API hostname");
 expect(!scripts.includes('workers.dev'), "a Workers account hostname remains in the runtime");
 expect(!sphragis.includes('workers.dev'), "a Workers account hostname remains in Sphragis");
@@ -466,4 +470,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix393.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix394.");

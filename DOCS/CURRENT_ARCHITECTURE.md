@@ -1,16 +1,17 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 15 août 2026.
+État de référence : 21 août 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix392-20260815`
-- Service Worker : `infra-shell-20260815-audio392`
-- CSS : `audiofix392-20260815` — handoff SPA à thème figé et file sérialisée
-- Catalogue : 31 albums et 283 pistes
+- Runtime : `audiofix394-20260821`
+- Service Worker : `infra-shell-20260821-audio394`
+- CSS : `audiofix394-20260821` — handoff SPA à thème figé et file sérialisée
+- Catalogue : 31 albums et 284 pistes
+- Origine audio : proxy R2 Range `https://infra180-api.pages.dev/audio/`
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
 - Sauvegarde comparative : tag `backup-audiofix373-20260724`

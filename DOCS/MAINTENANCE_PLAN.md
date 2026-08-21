@@ -1,6 +1,11 @@
 # Plan de maintenance — SITE INFRA
 
-État de référence : 18 juillet 2026.
+État de référence : 21 août 2026.
+
+Origine audio de production actuelle : proxy Worker
+`https://infra180-api.pages.dev/audio/`. Aucun runtime actif ne doit réintroduire le endpoint
+de développement `r2.dev`. Un domaine R2 personnalisé pourra remplacer ce proxy seulement quand
+une zone DNS appartenant au même compte Cloudflare sera disponible.
 
 Les purges autorisées du 18 juillet sont terminées. Toute nouvelle suppression devra de
 nouveau être précédée d’un inventaire et d’une sauvegarde adaptée.
@@ -29,6 +34,20 @@ télémétrie exploitable.
 - Les cinq générations locales encore actives, le catalogue live, le fallback, SQLite,
   les manifests, les logs et l’inventaire avec hashes sont conservés.
 - Le LaunchAgent est relancé après chaque maintenance.
+- La purge distante conservatrice du 21 août est sauvegardée sous
+  `/Users/infra/CODEX_APP/SITE_INFRA./BACKUPS/r2-dedup-20260821/` : 4 402 copies exactes
+  retirées sans toucher aux 284 pistes actives.
+- La rétention minimale finale a ensuite retiré 209 audios inactifs et 3 602 JSON historiques.
+  État vérifié : 285 objets / 2,098 Go, soit 284 audios actifs et `catalog/latest.json` ; les
+  284 contrôles de lecture Range passent. Le tampon local historique a été supprimé après
+  vérification et seuls les rapports légers restent dans
+  `/Users/infra/CODEX_APP/SITE_INFRA./BACKUPS/r2-minimal-retention-20260821/`.
+- Avant tout upload audio, `sync-itunes-r2-catalog.js` recalcule l'inventaire distant, avertit à
+  8 Go et bloque seulement une projection supérieure à 9 Go. Il n'existe pas de plafond fixe à
+  3 Go ou en nombre de pistes. Contrôle manuel :
+  `node _private/tools/sync-itunes-r2-catalog.js audit-r2-budget`.
+- Le Worker ne conserve plus de release/candidat JSON. Après une publication et toutes les six
+  heures, le LaunchAgent actif recalcule l'allowlist live et retire les objets audio orphelins.
 
 La bibliothèque Music reste strictement en lecture seule.
 

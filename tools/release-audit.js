@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix395-20260821",
-  shell: "infra-shell-20260821-audio395",
+  build: "audiofix396-20260822",
+  shell: "infra-shell-20260822-audio396",
   albums: 31,
   tracks: 284
 });
@@ -118,6 +118,9 @@ function verifyVersions() {
   if (!sw.includes(`const VERSION = "${expected.shell}"`)) {
     fail(`Service Worker is not ${expected.shell}`);
   }
+  if (!scripts.includes(`const SPA_SHELL_VERSION = "${expected.shell}"`)) {
+    fail(`runtime Service Worker contract is not ${expected.shell}`);
+  }
   if (!scripts.includes('const AUDIO_BASE = "https://infra180-api.pages.dev/audio"')) {
     fail("runtime audio origin is not the Worker R2 proxy");
   }
@@ -161,6 +164,12 @@ function verifyCriticalStartupPath() {
     const blockingRuntimeScript = source.match(/<script\s+src="[^"]*assets\/js\/[^"]+"(?![^>]*\bdefer\b)[^>]*><\/script>/i);
     if (blockingRuntimeScript) {
       fail(`parser-blocking runtime script in ${path.relative(root, filePath)}: ${blockingRuntimeScript[0]}`);
+    }
+    if (!source.includes('infra:launch-watchdog:v1') || !source.includes(`build:"${expected.build}"`)) {
+      fail(`startup watchdog is missing or stale in ${path.relative(root, filePath)}`);
+    }
+    if (/maximum-scale\s*=|user-scalable\s*=\s*no/i.test(source)) {
+      fail(`viewport zoom is disabled in ${path.relative(root, filePath)}`);
     }
   }
   if (!playerDocuments) fail("no player document found for startup-path verification");
@@ -257,6 +266,8 @@ function verifyNoLegacyRuntimeCovers() {
   }
 
   const tracks = readJson("public/data/tracks.json");
+  const scripts = fs.readFileSync(path.join(publicRoot, "assets/js/scripts.js"), "utf8");
+  const sw = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
   const expectedCovers = new Set(
     (tracks.albums || []).map((album) => String(album.cover || "").replace(/^\/+/, ""))
   );
@@ -283,10 +294,31 @@ function verifyNoLegacyRuntimeCovers() {
       `extras=${extras.join(",") || "none"}, missing=${missing.join(",") || "none"})`
     );
   }
+  const allowlistMatch = sw.match(/const CANONICAL_COVER_PATHS = new Set\(\[([\s\S]*?)\]\);/);
+  if (!allowlistMatch) fail("Service Worker canonical cover allowlist is missing");
+  const cachedCovers = new Set(JSON.parse(`[${allowlistMatch[1]}]`));
+  const unexpectedCached = [...cachedCovers].filter((cover) => !expectedCovers.has(cover));
+  const uncachedCanonical = [...expectedCovers].filter((cover) => !cachedCovers.has(cover));
+  if (cachedCovers.size !== expected.albums || unexpectedCached.length || uncachedCanonical.length) {
+    fail(
+      `Service Worker cover allowlist mismatch ` +
+      `(cached=${cachedCovers.size}, unexpected=${unexpectedCached.join(",") || "none"}, ` +
+      `missing=${uncachedCanonical.join(",") || "none"})`
+    );
+  }
+  if (
+    !sw.includes("const MAX_COVER_CACHE_ENTRIES = 31") ||
+    !sw.includes("await reconcileCoverCache()") ||
+    !scripts.includes("const ALBUM_COVER_IMAGE_CACHE_LIMIT = 4") ||
+    !scripts.includes("const ALBUM_COVER_PREPARE_LIMIT = 2") ||
+    !scripts.includes("covers.slice(0, Math.min(ALBUM_COVER_PREPARE_LIMIT, covers.length))")
+  ) {
+    fail("bounded cover cache/warmup policy is incomplete");
+  }
 
   console.log(
     `Canonical cover policy passed: ${physicalCovers.size} physical covers, ` +
-    "one per album, no 480/900 runtime reference."
+    "one per album, exact SW allowlist, warmup capped at 2."
   );
 }
 

@@ -14,9 +14,9 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix395-20260821";
-const shellRelease = "infra-shell-20260821-audio395";
-const cssRelease = "audiofix395-20260821";
+const release = "audiofix396-20260822";
+const shellRelease = "infra-shell-20260822-audio396";
+const cssRelease = "audiofix396-20260822";
 const frozenCssSha256 = "fb0d382ea68134269952dea7dbf44dd9015425b475bf9503971a509b072c78ce";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
@@ -47,9 +47,10 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix395");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix395");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio393");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix396");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix396");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio396");
+expect(scripts.includes(`const SPA_SHELL_VERSION = "${shellRelease}"`), "runtime shell version is stale");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
 expect(covers.includes('CACHE_NAME: "infra-covers-v2"'), "canonical covers do not use the isolated cache v2");
@@ -57,6 +58,10 @@ expect(covers.includes("adc-13-6e983f31-cover-1200.webp"), "stale ADC13 artwork 
 expect(catalogLoader.includes('normalizeCoverUrl", rawThumb, { width: 1200 }'), "live catalogue can reintroduce a non-canonical album cover");
 expect(sw.includes('const COVERS_CACHE = "infra-covers-v2"'), "Service Worker does not share the canonical cover cache");
 expect(sw.includes("cover-1200\\.webp"), "Service Worker does not cache the canonical cover URL");
+expect(sw.includes("const MAX_COVER_CACHE_ENTRIES = 31"), "Service Worker cover cache is not capped to the canonical inventory");
+expect(sw.includes("await reconcileCoverCache()"), "Service Worker activation does not purge stale cover entries");
+expect(scripts.includes("const ALBUM_COVER_IMAGE_CACHE_LIMIT = 4"), "cover memory cache is not minimal");
+expect(scripts.includes("const ALBUM_COVER_PREPARE_LIMIT = 2"), "cover warmup is not bounded");
 expect(!transport.includes("nowPlayingMetaIdleTimer"), "desktop metadata idle timer is still present");
 expect(!transport.includes("is-meta-idle"), "desktop metadata idle state is still present");
 expect(!styles.includes("is-meta-idle"), "desktop metadata idle opacity rule is still present");
@@ -443,12 +448,17 @@ const htmlFiles = ["public/index.html"]
     .map((name) => `public/music/${name}`))
   .concat(fs.readdirSync(path.join(root, "public/apps"))
     .filter((name) => name.endsWith(".html"))
-    .map((name) => `public/apps/${name}`));
-expect(htmlFiles.length === 35, `expected 35 player documents, found ${htmlFiles.length}`);
+    .map((name) => `public/apps/${name}`))
+  .concat(fs.readdirSync(path.join(root, "public/playlists"))
+    .filter((name) => name.endsWith(".html"))
+    .map((name) => `public/playlists/${name}`));
+expect(htmlFiles.length === 39, `expected 39 player documents, found ${htmlFiles.length}`);
 for (const relativePath of htmlFiles) {
   const source = read(relativePath);
   expect(source.includes(release), `${relativePath} does not reference ${release}`);
   expect(source.includes(cssRelease), `${relativePath} does not reference ${cssRelease}`);
+  expect(source.includes("infra:launch-watchdog:v1"), `${relativePath} has no startup watchdog`);
+  expect(!/maximum-scale\s*=|user-scalable\s*=\s*no/i.test(source), `${relativePath} disables viewport zoom`);
   expect(!source.includes("audiofix326-20260715"), `${relativePath} still references audiofix326 JavaScript`);
 }
 
@@ -470,4 +480,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix395.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix396.");

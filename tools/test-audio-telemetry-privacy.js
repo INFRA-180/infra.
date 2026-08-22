@@ -331,11 +331,28 @@ async function settle(turns = 20) {
     dom_ready_ms: 180,
     first_contentful_paint_ms: 140,
     first_app_frame_ms: 260,
+    app_ready_frame_ms: 260,
     init_done_ms: 230,
     catalog_ready_ms: 220,
+    document_ttfb_ms: 24,
+    document_download_ms: 8,
+    dom_parse_ms: 46,
+    critical_css_ready_ms: 90,
+    runtime_scripts_ready_ms: 170,
+    largest_contentful_paint_ms: 205,
+    cumulative_layout_shift_milli: 0,
+    interaction_to_next_paint_ms: 48,
+    previous_incomplete_launch_age_ms: 31_000,
     catalog_ready: true,
     service_worker_controlled: true,
-    app_frame_ready: true
+    app_frame_ready: true,
+    fcp_available: true,
+    lcp_available: true,
+    cls_available: true,
+    inp_available: true,
+    previous_incomplete_launch: true,
+    previous_launch_build: "audiofix395-20260821",
+    previous_launch_route_kind: "home"
   });
   telemetry.trackRuntimeEvent("album_swipe", {
     gesture_token: "swipe-safe-1",
@@ -869,6 +886,13 @@ async function settle(turns = 20) {
   assert.strictEqual(compactEvents.filter((event) => event.event === "audio_interruption").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "background_window").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "launch_summary").length, 1);
+  const launchSummary = compactEvents.find((event) => event.event === "launch_summary");
+  assert.strictEqual(launchSummary.app_ready_frame_ms, 260);
+  assert.strictEqual(launchSummary.document_ttfb_ms, 24);
+  assert.strictEqual(launchSummary.largest_contentful_paint_ms, 205);
+  assert.strictEqual(launchSummary.previous_incomplete_launch, true);
+  assert.strictEqual(launchSummary.previous_launch_build, "audiofix395-20260821");
+  assert.strictEqual(launchSummary.previous_launch_route_kind, "home");
   assert.strictEqual(compactEvents.filter((event) => event.event === "album_swipe").length, 1);
   assert.strictEqual(compactEvents.filter((event) => event.event === "queue_reorder").length, 1);
   const geometryNavigation = compactEvents.find((event) =>

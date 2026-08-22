@@ -1,5 +1,40 @@
 # Implementation Notes
 
+## 2026-08-22 — audiofix396 consolidation PWA, covers et télémétrie lisible
+
+- Les traces Chrome isolées donnent un LCP de 227 ms sans Service Worker et 305 ms avec le shell
+  PWA, CLS 0 et aucune erreur console. Le rendu normal n'est donc pas lent ; le défaut restant
+  était intermittent et se produisait avant la déclaration `app_frame_ready`, zone que l'ancienne
+  télémétrie ne pouvait pas observer. L'incident Clay historique ne peut pas être attribué à une
+  cause unique a posteriori, mais les anciens rejets WebKit, le manque d'attribution réseau et les
+  états de cache/version insuffisamment contrôlés expliquent pourquoi un morceau pouvait échouer
+  puis remarcher après renouvellement naturel des caches.
+- Les 39 documents joueur enregistrent maintenant un watchdog local, sans requête supplémentaire
+  et sans URL utilisateur. Une ouverture interrompue avant la première frame prête est rattachée
+  au `launch_summary` suivant avec son build, son type de route et son âge. Le lancement mesure
+  aussi TTFB, téléchargement du document, parse DOM, disponibilité CSS/scripts, FCP, LCP, CLS et
+  INP lorsqu'ils existent ; les observateurs sont coupés dès la fin du lancement.
+- La politique cover reste volontairement à un seul WebP 1200 × 1200 par album. Le Service Worker
+  possède l'allowlist exacte des 31 fichiers, plafonne `infra-covers-v2` à 31 et supprime à
+  l'activation toute entrée obsolète sans vider les covers valides. Le warmup est limité à 2 covers
+  sur tous les appareils et la mémoire décodée à 4, au lieu de préparer potentiellement les 31 dans
+  le navigateur classique.
+- Le rapport privé filtre par défaut le schéma v4 et le build actif ; `--schema`, `--build`,
+  `--platform` et `--since` permettent les audits ciblés. Il pagine jusqu'à 250 clés et avertit
+  sous 20 lancements ou lectures, afin qu'un p95 sur trois lectures ne soit plus présenté comme une
+  conclusion robuste. L'export Worker expose aussi le numéro de schéma de chaque session.
+- Nettoyage KV Cloudflare : 7 981 clés legacy exactes (`batch2:`, `log:`, `batch:`) supprimées ;
+  12 sessions `session4:` conservées avec expiration. Le Worker a été déployé sous la version
+  `2611dc18-20a6-42cf-98c9-c687b0267329`; un HEAD R2 réel répond toujours 200 avec
+  `Accept-Ranges`, ETag, CORS et cache immutable.
+- Le viewport n'interdit plus le zoom utilisateur. Le générateur Music/R2 et l'audit de release
+  protègent désormais le watchdog, le viewport accessible, l'alignement runtime/SW, l'inventaire
+  cover exact et les limites de warmup. La PWA déjà installée se met à jour normalement ; aucune
+  réinstallation ni service payant n'est requis.
+- Validation : 19 contrôles de régression, syntaxe Worker/runtime, déploiement Wrangler et lecture
+  R2 passent. Identifiants atomiques : runtime/CSS `audiofix396-20260822`, Service Worker
+  `infra-shell-20260822-audio396`.
+
 ## 2026-08-21 — audiofix395 démarrage PWA sans dépendance CSS tierce
 
 - La télémétrie a isolé une session lente `audiofix392` : premier rendu à 11 944 ms,

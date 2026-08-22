@@ -129,7 +129,7 @@
     "navigation_method", "navigation_result", "cancel_reason", "handler_state",
     "catalog_source", "service_worker_state", "cover_first_frame_state",
     "cover_second_frame_state", "cover_object_fit", "resume_gate_reason",
-    "home_restore_mode"
+    "home_restore_mode", "previous_launch_build", "previous_launch_route_kind"
   ]);
   const TELEMETRY_NUMBER_FIELDS = new Set([
     "timestamp_ms", "delta_ms", "duration_before_play_ms", "duration_ms", "delay_ms",
@@ -197,7 +197,11 @@
     "media_play_count", "media_pause_count", "media_previous_count", "media_next_count",
     "media_seek_count", "media_restart_count", "audio_interruption_count",
     "launch_head_ms", "dom_ready_ms", "first_contentful_paint_ms", "first_app_frame_ms",
-    "init_done_ms", "catalog_ready_ms", "service_worker_activity_count",
+    "app_ready_frame_ms", "init_done_ms", "catalog_ready_ms",
+    "document_ttfb_ms", "document_download_ms", "dom_parse_ms",
+    "critical_css_ready_ms", "runtime_scripts_ready_ms", "largest_contentful_paint_ms",
+    "cumulative_layout_shift_milli", "interaction_to_next_paint_ms",
+    "previous_incomplete_launch_age_ms", "service_worker_activity_count",
     "background_window_count", "background_sequence", "hidden_started_at_ms",
     "visible_return_at_ms", "hidden_duration_ms", "start_current_time", "end_current_time",
     "sample_count", "track_change_count", "error_count", "interruption_count",
@@ -222,6 +226,7 @@
     "handler_play", "handler_pause", "handler_previous", "handler_next", "handler_seekto",
     "audio_was_playing", "audio_is_playing", "progress_observed", "return_observed",
     "catalog_ready", "service_worker_controlled", "document_was_discarded", "app_frame_ready",
+    "fcp_available", "lcp_available", "cls_available", "inp_available", "previous_incomplete_launch",
     "handler_ready", "navigation_started", "navigation_completed", "lower_half",
     "scroll_restored", "dom_reused", "html_cache_hit", "cover_cache_hit",
     "ghost_created", "lift_animated", "flip_started", "flip_finished", "reduced_motion",

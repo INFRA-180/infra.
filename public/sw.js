@@ -1,9 +1,42 @@
-const VERSION = "infra-shell-20260821-audio395";
+const VERSION = "infra-shell-20260822-audio396";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers-v2";
 const NEXT_TRACK_CACHE = "infra-next-track-segments-v9";
-const MAX_COVER_CACHE_ENTRIES = 80;
+const MAX_COVER_CACHE_ENTRIES = 31;
+const CANONICAL_COVER_PATHS = new Set([
+  "assets/music/responsive/abricot-cover-1200.webp",
+  "assets/music/responsive/adc-13-6e983f31-cover-1200.webp",
+  "assets/music/responsive/anunnaki-cover-1200.webp",
+  "assets/music/responsive/anunnaki-instru-6a799ef0-cover-1200.webp",
+  "assets/music/responsive/asase-yaa-cover-1200.webp",
+  "assets/music/responsive/aspasie-cover-1200.webp",
+  "assets/music/responsive/ballades-cover-1200.webp",
+  "assets/music/responsive/black-stallion-cover-1200.webp",
+  "assets/music/responsive/cerises-cover-1200.webp",
+  "assets/music/responsive/cyberpunk-cover-1200.webp",
+  "assets/music/responsive/etoiles-cover-1200.webp",
+  "assets/music/responsive/fond-diffus-e28f5aa2-cover-1200.webp",
+  "assets/music/responsive/gaia-cover-1200.webp",
+  "assets/music/responsive/h-1-008-cover-1200.webp",
+  "assets/music/responsive/he-4-0026-cover-1200.webp",
+  "assets/music/responsive/impression-cover-1200.webp",
+  "assets/music/responsive/kali-cover-1200.webp",
+  "assets/music/responsive/ldc13-cover-1200.webp",
+  "assets/music/responsive/mami-wata-cover-1200.webp",
+  "assets/music/responsive/moremi-ajasoro-cover-1200.webp",
+  "assets/music/responsive/nahda-cover-1200.webp",
+  "assets/music/responsive/naviguer-cover-1200.webp",
+  "assets/music/responsive/osiris-cover-1200.webp",
+  "assets/music/responsive/pbb-cover-1200.webp",
+  "assets/music/responsive/peches-cover-1200.webp",
+  "assets/music/responsive/rue-de-paris-cover-1200.webp",
+  "assets/music/responsive/salam-cover-1200.webp",
+  "assets/music/responsive/sanguin-cover-1200.webp",
+  "assets/music/responsive/trou-noir-cover-1200.webp",
+  "assets/music/responsive/v-23pi56-cover-1200.webp",
+  "assets/music/responsive/voyager-cover-1200.webp"
+]);
 const AUDIO_PROXY_HOST = "infra180-api.pages.dev";
 const AUDIO_PROXY_PATH_PREFIX = "/audio/assets/music/streams/";
 const HTML_NETWORK_INFLIGHT = new Map();
@@ -11,33 +44,33 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix395-20260821",
-  "./assets/js/covers.js?v=audiofix395-20260821",
-  "./assets/js/favorites.js?v=audiofix395-20260821",
-  "./assets/js/favorites-ui.js?v=audiofix395-20260821",
-  "./assets/js/audio-visualizer.js?v=audiofix395-20260821",
-  "./assets/js/transport-ui.js?v=audiofix395-20260821",
-  "./assets/js/now-playing.js?v=audiofix395-20260821",
-  "./assets/js/album-player-ui.js?v=audiofix395-20260821",
-  "./assets/js/spa-renderer.js?v=audiofix395-20260821",
-  "./assets/js/audio-radio.js?v=audiofix395-20260821",
-  "./assets/js/media-session.js?v=audiofix395-20260821",
-  "./assets/js/audio-prefetch.js?v=audiofix395-20260821",
-  "./assets/js/spa-router.js?v=audiofix395-20260821",
-  "./assets/js/catalog-fallback.js?v=audiofix395-20260821",
-  "./assets/js/catalog-loader.js?v=audiofix395-20260821",
-  "./assets/js/audio-telemetry.js?v=audiofix395-20260821",
-  "./assets/js/downloads.js?v=audiofix395-20260821",
-  "./assets/js/home-catalog.js?v=audiofix395-20260821",
-  "./assets/js/audio-core.js?v=audiofix395-20260821",
-  "./assets/js/pwa-install.js?v=audiofix395-20260821",
-  "./assets/js/share-qr.js?v=audiofix395-20260821",
-  "./assets/js/scripts.js?v=audiofix395-20260821",
+  "./assets/css/styles.css?v=audiofix396-20260822",
+  "./assets/js/covers.js?v=audiofix396-20260822",
+  "./assets/js/favorites.js?v=audiofix396-20260822",
+  "./assets/js/favorites-ui.js?v=audiofix396-20260822",
+  "./assets/js/audio-visualizer.js?v=audiofix396-20260822",
+  "./assets/js/transport-ui.js?v=audiofix396-20260822",
+  "./assets/js/now-playing.js?v=audiofix396-20260822",
+  "./assets/js/album-player-ui.js?v=audiofix396-20260822",
+  "./assets/js/spa-renderer.js?v=audiofix396-20260822",
+  "./assets/js/audio-radio.js?v=audiofix396-20260822",
+  "./assets/js/media-session.js?v=audiofix396-20260822",
+  "./assets/js/audio-prefetch.js?v=audiofix396-20260822",
+  "./assets/js/spa-router.js?v=audiofix396-20260822",
+  "./assets/js/catalog-fallback.js?v=audiofix396-20260822",
+  "./assets/js/catalog-loader.js?v=audiofix396-20260822",
+  "./assets/js/audio-telemetry.js?v=audiofix396-20260822",
+  "./assets/js/downloads.js?v=audiofix396-20260822",
+  "./assets/js/home-catalog.js?v=audiofix396-20260822",
+  "./assets/js/audio-core.js?v=audiofix396-20260822",
+  "./assets/js/pwa-install.js?v=audiofix396-20260822",
+  "./assets/js/share-qr.js?v=audiofix396-20260822",
+  "./assets/js/scripts.js?v=audiofix396-20260822",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix395-20260821",
-  "./data/track-durations.json?v=audiofix395-20260821",
-  "./data/tracks.json?v=audiofix395-20260821",
+  "./data/catalog.json?v=audiofix396-20260822",
+  "./data/track-durations.json?v=audiofix396-20260822",
+  "./data/tracks.json?v=audiofix396-20260822",
   "./data/playlists.json?v=playlist-collage-20260802",
   "./assets/css/playlists.css?v=playlist-collage-20260802",
   "./assets/branding/infra-logo-white-photoroom-title.png",
@@ -57,7 +90,7 @@ const SHELL_ASSETS = [
 // audio. A missing admin/QR/Sphragis file must therefore never invalidate the
 // complete shell installation.
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/scripts.admin.js?v=audiofix395-20260821",
+  "./assets/js/scripts.admin.js?v=audiofix396-20260822",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./sphragis/",
   "./sphragis/index.html",
@@ -141,6 +174,19 @@ self.addEventListener("install", (event) => {
   event.waitUntil(installShellCache());
 });
 
+async function reconcileCoverCache() {
+  const cache = await caches.open(COVERS_CACHE);
+  const requests = await cache.keys();
+  await Promise.all(requests.map(function (request) {
+    const url = new URL(request.url);
+    const relativePath = url.pathname.split("/").slice(-4).join("/");
+    if (url.origin === self.location.origin && CANONICAL_COVER_PATHS.has(relativePath)) {
+      return false;
+    }
+    return cache.delete(request);
+  }));
+}
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async function () {
@@ -154,6 +200,7 @@ self.addEventListener("activate", (event) => {
           ))
           .map((key) => caches.delete(key))
       );
+      await reconcileCoverCache();
       await self.clients.claim();
     })()
   );

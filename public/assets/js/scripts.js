@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix395-20260821";
+window.INFRA_BUILD_TAG = "audiofix396-20260822";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -9,6 +9,57 @@ try {
 } catch (_err) {
   // Ignore build marker failures in unusual document states.
 }
+
+(function observeLaunchPerformance() {
+  const probe = window.__infraLaunchProbe && typeof window.__infraLaunchProbe === "object"
+    ? window.__infraLaunchProbe
+    : null;
+  if (!probe || typeof PerformanceObserver !== "function" || probe.performance_observers_started) return;
+  probe.performance_observers_started = true;
+  probe.performance_observers = [];
+  try {
+    const lcpObserver = new PerformanceObserver(function (list) {
+      const entries = list.getEntries();
+      const latest = entries[entries.length - 1];
+      if (!latest) return;
+      probe.largest_contentful_paint_ms = Math.max(0, Math.round(Number(latest.startTime) || 0));
+      probe.lcp_available = true;
+    });
+    lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
+    probe.performance_observers.push(lcpObserver);
+  } catch (_err) {
+    probe.lcp_available = false;
+  }
+  try {
+    probe.cumulative_layout_shift = 0;
+    probe.cls_available = true;
+    const clsObserver = new PerformanceObserver(function (list) {
+      list.getEntries().forEach(function (entry) {
+        if (!entry || entry.hadRecentInput) return;
+        probe.cumulative_layout_shift += Number(entry.value) || 0;
+      });
+    });
+    clsObserver.observe({ type: "layout-shift", buffered: true });
+    probe.performance_observers.push(clsObserver);
+  } catch (_err) {
+    probe.cls_available = false;
+  }
+  try {
+    const inpObserver = new PerformanceObserver(function (list) {
+      list.getEntries().forEach(function (entry) {
+        probe.interaction_to_next_paint_ms = Math.max(
+          Number(probe.interaction_to_next_paint_ms) || 0,
+          Math.round(Number(entry && entry.duration) || 0)
+        );
+        probe.inp_available = true;
+      });
+    });
+    inpObserver.observe({ type: "event", buffered: true, durationThreshold: 40 });
+    probe.performance_observers.push(inpObserver);
+  } catch (_err) {
+    probe.inp_available = false;
+  }
+})();
 
 const infraDownloadsApi = window.InfraDownloads || {};
 
@@ -406,8 +457,8 @@ function openAppDownloadGatekeeper(appName, url) {
     ? Boolean(coverConstants.SESSION_NAVIGATION_GATE_ENABLED)
     : true;
   // ROLLBACK: passer a false pour ne plus attendre les covers avant ouverture album.
-  const ALBUM_COVER_IMAGE_CACHE_LIMIT = isStandaloneDisplayMode() ? 4 : 24;
-  const PWA_COVER_PREPARE_LIMIT = 2;
+  const ALBUM_COVER_IMAGE_CACHE_LIMIT = 4;
+  const ALBUM_COVER_PREPARE_LIMIT = 2;
   const PREFETCH_NEXT_MAX_BYTES = Number.isFinite(Number(prefetchConstants.MAX_BYTES))
     ? Number(prefetchConstants.MAX_BYTES)
     : 2 * 1024 * 1024;
@@ -431,7 +482,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260821-audio395";
+  const SPA_SHELL_VERSION = "infra-shell-20260822-audio396";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -439,7 +490,7 @@ function openAppDownloadGatekeeper(appName, url) {
     : 240;
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix395-20260821";
+  const LOCAL_CATALOG_VERSION = "audiofix396-20260822";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -460,7 +511,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix395-20260821";
+  const runtimeVersion = "audiofix396-20260822";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -2296,8 +2347,7 @@ function openAppDownloadGatekeeper(appName, url) {
 
   function limitAlbumCoverWarmupUrls(covers) {
     if (!Array.isArray(covers) || !covers.length) return [];
-    if (!isMobilePwaCoverNavigation()) return covers;
-    return covers.slice(0, Math.min(PWA_COVER_PREPARE_LIMIT, covers.length));
+    return covers.slice(0, Math.min(ALBUM_COVER_PREPARE_LIMIT, covers.length));
   }
 
   function shouldPauseAlbumCoverWarmup() {
@@ -6480,6 +6530,30 @@ function openAppDownloadGatekeeper(appName, url) {
     });
   }
 
+  function latestResourceReadyMs(pattern) {
+    if (typeof performance === "undefined" || typeof performance.getEntriesByType !== "function") return 0;
+    return performance.getEntriesByType("resource").reduce(function (latest, entry) {
+      if (!entry || !pattern.test(String(entry.name || ""))) return latest;
+      return Math.max(latest, Number(entry.responseEnd) || 0);
+    }, 0);
+  }
+
+  function completeLaunchWatchdog(probe) {
+    if (!probe) return;
+    if (Array.isArray(probe.performance_observers)) {
+      probe.performance_observers.forEach(function (observer) {
+        if (observer && typeof observer.disconnect === "function") observer.disconnect();
+      });
+      probe.performance_observers.length = 0;
+    }
+    if (typeof probe.complete !== "function") return;
+    try {
+      probe.complete();
+    } catch (_err) {
+      // The watchdog is diagnostic only and must never affect startup.
+    }
+  }
+
   async function reportLaunchSummary(initStartedAt) {
     const initDoneMs = typeof performance !== "undefined" && typeof performance.now === "function"
       ? performance.now()
@@ -6506,8 +6580,23 @@ function openAppDownloadGatekeeper(appName, url) {
       dom_ready_ms: Math.max(0, Math.round(Number(navigation && navigation.domContentLoadedEventEnd) || Number(initStartedAt) || 0)),
       first_contentful_paint_ms: Math.max(0, Math.round(Number(fcp && fcp.startTime) || 0)),
       first_app_frame_ms: Math.max(0, Math.round(firstAppFrameMs)),
+      app_ready_frame_ms: Math.max(0, Math.round(firstAppFrameMs)),
       init_done_ms: Math.max(0, Math.round(initDoneMs)),
       catalog_ready_ms: catalogReady ? Math.max(0, Math.round(initDoneMs)) : 0,
+      document_ttfb_ms: Math.max(0, Math.round(Number(navigation && navigation.responseStart) || 0)),
+      document_download_ms: Math.max(0, Math.round(
+        (Number(navigation && navigation.responseEnd) || 0) - (Number(navigation && navigation.responseStart) || 0)
+      )),
+      dom_parse_ms: Math.max(0, Math.round(
+        (Number(navigation && navigation.domContentLoadedEventEnd) || Number(initStartedAt) || 0) -
+        (Number(navigation && navigation.responseEnd) || 0)
+      )),
+      critical_css_ready_ms: Math.max(0, Math.round(latestResourceReadyMs(/\/assets\/css\/(?:styles|playlists)\.css(?:\?|$)/))),
+      runtime_scripts_ready_ms: Math.max(0, Math.round(latestResourceReadyMs(/\/assets\/js\/[^/?]+\.js(?:\?|$)/))),
+      largest_contentful_paint_ms: Math.max(0, Math.round(Number(probe.largest_contentful_paint_ms) || 0)),
+      cumulative_layout_shift_milli: Math.max(0, Math.round((Number(probe.cumulative_layout_shift) || 0) * 1000)),
+      interaction_to_next_paint_ms: Math.max(0, Math.round(Number(probe.interaction_to_next_paint_ms) || 0)),
+      previous_incomplete_launch_age_ms: Math.max(0, Math.round(Number(probe.previous_incomplete_launch_age_ms) || 0)),
       service_worker_activity_count: Number(probe.service_worker_activity_count) || 0,
       catalog_ready: catalogReady,
       catalog_source: catalogState.catalogBundleSource || (catalogState.data ? "embedded-fallback" : "unavailable"),
@@ -6516,8 +6605,16 @@ function openAppDownloadGatekeeper(appName, url) {
       service_worker_state: navigator.serviceWorker && navigator.serviceWorker.controller ? "controlled" : "uncontrolled",
       document_was_discarded: Boolean(document.wasDiscarded),
       app_frame_ready: true,
+      fcp_available: Boolean(fcp),
+      lcp_available: probe.lcp_available === true,
+      cls_available: probe.cls_available === true,
+      inp_available: probe.inp_available === true,
+      previous_incomplete_launch: probe.previous_incomplete_launch === true,
+      previous_launch_build: String(probe.previous_launch_build || ""),
+      previous_launch_route_kind: String(probe.previous_launch_route_kind || ""),
       reason: "init_complete"
     });
+    completeLaunchWatchdog(probe);
   }
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -6531,17 +6628,30 @@ function openAppDownloadGatekeeper(appName, url) {
     void initPage().then(function () {
       return reportLaunchSummary(initStartedAt);
     }).catch(function () {
+      const probe = window.__infraLaunchProbe && typeof window.__infraLaunchProbe === "object"
+        ? window.__infraLaunchProbe
+        : {};
       trackAudioRuntimeEvent("launch_summary", {
-        launch_head_ms: Math.max(0, Math.round(Number(window.__infraLaunchProbe && window.__infraLaunchProbe.head_ms) || 0)),
+        launch_head_ms: Math.max(0, Math.round(Number(probe.head_ms) || 0)),
         dom_ready_ms: Math.max(0, Math.round(initStartedAt)),
         init_done_ms: 0,
         first_app_frame_ms: 0,
+        app_ready_frame_ms: 0,
+        previous_incomplete_launch_age_ms: Math.max(0, Math.round(Number(probe.previous_incomplete_launch_age_ms) || 0)),
         catalog_ready: false,
         service_worker_controlled: Boolean(navigator.serviceWorker && navigator.serviceWorker.controller),
         document_was_discarded: Boolean(document.wasDiscarded),
         app_frame_ready: false,
+        fcp_available: false,
+        lcp_available: probe.lcp_available === true,
+        cls_available: probe.cls_available === true,
+        inp_available: probe.inp_available === true,
+        previous_incomplete_launch: probe.previous_incomplete_launch === true,
+        previous_launch_build: String(probe.previous_launch_build || ""),
+        previous_launch_route_kind: String(probe.previous_launch_route_kind || ""),
         reason: "init_failed"
       });
+      completeLaunchWatchdog(probe);
     });
   });
 })();

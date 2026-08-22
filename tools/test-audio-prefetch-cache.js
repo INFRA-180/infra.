@@ -338,14 +338,15 @@ function segmentResponse(seed) {
   const normalPut = cache.put;
   let slowMutationActive = false;
   let overlappedMutation = false;
+  let resolveSlowMutation = null;
   cache.put = function (request, response) {
     if (request.url === "https://media.test/cache-timeout.m4a") {
       slowMutationActive = true;
       return new Promise(function (resolve) {
-        setTimeout(function () {
+        resolveSlowMutation = function () {
           slowMutationActive = false;
           resolve();
-        }, 25);
+        };
       });
     }
     if (slowMutationActive) overlappedMutation = true;
@@ -363,12 +364,15 @@ function segmentResponse(seed) {
   const mutationIdle = api.waitForMutationIdle().then(function () {
     mutationIdleResolved = true;
   });
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await Promise.resolve();
+  await Promise.resolve();
   assert.strictEqual(
     mutationIdleResolved,
     false,
     "The cache API must expose the timed-out mutation until its underlying put really settles"
   );
+  assert.strictEqual(typeof resolveSlowMutation, "function", "the slow mutation must still be controllable by the test");
+  resolveSlowMutation();
   await mutationIdle;
   await api.putSingle("https://media.test/after-timeout.m4a", segmentResponse(11));
   cache.put = normalPut;

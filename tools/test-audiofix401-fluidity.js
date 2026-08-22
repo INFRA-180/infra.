@@ -29,9 +29,17 @@ assert.equal(albumImages.filter((tag) => /fetchpriority="auto"/.test(tag)).lengt
 assert.equal(albumImages.filter((tag) => /data-cover-src="/.test(tag)).length, albumImages.length - 2);
 
 assert.match(homeCatalog, /const eagerCount = isApp \? 0 : 2;/);
-assert.match(homeCatalog, /image\.dataset\.appCoverSrc = item\.thumb/);
+assert.match(homeCatalog, /image\.dataset\.appCoverSrc = thumb/);
 assert.match(homeCatalog, /menu\.addEventListener\("toggle", loadApps\)/);
 assert.match(homeCatalog, /image\.decode\(\)\.then\(reveal\)/);
+assert.match(homeCatalog, /const source = resolveRuntimeAssetUrl\(image && image\.dataset && image\.dataset\[sourceAttribute\]\)/);
+assert.match(homeCatalog, /const thumb = resolveRuntimeAssetUrl\(item\.thumb\)/);
+assert.match(homeCatalog, /const srcset = resolveRuntimeSrcset\(image\.dataset\[srcsetAttribute\]\)/);
+assert.match(homeCatalog, /if \(sourceAttribute === "appCoverSrc"\) image\.loading = "eager"/);
+assert.match(scripts, /trackAudioRuntimeEvent,\s*toRuntimeAbsoluteUrl/);
+assert.match(scripts, /normalizeCoverUrl\(toRuntimeAbsoluteUrl\(raw\), \{ width: 1200 \}\)/);
+assert.match(spaRenderer, /querySelectorAll\("\[data-cover-src\], \[data-app-cover-src\]"\)/);
+assert.match(spaRenderer, /querySelectorAll\("\[data-cover-srcset\], \[data-app-cover-srcset\]"\)/);
 assert.doesNotMatch(homeCatalog, /shouldEager \|\| isApp/);
 
 const restoreStart = spaRenderer.indexOf("async function restoreLiveHomeRoute");
@@ -58,4 +66,4 @@ assert.match(scripts, /Math\.max\(0, 10000 - elapsed\)/);
 assert.match(scripts, /markLaunchWatchdogComplete\(probe\);\s*scheduleFinalLaunchSummary/);
 assert.doesNotMatch(scripts, /function completeLaunchWatchdog/);
 
-console.log("audiofix400 fluidity contracts passed: first paint, covers, Apps, scroll, player space, final vitals.");
+console.log("audiofix401 fluidity contracts passed: first paint, covers, Apps, scroll, player space, final vitals.");

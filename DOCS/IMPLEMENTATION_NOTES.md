@@ -1,5 +1,18 @@
 # Implementation Notes
 
+## 2026-08-22 — audiofix401 URLs de covers indépendantes de la route
+
+- La validation réseau complète d'`audiofix400` a révélé des requêtes `404` masquées par le cache
+  vers `/music/assets/music/responsive/...` pendant des cycles album → accueil. Leur cause était
+  une source différée ou un warmup encore résolu contre l'URL album courante.
+- Le catalogue résout désormais les `src`, `data-*` et chaque candidat `srcset` contre la racine
+  runtime avant leur utilisation. La capture Home fige aussi les `srcset` différés, et le warmup
+  transforme les covers du catalogue en URL runtime avant normalisation. Les icônes Applications
+  deviennent eager uniquement après l'ouverture de leur menu, afin que leur décodage ne reste pas
+  suspendu hors viewport.
+- Un contrat de release interdit la régression sur ces trois chemins. Identifiants atomiques :
+  runtime/CSS `audiofix401-20260822`, Service Worker `infra-shell-20260822-audio401`.
+
 ## 2026-08-22 — audiofix400 démarrage PWA unique et rendu stable
 
 - Une trace froide Fast 4G / CPU ×4 a prouvé que le cycle `controllerchange` historique relançait

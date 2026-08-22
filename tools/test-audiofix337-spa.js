@@ -98,8 +98,10 @@ async function testIosSwapUsesNativePaintedHandoff() {
   const freezeEnd = spaSource.indexOf("function lockLiveHomeCover", freezeStart);
   const freezeBody = spaSource.slice(freezeStart, freezeEnd);
   assert.ok(
-    freezeBody.includes('querySelectorAll("[data-cover-src]")') &&
-      freezeBody.includes('setAttribute("data-cover-src", normalizeUrlAgainstBase(value, baseUrl))'),
+    freezeBody.includes('querySelectorAll("[data-cover-src], [data-app-cover-src]")') &&
+      freezeBody.includes('element.setAttribute(attribute, normalizeUrlAgainstBase(value, baseUrl))') &&
+      freezeBody.includes('querySelectorAll("[data-cover-srcset], [data-app-cover-srcset]")') &&
+      freezeBody.includes('element.setAttribute(attribute, absolutizeSrcsetForBase(value, baseUrl))'),
     "deferred Home covers must be absolute before the album URL becomes the document base"
   );
   assert.ok(spaSource.includes("route_layers_at_promote"), "the promoted two-layer state is not measured");
@@ -262,7 +264,7 @@ async function main() {
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
   testStandaloneScrollbarPolicy();
-  console.log("audiofix400 SPA/transport tests: ok");
+  console.log("audiofix401 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

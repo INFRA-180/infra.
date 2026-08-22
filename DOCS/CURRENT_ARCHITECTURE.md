@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix400-20260822`
-- Service Worker : `infra-shell-20260822-audio400`
-- CSS : `audiofix400-20260822` — géométrie mobile déterministe avant JavaScript
+- Runtime : `audiofix401-20260822`
+- Service Worker : `infra-shell-20260822-audio401`
+- CSS : `audiofix401-20260822` — géométrie mobile déterministe avant JavaScript
 - Catalogue : 31 albums et 284 pistes
 - Origine audio : proxy R2 Range `https://infra180-api.pages.dev/audio/`
 - Cache audio : `infra-next-track-segments-v9`
@@ -165,7 +165,9 @@ avec des pixels différents.
 
 Sur l'accueil, seule la première cover est prioritaire haute ; les deux premières sont eager.
 Les autres gardent leurs dimensions mais reçoivent leur URL à l'approche du viewport, puis sont
-révélées après décodage. Les icônes Applications restent sans `src` tant que leur menu est fermé.
+révélées après décodage. Toutes les sources différées et leur `srcset` sont résolus depuis la
+racine runtime, indépendamment de l'URL album courante. Les icônes Applications restent sans
+`src` tant que leur menu est fermé.
 
 ## PWA et fullscreen
 

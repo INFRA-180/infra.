@@ -18,7 +18,7 @@ const runtime = [scripts, worker, audioRadio, nowPlaying].join("\n");
 assert.doesNotMatch(runtime, /window\.location\.reload\s*\(/, "a Service Worker update must never reload the visible PWA");
 assert.doesNotMatch(runtime, /SKIP_WAITING|skipWaiting\s*\(/, "updates must use the native waiting lifecycle");
 assert.doesNotMatch(runtime, /SERVICE_WORKER_RELOAD_|attemptDeferredServiceWorkerReload|scheduleDeferredServiceWorkerReload/);
-assert.doesNotMatch(runtime, /sw_reload_pending|sw_reload_executed/, "audiofix400 must stop emitting reload events");
+assert.doesNotMatch(runtime, /sw_reload_pending|sw_reload_executed/, "audiofix401 must stop emitting reload events");
 
 assert.match(scripts, /\.register\(swUrl, \{ scope: runtime\.baseUrl\.pathname, updateViaCache: "none" \}\)/);
 assert.match(scripts, /serviceWorkerRegistrationRef\.update\(\)\.catch/);

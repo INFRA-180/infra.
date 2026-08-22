@@ -35,6 +35,30 @@
     let albumSwipeGesture = null;
     let suppressedAlbumSwipeClick = null;
 
+    function resolveRuntimeAssetUrl(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      const resolved = call(ctx, "toRuntimeAbsoluteUrl", raw);
+      if (typeof resolved === "string" && resolved) return resolved;
+      try {
+        return new URL(raw, document.baseURI).href;
+      } catch (_err) {
+        return raw;
+      }
+    }
+
+    function resolveRuntimeSrcset(value) {
+      return String(value || "")
+        .split(",")
+        .map(function (candidate) {
+          const parts = candidate.trim().split(/\s+/);
+          const source = resolveRuntimeAssetUrl(parts.shift());
+          return source ? [source].concat(parts).join(" ") : "";
+        })
+        .filter(Boolean)
+        .join(", ");
+    }
+
     function displayAlbumCardTitle(title) {
       const formatted = call(ctx, "displayAlbumCardTitle", title);
       if (typeof formatted === "string") return formatted;
@@ -332,12 +356,13 @@
       image.decoding = "async";
       const eagerCount = isApp ? 0 : 2;
       const shouldEager = index < eagerCount;
-      if (shouldEager) image.src = item.thumb;
-      else if (isApp) image.dataset.appCoverSrc = item.thumb;
-      else image.dataset.coverSrc = item.thumb;
+      const thumb = resolveRuntimeAssetUrl(item.thumb);
+      if (shouldEager) image.src = thumb;
+      else if (isApp) image.dataset.appCoverSrc = thumb;
+      else image.dataset.coverSrc = thumb;
       image.loading = shouldEager ? "eager" : "lazy";
       image.setAttribute("fetchpriority", index === 0 && !isApp ? "high" : (shouldEager ? "auto" : "low"));
-      if (isApp && item.thumbSrcset) image.dataset.appCoverSrcset = item.thumbSrcset;
+      if (isApp && item.thumbSrcset) image.dataset.appCoverSrcset = resolveRuntimeSrcset(item.thumbSrcset);
       if (isApp && item.thumbSizes) image.dataset.appCoverSizes = item.thumbSizes;
 
       const label = document.createElement("span");
@@ -385,11 +410,11 @@
     }
 
     function loadDeferredImage(image, sourceAttribute, srcsetAttribute, sizesAttribute) {
-      const source = String(image && image.dataset && image.dataset[sourceAttribute] || "").trim();
+      const source = resolveRuntimeAssetUrl(image && image.dataset && image.dataset[sourceAttribute]);
       if (!source) return;
       image.dataset.coverLoading = "1";
       if (srcsetAttribute) {
-        const srcset = String(image.dataset[srcsetAttribute] || "").trim();
+        const srcset = resolveRuntimeSrcset(image.dataset[srcsetAttribute]);
         if (srcset) image.setAttribute("srcset", srcset);
         delete image.dataset[srcsetAttribute];
       }
@@ -398,6 +423,7 @@
         if (sizes) image.setAttribute("sizes", sizes);
         delete image.dataset[sizesAttribute];
       }
+      if (sourceAttribute === "appCoverSrc") image.loading = "eager";
       image.setAttribute("src", source);
       delete image.dataset[sourceAttribute];
 
@@ -574,7 +600,7 @@
       if (!card || !image || !label || !item) return false;
 
       const displayTitle = displayAlbumCardTitle(item.title);
-      const expectedThumb = String(item.thumb || "").trim();
+      const expectedThumb = resolveRuntimeAssetUrl(item.thumb);
       const currentThumb = String(image.getAttribute("src") || image.dataset.coverSrc || "").trim();
       const sameCover = Boolean(
         expectedThumb &&

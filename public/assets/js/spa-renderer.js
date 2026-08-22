@@ -1058,8 +1058,11 @@
       destinationRoute.setAttribute("data-spa-route-state", "current");
       installSpaSupplementalNodes(preparedRoute.supplementalNodes);
       preserveOrRemoveSourceRoute();
-      applyRequestedScroll();
+      // Reapply device/runtime classes before restoring scroll. On iPhone the
+      // Home grid is one column only when `ios-device` is present; scrolling
+      // against the temporary two-column geometry clamps a valid deep offset.
       runPersistentUiPrepaintSync();
+      applyRequestedScroll();
 
       if (animateEntry) {
         window.requestAnimationFrame(function () {
@@ -1111,8 +1114,11 @@
       routeLayersAtPromote = routeHost.querySelectorAll(".spa-route-layer").length;
       setSpaHandoffSafetyColor(getSpaRouteSafetyColor(destinationRoute));
       document.body.className = bodyClassName;
-      applyRequestedScroll();
+      // The destination must have its final iPhone/PWA geometry before the
+      // saved offset and anchor correction are applied. These synchronous DOM
+      // operations still complete before the promoted route can paint.
       runPersistentUiPrepaintSync();
+      applyRequestedScroll();
       domMutationMs = Math.max(0, Math.round(getAudioTelemetryNow() - mutationStartedAt));
 
       await nextSpaAnimationFrame();

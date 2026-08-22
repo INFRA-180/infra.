@@ -59,14 +59,29 @@ async function testIosSwapUsesNativePaintedHandoff() {
   const retainedIndex = handoff.indexOf("sourceRetainedUntilPromote");
   const promoteIndex = handoff.indexOf('destinationRoute.classList.remove("is-staged")');
   const bodyIndex = handoff.indexOf("document.body.className = bodyClassName");
+  const prepaintSyncIndex = handoff.indexOf("runPersistentUiPrepaintSync()", bodyIndex);
+  const scrollRestoreIndex = handoff.indexOf("applyRequestedScroll()", bodyIndex);
   const postPromoteFrameIndex = handoff.indexOf("await nextSpaAnimationFrame()");
   const detachIndex = handoff.indexOf("preserveOrRemoveSourceRoute()", postPromoteFrameIndex);
   assert.ok(stagedIndex >= 0 && stagedIndex < appendIndex, "destination must be staged before insertion");
   assert.ok(appendIndex < renderingIndex, "destination must be inserted before its rendering opportunity");
   assert.ok(renderingIndex < retainedIndex && retainedIndex < promoteIndex, "source must remain attached through staging");
   assert.ok(promoteIndex < bodyIndex, "destination must be promoted before the global route class changes");
-  assert.ok(bodyIndex < postPromoteFrameIndex, "promoted destination needs a painted frame before cleanup");
+  assert.ok(
+    bodyIndex < prepaintSyncIndex && prepaintSyncIndex < scrollRestoreIndex,
+    "final iPhone/PWA geometry must be synchronized before restoring the saved scroll"
+  );
+  assert.ok(scrollRestoreIndex < postPromoteFrameIndex, "promoted destination needs a painted frame before cleanup");
   assert.ok(postPromoteFrameIndex < detachIndex, "source must detach only after destination promotion");
+
+  const swapFunctionStart = spaSource.indexOf("function swapSpaFragment");
+  const simpleSwapStart = spaSource.indexOf("function applySwap()", swapFunctionStart);
+  const simpleSwapEnd = spaSource.indexOf("async function applyPaintedHandoff", simpleSwapStart);
+  const simpleSwap = spaSource.slice(simpleSwapStart, simpleSwapEnd);
+  assert.ok(
+    simpleSwap.indexOf("runPersistentUiPrepaintSync()") < simpleSwap.indexOf("applyRequestedScroll()"),
+    "the non-handoff swap must also settle final geometry before scroll restoration"
+  );
   assert.ok(spaSource.includes('handoff_strategy: mode === "painted_handoff" ? "dual_route" : ""'));
   assert.ok(spaSource.includes("SPA_ROUTE_THEME_PROPERTIES"), "route themes must be frozen during the painted handoff");
   assert.ok(spaSource.includes("freezeSpaRouteTheme(sourceRoute"), "the outgoing route theme is not frozen");
@@ -214,6 +229,22 @@ function testWebKitHistoryQuotaGuard() {
   assert.ok(!spaSource.includes("history.replaceState("), "SPA renderer still calls replaceState without the safe writer");
 }
 
+function testStandaloneScrollbarPolicy() {
+  assert.ok(
+    scriptsSource.includes('document.documentElement.classList.toggle("pwa-standalone", isStandaloneDisplayMode())'),
+    "legacy installed iOS mode must expose a root class for PWA-only styling"
+  );
+  assert.ok(stylesSource.includes("@media (display-mode: standalone)"), "standalone display mode CSS is missing");
+  assert.ok(stylesSource.includes("html.pwa-standalone"), "legacy standalone CSS fallback is missing");
+  assert.ok(stylesSource.includes("scrollbar-width: none"), "the standard scrollbar suppression is missing");
+  assert.ok(stylesSource.includes("body::-webkit-scrollbar"), "the WebKit scrollbar suppression is missing");
+  assert.ok(
+    !stylesSource.includes("html.pwa-standalone {\n  overflow: hidden") &&
+      !stylesSource.includes("@media (display-mode: standalone) {\n  html {\n    overflow: hidden"),
+    "hiding the PWA scrollbar must never disable document scrolling"
+  );
+}
+
 async function main() {
   await testRuntimeClassSanitizer();
   await testIosSwapUsesNativePaintedHandoff();
@@ -222,7 +253,8 @@ async function main() {
   testCoverSwapHasNoSnapshotOrSecondDecode();
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
-  console.log("audiofix397 SPA/transport tests: ok");
+  testStandaloneScrollbarPolicy();
+  console.log("audiofix398 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

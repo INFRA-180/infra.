@@ -1,5 +1,32 @@
 # Implementation Notes
 
+## 2026-08-22 — audiofix398 retour PWA stable et covers sans flash
+
+- Une reproduction mobile/PWA sur la version publique a prouvé que l'historique conservait la
+  bonne position (`6995 px`) et la renvoyait correctement au `popstate`. Le défaut venait de
+  l'ordre du rendu : l'accueil était encore calculé en grille mobile 2 colonnes lorsque
+  `scrollTo(0, 6995)` était exécuté. WebKit/Chromium plafonnait alors le scroll à `3137 px`, puis
+  la classe `ios-device` remettait la grille en 1 colonne sans corriger la position.
+- La route rétablit désormais ses classes runtime et sa géométrie iPhone avant d'appliquer la
+  position et la correction d'ancre, dans les deux chemins de swap. Les covers déjà décodées et
+  retenues autour de la carte touchée correspondent ainsi réellement au viewport restauré : le
+  flash mesuré de trois images sans `currentSrc` pendant 200 à 470 ms disparaît sans rendre les
+  31 covers eager ni augmenter inutilement les téléchargements.
+- La barre de défilement du document est masquée uniquement dans la PWA installée, avec
+  `scrollbar-width: none`, le repli WebKit `::-webkit-scrollbar` et une classe
+  `pwa-standalone` pour l'ancien signal iOS. Le défilement, le zoom et la liste interne « à
+  suivre » restent fonctionnels.
+- Références : [MDN — `History.scrollRestoration`](https://developer.mozilla.org/en-US/docs/Web/API/History/scrollRestoration),
+  [MDN — History API](https://developer.mozilla.org/en-US/docs/Web/API/History_API/Working_with_the_History_API),
+  [web.dev — View Transitions SPA](https://web.dev/learn/css/view-transitions-spas) et
+  [MDN — `::-webkit-scrollbar`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Selectors/%3A%3A-webkit-scrollbar).
+- Garde de non-régression : le test SPA impose maintenant l'ordre `classe de route -> géométrie
+  runtime -> scroll -> paint` pour les deux swaps et vérifie que masquer la barre ne désactive
+  jamais le scroll. La validation PWA mobile en Fast 4G avec CPU ×4 restaure `6995 px` et la carte
+  à `232 px`, affiche 3 covers visibles sur 3 dès la première frame, avec LCP retour 141 ms,
+  INP 75 ms et CLS 0. Identifiants atomiques : runtime/CSS `audiofix398-20260822`, Service Worker
+  `infra-shell-20260822-audio398`.
+
 ## 2026-08-22 — audiofix397 consolidation PWA, covers et télémétrie lisible
 
 - Les traces Chrome isolées donnent un LCP de 227 ms sans Service Worker et 305 ms avec le shell

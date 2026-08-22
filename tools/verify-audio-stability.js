@@ -14,10 +14,10 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix397-20260822";
-const shellRelease = "infra-shell-20260822-audio397";
-const cssRelease = "audiofix397-20260822";
-const frozenCssSha256 = "fb0d382ea68134269952dea7dbf44dd9015425b475bf9503971a509b072c78ce";
+const release = "audiofix398-20260822";
+const shellRelease = "infra-shell-20260822-audio398";
+const cssRelease = "audiofix398-20260822";
+const frozenCssSha256 = "26557040f359c93dc789856743560fcd240c5e7adca9c1f8492c80b1c91dc951";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");
@@ -48,9 +48,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix397");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix397");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio396");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix398");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix398");
+expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio398");
 expect(scripts.includes(`const SPA_SHELL_VERSION = "${shellRelease}"`), "runtime shell version is stale");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
@@ -483,4 +483,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix397.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix398.");

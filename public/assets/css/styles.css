@@ -200,6 +200,35 @@ body {
   min-height: 100%;
 }
 
+/* Keep document scrolling intact while removing the browser chrome-like rail
+   from the installed PWA. The class is a legacy iOS fallback for
+   navigator.standalone; the media query is the standards-based path. */
+html.pwa-standalone,
+html.pwa-standalone body {
+  scrollbar-width: none;
+}
+
+html.pwa-standalone::-webkit-scrollbar,
+html.pwa-standalone body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+@media (display-mode: standalone) {
+  html,
+  body {
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
 html {
   height: auto;
   background-color: var(--pwa-status-bg);

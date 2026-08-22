@@ -14,9 +14,9 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix396-20260822";
-const shellRelease = "infra-shell-20260822-audio396";
-const cssRelease = "audiofix396-20260822";
+const release = "audiofix397-20260822";
+const shellRelease = "infra-shell-20260822-audio397";
+const cssRelease = "audiofix397-20260822";
 const frozenCssSha256 = "fb0d382ea68134269952dea7dbf44dd9015425b475bf9503971a509b072c78ce";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
@@ -30,6 +30,7 @@ const transport = read("public/assets/js/transport-ui.js");
 const visualizer = read("public/assets/js/audio-visualizer.js");
 const telemetry = read("public/assets/js/audio-telemetry.js");
 const covers = read("public/assets/js/covers.js");
+const homeCatalog = read("public/assets/js/home-catalog.js");
 const spa = read("public/assets/js/spa-renderer.js");
 const spaRouter = read("public/assets/js/spa-router.js");
 const sphragis = read("public/assets/js/sphragis.js");
@@ -47,8 +48,8 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix396");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix396");
+expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix397");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix397");
 expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio396");
 expect(scripts.includes(`const SPA_SHELL_VERSION = "${shellRelease}"`), "runtime shell version is stale");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
@@ -62,6 +63,8 @@ expect(sw.includes("const MAX_COVER_CACHE_ENTRIES = 31"), "Service Worker cover 
 expect(sw.includes("await reconcileCoverCache()"), "Service Worker activation does not purge stale cover entries");
 expect(scripts.includes("const ALBUM_COVER_IMAGE_CACHE_LIMIT = 4"), "cover memory cache is not minimal");
 expect(scripts.includes("const ALBUM_COVER_PREPARE_LIMIT = 2"), "cover warmup is not bounded");
+expect(homeCatalog.includes('querySelectorAll("img[data-cover-src]")'), "offscreen home covers are not explicitly deferred");
+expect(homeCatalog.includes('rootMargin: "320px 0px"'), "home cover observer has no bounded preload margin");
 expect(!transport.includes("nowPlayingMetaIdleTimer"), "desktop metadata idle timer is still present");
 expect(!transport.includes("is-meta-idle"), "desktop metadata idle state is still present");
 expect(!styles.includes("is-meta-idle"), "desktop metadata idle opacity rule is still present");
@@ -480,4 +483,4 @@ for (const fileName of albumCoverUrls) {
 }
 expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix396.");
+if (!process.exitCode) console.log("Audio stability checks passed for audiofix397.");

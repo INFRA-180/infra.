@@ -1,6 +1,6 @@
 # Implementation Notes
 
-## 2026-08-22 — audiofix396 consolidation PWA, covers et télémétrie lisible
+## 2026-08-22 — audiofix397 consolidation PWA, covers et télémétrie lisible
 
 - Les traces Chrome isolées donnent un LCP de 227 ms sans Service Worker et 305 ms avec le shell
   PWA, CLS 0 et aucune erreur console. Le rendu normal n'est donc pas lent ; le défaut restant
@@ -17,8 +17,10 @@
 - La politique cover reste volontairement à un seul WebP 1200 × 1200 par album. Le Service Worker
   possède l'allowlist exacte des 31 fichiers, plafonne `infra-covers-v2` à 31 et supprime à
   l'activation toute entrée obsolète sans vider les covers valides. Le warmup est limité à 2 covers
-  sur tous les appareils et la mémoire décodée à 4, au lieu de préparer potentiellement les 31 dans
-  le navigateur classique.
+  sur tous les appareils et la mémoire décodée à 4. Les 27 covers album hors premier écran et les
+  16 tuiles de playlists n'ont plus de `src` initial : un `IntersectionObserver` à 320 px les active
+  à l'approche du viewport. Le test mobile local passe ainsi de 31 covers demandées à 10 images
+  actives, dont seulement 2 déjà écrites dans le cache après le lancement.
 - Le rapport privé filtre par défaut le schéma v4 et le build actif ; `--schema`, `--build`,
   `--platform` et `--since` permettent les audits ciblés. Il pagine jusqu'à 250 clés et avertit
   sous 20 lancements ou lectures, afin qu'un p95 sur trois lectures ne soit plus présenté comme une
@@ -32,8 +34,8 @@
   cover exact et les limites de warmup. La PWA déjà installée se met à jour normalement ; aucune
   réinstallation ni service payant n'est requis.
 - Validation : 19 contrôles de régression, syntaxe Worker/runtime, déploiement Wrangler et lecture
-  R2 passent. Identifiants atomiques : runtime/CSS `audiofix396-20260822`, Service Worker
-  `infra-shell-20260822-audio396`.
+  R2 passent. Identifiants atomiques : runtime/CSS `audiofix397-20260822`, Service Worker
+  `infra-shell-20260822-audio397`.
 
 ## 2026-08-21 — audiofix395 démarrage PWA sans dépendance CSS tierce
 

@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix396-20260822",
-  shell: "infra-shell-20260822-audio396",
+  build: "audiofix397-20260822",
+  shell: "infra-shell-20260822-audio397",
   albums: 31,
   tracks: 284
 });
@@ -267,6 +267,8 @@ function verifyNoLegacyRuntimeCovers() {
 
   const tracks = readJson("public/data/tracks.json");
   const scripts = fs.readFileSync(path.join(publicRoot, "assets/js/scripts.js"), "utf8");
+  const home = fs.readFileSync(path.join(publicRoot, "index.html"), "utf8");
+  const homeCatalog = fs.readFileSync(path.join(publicRoot, "assets/js/home-catalog.js"), "utf8");
   const sw = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
   const expectedCovers = new Set(
     (tracks.albums || []).map((album) => String(album.cover || "").replace(/^\/+/, ""))
@@ -315,10 +317,25 @@ function verifyNoLegacyRuntimeCovers() {
   ) {
     fail("bounded cover cache/warmup policy is incomplete");
   }
+  const homeAlbumImages = [...home.matchAll(/<img class="album-thumb album-cover"[^>]+>/g)].map((match) => match[0]);
+  const eagerHomeCovers = homeAlbumImages.filter((tag) => /\ssrc="/.test(tag));
+  const deferredHomeCovers = homeAlbumImages.filter((tag) => /\sdata-cover-src="/.test(tag));
+  const deferredPlaylistTiles = [...home.matchAll(/<img class="playlist-cover-tile"[^>]+>/g)]
+    .filter((match) => /\sdata-cover-src="/.test(match[0]));
+  if (
+    homeAlbumImages.length !== expected.albums ||
+    eagerHomeCovers.length !== 4 ||
+    deferredHomeCovers.length !== expected.albums - 4 ||
+    deferredPlaylistTiles.length !== 16 ||
+    !homeCatalog.includes('querySelectorAll("img[data-cover-src]")') ||
+    !homeCatalog.includes('rootMargin: "320px 0px"')
+  ) {
+    fail("home cover network deferral policy is incomplete");
+  }
 
   console.log(
     `Canonical cover policy passed: ${physicalCovers.size} physical covers, ` +
-    "one per album, exact SW allowlist, warmup capped at 2."
+    "one per album, exact SW allowlist, warmup capped at 2, offscreen network deferred."
   );
 }
 

@@ -12,6 +12,7 @@
     const catalogState = ctx.catalogState || {
       data: null,
       albumGridObserver: null,
+      albumCoverObserver: null,
       albumGridScrollHandler: null
     };
     const clipState = ctx.clipState || {
@@ -327,11 +328,12 @@
       image.width = item.width;
       image.height = item.height;
       image.style.aspectRatio = `${item.width} / ${item.height}`;
-      image.src = item.thumb;
       image.alt = item.thumbAlt || item.title;
       image.decoding = "async";
       const eagerCount = isApp ? 3 : 4;
       const shouldEager = index < eagerCount;
+      if (shouldEager || isApp) image.src = item.thumb;
+      else image.dataset.coverSrc = item.thumb;
       image.loading = shouldEager ? "eager" : "lazy";
       image.setAttribute("fetchpriority", shouldEager ? "high" : "low");
       if (isApp && item.thumbSrcset) image.setAttribute("srcset", item.thumbSrcset);
@@ -374,6 +376,34 @@
       }
     }
 
+    function observeDeferredAlbumCovers(root) {
+      const scope = root || document;
+      const images = Array.from(scope.querySelectorAll("img[data-cover-src]"));
+      if (!images.length) return;
+      const load = function (image) {
+        const source = String(image && image.dataset && image.dataset.coverSrc || "").trim();
+        if (!source) return;
+        image.setAttribute("src", source);
+        delete image.dataset.coverSrc;
+      };
+      if (!("IntersectionObserver" in window)) {
+        images.forEach(load);
+        return;
+      }
+      if (!catalogState.albumCoverObserver) {
+        catalogState.albumCoverObserver = new IntersectionObserver(function (entries, observer) {
+          entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            observer.unobserve(entry.target);
+            load(entry.target);
+          });
+        }, { rootMargin: "320px 0px" });
+      }
+      images.forEach(function (image) {
+        catalogState.albumCoverObserver.observe(image);
+      });
+    }
+
     function renderProgressiveAlbumGrid(grid, items) {
       resetProgressiveAlbumGrid();
 
@@ -403,6 +433,7 @@
           fragment.appendChild(buildCatalogCard(albums[index], "album", index));
         }
         grid.insertBefore(fragment, sentinel);
+        observeDeferredAlbumCovers(document);
         rendered = nextLimit;
         finished = rendered >= albums.length;
         sentinel.hidden = finished;
@@ -482,7 +513,7 @@
 
       const displayTitle = displayAlbumCardTitle(item.title);
       const expectedThumb = String(item.thumb || "").trim();
-      const currentThumb = String(image.getAttribute("src") || "").trim();
+      const currentThumb = String(image.getAttribute("src") || image.dataset.coverSrc || "").trim();
       const sameCover = Boolean(
         expectedThumb &&
         getAssetFileName(currentThumb) === getAssetFileName(expectedThumb)
@@ -491,7 +522,13 @@
       card.setAttribute("href", String(item.page || ""));
       card.setAttribute("aria-label", `Ouvrir l'album ${displayTitle}`);
       if (!sameCover) {
-        image.setAttribute("src", expectedThumb);
+        if (index < 4) {
+          image.setAttribute("src", expectedThumb);
+          delete image.dataset.coverSrc;
+        } else {
+          image.removeAttribute("src");
+          image.dataset.coverSrc = expectedThumb;
+        }
         delete image.dataset.spaCoverLocked;
       }
       image.removeAttribute("srcset");
@@ -538,6 +575,7 @@
         if (node && node.parentNode === grid) node.remove();
       });
       grid.dataset.catalogReady = "1";
+      observeDeferredAlbumCovers(document);
       return true;
     }
 
@@ -562,7 +600,9 @@
         const lockedCover = lockedCoverMatchesCatalog(image, item.thumb);
 
         if (getCardAttribute(card, "href") !== String(item.page || "").trim()) return false;
-        if (!lockedCover && getCardAttribute(image, "src") !== String(item.thumb || "").trim()) return false;
+        const currentCover = getCardAttribute(image, "src") || getCardAttribute(image, "data-cover-src");
+        if (!lockedCover && currentCover !== String(item.thumb || "").trim()) return false;
+        if (shouldEager && !getCardAttribute(image, "src")) return false;
         if (getCardAttribute(image, "alt") !== String(item.thumbAlt || item.title || "").trim()) return false;
         if (getCardAttribute(image, "width") !== String(item.width || "")) return false;
         if (getCardAttribute(image, "height") !== String(item.height || "")) return false;
@@ -579,6 +619,7 @@
       if (!homeAlbumGridMatchesCatalog(grid, albums)) return false;
       resetProgressiveAlbumGrid();
       grid.dataset.catalogReady = "1";
+      observeDeferredAlbumCovers(document);
       return true;
     }
 

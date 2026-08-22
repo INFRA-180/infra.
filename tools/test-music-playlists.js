@@ -192,12 +192,15 @@ for (const contract of expected) {
   const cardStart = index.indexOf(`href="playlists/${contract.slug}.html"`);
   const cardEnd = index.indexOf("</a>", cardStart);
   const card = index.slice(cardStart, cardEnd);
-  const cardCovers = [...card.matchAll(/class="playlist-cover-tile" src="assets\/music\/responsive\/([^"]+)"/g)].map((match) => match[1]);
+  const cardCovers = [...card.matchAll(/class="playlist-cover-tile" data-cover-src="assets\/music\/responsive\/([^"]+)"/g)].map((match) => match[1]);
   if (JSON.stringify(cardCovers) !== JSON.stringify(contract.covers) || card.includes("playlist-cover-image") || card.includes(contract.archivedCover)) {
     fail(`home page mosaic is incorrect for ${contract.name}`);
   }
   if ((card.match(/class="playlist-cover-tile"[^>]+loading="lazy"/g) || []).length !== 4 || (card.match(/class="playlist-cover-tile"[^>]+fetchpriority="low"/g) || []).length !== 4) {
     fail(`home page mosaic loading is incorrect for collapsed ${contract.name}`);
+  }
+  if (/class="playlist-cover-tile"\s+src=/.test(card)) {
+    fail(`collapsed home mosaic eagerly downloads covers for ${contract.name}`);
   }
   if (!card.includes(`<span class="playlist-card-title">${contract.symbol}</span>`) || card.includes(`<span class="playlist-card-title">${contract.name}</span>`)) {
     fail(`home page does not show only the sign for ${contract.name}`);

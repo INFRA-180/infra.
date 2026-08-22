@@ -94,6 +94,14 @@ async function testIosSwapUsesNativePaintedHandoff() {
     liveCaptureBody.includes("freezeLiveHomeResourceUrls(currentRoute"),
     "Home resource URLs must be frozen before navigation changes the document base URL"
   );
+  const freezeStart = spaSource.indexOf("function freezeLiveHomeResourceUrls");
+  const freezeEnd = spaSource.indexOf("function lockLiveHomeCover", freezeStart);
+  const freezeBody = spaSource.slice(freezeStart, freezeEnd);
+  assert.ok(
+    freezeBody.includes('querySelectorAll("[data-cover-src]")') &&
+      freezeBody.includes('setAttribute("data-cover-src", normalizeUrlAgainstBase(value, baseUrl))'),
+    "deferred Home covers must be absolute before the album URL becomes the document base"
+  );
   assert.ok(spaSource.includes("route_layers_at_promote"), "the promoted two-layer state is not measured");
   assert.ok(spaSource.includes("route_layers_after_detach"), "the post-handoff layer state is not measured");
   assert.ok(spaSource.includes("route_host_has_current"), "the route host invariant is not measured");
@@ -254,7 +262,7 @@ async function main() {
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
   testStandaloneScrollbarPolicy();
-  console.log("audiofix398 SPA/transport tests: ok");
+  console.log("audiofix399 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

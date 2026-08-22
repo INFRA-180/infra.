@@ -1,5 +1,21 @@
 # Implementation Notes
 
+## 2026-08-22 — audiofix399 URLs différées stables pendant la navigation
+
+- La vérification réseau après `audiofix398` a isolé un second défaut masqué par le cache : cinq
+  covers hors écran gardaient un `data-cover-src` relatif lorsque l'accueil retenu passait sous
+  l'URL d'un album. Si l'`IntersectionObserver` les activait à cet instant, le navigateur demandait
+  `/music/assets/music/responsive/...` et recevait `404`; une cover déjà en cache restait fluide,
+  une autre pouvait clignoter.
+- La capture live de l'accueil convertit maintenant les `data-cover-src` différés en URL absolue,
+  en plus des `src`, `srcset` et `poster`. Le chargement progressif reste minimal : aucune cover
+  supplémentaire n'est forcée, seule sa future adresse devient indépendante de la route courante.
+- Le garde SPA vérifie explicitement cette normalisation. La reproduction PWA locale confirme
+  34 sources différées absolues, aucune source `/music/assets/...`, aucune erreur console et 46
+  requêtes sur 46 en `200`, tout en restaurant `6995 px` et 3 covers visibles sur 3. Identifiants
+  atomiques : runtime/CSS `audiofix399-20260822`, Service Worker
+  `infra-shell-20260822-audio399`.
+
 ## 2026-08-22 — audiofix398 retour PWA stable et covers sans flash
 
 - Une reproduction mobile/PWA sur la version publique a prouvé que l'historique conservait la

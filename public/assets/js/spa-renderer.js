@@ -295,6 +295,12 @@
     if (!root || typeof root.querySelectorAll !== "function") return 0;
     let frozen = 0;
 
+    root.querySelectorAll("[data-cover-src]").forEach(function (element) {
+      const value = String(element.getAttribute("data-cover-src") || "").trim();
+      if (!value) return;
+      element.setAttribute("data-cover-src", normalizeUrlAgainstBase(value, baseUrl));
+      frozen += 1;
+    });
     root.querySelectorAll("img[src], source[src]").forEach(function (element) {
       const value = String(element.getAttribute("src") || "").trim();
       if (!value) return;

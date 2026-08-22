@@ -8,8 +8,8 @@ const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
 const expected = Object.freeze({
-  build: "audiofix399-20260822",
-  shell: "infra-shell-20260822-audio399",
+  build: "audiofix400-20260822",
+  shell: "infra-shell-20260822-audio400",
   albums: 31,
   tracks: 284
 });
@@ -324,8 +324,10 @@ function verifyNoLegacyRuntimeCovers() {
     .filter((match) => /\sdata-cover-src="/.test(match[0]));
   if (
     homeAlbumImages.length !== expected.albums ||
-    eagerHomeCovers.length !== 4 ||
-    deferredHomeCovers.length !== expected.albums - 4 ||
+    eagerHomeCovers.length !== 2 ||
+    deferredHomeCovers.length !== expected.albums - 2 ||
+    eagerHomeCovers.filter((tag) => /fetchpriority="high"/.test(tag)).length !== 1 ||
+    eagerHomeCovers.filter((tag) => /fetchpriority="auto"/.test(tag)).length !== 1 ||
     deferredPlaylistTiles.length !== 16 ||
     !homeCatalog.includes('querySelectorAll("img[data-cover-src]")') ||
     !homeCatalog.includes('rootMargin: "320px 0px"')
@@ -367,7 +369,8 @@ function runRegressionSuite() {
     "tools/test-favorites-page-ui.js",
     "tools/test-share-qr-ui.js",
     "tools/test-spa-page-cache.js",
-    "tools/test-startup-ready-reload.js",
+    "tools/test-service-worker-update-lifecycle.js",
+    "tools/test-audiofix400-fluidity.js",
     "tools/test-transport-pip.js",
     "tools/verify-audio-stability.js",
     "tools/verify-public-boundary.js"

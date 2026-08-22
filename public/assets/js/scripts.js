@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix399-20260822";
+window.INFRA_BUILD_TAG = "audiofix400-20260822";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -234,10 +234,7 @@ function openAppDownloadGatekeeper(appName, url) {
     prepaintSyncActive: false,
     pwaCoverHold: null,
     liveHomeRoute: null,
-    pageCacheApi: null,
-    shellWarmupScheduled: false,
-    shellWarmupDone: false,
-    shellWarmupAttempts: 0
+    pageCacheApi: null
   };
 
   const audioState = {
@@ -482,7 +479,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260822-audio399";
+  const SPA_SHELL_VERSION = "infra-shell-20260822-audio400";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -490,7 +487,7 @@ function openAppDownloadGatekeeper(appName, url) {
     : 240;
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix399-20260822";
+  const LOCAL_CATALOG_VERSION = "audiofix400-20260822";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -511,7 +508,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix399-20260822";
+  const runtimeVersion = "audiofix400-20260822";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -723,7 +720,6 @@ function openAppDownloadGatekeeper(appName, url) {
       markAudioTelemetryInactive,
       buildAudioMonitorPayload,
       getAudioBufferedEnd,
-      scheduleDeferredServiceWorkerReload,
       syncCurrentTrackDurationFromAudio,
       maybePrefetchNextTrack,
       logAudioAuditEvent,
@@ -1169,7 +1165,6 @@ function openAppDownloadGatekeeper(appName, url) {
       setThemeColor,
       syncPwaStatusColor,
       syncTransportUi,
-      scheduleDeferredServiceWorkerReload,
       getCurrentPlayableAudioSrc,
       getCurrentPlaylistTrack,
       normalizeTrackTitle,
@@ -1465,21 +1460,10 @@ function openAppDownloadGatekeeper(appName, url) {
   let adminScriptPromise = null;
   let serviceWorkerRegistered = false;
   let serviceWorkerControllerChangeBound = false;
-  let serviceWorkerControllerReloading = false;
-  let serviceWorkerControllerReloadPending = false;
-  let serviceWorkerControllerReloadTimer = 0;
-  let startupReady = false;
   let serviceWorkerRegistrationRef = null;
   let serviceWorkerReportedVersion = "";
-  let serviceWorkerWaitingActivationWorker = null;
   let serviceWorkerLastUpdateCheckAt = 0;
-  const pageOpenedAt = getAudioTelemetryNow();
   let serviceWorkerControllerChangeAt = 0;
-  let serviceWorkerReloadExecutedAt = 0;
-  let lastUserInteractionAt = getAudioTelemetryNow();
-  let documentVisibleSinceAt = document.visibilityState === "visible" ? getAudioTelemetryNow() : 0;
-  const SERVICE_WORKER_RELOAD_MIN_IDLE_MS = 8000;
-  const SERVICE_WORKER_RELOAD_MIN_VISIBLE_MS = 2000;
   const SERVICE_WORKER_UPDATE_CHECK_MIN_MS = 60000;
 
   function purgeAdminUi() {
@@ -2942,134 +2926,28 @@ function openAppDownloadGatekeeper(appName, url) {
     purgeAdminUi();
   }
 
-  function getServiceWorkerReloadState() {
-    const now = getAudioTelemetryNow();
+  function buildServiceWorkerTransitionTelemetry(extra) {
     const audio = audioState.audio;
     const audioPlaying = Boolean(audio && !audio.paused && getCurrentPlayableAudioSrc(audio));
-    const trackStarting = Boolean(audioState.trackStartInFlight);
-    // A paused detached player must not be destroyed by a deferred runtime
-    // reload. Treat Document PiP like the fullscreen surface for reload safety.
     const overlayOpen = Boolean(
       audioState.nowPlayingOpen ||
       audioState.nowPlayingClosing ||
       audioState.transportPipOpen ||
       audioState.transportPipOpening
     );
-    const navigationActive = Boolean(spaState.navigationActive);
-    const visible = document.visibilityState === "visible";
-    const idleForMs = Math.max(0, Math.round(now - lastUserInteractionAt));
-    const visibleForMs = visible && documentVisibleSinceAt ? Math.max(0, Math.round(now - documentVisibleSinceAt)) : 0;
-    return {
-      audioPlaying,
-      trackStarting,
-      overlayOpen,
-      navigationActive,
-      visible,
-      idleForMs,
-      visibleForMs,
-      idleSafe: idleForMs >= SERVICE_WORKER_RELOAD_MIN_IDLE_MS,
-      visibleSafe: visibleForMs >= SERVICE_WORKER_RELOAD_MIN_VISIBLE_MS
-    };
-  }
-
-  function buildServiceWorkerReloadTelemetry(extra) {
-    const state = getServiceWorkerReloadState();
     return Object.assign({
-      page_delta_ms: Math.max(0, Math.round(getAudioTelemetryNow() - pageOpenedAt)),
+      audioPlaying,
+      trackStarting: Boolean(audioState.trackStartInFlight),
+      overlayOpen,
       controllerchange_delta_ms: serviceWorkerControllerChangeAt
         ? Math.max(0, Math.round(getAudioTelemetryNow() - serviceWorkerControllerChangeAt))
         : null,
-      reload_executed_delta_ms: serviceWorkerReloadExecutedAt
-        ? Math.max(0, Math.round(getAudioTelemetryNow() - serviceWorkerReloadExecutedAt))
-        : null,
       visibility_state: document.visibilityState || "",
-      idle_for_ms: state.idleForMs,
-      visible_for_ms: state.visibleForMs,
-      audio_playing: state.audioPlaying,
-      track_starting: state.trackStarting,
-      overlay_open: state.overlayOpen,
-      navigation_active: state.navigationActive
+      audio_playing: audioPlaying,
+      track_starting: Boolean(audioState.trackStartInFlight),
+      overlay_open: overlayOpen,
+      navigation_active: Boolean(spaState.navigationActive)
     }, extra || {});
-  }
-
-  function isServiceWorkerReloadSafe() {
-    const state = getServiceWorkerReloadState();
-    return (
-      state.visible &&
-      state.idleSafe &&
-      state.visibleSafe &&
-      !state.audioPlaying &&
-      !state.trackStarting &&
-      !state.overlayOpen &&
-      !state.navigationActive
-    );
-  }
-
-  function getDeferredServiceWorkerReloadDelayMs() {
-    const state = getServiceWorkerReloadState();
-    if (!state.visible) return 0;
-    if (state.audioPlaying || state.trackStarting || state.overlayOpen) return 0;
-    return Math.max(
-      180,
-      SERVICE_WORKER_RELOAD_MIN_IDLE_MS - state.idleForMs + 180,
-      SERVICE_WORKER_RELOAD_MIN_VISIBLE_MS - state.visibleForMs + 180
-    );
-  }
-
-  function clearDeferredServiceWorkerReloadTimer() {
-    if (!serviceWorkerControllerReloadTimer) return;
-    window.clearTimeout(serviceWorkerControllerReloadTimer);
-    serviceWorkerControllerReloadTimer = 0;
-  }
-
-  function attemptDeferredServiceWorkerReload() {
-    clearDeferredServiceWorkerReloadTimer();
-    if (!serviceWorkerControllerReloadPending || serviceWorkerControllerReloading) return;
-    if (!startupReady) return;
-    if (!isServiceWorkerReloadSafe()) {
-      const delay = getDeferredServiceWorkerReloadDelayMs();
-      if (delay > 0) scheduleDeferredServiceWorkerReload(delay);
-      return;
-    }
-    serviceWorkerControllerReloadPending = false;
-    serviceWorkerControllerReloading = true;
-    serviceWorkerReloadExecutedAt = getAudioTelemetryNow();
-    trackAudioRuntimeEvent("sw_reload_executed", buildServiceWorkerReloadTelemetry());
-    flushAudioTelemetryQueue({ beacon: true });
-    window.setTimeout(function () {
-      window.location.reload();
-    }, 80);
-  }
-
-  function scheduleDeferredServiceWorkerReload(delayMs) {
-    if (!serviceWorkerControllerReloadPending || serviceWorkerControllerReloading) return;
-    if (!startupReady) return;
-    clearDeferredServiceWorkerReloadTimer();
-    serviceWorkerControllerReloadTimer = window.setTimeout(
-      attemptDeferredServiceWorkerReload,
-      Math.max(0, Number(delayMs) || 180)
-    );
-  }
-
-  function markServiceWorkerReloadPendingForRuntime() {
-    try {
-      const reloadKey = "infra_sw_controller_reload_runtime_v2";
-      const previousRuntime = String(sessionStorage.getItem(reloadKey) || "").trim();
-      if (previousRuntime === runtimeVersion) return false;
-      sessionStorage.setItem(reloadKey, runtimeVersion);
-    } catch (_err) {
-      // Ignore storage errors; the in-memory pending flag still protects the session.
-    }
-    serviceWorkerControllerReloadPending = true;
-    trackAudioRuntimeEvent("sw_reload_pending", buildServiceWorkerReloadTelemetry());
-    return true;
-  }
-
-  function noteUserInteractionForServiceWorkerReload() {
-    lastUserInteractionAt = getAudioTelemetryNow();
-    if (serviceWorkerControllerReloadPending) {
-      scheduleDeferredServiceWorkerReload(SERVICE_WORKER_RELOAD_MIN_IDLE_MS + 180);
-    }
   }
 
   function readStoragePersistRequestMarker() {
@@ -3163,9 +3041,6 @@ function openAppDownloadGatekeeper(appName, url) {
     });
   }
 
-  ["pointerdown", "touchstart", "click", "keydown", "scroll"].forEach(function (eventName) {
-    window.addEventListener(eventName, noteUserInteractionForServiceWorkerReload, { passive: true });
-  });
   if (isStandaloneDisplayMode()) {
     ["pointerdown", "touchstart", "keydown"].forEach(function (eventName) {
       window.addEventListener(eventName, beginPwaStorageObservation, { capture: true, passive: true });
@@ -3174,12 +3049,8 @@ function openAppDownloadGatekeeper(appName, url) {
 
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState !== "visible") return;
-    documentVisibleSinceAt = getAudioTelemetryNow();
     callAudioRadio("scheduleSystemInterruptionResumeAfterActive", ["visibility_sample"]);
     requestServiceWorkerUpdateCheck("visible");
-    if (serviceWorkerControllerReloadPending) {
-      scheduleDeferredServiceWorkerReload(SERVICE_WORKER_RELOAD_MIN_VISIBLE_MS + 180);
-    }
   });
 
   function requestServiceWorkerUpdateCheck(reason) {
@@ -3189,9 +3060,7 @@ function openAppDownloadGatekeeper(appName, url) {
       return;
     }
     serviceWorkerLastUpdateCheckAt = now;
-    serviceWorkerRegistrationRef.update().then(function () {
-      maybeActivateWaitingServiceWorker(serviceWorkerRegistrationRef, reason || "update");
-    }).catch(function () {
+    serviceWorkerRegistrationRef.update().catch(function () {
       // Ignore update probe failures; the app keeps using the active shell.
     });
   }
@@ -3206,26 +3075,6 @@ function openAppDownloadGatekeeper(appName, url) {
     }
   }
 
-  function maybeActivateWaitingServiceWorker(registration, reason) {
-    const waiting = registration && registration.waiting;
-    if (!waiting || typeof waiting.postMessage !== "function") return false;
-    if (serviceWorkerWaitingActivationWorker === waiting) return false;
-    const state = getServiceWorkerReloadState();
-    if (state.audioPlaying || state.trackStarting || state.overlayOpen || state.navigationActive) return false;
-    serviceWorkerWaitingActivationWorker = waiting;
-    trackAudioRuntimeEvent("sw_waiting_activation", buildServiceWorkerReloadTelemetry({
-      reason: reason || "safe_idle",
-      strategy: "safe_idle_skip_waiting"
-    }));
-    try {
-      waiting.postMessage({ type: "SKIP_WAITING" });
-      return true;
-    } catch (_err) {
-      serviceWorkerWaitingActivationWorker = null;
-      return false;
-    }
-  }
-
   function registerServiceWorker() {
     if (serviceWorkerRegistered) return;
     serviceWorkerRegistered = true;
@@ -3235,15 +3084,12 @@ function openAppDownloadGatekeeper(appName, url) {
 
     if (!serviceWorkerControllerChangeBound) {
       navigator.serviceWorker.addEventListener("controllerchange", function () {
-        if (serviceWorkerControllerReloading) return;
         serviceWorkerControllerChangeAt = getAudioTelemetryNow();
         serviceWorkerReportedVersion = "";
         window.setTimeout(requestActiveServiceWorkerVersion, 0);
-        spaState.shellWarmupAttempts = 0;
-        scheduleSpaAlbumShellWarmup("controllerchange");
-        trackAudioRuntimeEvent("sw_controllerchange", buildServiceWorkerReloadTelemetry());
-        if (!markServiceWorkerReloadPendingForRuntime()) return;
-        scheduleDeferredServiceWorkerReload();
+        trackAudioRuntimeEvent("sw_controllerchange", buildServiceWorkerTransitionTelemetry({
+          strategy: "natural_lifecycle"
+        }));
       });
       serviceWorkerControllerChangeBound = true;
     }
@@ -3254,25 +3100,7 @@ function openAppDownloadGatekeeper(appName, url) {
       .then(function (registration) {
         serviceWorkerRegistrationRef = registration;
         requestActiveServiceWorkerVersion();
-        if (registration.waiting) {
-          spaState.shellWarmupAttempts = 0;
-          scheduleSpaAlbumShellWarmup("registered_waiting");
-        }
-        maybeActivateWaitingServiceWorker(registration, "registered_waiting");
         requestServiceWorkerUpdateCheck("registered");
-
-        registration.addEventListener("updatefound", function () {
-          const worker = registration.installing;
-          if (!worker) return;
-          worker.addEventListener("statechange", function () {
-            if (worker.state === "installed") {
-              serviceWorkerWaitingActivationWorker = null;
-              spaState.shellWarmupAttempts = 0;
-              scheduleSpaAlbumShellWarmup("worker_installed");
-              maybeActivateWaitingServiceWorker(registration, "update_installed");
-            }
-          });
-        });
       })
       .catch(function () {
         // Ignore SW registration failures.
@@ -3623,143 +3451,6 @@ function openAppDownloadGatekeeper(appName, url) {
       cacheName: SPA_SHELL_CACHE_NAME,
       timeoutMs: SPA_PAGE_FETCH_TIMEOUT_MS
     }));
-  }
-
-  function scheduleSpaAlbumShellWarmup(reason) {
-    if (!spaState.enabled || spaState.shellWarmupDone || spaState.shellWarmupScheduled) return;
-    if (!spaState.pageCacheApi || typeof spaState.pageCacheApi.warm !== "function") return;
-    spaState.shellWarmupScheduled = true;
-
-    const run = function () {
-      spaState.shellWarmupAttempts += 1;
-      loadTracksData().then(function (tracksData) {
-        const albums = Array.isArray(tracksData && tracksData.albums) ? tracksData.albums : [];
-        const pages = Array.from(new Set(albums.map(function (album) {
-          const page = album && album.page
-            ? album.page
-            : (album && album.slug ? `music/${album.slug}.html` : "");
-          return page ? new URL(page, runtime.baseUrl).href : "";
-        }).filter(Boolean)));
-        if (!pages.length) return { requested: 0, warmed: 0 };
-        return spaState.pageCacheApi.warm(pages, {
-          cacheName: SPA_SHELL_CACHE_NAME,
-          concurrency: 4,
-          reason: reason || "shell_warmup"
-        });
-      }).then(function (result) {
-        const requested = Math.max(0, Number(result && result.requested) || 0);
-        const warmed = Math.max(0, Number(result && result.warmed) || 0);
-        spaState.shellWarmupDone = requested > 0 && warmed >= requested;
-      }).catch(function () {
-        spaState.shellWarmupDone = false;
-      }).finally(function () {
-        spaState.shellWarmupScheduled = false;
-        if (!spaState.shellWarmupDone && spaState.shellWarmupAttempts < 3) {
-          window.setTimeout(function () {
-            scheduleSpaAlbumShellWarmup("shell_retry");
-          }, 1200);
-        }
-      });
-    };
-
-    if (typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(run, { timeout: 450 });
-      return;
-    }
-    window.setTimeout(run, 80);
-  }
-
-  function scheduleSpaPagePrefetch() {
-    if (!spaState.enabled) return;
-
-    const seen = new Set();
-    const queue = [];
-    const current = new URL(window.location.href);
-
-    function enqueuePrefetchUrl(hrefLike) {
-      let url = null;
-      try {
-        url = new URL(String(hrefLike || ""), window.location.href);
-      } catch (_err) {
-        return;
-      }
-      if (!isSpaNavigableUrl(url)) return;
-
-      const key = getSpaPageCacheKey(url);
-      if (!key || seen.has(key)) return;
-      if (url.pathname === current.pathname && url.search === current.search) return;
-      seen.add(key);
-      queue.push(url.href);
-    }
-
-    const links = Array.from(document.querySelectorAll("a[href]"));
-    links.forEach(function (link) {
-      const href = String(link.getAttribute("href") || "").trim();
-      if (!href || href.startsWith("#")) return;
-      if (href.startsWith("mailto:") || href.startsWith("tel:")) return;
-      enqueuePrefetchUrl(link.href);
-    });
-
-    const isHome = document.body.classList.contains("home-screen");
-    if (!isHome) {
-      const homeHref = new URL("index.html", runtime.baseUrl).href;
-      const homeKey = getSpaPageCacheKey(homeHref);
-      if (homeKey && !seen.has(homeKey)) queue.unshift(homeHref);
-    }
-
-    const scheduleQueue = function () {
-      if (!queue.length) return;
-      const playbackActive = isAudioPlaybackActive();
-      let limit = isHome ? 21 : 8;
-      if (isIosDevice()) {
-        limit = Math.min(limit, isHome ? 8 : 5);
-      }
-      if (playbackActive) {
-        limit = Math.min(limit, isIosDevice() ? 5 : 7);
-      }
-      if (isAggressivePrefetchPaused()) {
-        limit = Math.min(limit, 2);
-      }
-      queue.slice(0, limit).forEach(function (href, index) {
-        setTimeout(function () {
-          prefetchSpaPage(href, {
-            cacheOnly: isStandaloneDisplayMode()
-          });
-        }, index * 90);
-      });
-    };
-
-    const run = function () {
-      if (!isHome) {
-        scheduleQueue();
-        return;
-      }
-
-      loadTracksData()
-        .then(function (tracksData) {
-          const albums = Array.isArray(tracksData && tracksData.albums) ? tracksData.albums : [];
-          albums.forEach(function (album) {
-            const page = album && album.page
-              ? album.page
-              : (album && album.slug ? `music/${album.slug}.html` : "");
-            if (!page) return;
-            enqueuePrefetchUrl(new URL(page, runtime.baseUrl).href);
-          });
-          scheduleQueue();
-        })
-        .catch(function () {
-          scheduleQueue();
-        });
-    };
-
-    if (typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(function () {
-        run();
-      }, { timeout: 1200 });
-      return;
-    }
-
-    setTimeout(run, 120);
   }
 
   function getSpaPersistRoot() {
@@ -6189,8 +5880,7 @@ function openAppDownloadGatekeeper(appName, url) {
       cardRank: Math.max(0, Math.round(Number(opts.cardRank) || 0)),
       lowerHalf: Boolean(opts.lowerHalf),
       gestureToken: String(opts.gestureToken || ""),
-      controllerchangeAtStart: serviceWorkerControllerChangeAt,
-      reloadExecutedAtStart: serviceWorkerReloadExecutedAt
+      controllerchangeAtStart: serviceWorkerControllerChangeAt
     };
     trackAudioRuntimeEvent("album_open_tap", {
       track: "album_open",
@@ -6215,7 +5905,6 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!context || !context.startedAt) return;
     const endedAt = getAudioTelemetryNow();
     const controllerBetween = isTelemetryTimestampBetween(serviceWorkerControllerChangeAt, context.startedAt, endedAt);
-    const reloadBetween = isTelemetryTimestampBetween(serviceWorkerReloadExecutedAt, context.startedAt, endedAt);
     trackAudioRuntimeEvent(eventName, Object.assign({
       track: "album_open",
       album: context.toAlbum || "",
@@ -6225,8 +5914,8 @@ function openAppDownloadGatekeeper(appName, url) {
       to_url: context.toUrl,
       delta_ms: Math.max(0, Math.round(endedAt - context.startedAt)),
       controllerchange: controllerBetween,
-      sw_reload_between: Boolean(controllerBetween || reloadBetween),
-      reload_executed: reloadBetween,
+      sw_reload_between: false,
+      reload_executed: false,
       navigation_token: context.navigationToken,
       trigger: context.trigger,
       surface: context.surface,
@@ -6438,8 +6127,6 @@ function openAppDownloadGatekeeper(appName, url) {
     syncAudioUi();
 
     scheduleFavoritesPreload("home_restore");
-    scheduleSpaPagePrefetch();
-    scheduleSpaAlbumShellWarmup("home_restore");
     scheduleAlbumCoverCacheWarmup("home_restore");
     snapshotCurrentSpaPage(spaState.currentUrl || window.location.href);
     initPwaInstallPrompt(adminMode);
@@ -6517,8 +6204,6 @@ function openAppDownloadGatekeeper(appName, url) {
       teardownAdminFeatures();
     }
 
-    scheduleSpaPagePrefetch();
-    scheduleSpaAlbumShellWarmup(isHomeScreen ? "home_idle" : "page_idle");
     scheduleAlbumCoverCacheWarmup(isHomeScreen ? "home_idle" : "page_idle");
     snapshotCurrentSpaPage(spaState.currentUrl || window.location.href);
     initPwaInstallPrompt(adminMode);
@@ -6541,14 +6226,8 @@ function openAppDownloadGatekeeper(appName, url) {
     }, 0);
   }
 
-  function completeLaunchWatchdog(probe) {
+  function markLaunchWatchdogComplete(probe) {
     if (!probe) return;
-    if (Array.isArray(probe.performance_observers)) {
-      probe.performance_observers.forEach(function (observer) {
-        if (observer && typeof observer.disconnect === "function") observer.disconnect();
-      });
-      probe.performance_observers.length = 0;
-    }
     if (typeof probe.complete !== "function") return;
     try {
       probe.complete();
@@ -6557,19 +6236,16 @@ function openAppDownloadGatekeeper(appName, url) {
     }
   }
 
-  async function reportLaunchSummary(initStartedAt) {
-    const initDoneMs = typeof performance !== "undefined" && typeof performance.now === "function"
-      ? performance.now()
-      : 0;
-    await nextApplicationFrames();
-    startupReady = true;
-    if (serviceWorkerControllerReloadPending) scheduleDeferredServiceWorkerReload();
-    const firstAppFrameMs = typeof performance !== "undefined" && typeof performance.now === "function"
-      ? performance.now()
-      : initDoneMs;
-    const probe = window.__infraLaunchProbe && typeof window.__infraLaunchProbe === "object"
-      ? window.__infraLaunchProbe
-      : {};
+  function disconnectLaunchPerformanceObservers(probe) {
+    if (!probe || !Array.isArray(probe.performance_observers)) return;
+    probe.performance_observers.forEach(function (observer) {
+      if (observer && typeof observer.disconnect === "function") observer.disconnect();
+    });
+    probe.performance_observers.length = 0;
+  }
+
+  function buildLaunchSummary(state, finalReason) {
+    const probe = state.probe;
     const paints = typeof performance !== "undefined" && typeof performance.getEntriesByType === "function"
       ? performance.getEntriesByType("paint")
       : [];
@@ -6577,21 +6253,20 @@ function openAppDownloadGatekeeper(appName, url) {
     const navigation = typeof performance !== "undefined" && typeof performance.getEntriesByType === "function"
       ? performance.getEntriesByType("navigation")[0]
       : null;
-    const catalogReady = Boolean(catalogState.data || (fallbackCatalog && fallbackCatalog.albums && fallbackCatalog.albums.length));
-    trackAudioRuntimeEvent("launch_summary", {
+    return {
       launch_head_ms: Math.max(0, Math.round(Number(probe.head_ms) || 0)),
-      dom_ready_ms: Math.max(0, Math.round(Number(navigation && navigation.domContentLoadedEventEnd) || Number(initStartedAt) || 0)),
+      dom_ready_ms: Math.max(0, Math.round(Number(navigation && navigation.domContentLoadedEventEnd) || Number(state.initStartedAt) || 0)),
       first_contentful_paint_ms: Math.max(0, Math.round(Number(fcp && fcp.startTime) || 0)),
-      first_app_frame_ms: Math.max(0, Math.round(firstAppFrameMs)),
-      app_ready_frame_ms: Math.max(0, Math.round(firstAppFrameMs)),
-      init_done_ms: Math.max(0, Math.round(initDoneMs)),
-      catalog_ready_ms: catalogReady ? Math.max(0, Math.round(initDoneMs)) : 0,
+      first_app_frame_ms: Math.max(0, Math.round(state.firstAppFrameMs)),
+      app_ready_frame_ms: Math.max(0, Math.round(state.firstAppFrameMs)),
+      init_done_ms: Math.max(0, Math.round(state.initDoneMs)),
+      catalog_ready_ms: state.catalogReady ? Math.max(0, Math.round(state.initDoneMs)) : 0,
       document_ttfb_ms: Math.max(0, Math.round(Number(navigation && navigation.responseStart) || 0)),
       document_download_ms: Math.max(0, Math.round(
         (Number(navigation && navigation.responseEnd) || 0) - (Number(navigation && navigation.responseStart) || 0)
       )),
       dom_parse_ms: Math.max(0, Math.round(
-        (Number(navigation && navigation.domContentLoadedEventEnd) || Number(initStartedAt) || 0) -
+        (Number(navigation && navigation.domContentLoadedEventEnd) || Number(state.initStartedAt) || 0) -
         (Number(navigation && navigation.responseEnd) || 0)
       )),
       critical_css_ready_ms: Math.max(0, Math.round(latestResourceReadyMs(/\/assets\/css\/(?:styles|playlists)\.css(?:\?|$)/))),
@@ -6601,9 +6276,9 @@ function openAppDownloadGatekeeper(appName, url) {
       interaction_to_next_paint_ms: Math.max(0, Math.round(Number(probe.interaction_to_next_paint_ms) || 0)),
       previous_incomplete_launch_age_ms: Math.max(0, Math.round(Number(probe.previous_incomplete_launch_age_ms) || 0)),
       service_worker_activity_count: Number(probe.service_worker_activity_count) || 0,
-      catalog_ready: catalogReady,
-      catalog_source: catalogState.catalogBundleSource || (catalogState.data ? "embedded-fallback" : "unavailable"),
-      state: catalogState.catalogBundleReleaseId || `local-${LOCAL_CATALOG_VERSION}`,
+      catalog_ready: state.catalogReady,
+      catalog_source: state.catalogSource,
+      state: state.catalogRelease,
       service_worker_controlled: Boolean(navigator.serviceWorker && navigator.serviceWorker.controller),
       service_worker_state: navigator.serviceWorker && navigator.serviceWorker.controller ? "controlled" : "uncontrolled",
       document_was_discarded: Boolean(document.wasDiscarded),
@@ -6615,9 +6290,64 @@ function openAppDownloadGatekeeper(appName, url) {
       previous_incomplete_launch: probe.previous_incomplete_launch === true,
       previous_launch_build: String(probe.previous_launch_build || ""),
       previous_launch_route_kind: String(probe.previous_launch_route_kind || ""),
-      reason: "init_complete"
+      reason: finalReason || "vitals_timeout"
+    };
+  }
+
+  function scheduleFinalLaunchSummary(state) {
+    let finalized = false;
+    let timerId = 0;
+    const cleanup = function () {
+      if (timerId) window.clearTimeout(timerId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+    const finalize = function (reason, beacon) {
+      if (finalized) return;
+      finalized = true;
+      cleanup();
+      trackAudioRuntimeEvent("launch_summary", buildLaunchSummary(state, reason));
+      disconnectLaunchPerformanceObservers(state.probe);
+      if (beacon) flushAudioTelemetryQueue({ beacon: true });
+    };
+    const onVisibilityChange = function () {
+      if (document.visibilityState === "hidden") finalize("visibility_hidden", true);
+    };
+    const onPageHide = function () { finalize("pagehide", true); };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", onPageHide, { once: true });
+
+    const elapsed = typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : 0;
+    timerId = window.setTimeout(function () {
+      finalize("vitals_timeout", false);
+    }, Math.max(0, 10000 - elapsed));
+    if (document.visibilityState === "hidden") finalize("visibility_hidden", true);
+  }
+
+  async function reportLaunchSummary(initStartedAt) {
+    const initDoneMs = typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : 0;
+    await nextApplicationFrames();
+    const firstAppFrameMs = typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : initDoneMs;
+    const probe = window.__infraLaunchProbe && typeof window.__infraLaunchProbe === "object"
+      ? window.__infraLaunchProbe
+      : {};
+    const catalogReady = Boolean(catalogState.data || (fallbackCatalog && fallbackCatalog.albums && fallbackCatalog.albums.length));
+    markLaunchWatchdogComplete(probe);
+    scheduleFinalLaunchSummary({
+      initStartedAt,
+      initDoneMs,
+      firstAppFrameMs,
+      probe,
+      catalogReady,
+      catalogSource: catalogState.catalogBundleSource || (catalogState.data ? "embedded-fallback" : "unavailable"),
+      catalogRelease: catalogState.catalogBundleReleaseId || `local-${LOCAL_CATALOG_VERSION}`
     });
-    completeLaunchWatchdog(probe);
   }
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -6654,7 +6384,8 @@ function openAppDownloadGatekeeper(appName, url) {
         previous_launch_route_kind: String(probe.previous_launch_route_kind || ""),
         reason: "init_failed"
       });
-      completeLaunchWatchdog(probe);
+      markLaunchWatchdogComplete(probe);
+      disconnectLaunchPerformanceObservers(probe);
     });
   });
 })();

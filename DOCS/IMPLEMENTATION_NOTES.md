@@ -1,5 +1,28 @@
 # Implementation Notes
 
+## 2026-08-22 — audiofix400 démarrage PWA unique et rendu stable
+
+- Une trace froide Fast 4G / CPU ×4 a prouvé que le cycle `controllerchange` historique relançait
+  volontairement la page environ 9,5 secondes après son premier affichage : deux navigations,
+  deux chargements des 21 scripts et 90 requêtes au total. Le runtime ne possède plus de timer de
+  reload, n'envoie plus `SKIP_WAITING` et laisse désormais le nouveau Worker attendre la fermeture
+  naturelle de l'ancienne PWA. `clients.claim()` reste actif lors de la première installation,
+  sans reload visible. Les warmups de routes automatiques sont supprimés ; le précache offline et
+  le prefetch lié à une intention utilisateur restent actifs.
+- La géométrie Home mobile à une colonne est déclarée directement en CSS avant JavaScript, avec
+  `display-mode: standalone` comme garde explicite pour la PWA.
+  Le retour Home reprend ensuite les mutations de la route, restaure le scroll au frame suivant,
+  corrige l'ancre une fois au second frame et persiste la position finale.
+- La politique image reste sans nouvelle variante : un seul WebP 1200 par album, une cover high,
+  deux eager, puis chargement différé avec révélation après `decode()`. Les icônes Applications
+  n'obtiennent leur `src/srcset/sizes` qu'à l'ouverture du menu. L'espace du mini-player est piloté
+  par `ResizeObserver` et n'effectue plus de lecture géométrique à chaque synchronisation UI.
+- Le watchdog est marqué complet dès l'app prête, tandis que LCP/CLS/INP restent observés jusqu'au
+  masquage, `pagehide` ou 10 secondes. Un seul `launch_summary` est envoyé. La suite de release
+  comporte 20 contrôles, dont les nouveaux contrats de cycle Worker et de fluidité.
+- Identifiants atomiques : runtime/CSS `audiofix400-20260822`, Service Worker
+  `infra-shell-20260822-audio400`.
+
 ## 2026-08-22 — audiofix399 URLs différées stables pendant la navigation
 
 - La vérification réseau après `audiofix398` a isolé un second défaut masqué par le cache : cinq

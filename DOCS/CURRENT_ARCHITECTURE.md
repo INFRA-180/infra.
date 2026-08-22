@@ -1,15 +1,15 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 21 août 2026.
+État de référence : 22 août 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix395-20260821`
-- Service Worker : `infra-shell-20260821-audio395`
-- CSS : `audiofix395-20260821` — démarrage local sans import CSS tiers bloquant
+- Runtime : `audiofix400-20260822`
+- Service Worker : `infra-shell-20260822-audio400`
+- CSS : `audiofix400-20260822` — géométrie mobile déterministe avant JavaScript
 - Catalogue : 31 albums et 284 pistes
 - Origine audio : proxy R2 Range `https://infra180-api.pages.dev/audio/`
 - Cache audio : `infra-next-track-segments-v9`
@@ -163,6 +163,10 @@ manuelle doit passer par `COVER_OVERRIDES` avec copie de la source et SHA-256. L
 conserve ses intermédiaires sous `_private/runtime` et refuse d'écraser une URL non versionnée
 avec des pixels différents.
 
+Sur l'accueil, seule la première cover est prioritaire haute ; les deux premières sont eager.
+Les autres gardent leurs dimensions mais reçoivent leur URL à l'approche du viewport, puis sont
+révélées après décodage. Les icônes Applications restent sans `src` tant que leur menu est fermé.
+
 ## PWA et fullscreen
 
 La géométrie iPhone validée est figée :
@@ -184,10 +188,18 @@ En PWA mobile, le passage entre routes utilise par défaut un handoff `dual_rout
 compositeur. La source visible et la destination stagée portent chacune leurs variables de thème
 calculées ; le fond de sécurité global suit atomiquement la couche supérieure. La destination
 dispose de deux frames de rendu avant promotion, puis la source reste une frame complète avant
-détachement. Le DOM Home vivant est conservé hors écran et son scroll est restauré avant de
-reprendre ses mises à jour. Le contrôle `?pwa-swap=view` reste disponible pour comparer une View
+détachement. Le DOM Home vivant est conservé hors écran. Au retour, ses classes et son ordre de
+modules sont d'abord repris, le scroll sauvegardé est appliqué au frame suivant, puis une unique
+correction d'ancre est effectuée au second frame et enregistrée dans l'historique. Le contrôle
+`?pwa-swap=view` reste disponible pour comparer une View
 Transition native. La cover hero réserve un carré 1200×1200 et décode en mode synchrone ; les
 images de la grille Accueil restent paresseuses et asynchrones.
+
+Une mise à jour du Service Worker n'active jamais `skipWaiting` depuis un client visible et ne
+recharge jamais la PWA. Le nouveau shell reste `waiting` tant que l'ancienne version possède un
+client, puis s'active après la fermeture naturelle de tous les clients. `clients.claim()` reste
+utilisé pour la première installation. Les documents album/playlists restent précachés ; le
+runtime ne lance plus de warmup massif et ne précharge une route qu'à l'intention utilisateur.
 
 ## Partage par QR
 
@@ -225,6 +237,10 @@ le mode de swap, le type de route, la restauration Home/scroll, les invariants d
 l’état de la cover aux première et deuxième frames peintes. La file rapporte ses vraies fins de
 preview/FLIP sans événement supplémentaire. Cette observabilité n’ajoute ni requête Worker ni clé
 KV. La PWA demande le stockage persistant une seule fois, à la première interaction.
+
+Le watchdog de lancement est clôturé dès la première frame applicative prête, mais les observers
+LCP/CLS/INP restent actifs. Un unique `launch_summary` est finalisé sur masquage, `pagehide` ou au
+plus tard 10 secondes après la navigation, afin de ne plus confondre disponibilité UI et LCP final.
 
 Les URLs complètes, chemins privés et identifiants personnels ne quittent pas le navigateur.
 

@@ -322,14 +322,14 @@
     return frozen;
   }
 
-  function lockLiveHomeCover(image, state) {
+  function lockLiveHomeCover(image, state, index) {
     if (!image || !state || !state.source) return;
     if (!String(image.getAttribute("src") || "").trim()) {
       image.setAttribute("src", String(state.source));
     }
     image.setAttribute("loading", "eager");
     image.setAttribute("decoding", "async");
-    image.setAttribute("fetchpriority", "high");
+    image.setAttribute("fetchpriority", index === 0 ? "high" : "auto");
     image.dataset.spaCoverLocked = "1";
   }
 
@@ -339,10 +339,10 @@
       return Promise.resolve({ requested: 0, decoded: 0, timedOut: false });
     }
 
-    const images = states.slice(0, 4).map(function (state) {
+    const images = states.slice(0, 2).map(function (state, index) {
       const card = findAlbumCardByUrl(route.fragment, state.href);
       const image = card && card.querySelector("img.album-cover");
-      if (image) lockLiveHomeCover(image, state);
+      if (image) lockLiveHomeCover(image, state, index);
       return image;
     }).filter(Boolean);
     if (!images.length) {
@@ -541,8 +541,10 @@
     const width = 1200;
     return Array.from(fragment.querySelectorAll("img.album-cover"))
       .slice(0, maxImages)
-      .reduce(function (count, image) {
-        return count + (lockSpaCoverSource(image, sourceUrl, width) ? 1 : 0);
+      .reduce(function (count, image, index) {
+        const locked = lockSpaCoverSource(image, sourceUrl, width);
+        if (locked && index > 0) image.setAttribute("fetchpriority", "auto");
+        return count + (locked ? 1 : 0);
       }, 0);
   }
 
@@ -1275,22 +1277,26 @@
       persistRoot,
       {
         restoreScroll: requested,
-        homeRestoreMode: "live_dom",
-        afterScroll: function () {
-          const anchor = findAlbumCardByUrl(document, route.anchorHref);
-          if (!anchor || !Number.isFinite(route.anchorViewportTop)) return;
-          anchorCorrection = Math.round(anchor.getBoundingClientRect().top - route.anchorViewportTop);
-          if (Math.abs(anchorCorrection) > 0) window.scrollBy(0, anchorCorrection);
-        }
+        homeRestoreMode: "live_dom"
       }
     );
 
     spaState.liveHomeRoute = null;
+    // Reapply Home-only classes and module order before the final scroll. The
+    // retained route can otherwise change height after the saved offset was
+    // applied, which Safari may clamp to the top of the document.
+    resumeLiveHomeRoute();
+    await nextSpaAnimationFrame();
+    window.scrollTo(requested.x, requested.y);
+    await nextSpaAnimationFrame();
+    const anchor = findAlbumCardByUrl(document, route.anchorHref);
+    if (anchor && Number.isFinite(route.anchorViewportTop)) {
+      anchorCorrection = Math.round(anchor.getBoundingClientRect().top - route.anchorViewportTop);
+      if (Math.abs(anchorCorrection) > 0) window.scrollBy(0, anchorCorrection);
+    }
+    saveCurrentScrollPositionInHistory();
     const appliedX = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));
     const appliedY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
-    // Defer non-visual Home maintenance until the retained route has produced
-    // its first frames; cloning the whole route here previously delayed paint.
-    resumeLiveHomeRoute();
     const result = Object.assign({}, swapResult || {}, {
       swap_mode: String(swapResult && swapResult.swap_mode || "live_dom_restore"),
       swap_policy: String(swapResult && swapResult.swap_policy || "standard"),
@@ -1332,13 +1338,13 @@
     if (isAlbumPage) {
       await waitForSpaAlbumCoverReady(fragment, sourceUrl, telemetry);
     } else if (isHomePage && isMobilePwaCoverNavigation()) {
-      const lockedCoverCount = lockSpaHomeCoverSources(fragment, sourceUrl, 4);
+      const lockedCoverCount = lockSpaHomeCoverSources(fragment, sourceUrl, 2);
       await decodeSpaCriticalImages(fragment, Object.assign({}, telemetry || {}, {
         blocking: true,
         pwa_home_mode: true,
         source_locked_count: lockedCoverCount
       }), {
-        imageLimit: 4,
+        imageLimit: 2,
         timeoutMs: 260
       });
     } else {

@@ -103,7 +103,6 @@
     const markAudioTelemetryInactive = method(ctx, "markAudioTelemetryInactive", function () {});
     const buildAudioMonitorPayload = method(ctx, "buildAudioMonitorPayload", function () { return {}; });
     const getAudioBufferedEnd = method(ctx, "getAudioBufferedEnd", function () { return 0; });
-    const scheduleDeferredServiceWorkerReload = method(ctx, "scheduleDeferredServiceWorkerReload", function () {});
     const syncCurrentTrackDurationFromAudio = method(ctx, "syncCurrentTrackDurationFromAudio", function () {});
     const logAudioAuditEvent = method(ctx, "logAudioAuditEvent", function () {});
     const setTrackStatus = method(ctx, "setTrackStatus", function () {});
@@ -2641,7 +2640,6 @@
       stopAudioTelemetryHeartbeat();
       clearFadeTimer();
       saveResumeState();
-      scheduleDeferredServiceWorkerReload();
       markAudioTelemetryInactive();
       if (
         pauseContext !== "internal" &&
@@ -2708,7 +2706,6 @@
       saveResumeState();
       syncMediaSessionMetadata({ forcePosition: true });
       playNext({ seamless: true, auto: true });
-      scheduleDeferredServiceWorkerReload();
     });
 
     audio.addEventListener("loadedmetadata", function () {
@@ -2953,7 +2950,6 @@
             });
           }
           resyncMediaSessionControls();
-          scheduleDeferredServiceWorkerReload();
         }
       });
       audioState.resumeBound = true;

@@ -23,7 +23,6 @@
     const setThemeColor = method(ctx, "setThemeColor");
     const syncPwaStatusColor = method(ctx, "syncPwaStatusColor");
     const syncTransportUi = method(ctx, "syncTransportUi");
-    const scheduleDeferredServiceWorkerReload = method(ctx, "scheduleDeferredServiceWorkerReload");
     const getCurrentPlayableAudioSrc = method(ctx, "getCurrentPlayableAudioSrc", function () { return ""; });
     const getCurrentPlaylistTrack = method(ctx, "getCurrentPlaylistTrack", function () { return null; });
     const normalizeTrackTitle = method(ctx, "normalizeTrackTitle", function (value) { return String(value || "").trim(); });
@@ -412,7 +411,6 @@
       window.scrollTo(0, audioState.nowPlayingScrollY);
     }
     syncTransportUi();
-    scheduleDeferredServiceWorkerReload();
   }
 
   function openNowPlayingOverlay() {

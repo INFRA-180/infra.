@@ -330,14 +330,15 @@
       image.style.aspectRatio = `${item.width} / ${item.height}`;
       image.alt = item.thumbAlt || item.title;
       image.decoding = "async";
-      const eagerCount = isApp ? 3 : 4;
+      const eagerCount = isApp ? 0 : 2;
       const shouldEager = index < eagerCount;
-      if (shouldEager || isApp) image.src = item.thumb;
+      if (shouldEager) image.src = item.thumb;
+      else if (isApp) image.dataset.appCoverSrc = item.thumb;
       else image.dataset.coverSrc = item.thumb;
       image.loading = shouldEager ? "eager" : "lazy";
-      image.setAttribute("fetchpriority", shouldEager ? "high" : "low");
-      if (isApp && item.thumbSrcset) image.setAttribute("srcset", item.thumbSrcset);
-      if (isApp && item.thumbSizes) image.setAttribute("sizes", item.thumbSizes);
+      image.setAttribute("fetchpriority", index === 0 && !isApp ? "high" : (shouldEager ? "auto" : "low"));
+      if (isApp && item.thumbSrcset) image.dataset.appCoverSrcset = item.thumbSrcset;
+      if (isApp && item.thumbSizes) image.dataset.appCoverSizes = item.thumbSizes;
 
       const label = document.createElement("span");
       if (item.editKey) label.setAttribute("data-edit-key", item.editKey);
@@ -362,6 +363,7 @@
       });
       grid.replaceChildren(fragment);
       grid.dataset.catalogReady = "1";
+      if (type === "app") bindDeferredAppCovers(grid);
     }
 
     function resetProgressiveAlbumGrid() {
@@ -376,15 +378,54 @@
       }
     }
 
+    function revealDeferredImage(image) {
+      if (!image) return;
+      delete image.dataset.coverLoading;
+      image.dataset.coverReady = "1";
+    }
+
+    function loadDeferredImage(image, sourceAttribute, srcsetAttribute, sizesAttribute) {
+      const source = String(image && image.dataset && image.dataset[sourceAttribute] || "").trim();
+      if (!source) return;
+      image.dataset.coverLoading = "1";
+      if (srcsetAttribute) {
+        const srcset = String(image.dataset[srcsetAttribute] || "").trim();
+        if (srcset) image.setAttribute("srcset", srcset);
+        delete image.dataset[srcsetAttribute];
+      }
+      if (sizesAttribute) {
+        const sizes = String(image.dataset[sizesAttribute] || "").trim();
+        if (sizes) image.setAttribute("sizes", sizes);
+        delete image.dataset[sizesAttribute];
+      }
+      image.setAttribute("src", source);
+      delete image.dataset[sourceAttribute];
+
+      const reveal = function () { revealDeferredImage(image); };
+      if (typeof image.decode === "function") {
+        image.decode().then(reveal).catch(function () {
+          if (image.complete) {
+            reveal();
+            return;
+          }
+          image.addEventListener("load", reveal, { once: true });
+          image.addEventListener("error", reveal, { once: true });
+        });
+        return;
+      }
+      if (image.complete) reveal();
+      else {
+        image.addEventListener("load", reveal, { once: true });
+        image.addEventListener("error", reveal, { once: true });
+      }
+    }
+
     function observeDeferredAlbumCovers(root) {
       const scope = root || document;
       const images = Array.from(scope.querySelectorAll("img[data-cover-src]"));
       if (!images.length) return;
       const load = function (image) {
-        const source = String(image && image.dataset && image.dataset.coverSrc || "").trim();
-        if (!source) return;
-        image.setAttribute("src", source);
-        delete image.dataset.coverSrc;
+        loadDeferredImage(image, "coverSrc");
       };
       if (!("IntersectionObserver" in window)) {
         images.forEach(load);
@@ -402,6 +443,27 @@
       images.forEach(function (image) {
         catalogState.albumCoverObserver.observe(image);
       });
+    }
+
+    function bindDeferredAppCovers(root) {
+      const scope = root || document;
+      const menu = scope.closest && scope.closest(".apps-menu")
+        ? scope.closest(".apps-menu")
+        : document.querySelector(".apps-menu");
+      if (!menu) return;
+
+      const loadApps = function () {
+        if (!menu.open) return;
+        Array.from(menu.querySelectorAll("img[data-app-cover-src]")).forEach(function (image) {
+          loadDeferredImage(image, "appCoverSrc", "appCoverSrcset", "appCoverSizes");
+        });
+      };
+      if (menu._infraAppCoverToggleHandler) {
+        menu.removeEventListener("toggle", menu._infraAppCoverToggleHandler);
+      }
+      menu._infraAppCoverToggleHandler = loadApps;
+      menu.addEventListener("toggle", loadApps);
+      loadApps();
     }
 
     function renderProgressiveAlbumGrid(grid, items) {
@@ -522,7 +584,7 @@
       card.setAttribute("href", String(item.page || ""));
       card.setAttribute("aria-label", `Ouvrir l'album ${displayTitle}`);
       if (!sameCover) {
-        if (index < 4) {
+        if (index < 2) {
           image.setAttribute("src", expectedThumb);
           delete image.dataset.coverSrc;
         } else {
@@ -538,8 +600,8 @@
       image.style.aspectRatio = `${item.width || 1200} / ${item.height || 1200}`;
       image.setAttribute("alt", String(item.thumbAlt || item.title || ""));
       image.setAttribute("decoding", "async");
-      image.setAttribute("loading", index < 4 ? "eager" : "lazy");
-      image.setAttribute("fetchpriority", index < 4 ? "high" : "low");
+      image.setAttribute("loading", index < 2 ? "eager" : "lazy");
+      image.setAttribute("fetchpriority", index === 0 ? "high" : (index === 1 ? "auto" : "low"));
       if (item.editKey) label.setAttribute("data-edit-key", item.editKey);
       else label.removeAttribute("data-edit-key");
       label.textContent = displayTitle;
@@ -596,7 +658,8 @@
         if (!card || !image || !label) return false;
 
         const displayTitle = displayAlbumCardTitle(item.title);
-        const shouldEager = index < 4;
+        const shouldEager = index < 2;
+        const expectedPriority = index === 0 ? "high" : (index === 1 ? "auto" : "low");
         const lockedCover = lockedCoverMatchesCatalog(image, item.thumb);
 
         if (getCardAttribute(card, "href") !== String(item.page || "").trim()) return false;
@@ -607,7 +670,7 @@
         if (getCardAttribute(image, "width") !== String(item.width || "")) return false;
         if (getCardAttribute(image, "height") !== String(item.height || "")) return false;
         if (getCardAttribute(image, "loading") !== (shouldEager ? "eager" : "lazy")) return false;
-        if (getCardAttribute(image, "fetchpriority") !== (shouldEager ? "high" : "low")) return false;
+        if (getCardAttribute(image, "fetchpriority") !== expectedPriority) return false;
         if (getCardAttribute(image, "srcset")) return false;
         if (getCardAttribute(image, "sizes")) return false;
         if (String(label.textContent || "").trim() !== displayTitle) return false;

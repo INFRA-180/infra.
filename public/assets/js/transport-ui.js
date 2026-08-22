@@ -74,6 +74,12 @@
       }
     });
     const audioVisualizerApi = window.InfraAudioVisualizer || null;
+    let mobilePlayerSpaceObserver = null;
+    let mobilePlayerSpaceObservedRoot = null;
+    let mobilePlayerSpaceRaf = 0;
+    let mobilePlayerSpaceEnabled = false;
+    let mobilePlayerSpaceHeight = 0;
+    let mobilePlayerSpaceValue = -1;
 
   function isDesktopTransportViewport() {
     return typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 981px)").matches;
@@ -2841,26 +2847,67 @@
     syncNowPlayingOverlayProgress();
   }
 
-  function syncMobilePlayerSpace(isMobileLayout, shouldShow) {
+  function commitMobilePlayerSpace() {
     const rootEl = document.documentElement;
     if (!rootEl) return;
+    const nextSpace = mobilePlayerSpaceEnabled
+      ? Math.max(0, Math.ceil(mobilePlayerSpaceHeight + 12))
+      : 0;
+    if (nextSpace === mobilePlayerSpaceValue) return;
+    mobilePlayerSpaceValue = nextSpace;
+    rootEl.style.setProperty("--mobile-player-space", `${nextSpace}px`);
+  }
 
-    if (!isMobileLayout || !shouldShow) {
-      rootEl.style.setProperty("--mobile-player-space", "0px");
+  function scheduleMobilePlayerSpaceFallback(root) {
+    if (mobilePlayerSpaceRaf || !root || !mobilePlayerSpaceEnabled) return;
+    const run = function () {
+      mobilePlayerSpaceRaf = 0;
+      if (!mobilePlayerSpaceEnabled || root.hidden) return;
+      mobilePlayerSpaceHeight = Math.max(0, Number(root.offsetHeight) || 0);
+      commitMobilePlayerSpace();
+    };
+    if (typeof window.requestAnimationFrame === "function") {
+      mobilePlayerSpaceRaf = window.requestAnimationFrame(run);
+    } else {
+      run();
+    }
+  }
+
+  function observeMobilePlayerSpace(root) {
+    if (!root || mobilePlayerSpaceObservedRoot === root) return;
+    if (mobilePlayerSpaceObserver) mobilePlayerSpaceObserver.disconnect();
+    mobilePlayerSpaceObservedRoot = root;
+    if (typeof window.ResizeObserver !== "function") {
+      mobilePlayerSpaceObserver = null;
       return;
     }
+    mobilePlayerSpaceObserver = new window.ResizeObserver(function (entries) {
+      const entry = entries.find(function (candidate) { return candidate && candidate.target === root; });
+      if (!entry) return;
+      const borderBox = Array.isArray(entry.borderBoxSize)
+        ? entry.borderBoxSize[0]
+        : entry.borderBoxSize;
+      const height = Number(borderBox && borderBox.blockSize) ||
+        Number(entry.contentRect && entry.contentRect.height) || 0;
+      mobilePlayerSpaceHeight = Math.max(0, height);
+      commitMobilePlayerSpace();
+    });
+    mobilePlayerSpaceObserver.observe(root);
+  }
 
+  function syncMobilePlayerSpace(isMobileLayout, shouldShow) {
     const transport = audioState.transport;
-    if (!transport || !transport.root || transport.root.hidden) {
-      rootEl.style.setProperty("--mobile-player-space", "0px");
+    const root = transport && transport.root;
+    mobilePlayerSpaceEnabled = Boolean(isMobileLayout && shouldShow && root && !root.hidden);
+    if (!root) {
+      commitMobilePlayerSpace();
       return;
     }
-
-    const rect = transport.root.getBoundingClientRect();
-    const computed = window.getComputedStyle(transport.root);
-    const bottom = parseFloat(computed.bottom || "0") || 0;
-    const space = Math.max(0, Math.ceil(rect.height + bottom + 12));
-    rootEl.style.setProperty("--mobile-player-space", `${space}px`);
+    observeMobilePlayerSpace(root);
+    commitMobilePlayerSpace();
+    if (mobilePlayerSpaceEnabled && !mobilePlayerSpaceHeight && !mobilePlayerSpaceObserver) {
+      scheduleMobilePlayerSpaceFallback(root);
+    }
   }
 
   function getMiniPlayerVisibilityReason(details) {

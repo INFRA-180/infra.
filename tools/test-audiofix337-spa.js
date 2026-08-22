@@ -262,7 +262,7 @@ async function main() {
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
   testStandaloneScrollbarPolicy();
-  console.log("audiofix399 SPA/transport tests: ok");
+  console.log("audiofix400 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

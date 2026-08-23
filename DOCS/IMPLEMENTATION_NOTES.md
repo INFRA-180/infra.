@@ -1,5 +1,15 @@
 # Implementation Notes
 
+## 2026-08-24 — audiofix404 cover définitive de D 2.0141
+
+- La cover de secours de `D 2.0141` est remplacée par le master carré fourni, conservé sous
+  `assets/music/sources/d-2-0141-original-560ec418.jpeg` avec contrôle SHA-256, puis décliné en
+  WebP canonique 1200×1200 à URL de contenu versionnée.
+- La source et son empreinte sont inscrites dans la politique de covers du générateur : les
+  prochaines synchronisations réutiliseront cette cover sans revenir au visuel de secours.
+- Identifiants atomiques : runtime/CSS `audiofix404-20260824`, Service Worker
+  `infra-shell-20260824-audio404`, audio inchangé `v20260823T224523Z-d20141`.
+
 ## 2026-08-24 — audiofix403 catalogue auto, covers persistantes et Play Radio froid
 
 - Le nouvel album `D 2.0141` est intégré sous le slug déterministe `d-2-0141` : 1 piste

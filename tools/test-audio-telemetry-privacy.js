@@ -678,16 +678,20 @@ async function settle(turns = 20) {
     cover_aspect_ratio_milli: 1000,
     cover_geometry_ok: true,
     cover_object_fit: "contain",
-    handoff_strategy: "dual_route",
-    handoff_stage_ms: 17,
-    source_retained_until_promote: true,
+    handoff_strategy: "single_route_atomic",
+    handoff_stage_ms: 0,
+    source_retained_until_promote: false,
     source_detached_after_promote: true,
-    theme_tokens_frozen: true,
-    route_layers_at_promote: 2,
+    theme_tokens_frozen: false,
+    route_layers_at_promote: 1,
     route_layers_after_detach: 1,
+    route_layers_before_commit: 1,
+    route_layers_after_commit: 1,
+    single_route_invariant: true,
     route_host_has_current: true
   }));
   telemetry.trackRuntimeEvent("spa_render_done", Object.assign({}, navBase, { duration_ms: 90 }));
+  telemetry.trackRuntimeEvent("spa_hydration_done", Object.assign({}, navBase, { duration_ms: 14 }));
   telemetry.trackRuntimeEvent("album_open_done", navBase);
   telemetry.trackRuntimeEvent("nav:album_done", navBase);
 
@@ -702,10 +706,11 @@ async function settle(turns = 20) {
     telemetry.trackRuntimeEvent("spa_swap_done", Object.assign({}, repeatedNav, {
       duration_ms: 1,
       route_kind: "album",
-      handoff_strategy: "dual_route",
-      handoff_stage_ms: 1,
-      source_retained_until_promote: true,
-      source_detached_after_promote: true
+      handoff_strategy: "single_route_atomic",
+      source_detached_after_promote: true,
+      route_layers_before_commit: 1,
+      route_layers_after_commit: 1,
+      single_route_invariant: true
     }));
     telemetry.trackRuntimeEvent("nav:album_done", repeatedNav);
   }
@@ -734,9 +739,12 @@ async function settle(turns = 20) {
     route_kind: "home",
     home_dom_reused: true,
     home_restore_mode: "live_dom",
-    theme_tokens_frozen: true,
-    route_layers_at_promote: 2,
+    theme_tokens_frozen: false,
+    route_layers_at_promote: 1,
     route_layers_after_detach: 1,
+    route_layers_before_commit: 1,
+    route_layers_after_commit: 1,
+    single_route_invariant: true,
     route_host_has_current: true,
     scroll_restore_requested_y: 1200,
     scroll_restore_applied_y: 1200,
@@ -903,14 +911,19 @@ async function settle(turns = 20) {
   assert.strictEqual(geometryNavigation.cover_aspect_ratio_milli, 1000);
   assert.strictEqual(geometryNavigation.cover_geometry_ok, true);
   assert.strictEqual(geometryNavigation.cover_object_fit, "contain");
-  assert.strictEqual(geometryNavigation.handoff_strategy, "dual_route");
-  assert.strictEqual(geometryNavigation.handoff_stage_ms, 17);
-  assert.strictEqual(geometryNavigation.source_retained_until_promote, true);
+  assert.strictEqual(geometryNavigation.handoff_strategy, "single_route_atomic");
+  assert.strictEqual(geometryNavigation.handoff_stage_ms, 0);
+  assert.strictEqual(geometryNavigation.source_retained_until_promote, false);
   assert.strictEqual(geometryNavigation.source_detached_after_promote, true);
-  assert.strictEqual(geometryNavigation.theme_tokens_frozen, true);
-  assert.strictEqual(geometryNavigation.route_layers_at_promote, 2);
+  assert.strictEqual(geometryNavigation.theme_tokens_frozen, false);
+  assert.strictEqual(geometryNavigation.route_layers_at_promote, 1);
   assert.strictEqual(geometryNavigation.route_layers_after_detach, 1);
+  assert.strictEqual(geometryNavigation.route_layers_before_commit, 1);
+  assert.strictEqual(geometryNavigation.route_layers_after_commit, 1);
+  assert.strictEqual(geometryNavigation.single_route_invariant, true);
   assert.strictEqual(geometryNavigation.route_host_has_current, true);
+  assert.strictEqual(geometryNavigation.render_ms, 90);
+  assert.strictEqual(geometryNavigation.hydration_ms, 14);
   const restoredHome = compactEvents.find((event) => (
     event.event === "spa_navigation" && event.home_restore_mode === "live_dom"
   ));

@@ -297,43 +297,6 @@ body.app-screen::before,
   background-color: var(--bg-mid);
 }
 
-#infraSpaRouteHost.is-handoff-active {
-  isolation: isolate;
-}
-
-.spa-route-layer.is-staged,
-.spa-route-layer.is-retained-source {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-  pointer-events: none;
-  transition: none !important;
-}
-
-.spa-route-layer.is-staged {
-  z-index: 2;
-  opacity: 0.001;
-}
-
-.spa-route-layer.is-retained-source {
-  z-index: 1;
-  opacity: 1;
-}
-
-.spa-route-layer.is-promoted {
-  z-index: 2;
-}
-
-.spa-route-layer.is-staged > *,
-.spa-route-layer.is-retained-source > * {
-  transform: translate3d(0, var(--spa-route-offset-y, 0), 0);
-  transition: none !important;
-}
-
 body.album-screen {
   --pwa-status-bg: var(--bg-mid);
 }
@@ -352,7 +315,7 @@ html.pwa-home-restore-active body::before {
 html.pwa-swap-active,
 html.pwa-swap-active body,
 html.pwa-swap-active body::before {
-  background-color: var(--spa-handoff-safety-bg, var(--pwa-status-bg)) !important;
+  background-color: var(--pwa-status-bg) !important;
 }
 
 body.home-screen {

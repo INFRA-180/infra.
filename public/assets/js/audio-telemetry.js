@@ -80,6 +80,7 @@
     "spa_swap_done",
     "spa_swap_start",
     "spa_scroll_restore",
+    "spa_hydration_done",
     "spa_render_done",
     "spa_render_start",
     "nav:album_abort",
@@ -142,7 +143,7 @@
     "cancelled_count", "health_session_age_ms", "volume", "click_perf_ms",
     "guard_age_ms", "guard_current_time", "progressed_seconds", "playback_rate",
     "play_call_ms", "loadstart_ms", "canplay_ms", "play_resolved_ms", "playing_ms",
-    "waiting_count", "stalled_count", "prefetch_age_ms", "render_ms", "swap_ms",
+    "waiting_count", "stalled_count", "prefetch_age_ms", "render_ms", "swap_ms", "hydration_ms",
     "screen_width", "screen_height", "inner_width", "inner_height",
     "root_client_width", "root_client_height",
     "visual_viewport_width", "visual_viewport_height",
@@ -167,6 +168,7 @@
     "track_superseded_count", "scroll_restore_requested_x", "scroll_restore_requested_y",
     "scroll_restore_applied_x", "scroll_restore_applied_y", "scroll_restore_delta_y",
     "scroll_restore_anchor_correction", "route_layers_at_promote", "route_layers_after_detach",
+    "route_layers_before_commit", "route_layers_after_commit",
     "first_paint_ms", "visible_cover_count", "visible_cover_ready_count",
     "second_paint_ms", "second_visible_cover_count", "second_visible_cover_ready_count",
     "spa_cover_not_ready_count", "spa_second_cover_not_ready_count",
@@ -233,7 +235,7 @@
     "lift_finished", "cover_geometry_ok", "native_play_observed", "bfcache",
     "source_retained_until_promote", "source_detached_after_promote",
     "layout_hit_test", "source_hidden_while_ghost", "theme_tokens_frozen",
-    "route_host_has_current"
+    "route_host_has_current", "single_route_invariant"
   ]);
 
   function now() {
@@ -1977,6 +1979,9 @@
         theme_tokens_frozen: Boolean(transition.theme_tokens_frozen),
         route_layers_at_promote: transition.route_layers_at_promote || 0,
         route_layers_after_detach: transition.route_layers_after_detach || 0,
+        route_layers_before_commit: transition.route_layers_before_commit || 0,
+        route_layers_after_commit: transition.route_layers_after_commit || 0,
+        single_route_invariant: transition.single_route_invariant === true,
         route_host_has_current: Boolean(transition.route_host_has_current),
         home_restore_mode: transition.home_restore_mode || "",
         scroll_restore_requested_x: transition.scroll_restore_requested_x,
@@ -1998,6 +2003,7 @@
         cover_timed_out: Boolean(transition.cover_timed_out),
         render_ms: transition.render_ms || 0,
         swap_ms: transition.swap_ms || 0,
+        hydration_ms: transition.hydration_ms || 0,
         response_ms: transition.response_ms || 0,
         strategy: transition.strategy || "",
         cache_hint: transition.cache_hint || "",
@@ -2080,7 +2086,7 @@
     function processSpaRuntimeEvent(eventType, payload, source, timestampMs) {
       const spaEvents = new Set([
         "album_open_tap", "album_open_done", "album_open_fail", "nav:album_start",
-        "nav:album_done", "nav:album_abort", "spa_render_start", "spa_render_done",
+        "nav:album_done", "nav:album_abort", "spa_render_start", "spa_render_done", "spa_hydration_done",
         "spa_swap_start", "spa_swap_done", "spa_scroll_restore", "cover_decode_duration", "spa_html_response"
       ]);
       if (!spaEvents.has(eventType)) return;
@@ -2103,6 +2109,7 @@
         );
       }
       if (eventType === "spa_render_done") transition.render_ms = Math.round(Number(source.duration_ms) || 0);
+      if (eventType === "spa_hydration_done") transition.hydration_ms = Math.round(Number(source.duration_ms) || 0);
       if (eventType === "spa_swap_done") {
         transition.swap_ms = Math.round(Number(source.duration_ms) || 0);
         transition.swap_mode = String(source.swap_mode || "");
@@ -2114,6 +2121,9 @@
         transition.theme_tokens_frozen = source.theme_tokens_frozen === true;
         transition.route_layers_at_promote = Math.max(0, Math.round(Number(source.route_layers_at_promote) || 0));
         transition.route_layers_after_detach = Math.max(0, Math.round(Number(source.route_layers_after_detach) || 0));
+        transition.route_layers_before_commit = Math.max(0, Math.round(Number(source.route_layers_before_commit) || 0));
+        transition.route_layers_after_commit = Math.max(0, Math.round(Number(source.route_layers_after_commit) || 0));
+        transition.single_route_invariant = source.single_route_invariant === true;
         transition.route_host_has_current = source.route_host_has_current === true;
         transition.home_restore_mode = String(source.home_restore_mode || "");
         [

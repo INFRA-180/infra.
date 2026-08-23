@@ -851,77 +851,6 @@
     });
   }
 
-  function waitForSpaRenderingOpportunity() {
-    if (typeof window.requestAnimationFrame !== "function") return Promise.resolve();
-    return new Promise(function (resolve) {
-      window.requestAnimationFrame(function () {
-        window.requestAnimationFrame(function () { resolve(); });
-      });
-    });
-  }
-
-  const SPA_ROUTE_THEME_PROPERTIES = [
-    "--accent", "--ink", "--ink-soft", "--line",
-    "--bg-glow-1", "--bg-glow-2", "--bg-start", "--bg-mid", "--bg-end",
-    "--overlay-bg", "--panel-bg", "--panel-border", "--code-bg",
-    "--pill-bg", "--pill-ink", "--pwa-status-bg"
-  ];
-
-  function freezeSpaRouteTheme(layer, bodyClassName) {
-    if (!layer || !layer.style || typeof window.getComputedStyle !== "function") return false;
-    const computed = window.getComputedStyle(document.documentElement);
-    const values = new Map();
-    SPA_ROUTE_THEME_PROPERTIES.forEach(function (property) {
-      const value = String(computed.getPropertyValue(property) || "").trim();
-      if (value) values.set(property, value);
-    });
-    const classes = String(bodyClassName || layer.className || "").split(/\s+/);
-    if (classes.includes("album-screen") || classes.includes("app-screen")) {
-      const albumBackground = values.get("--bg-mid");
-      if (albumBackground) values.set("--pwa-status-bg", albumBackground);
-    }
-    values.forEach(function (value, property) {
-      layer.style.setProperty(property, value);
-    });
-    layer.setAttribute("data-spa-theme-frozen", "true");
-    return values.size > 0;
-  }
-
-  function clearSpaRouteTheme(layer) {
-    if (!layer || !layer.style) return;
-    SPA_ROUTE_THEME_PROPERTIES.forEach(function (property) {
-      layer.style.removeProperty(property);
-    });
-    layer.removeAttribute("data-spa-theme-frozen");
-  }
-
-  function getSpaRouteSafetyColor(layer) {
-    if (!layer || typeof window.getComputedStyle !== "function") return "";
-    try {
-      const pseudo = window.getComputedStyle(layer, "::before");
-      const color = String(pseudo && pseudo.backgroundColor || "").trim();
-      if (color && color !== "rgba(0, 0, 0, 0)" && color !== "transparent") return color;
-    } catch (_err) {
-      // Fall back to the frozen theme tokens below.
-    }
-    const computed = window.getComputedStyle(layer);
-    return String(
-      computed.getPropertyValue(layer.classList.contains("album-screen") ? "--bg-mid" : "--bg-end") || ""
-    ).trim();
-  }
-
-  function setSpaHandoffSafetyColor(color) {
-    const root = document.documentElement;
-    if (!root || !root.style) return;
-    const value = String(color || "").trim();
-    if (value) root.style.setProperty("--spa-handoff-safety-bg", value);
-  }
-
-  function clearSpaHandoffSafetyColor() {
-    const root = document.documentElement;
-    if (root && root.style) root.style.removeProperty("--spa-handoff-safety-bg");
-  }
-
   function getSpaRouteClassName(bodyClassName) {
     return sanitizeSpaBodyClassName(bodyClassName)
       .split(/\s+/)
@@ -1019,12 +948,9 @@
     let appliedScrollX = null;
     let appliedScrollY = null;
     let scrollAppliedDuringSwap = false;
-    let handoffStageMs = 0;
-    let sourceRetainedUntilPromote = false;
+    let routeLayersBeforeCommit = 0;
+    let routeLayersAfterCommit = 0;
     let sourceDetachedAfterPromote = false;
-    let themeTokensFrozen = false;
-    let routeLayersAtPromote = 0;
-    let routeLayersAfterDetach = 0;
     let routeHostHasCurrent = false;
 
     function freezeSourceRouteForCapture() {
@@ -1036,8 +962,8 @@
       );
     }
 
-    function preserveOrRemoveSourceRoute() {
-      if (!sourceRoute || !sourceRoute.parentNode) return;
+    function preserveDetachedSourceRoute() {
+      if (!sourceRoute) return;
       const liveHomeCapture = opts.liveHomeCapture;
       const preserveHome = Boolean(
         liveHomeCapture &&
@@ -1048,11 +974,8 @@
         liveHomeFragment.appendChild(sourceRoute);
         liveHomeCapture.fragment = liveHomeFragment;
         spaState.liveHomeRoute = liveHomeCapture;
-      } else {
-        sourceRoute.remove();
       }
-      clearSpaRouteTheme(sourceRoute);
-      sourceDetachedAfterPromote = true;
+      sourceDetachedAfterPromote = !sourceRoute.isConnected;
     }
 
     function applyRequestedScroll() {
@@ -1070,10 +993,20 @@
       const mutationStartedAt = getAudioTelemetryNow();
       freezeSourceRouteForCapture();
       document.body.className = bodyClassName;
-      routeHost.appendChild(destinationRoute);
       destinationRoute.setAttribute("data-spa-route-state", "current");
+      destinationRoute.removeAttribute("aria-hidden");
+      destinationRoute.inert = false;
+      routeLayersBeforeCommit = routeHost.querySelectorAll(".spa-route-layer").length;
+      // The destination was prepared and its critical cover decoded while
+      // detached. One DOM operation now commits the route without ever asking
+      // WebKit to composite two fixed layers or an almost-transparent frame.
+      routeHost.replaceChildren(destinationRoute);
+      routeLayersAfterCommit = routeHost.querySelectorAll(".spa-route-layer").length;
+      routeHostHasCurrent = Boolean(
+        routeHost.querySelector(".spa-route-layer[data-spa-route-state='current']")
+      );
       installSpaSupplementalNodes(preparedRoute.supplementalNodes);
-      preserveOrRemoveSourceRoute();
+      preserveDetachedSourceRoute();
       // Reapply device/runtime classes before restoring scroll. On iPhone the
       // Home grid is one column only when `ios-device` is present; scrolling
       // against the temporary two-column geometry clamps a valid deep offset.
@@ -1086,65 +1019,6 @@
         });
       }
       domMutationMs = Math.max(0, Math.round(getAudioTelemetryNow() - mutationStartedAt));
-    }
-
-    async function applyPaintedHandoff() {
-      if (applied) return;
-      applied = true;
-      const mutationStartedAt = getAudioTelemetryNow();
-      freezeSourceRouteForCapture();
-      const sourceThemeFrozen = sourceRoute
-        ? freezeSpaRouteTheme(sourceRoute, sourceRoute.className)
-        : true;
-      const destinationThemeFrozen = freezeSpaRouteTheme(destinationRoute, bodyClassName);
-      themeTokensFrozen = Boolean(sourceThemeFrozen && destinationThemeFrozen);
-      setSpaHandoffSafetyColor(getSpaRouteSafetyColor(sourceRoute || destinationRoute));
-      const sourceScrollY = Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0));
-      const destinationScrollY = requestedScroll ? requestedScroll.y : 0;
-      destinationRoute.classList.add("is-staged");
-      destinationRoute.style.setProperty("--spa-route-offset-y", `${-destinationScrollY}px`);
-      destinationRoute.setAttribute("aria-hidden", "true");
-      destinationRoute.inert = true;
-      routeHost.classList.add("is-handoff-active");
-      routeHost.appendChild(destinationRoute);
-      installSpaSupplementalNodes(preparedRoute.supplementalNodes);
-
-      const stagedAt = getAudioTelemetryNow();
-      await waitForSpaRenderingOpportunity();
-      handoffStageMs = Math.max(0, Math.round(getAudioTelemetryNow() - stagedAt));
-      sourceRetainedUntilPromote = Boolean(sourceRoute && sourceRoute.isConnected);
-
-      if (sourceRoute) {
-        sourceRoute.classList.add("is-retained-source");
-        sourceRoute.style.setProperty("--spa-route-offset-y", `${-sourceScrollY}px`);
-        sourceRoute.setAttribute("data-spa-route-state", "outgoing");
-        sourceRoute.setAttribute("aria-hidden", "true");
-        sourceRoute.inert = true;
-      }
-      destinationRoute.classList.remove("is-staged");
-      destinationRoute.classList.add("is-promoted");
-      destinationRoute.style.removeProperty("--spa-route-offset-y");
-      destinationRoute.setAttribute("data-spa-route-state", "current");
-      destinationRoute.removeAttribute("aria-hidden");
-      destinationRoute.inert = false;
-      routeLayersAtPromote = routeHost.querySelectorAll(".spa-route-layer").length;
-      setSpaHandoffSafetyColor(getSpaRouteSafetyColor(destinationRoute));
-      document.body.className = bodyClassName;
-      // The destination must have its final iPhone/PWA geometry before the
-      // saved offset and anchor correction are applied. These synchronous DOM
-      // operations still complete before the promoted route can paint.
-      runPersistentUiPrepaintSync();
-      applyRequestedScroll();
-      domMutationMs = Math.max(0, Math.round(getAudioTelemetryNow() - mutationStartedAt));
-
-      await nextSpaAnimationFrame();
-      preserveOrRemoveSourceRoute();
-      destinationRoute.classList.remove("is-promoted");
-      routeHost.classList.remove("is-handoff-active");
-      routeLayersAfterDetach = routeHost.querySelectorAll(".spa-route-layer").length;
-      routeHostHasCurrent = Boolean(
-        routeHost.querySelector(".spa-route-layer[data-spa-route-state='current']")
-      );
     }
 
     function finish(mode) {
@@ -1160,13 +1034,16 @@
         const base = {
           swap_mode: mode,
           swap_policy: swapPolicy,
-          handoff_strategy: mode === "painted_handoff" ? "dual_route" : "",
-          handoff_stage_ms: handoffStageMs,
-          source_retained_until_promote: sourceRetainedUntilPromote,
+          handoff_strategy: mode === "view_transition" ? "native_view_transition" : "single_route_atomic",
+          handoff_stage_ms: 0,
+          source_retained_until_promote: false,
           source_detached_after_promote: sourceDetachedAfterPromote,
-          theme_tokens_frozen: themeTokensFrozen,
-          route_layers_at_promote: routeLayersAtPromote,
-          route_layers_after_detach: routeLayersAfterDetach,
+          theme_tokens_frozen: false,
+          route_layers_at_promote: routeLayersAfterCommit,
+          route_layers_after_detach: routeLayersAfterCommit,
+          route_layers_before_commit: routeLayersBeforeCommit,
+          route_layers_after_commit: routeLayersAfterCommit,
+          single_route_invariant: routeLayersAfterCommit === 1 && routeHostHasCurrent,
           route_host_has_current: routeHostHasCurrent,
           home_restore_mode: String(opts.homeRestoreMode || ""),
           route_kind: routeClasses.includes("album-screen")
@@ -1189,16 +1066,11 @@
         });
       }).then(function (result) {
         if (instantPwaSwap) {
-          clearSpaRouteTheme(destinationRoute);
-          clearSpaHandoffSafetyColor();
           setSpaSwapPaintLock(false);
         }
         return result;
       }, function (error) {
         if (instantPwaSwap) {
-          clearSpaRouteTheme(destinationRoute);
-          clearSpaRouteTheme(sourceRoute);
-          clearSpaHandoffSafetyColor();
           setSpaSwapPaintLock(false);
         }
         throw error;
@@ -1241,9 +1113,8 @@
     }
 
     if (instantPwaSwap) {
-      return applyPaintedHandoff().then(function () {
-        return finish("painted_handoff");
-      });
+      applySwap();
+      return finish("atomic_swap");
     }
 
     return new Promise(function (resolve) {
@@ -1385,6 +1256,20 @@
     } else if (isHomePage && isMobilePwaCoverNavigation()) {
       releasePwaCoverHold("home_first_paint");
     }
+  }
+
+  function trackSpaVisualReady(telemetry, startedAt) {
+    trackAudioRuntimeEvent("spa_render_done", Object.assign({}, telemetry || {}, {
+      duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
+    }));
+  }
+
+  async function hydrateSpaRoute(telemetry) {
+    const startedAt = getAudioTelemetryNow();
+    await initPage();
+    trackAudioRuntimeEvent("spa_hydration_done", Object.assign({}, telemetry || {}, {
+      duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt))
+    }));
   }
 
   async function spaNavigate(href, options) {
@@ -1625,16 +1510,17 @@
           });
           return;
         }
-        await initPage();
-        trackAudioRuntimeEvent("spa_render_done", {
+        const cachedCompletionTelemetry = {
           album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
           from_album: audioSwitchContext.fromAlbum || "",
           to_album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
           from_url: rendered.href,
           to_url: url.href,
           cached: true,
-          duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - cachedRenderStartedAt))
-        });
+          navigation_token: navToken
+        };
+        trackSpaVisualReady(cachedCompletionTelemetry, cachedRenderStartedAt);
+        await hydrateSpaRoute(cachedCompletionTelemetry);
         finishAlbumOpenTelemetry(albumOpenContext, "album_open_done", {
           cached: true
         });
@@ -1770,16 +1656,17 @@
       });
       return;
     }
-    await initPage();
-    trackAudioRuntimeEvent("spa_render_done", {
+    const completionTelemetry = {
       album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
       from_album: audioSwitchContext.fromAlbum || "",
       to_album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(url.href),
       from_url: rendered.href,
       to_url: url.href,
       cached: loadedFromCache,
-      duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - renderStartedAt))
-    });
+      navigation_token: navToken
+    };
+    trackSpaVisualReady(completionTelemetry, renderStartedAt);
+    await hydrateSpaRoute(completionTelemetry);
     finishAlbumOpenTelemetry(albumOpenContext, "album_open_done", {
       cached: loadedFromCache
     });

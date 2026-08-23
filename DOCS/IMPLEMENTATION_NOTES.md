@@ -1,5 +1,26 @@
 # Implementation Notes
 
+## 2026-08-23 — audiofix402 navigation PWA mono-couche
+
+- La télémétrie iPhone de la dernière session disponible utilisait encore `audiofix399` et
+  signalait des HTML/covers entièrement en cache et prêts aux deux premières frames. Le blanc
+  observé ne venait donc ni du réseau ni du décodage de la cover, mais du handoff personnalisé qui
+  superposait deux routes fixes, dont la destination à `opacity: 0.001`, avant de détacher la source.
+- Le chemin PWA par défaut prépare toujours la destination et sa cover critique hors DOM, mais le
+  commit visuel est désormais un unique `replaceChildren()` : une seule route courante, aucune
+  couche fixe, aucun staging transparent et aucun `translate3d`. La Home vivante reste conservée
+  dans son `DocumentFragment` après ce remplacement, puis reprend sa restauration de scroll et sa
+  correction d'ancre existantes.
+- `spa_render_done` est maintenant émis dès que le swap et ses deux sondes post-commit sont
+  terminés. `initPage()` est mesuré séparément par `spa_hydration_done`, compacté dans
+  `spa_navigation.hydration_ms`. Les compteurs avant/après commit et
+  `single_route_invariant` permettent d'identifier une régression structurelle sans prétendre
+  observer les pixels du compositeur WebKit.
+- La validation de release reste entièrement automatisée et sans ouverture de navigateur. La
+  validation réelle de la PWA installée sur iPhone appartient à l'utilisateur.
+- Identifiants atomiques : runtime/CSS `audiofix402-20260823`, Service Worker
+  `infra-shell-20260823-audio402`.
+
 ## 2026-08-22 — audiofix401 URLs de covers indépendantes de la route
 
 - La validation réseau complète d'`audiofix400` a révélé des requêtes `404` masquées par le cache

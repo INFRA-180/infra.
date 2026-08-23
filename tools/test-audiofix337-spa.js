@@ -48,45 +48,36 @@ async function testRuntimeClassSanitizer() {
   );
 }
 
-async function testIosSwapUsesNativePaintedHandoff() {
-  const handoffStart = spaSource.indexOf("async function applyPaintedHandoff");
-  const handoffEnd = spaSource.indexOf("function finish(mode)", handoffStart);
-  const handoff = spaSource.slice(handoffStart, handoffEnd);
-  assert.ok(handoffStart >= 0 && handoffEnd > handoffStart, "painted handoff implementation is missing");
-  const stagedIndex = handoff.indexOf('destinationRoute.classList.add("is-staged")');
-  const appendIndex = handoff.indexOf("routeHost.appendChild(destinationRoute)");
-  const renderingIndex = handoff.indexOf("await waitForSpaRenderingOpportunity()");
-  const retainedIndex = handoff.indexOf("sourceRetainedUntilPromote");
-  const promoteIndex = handoff.indexOf('destinationRoute.classList.remove("is-staged")');
-  const bodyIndex = handoff.indexOf("document.body.className = bodyClassName");
-  const prepaintSyncIndex = handoff.indexOf("runPersistentUiPrepaintSync()", bodyIndex);
-  const scrollRestoreIndex = handoff.indexOf("applyRequestedScroll()", bodyIndex);
-  const postPromoteFrameIndex = handoff.indexOf("await nextSpaAnimationFrame()");
-  const detachIndex = handoff.indexOf("preserveOrRemoveSourceRoute()", postPromoteFrameIndex);
-  assert.ok(stagedIndex >= 0 && stagedIndex < appendIndex, "destination must be staged before insertion");
-  assert.ok(appendIndex < renderingIndex, "destination must be inserted before its rendering opportunity");
-  assert.ok(renderingIndex < retainedIndex && retainedIndex < promoteIndex, "source must remain attached through staging");
-  assert.ok(promoteIndex < bodyIndex, "destination must be promoted before the global route class changes");
-  assert.ok(
-    bodyIndex < prepaintSyncIndex && prepaintSyncIndex < scrollRestoreIndex,
-    "final iPhone/PWA geometry must be synchronized before restoring the saved scroll"
-  );
-  assert.ok(scrollRestoreIndex < postPromoteFrameIndex, "promoted destination needs a painted frame before cleanup");
-  assert.ok(postPromoteFrameIndex < detachIndex, "source must detach only after destination promotion");
-
+async function testIosSwapUsesSingleRouteAtomicCommit() {
   const swapFunctionStart = spaSource.indexOf("function swapSpaFragment");
-  const simpleSwapStart = spaSource.indexOf("function applySwap()", swapFunctionStart);
-  const simpleSwapEnd = spaSource.indexOf("async function applyPaintedHandoff", simpleSwapStart);
-  const simpleSwap = spaSource.slice(simpleSwapStart, simpleSwapEnd);
+  const atomicSwapStart = spaSource.indexOf("function applySwap()", swapFunctionStart);
+  const atomicSwapEnd = spaSource.indexOf("function finish(mode)", atomicSwapStart);
+  const atomicSwap = spaSource.slice(atomicSwapStart, atomicSwapEnd);
+  const bodyIndex = atomicSwap.indexOf("document.body.className = bodyClassName");
+  const beforeCountIndex = atomicSwap.indexOf("routeLayersBeforeCommit =");
+  const replaceIndex = atomicSwap.indexOf("routeHost.replaceChildren(destinationRoute)");
+  const afterCountIndex = atomicSwap.indexOf("routeLayersAfterCommit =");
+  const preserveIndex = atomicSwap.indexOf("preserveDetachedSourceRoute()");
+  const prepaintSyncIndex = atomicSwap.indexOf("runPersistentUiPrepaintSync()");
+  const scrollRestoreIndex = atomicSwap.indexOf("applyRequestedScroll()");
+  assert.ok(atomicSwapStart >= 0 && atomicSwapEnd > atomicSwapStart, "atomic swap implementation is missing");
+  assert.ok(bodyIndex >= 0 && bodyIndex < beforeCountIndex, "destination classes must be fixed before commit");
+  assert.ok(beforeCountIndex < replaceIndex && replaceIndex < afterCountIndex, "route replacement must be one measured DOM operation");
+  assert.ok(afterCountIndex < preserveIndex, "the detached Home route must be preserved only after the atomic commit");
   assert.ok(
-    simpleSwap.indexOf("runPersistentUiPrepaintSync()") < simpleSwap.indexOf("applyRequestedScroll()"),
-    "the non-handoff swap must also settle final geometry before scroll restoration"
+    preserveIndex < prepaintSyncIndex && prepaintSyncIndex < scrollRestoreIndex,
+    "the final iPhone/PWA geometry must settle before scroll restoration"
   );
-  assert.ok(spaSource.includes('handoff_strategy: mode === "painted_handoff" ? "dual_route" : ""'));
-  assert.ok(spaSource.includes("SPA_ROUTE_THEME_PROPERTIES"), "route themes must be frozen during the painted handoff");
-  assert.ok(spaSource.includes("freezeSpaRouteTheme(sourceRoute"), "the outgoing route theme is not frozen");
-  assert.ok(spaSource.includes("freezeSpaRouteTheme(destinationRoute"), "the destination route theme is not frozen");
-  assert.ok(spaSource.includes("clearSpaRouteTheme(destinationRoute)"), "temporary destination theme tokens are not cleaned up");
+  assert.ok(spaSource.includes('return finish("atomic_swap")'));
+  assert.ok(spaSource.includes('"single_route_atomic"'));
+  assert.ok(spaSource.includes("route_layers_before_commit"), "pre-commit route count is not measured");
+  assert.ok(spaSource.includes("route_layers_after_commit"), "post-commit route count is not measured");
+  assert.ok(spaSource.includes("single_route_invariant"), "the one-route invariant is not measured");
+  assert.ok(!spaSource.includes("applyPaintedHandoff"), "legacy dual-route handoff must be absent");
+  assert.ok(!spaSource.includes('destinationRoute.classList.add("is-staged")'), "destination must never use a transparent staged layer");
+  assert.ok(!stylesSource.includes(".spa-route-layer.is-staged"), "staged route compositor CSS must be absent");
+  assert.ok(!stylesSource.includes(".spa-route-layer.is-retained-source"), "retained fixed route CSS must be absent");
+  assert.ok(!stylesSource.includes("translate3d(0, var(--spa-route-offset-y"), "route swaps must not promote fixed GPU layers");
   const liveCaptureStart = spaSource.indexOf("function captureLiveHomeRoute");
   const liveCaptureEnd = spaSource.indexOf("function canRestoreLiveHomeRoute", liveCaptureStart);
   const liveCaptureBody = spaSource.slice(liveCaptureStart, liveCaptureEnd);
@@ -104,8 +95,6 @@ async function testIosSwapUsesNativePaintedHandoff() {
       freezeBody.includes('element.setAttribute(attribute, absolutizeSrcsetForBase(value, baseUrl))'),
     "deferred Home covers must be absolute before the album URL becomes the document base"
   );
-  assert.ok(spaSource.includes("route_layers_at_promote"), "the promoted two-layer state is not measured");
-  assert.ok(spaSource.includes("route_layers_after_detach"), "the post-handoff layer state is not measured");
   assert.ok(spaSource.includes("route_host_has_current"), "the route host invariant is not measured");
 
   const spaDocuments = [
@@ -148,14 +137,13 @@ function testCoverSwapHasNoSnapshotOrSecondDecode() {
     "the route-critical album hero must decode synchronously for the destination paint"
   );
   assert.ok(
-    spaSource.includes("function waitForSpaRenderingOpportunity") &&
-      spaSource.includes("await waitForSpaRenderingOpportunity()") &&
-      spaSource.includes("await nextSpaAnimationFrame()"),
-    "the destination needs a rendering opportunity and one promoted frame before source cleanup"
+    spaSource.includes("routeHost.replaceChildren(destinationRoute)") &&
+      spaSource.includes("return waitForSpaFirstPaint().then"),
+    "the detached destination must commit atomically before the two post-commit probes"
   );
   assert.ok(
       stylesSource.includes("html.pwa-swap-active body::before") &&
-      stylesSource.includes("--spa-handoff-safety-bg") &&
+      stylesSource.includes("background-color: var(--pwa-status-bg) !important") &&
       stylesSource.includes("transition: none !important;") &&
       stylesSource.includes("::view-transition-image-pair(root)") &&
       stylesSource.includes("isolation: auto;"),
@@ -257,14 +245,14 @@ function testStandaloneScrollbarPolicy() {
 
 async function main() {
   await testRuntimeClassSanitizer();
-  await testIosSwapUsesNativePaintedHandoff();
+  await testIosSwapUsesSingleRouteAtomicCommit();
   testIosSwapDefaultsToSimpleAtomicMode();
   testFullscreenFinalizationAndSnapshotDedup();
   testCoverSwapHasNoSnapshotOrSecondDecode();
   testVisibilityTelemetryIsTransitionOnly();
   testWebKitHistoryQuotaGuard();
   testStandaloneScrollbarPolicy();
-  console.log("audiofix401 SPA/transport tests: ok");
+  console.log("audiofix402 SPA/transport tests: ok");
 }
 
 main().catch(function (error) {

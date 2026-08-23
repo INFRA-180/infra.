@@ -13,6 +13,7 @@ const css = read("public/assets/css/styles.css");
 const home = read("public/index.html");
 const homeCatalog = read("public/assets/js/home-catalog.js");
 const spaRenderer = read("public/assets/js/spa-renderer.js");
+const audioTelemetry = read("public/assets/js/audio-telemetry.js");
 const transport = read("public/assets/js/transport-ui.js");
 const scripts = read("public/assets/js/scripts.js");
 
@@ -66,4 +67,15 @@ assert.match(scripts, /Math\.max\(0, 10000 - elapsed\)/);
 assert.match(scripts, /markLaunchWatchdogComplete\(probe\);\s*scheduleFinalLaunchSummary/);
 assert.doesNotMatch(scripts, /function completeLaunchWatchdog/);
 
-console.log("audiofix401 fluidity contracts passed: first paint, covers, Apps, scroll, player space, final vitals.");
+assert.match(spaRenderer, /routeHost\.replaceChildren\(destinationRoute\)/);
+assert.match(spaRenderer, /return finish\("atomic_swap"\)/);
+assert.match(spaRenderer, /single_route_invariant: routeLayersAfterCommit === 1 && routeHostHasCurrent/);
+assert.doesNotMatch(spaRenderer, /applyPaintedHandoff|painted_handoff|dual_route/);
+assert.doesNotMatch(css, /\.spa-route-layer\.is-staged|\.spa-route-layer\.is-retained-source/);
+assert.match(spaRenderer, /trackSpaVisualReady\(cachedCompletionTelemetry, cachedRenderStartedAt\);\s*await hydrateSpaRoute\(cachedCompletionTelemetry\);/);
+assert.match(spaRenderer, /trackSpaVisualReady\(completionTelemetry, renderStartedAt\);\s*await hydrateSpaRoute\(completionTelemetry\);/);
+assert.match(audioTelemetry, /"spa_hydration_done"/);
+assert.match(audioTelemetry, /transition\.hydration_ms = Math\.round/);
+assert.match(audioTelemetry, /hydration_ms: transition\.hydration_ms \|\| 0/);
+
+console.log("audiofix402 fluidity contracts passed: atomic route, visual timing, hydration, covers, scroll and final vitals.");

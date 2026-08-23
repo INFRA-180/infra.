@@ -1,15 +1,15 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 22 août 2026.
+État de référence : 23 août 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix401-20260822`
-- Service Worker : `infra-shell-20260822-audio401`
-- CSS : `audiofix401-20260822` — géométrie mobile déterministe avant JavaScript
+- Runtime : `audiofix402-20260823`
+- Service Worker : `infra-shell-20260823-audio402`
+- CSS : `audiofix402-20260823` — géométrie mobile déterministe avant JavaScript
 - Catalogue : 31 albums et 284 pistes
 - Origine audio : proxy R2 Range `https://infra180-api.pages.dev/audio/`
 - Cache audio : `infra-next-track-segments-v9`
@@ -50,7 +50,9 @@ Principaux composants :
 - `audio-radio.js` : Radio, Shuffle, files matérialisées et plan de prefetch ;
 - `audio-prefetch.js` : requêtes Range et cache segmenté ;
 - `catalog-loader.js` : catalogue live, cache local et fallback Git ;
-- `spa-router.js` et `spa-renderer.js` : navigation album sans perdre le lecteur global ;
+- `spa-router.js` et `spa-renderer.js` : navigation album sans perdre le lecteur global ; la
+  destination et sa cover critique sont préparées hors DOM, puis une unique couche de route est
+  remplacée atomiquement, sans couche fixe, opacité de staging ni promotion `translate3d` ;
 - `transport-ui.js`, `now-playing.js`, `album-player-ui.js` : interfaces du lecteur ;
 - `audio-visualizer.js` : analyse Web Audio live et animation fullscreen desktop ;
 - `media-session.js` : commandes iOS, écran verrouillé et centre de contrôle ;
@@ -235,8 +237,9 @@ La visibilité de page reste un indice et n’est jamais présentée comme une p
 verrouillé ou du centre de contrôle.
 
 Ce même résumé contient un inventaire borné du stockage local, les hits/miss HTML et covers,
-le mode de swap, le type de route, la restauration Home/scroll, les invariants de couches et
-l’état de la cover aux première et deuxième frames peintes. La file rapporte ses vraies fins de
+le mode de swap, le type de route, la restauration Home/scroll, l'invariant d'une seule couche et
+l’état de la cover aux première et deuxième frames peintes. Le temps visuel `render_ms` s'arrête
+avant `initPage()` ; `hydration_ms` mesure séparément l'initialisation de la nouvelle route. La file rapporte ses vraies fins de
 preview/FLIP sans événement supplémentaire. Cette observabilité n’ajoute ni requête Worker ni clé
 KV. La PWA demande le stockage persistant une seule fois, à la première interaction.
 
@@ -254,5 +257,5 @@ La commande de référence est :
 node tools/release-audit.js
 ```
 
-Elle doit passer avant chaque push. La validation PWA iPhone reste ensuite effectuée par
-l’utilisateur.
+Elle doit passer avant chaque push. Ces contrôles sont exécutés sans navigateur ; la validation
+visuelle, tactile et audio de la PWA iPhone reste ensuite effectuée exclusivement par l’utilisateur.

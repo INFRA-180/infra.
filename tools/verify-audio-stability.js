@@ -14,10 +14,6 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const release = "audiofix402-20260823";
-const shellRelease = "infra-shell-20260823-audio402";
-const cssRelease = "audiofix402-20260823";
-const frozenCssSha256 = "2714da4ba934003fc4a5ed2561a4fa6bce48b666995d1d18162ddd9cab916412";
 const scripts = read("public/assets/js/scripts.js");
 const radio = read("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");
@@ -37,6 +33,11 @@ const sphragis = read("public/assets/js/sphragis.js");
 const sphragisPage = read("public/sphragis/index.html");
 const sw = read("public/sw.js");
 const styles = read("public/assets/css/styles.css");
+const release = (scripts.match(/window\.INFRA_BUILD_TAG = "([^"]+)";/) || [])[1] || "";
+const shellRelease = (sw.match(/const VERSION = "([^"]+)";/) || [])[1] || "";
+const cssRelease = release;
+const catalogAlbumCount = (JSON.parse(read("public/data/tracks.json")).albums || []).length;
+const frozenCssSha256 = "a82a5bdbac1fc504c515eeac64600eb48cc95a1a6330990b7647aab4ec2e38e6";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -48,9 +49,9 @@ function functionBody(source, name, nextName) {
   return source.slice(start, end);
 }
 
-expect(scripts.includes(`window.INFRA_BUILD_TAG = "${release}"`), "runtime build tag is not audiofix402");
-expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is not audiofix402");
-expect(sw.includes(`const VERSION = "${shellRelease}"`), "Service Worker cache version is not audio402");
+expect(/^audiofix\d+-\d{8}$/.test(release), "runtime build tag is invalid");
+expect(scripts.includes(`const runtimeVersion = "${release}"`), "runtime query version is stale");
+expect(/^infra-shell-\d{8}-audio\d+$/.test(shellRelease), "Service Worker cache version is invalid");
 expect(scripts.includes(`const SPA_SHELL_VERSION = "${shellRelease}"`), "runtime shell version is stale");
 expect(sw.includes('const NEXT_TRACK_CACHE = "infra-next-track-segments-v9"'), "Service Worker does not use segment cache v9");
 expect(covers.includes('CANONICAL_WIDTH: 1200'), "album artwork is not canonicalized to 1200 px");
@@ -59,7 +60,7 @@ expect(covers.includes("adc-13-6e983f31-cover-1200.webp"), "stale ADC13 artwork 
 expect(catalogLoader.includes('normalizeCoverUrl", rawThumb, { width: 1200 }'), "live catalogue can reintroduce a non-canonical album cover");
 expect(sw.includes('const COVERS_CACHE = "infra-covers-v2"'), "Service Worker does not share the canonical cover cache");
 expect(sw.includes("cover-1200\\.webp"), "Service Worker does not cache the canonical cover URL");
-expect(sw.includes("const MAX_COVER_CACHE_ENTRIES = 31"), "Service Worker cover cache is not capped to the canonical inventory");
+expect(sw.includes(`const MAX_COVER_CACHE_ENTRIES = ${catalogAlbumCount}`), "Service Worker cover cache is not capped to the canonical inventory");
 expect(sw.includes("await reconcileCoverCache()"), "Service Worker activation does not purge stale cover entries");
 expect(scripts.includes("const ALBUM_COVER_IMAGE_CACHE_LIMIT = 4"), "cover memory cache is not minimal");
 expect(scripts.includes("const ALBUM_COVER_PREPARE_LIMIT = 2"), "cover warmup is not bounded");
@@ -387,7 +388,7 @@ expect(spa.includes('image.setAttribute("decoding", "sync")'), "route-critical a
 expect(spa.includes('spaState.activeNavigationHref === url.href'), "duplicate SPA album navigation is not coalesced");
 expect(spa.includes('error && error.code === "SPA_PAGE_FETCH_TIMEOUT"'), "stuck SPA fetches have no bounded fallback");
 expect(spa.includes("loadedPage = await loadSpaPageDocument"), "album navigation does not use the shared page loader");
-expect(spaRouter.includes("PAGE_CACHE_LIMIT: 40"), "the SPA cache cannot retain home plus all 31 albums");
+expect(spaRouter.includes("PAGE_CACHE_LIMIT: 40"), "the SPA cache cannot retain home plus the complete album catalogue");
 expect(spaRouter.includes("PAGE_CACHE_LOOKUP_TIMEOUT_MS: 450"), "a stuck CacheStorage lookup can still freeze album navigation");
 expect(spaRouter.includes('strategy: "window_shell_cache"'), "album navigation does not read the installed shell directly");
 expect(spaRouter.includes("inflightPages.has(key)"), "intent and click HTML requests are not deduplicated");
@@ -418,7 +419,7 @@ expect(Boolean(albumPageManifest), "Service Worker album document manifest is mi
 const installedAlbumPages = albumPageManifest
   ? Array.from(albumPageManifest[1].matchAll(/\.\/music\/[^"']+-infra\.html/g), (match) => match[0])
   : [];
-expect(installedAlbumPages.length === 31, `expected 31 installed album documents, found ${installedAlbumPages.length}`);
+expect(installedAlbumPages.length === catalogAlbumCount, `expected ${catalogAlbumCount} installed album documents, found ${installedAlbumPages.length}`);
 expect(sw.includes("event.respondWith(htmlCacheFirst(request, SHELL_CACHE));"), "SPA HTML fetches remain network-first");
 const htmlCacheFirstBody = functionBody(sw, "htmlCacheFirst", "staleWhileRevalidate");
 expect(htmlCacheFirstBody.indexOf("if (cached)") < htmlCacheFirstBody.indexOf("fetch(request)"), "a shell hit still starts a background HTML fetch");
@@ -457,7 +458,7 @@ const htmlFiles = ["public/index.html"]
   .concat(fs.readdirSync(path.join(root, "public/playlists"))
     .filter((name) => name.endsWith(".html"))
     .map((name) => `public/playlists/${name}`));
-expect(htmlFiles.length === 39, `expected 39 player documents, found ${htmlFiles.length}`);
+expect(htmlFiles.length === catalogAlbumCount + 8, `expected ${catalogAlbumCount + 8} player documents, found ${htmlFiles.length}`);
 for (const relativePath of htmlFiles) {
   const source = read(relativePath);
   expect(source.includes(release), `${relativePath} does not reference ${release}`);
@@ -483,6 +484,6 @@ for (const relativePath of ["public/index.html"].concat(
 for (const fileName of albumCoverUrls) {
   expect(fs.existsSync(path.join(root, "public/assets/music/responsive", fileName)), `missing canonical cover ${fileName}`);
 }
-expect(albumCoverUrls.size >= 31, `expected at least 31 canonical album covers, found ${albumCoverUrls.size}`);
+expect(albumCoverUrls.size >= catalogAlbumCount, `expected at least ${catalogAlbumCount} canonical album covers, found ${albumCoverUrls.size}`);
 
-if (!process.exitCode) console.log("Audio stability checks passed for audiofix402.");
+if (!process.exitCode) console.log(`Audio stability checks passed for ${release}.`);

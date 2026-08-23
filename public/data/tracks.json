@@ -1,6 +1,6 @@
 {
-  "version": "audiofix402-20260823",
-  "generatedAt": "2026-08-21",
+  "version": "audiofix403-20260824",
+  "generatedAt": "2026-08-24",
   "source": "Music macOS masters AAC 320 R2",
   "audioPrefix": "mixed",
   "audioPrefixes": [
@@ -14,9 +14,25 @@
     "assets/music/streams/v20260709T225421Z-e03d7535fa",
     "assets/music/streams/v20260717T112959Z-30b7200f03",
     "assets/music/streams/v20260801T185702Z-9b0202f2f9",
-    "assets/music/streams/v20260802T183541Z-53dd6082c0"
+    "assets/music/streams/v20260802T183541Z-53dd6082c0",
+    "assets/music/streams/v20260823T224523Z-d20141"
   ],
   "albums": [
+    {
+      "slug": "d-2-0141",
+      "title": "D 2.0141",
+      "page": "music/d-2-0141-infra.html",
+      "cover": "assets/music/responsive/d-2-0141-2dfeb783-cover-1200.webp",
+      "tracks": [
+        {
+          "index": 1,
+          "title": "MARJOLAINE",
+          "src": "assets/music/streams/v20260823T224523Z-d20141/d-2-0141/01-marjolaine.m4a",
+          "duration": "2:44",
+          "seconds": 164.003
+        }
+      ]
+    },
     {
       "slug": "v-23pi56",
       "title": "V-23π56",

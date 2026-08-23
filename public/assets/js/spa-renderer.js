@@ -107,6 +107,13 @@
     return Boolean(mobileDevice || mobileViewport);
   }
 
+  function isCompactCoverNavigation() {
+    if (isMobilePwaCoverNavigation()) return true;
+    return typeof window.matchMedia === "function"
+      ? window.matchMedia("(max-width: 980px)").matches
+      : window.innerWidth <= 980;
+  }
+
   function getPwaSwapPolicy() {
     let requested = "";
     try {
@@ -209,7 +216,6 @@
   }
 
   function captureLiveHomeRoute(targetUrl, renderedUrl) {
-    if (!isMobilePwaCoverNavigation()) return null;
     if (!document.body.classList.contains("home-screen")) return null;
     if (!/\/music\/[^/]+\.html$/i.test(String(targetUrl && targetUrl.pathname || ""))) return null;
     if (String(window.location.search || "").includes("edit=1")) return null;
@@ -281,13 +287,16 @@
       anchorViewportTop: targetRect ? Math.round(targetRect.top) : null,
       coverStates,
       frozenResourceCount,
+      layer: currentRoute,
       fragment: null
     };
   }
 
   function canRestoreLiveHomeRoute(urlLike) {
     const route = spaState.liveHomeRoute;
-    if (!route || !route.fragment || !route.fragment.childNodes.length) return false;
+    const connectedLayer = Boolean(route && route.layer && route.layer.isConnected);
+    const detachedFragment = Boolean(route && route.fragment && route.fragment.childNodes.length);
+    if (!route || (!connectedLayer && !detachedFragment)) return false;
     return Boolean(route.url && route.url === getComparableSpaUrl(urlLike));
   }
 
@@ -343,12 +352,13 @@
 
   function prepareLiveHomeRouteCovers(route) {
     const states = Array.isArray(route && route.coverStates) ? route.coverStates : [];
-    if (!route || !route.fragment || !states.length) {
+    const routeRoot = route && route.layer && route.layer.isConnected ? route.layer : route && route.fragment;
+    if (!routeRoot || !states.length) {
       return Promise.resolve({ requested: 0, decoded: 0, timedOut: false });
     }
 
     const images = states.slice(0, 2).map(function (state, index) {
-      const card = findAlbumCardByUrl(route.fragment, state.href);
+      const card = findAlbumCardByUrl(routeRoot, state.href);
       const image = card && card.querySelector("img.album-cover");
       if (image) lockLiveHomeCover(image, state, index);
       return image;
@@ -570,12 +580,15 @@
       return Promise.resolve();
     }
 
-    const pwaCoverMode = isMobilePwaCoverNavigation();
+    const pwaCoverMode = isCompactCoverNavigation();
     const coverWidth = 1200;
     const target = getImagePreferredSrc(image, sourceUrl, {
       preferredWidth: coverWidth
     });
-    const timeoutMs = pwaCoverMode ? 900 : 55;
+    // In the installed mobile app the source route stays visible until the
+    // destination cover is actually decoded. A timeout-to-swap reintroduced a
+    // blank hero even when the response was already in CacheStorage.
+    const timeoutMs = pwaCoverMode ? 0 : 55;
     if (!target) {
       trackAudioRuntimeEvent("cover_decode_duration", Object.assign({}, telemetry || {}, {
         image_count: 1,
@@ -668,9 +681,11 @@
         function handleError() {
           done(false, false);
         }
-        timeoutId = window.setTimeout(function () {
-          done(false, true);
-        }, timeoutMs);
+        if (timeoutMs > 0) {
+          timeoutId = window.setTimeout(function () {
+            done(false, true);
+          }, timeoutMs);
+        }
         image.addEventListener("load", handleLoad);
         image.addEventListener("error", handleError);
         if (image.complete && image.naturalWidth > 0) {
@@ -962,7 +977,7 @@
       );
     }
 
-    function preserveDetachedSourceRoute() {
+    function preserveSourceRoute() {
       if (!sourceRoute) return;
       const liveHomeCapture = opts.liveHomeCapture;
       const preserveHome = Boolean(
@@ -970,10 +985,14 @@
         sourceRoute.classList.contains("home-screen")
       );
       if (preserveHome) {
-        const liveHomeFragment = document.createDocumentFragment();
-        liveHomeFragment.appendChild(sourceRoute);
-        liveHomeCapture.fragment = liveHomeFragment;
+        sourceRoute.setAttribute("data-spa-route-state", "retained");
+        sourceRoute.setAttribute("aria-hidden", "true");
+        sourceRoute.inert = true;
+        liveHomeCapture.layer = sourceRoute;
+        liveHomeCapture.fragment = null;
         spaState.liveHomeRoute = liveHomeCapture;
+      } else {
+        sourceRoute.remove();
       }
       sourceDetachedAfterPromote = !sourceRoute.isConnected;
     }
@@ -997,16 +1016,25 @@
       destinationRoute.removeAttribute("aria-hidden");
       destinationRoute.inert = false;
       routeLayersBeforeCommit = routeHost.querySelectorAll(".spa-route-layer").length;
-      // The destination was prepared and its critical cover decoded while
-      // detached. One DOM operation now commits the route without ever asking
-      // WebKit to composite two fixed layers or an almost-transparent frame.
-      routeHost.replaceChildren(destinationRoute);
+      const retainConnectedHome = Boolean(
+        opts.liveHomeCapture &&
+        sourceRoute &&
+        sourceRoute.classList.contains("home-screen")
+      );
+      if (retainConnectedHome) {
+        sourceRoute.setAttribute("data-spa-route-state", "retained");
+        sourceRoute.setAttribute("aria-hidden", "true");
+        sourceRoute.inert = true;
+        routeHost.appendChild(destinationRoute);
+      } else {
+        routeHost.replaceChildren(destinationRoute);
+      }
       routeLayersAfterCommit = routeHost.querySelectorAll(".spa-route-layer").length;
       routeHostHasCurrent = Boolean(
         routeHost.querySelector(".spa-route-layer[data-spa-route-state='current']")
       );
       installSpaSupplementalNodes(preparedRoute.supplementalNodes);
-      preserveDetachedSourceRoute();
+      preserveSourceRoute();
       // Reapply device/runtime classes before restoring scroll. On iPhone the
       // Home grid is one column only when `ios-device` is present; scrolling
       // against the temporary two-column geometry clamps a valid deep offset.
@@ -1034,9 +1062,9 @@
         const base = {
           swap_mode: mode,
           swap_policy: swapPolicy,
-          handoff_strategy: mode === "view_transition" ? "native_view_transition" : "single_route_atomic",
+          handoff_strategy: mode === "view_transition" ? "native_view_transition" : "connected_route_stack",
           handoff_stage_ms: 0,
-          source_retained_until_promote: false,
+          source_retained_until_promote: Boolean(opts.liveHomeCapture),
           source_detached_after_promote: sourceDetachedAfterPromote,
           theme_tokens_frozen: false,
           route_layers_at_promote: routeLayersAfterCommit,
@@ -1044,6 +1072,11 @@
           route_layers_before_commit: routeLayersBeforeCommit,
           route_layers_after_commit: routeLayersAfterCommit,
           single_route_invariant: routeLayersAfterCommit === 1 && routeHostHasCurrent,
+          connected_home_retained: Boolean(
+            opts.liveHomeCapture &&
+            opts.liveHomeCapture.layer &&
+            opts.liveHomeCapture.layer.isConnected
+          ),
           route_host_has_current: routeHostHasCurrent,
           home_restore_mode: String(opts.homeRestoreMode || ""),
           route_kind: routeClasses.includes("album-screen")
@@ -1147,31 +1180,79 @@
     if (Number.isFinite(opts.navToken) && spaState.navToken !== opts.navToken) {
       return null;
     }
-    const persistRoot = getSpaPersistRoot();
     let anchorCorrection = 0;
     if (route.title) document.title = route.title;
-    const swapResult = await swapSpaFragment(
-      route.fragment,
-      sanitizeSpaBodyClassName(route.bodyClassName || "home-screen"),
-      persistRoot,
-      {
-        restoreScroll: requested,
-        homeRestoreMode: "live_dom"
+    const retainedHome = route.layer && route.layer.isConnected ? route.layer : null;
+    let swapResult;
+    if (retainedHome) {
+      const routeHost = retainedHome.parentNode;
+      const outgoing = routeHost && routeHost.querySelector(
+        ".spa-route-layer[data-spa-route-state='current']"
+      );
+      setSpaSwapPaintLock(true);
+      try {
+        if (outgoing && outgoing !== retainedHome) {
+          outgoing.setAttribute("data-spa-route-state", "retiring");
+          outgoing.setAttribute("aria-hidden", "true");
+          outgoing.inert = true;
+        }
+        retainedHome.setAttribute("data-spa-route-state", "current");
+        retainedHome.removeAttribute("aria-hidden");
+        retainedHome.inert = false;
+        document.body.className = sanitizeSpaBodyClassName(route.bodyClassName || "home-screen");
+        runPersistentUiPrepaintSync();
+        resumeLiveHomeRoute();
+        window.scrollTo(requested.x, requested.y);
+        const anchor = findAlbumCardByUrl(retainedHome, route.anchorHref);
+        if (anchor && Number.isFinite(route.anchorViewportTop)) {
+          anchorCorrection = Math.round(anchor.getBoundingClientRect().top - route.anchorViewportTop);
+          if (Math.abs(anchorCorrection) > 0) window.scrollBy(0, anchorCorrection);
+        }
+        if (outgoing && outgoing !== retainedHome) outgoing.remove();
+        swapResult = {
+          swap_mode: "connected_home_restore",
+          swap_policy: getPwaSwapPolicy(),
+          handoff_strategy: "connected_route_stack",
+          route_layers_after_commit: routeHost ? routeHost.querySelectorAll(".spa-route-layer").length : 1,
+          route_host_has_current: true,
+          connected_home_retained: true,
+          source_detached_after_promote: false,
+          home_restore_mode: "live_dom"
+        };
+        await nextSpaAnimationFrame();
+      } finally {
+        setSpaSwapPaintLock(false);
       }
-    );
+    } else {
+      const persistRoot = getSpaPersistRoot();
+      swapResult = await swapSpaFragment(
+        route.fragment,
+        sanitizeSpaBodyClassName(route.bodyClassName || "home-screen"),
+        persistRoot,
+        {
+          restoreScroll: requested,
+          homeRestoreMode: "live_dom"
+        }
+      );
+      resumeLiveHomeRoute();
+      await nextSpaAnimationFrame();
+      window.scrollTo(requested.x, requested.y);
+      await nextSpaAnimationFrame();
+      const anchor = findAlbumCardByUrl(document, route.anchorHref);
+      if (anchor && Number.isFinite(route.anchorViewportTop)) {
+        anchorCorrection = Math.round(anchor.getBoundingClientRect().top - route.anchorViewportTop);
+        if (Math.abs(anchorCorrection) > 0) window.scrollBy(0, anchorCorrection);
+      }
+    }
 
     spaState.liveHomeRoute = null;
-    // Reapply Home-only classes and module order before the final scroll. The
-    // retained route can otherwise change height after the saved offset was
-    // applied, which Safari may clamp to the top of the document.
-    resumeLiveHomeRoute();
-    await nextSpaAnimationFrame();
-    window.scrollTo(requested.x, requested.y);
-    await nextSpaAnimationFrame();
     const anchor = findAlbumCardByUrl(document, route.anchorHref);
     if (anchor && Number.isFinite(route.anchorViewportTop)) {
-      anchorCorrection = Math.round(anchor.getBoundingClientRect().top - route.anchorViewportTop);
-      if (Math.abs(anchorCorrection) > 0) window.scrollBy(0, anchorCorrection);
+      const finalCorrection = Math.round(anchor.getBoundingClientRect().top - route.anchorViewportTop);
+      if (Math.abs(finalCorrection) > 0) {
+        window.scrollBy(0, finalCorrection);
+        anchorCorrection += finalCorrection;
+      }
     }
     saveCurrentScrollPositionInHistory();
     const appliedX = Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0));

@@ -978,7 +978,6 @@
 
   function shouldPrepareInitialGlobalRandomPlayback() {
     return Boolean(
-      document.body.classList.contains("home-screen") &&
       !audioState.globalRandomStartInFlight &&
       !hasPlaybackSession()
     );
@@ -1150,12 +1149,79 @@
       audioState.tracksData.albums.length
     );
     return Boolean(
-      document.body.classList.contains("home-screen") &&
       !audioState.globalRandomStartInFlight &&
       (hasPreparedMetadata || hasInMemoryMetadata) &&
       !hasPlaybackSession() &&
       !(audio && getCurrentPlayableAudioSrc(audio))
     );
+  }
+
+
+
+  function startSelectedTrackInRadioFromCold(track, options) {
+    const opts = options || {};
+    const audio = audioState.audio || ensureGlobalAudio();
+    if (
+      !track ||
+      !track.src ||
+      !audio ||
+      hasPlaybackSession() ||
+      getCurrentPlayableAudioSrc(audio) ||
+      audioState.trackStartInFlight
+    ) {
+      return false;
+    }
+    prepareInitialRadioFromMemory("selected_track_cold");
+    const prepared = consumePreparedInitialGlobalRandomPlaylist() || [];
+    const selected = buildPreservedTrack(track, track.src);
+    if (!selected) return false;
+    const queue = [selected].concat(prepared.filter(function (entry) {
+      return entry && !srcMatches(entry.src, selected.src);
+    }));
+    audioState.homeMode = "radio";
+    audioState.playlistKind = "radio";
+    audioState.shuffleOn = false;
+    audioState.radioQueue = queue;
+    audioState.radioQueueCursor = 0;
+    audioState.playlist = audioState.radioQueue;
+    audioState.currentIndex = 0;
+    persistHomePlayMode("radio");
+    syncPlaylistContext(audioState.playlist, { preserveRecent: true });
+    savePlaybackQueueContext();
+    syncMediaSessionMetadata({ forcePosition: true });
+    startTrack(0, {
+      seamless: true,
+      immediatePlay: true,
+      userGesture: true,
+      coldStart: true,
+      surface: String(opts.surface || "track_cold_radio")
+    });
+    if (queue.length === 1) {
+      ensureRadioPlaylistLoaded().then(function (catalog) {
+        if (
+          audioState.homeMode !== "radio" ||
+          audioState.playlistKind !== "radio" ||
+          !audioState.radioQueue.length ||
+          !srcMatches(audioState.radioQueue[0].src, selected.src)
+        ) {
+          return;
+        }
+        const tail = buildRadioQueue(
+          catalog,
+          Math.max(0, audioState.radioQueueBatchSize - 1),
+          selected.src
+        );
+        if (!tail.length) return;
+        audioState.radioQueue = [audioState.radioQueue[0]].concat(tail);
+        audioState.radioQueueCursor = 0;
+        audioState.playlist = audioState.radioQueue;
+        audioState.currentIndex = 0;
+        syncPlaylistContext(audioState.playlist, { preserveRecent: true });
+        savePlaybackQueueContext();
+        syncAudioUi();
+      }).catch(function () {});
+    }
+    return true;
   }
 
 
@@ -2440,32 +2506,28 @@
 
   function handleGlobalTransportToggle() {
     const audio = audioState.audio || ensureGlobalAudio();
-    if (startCurrentPageCollectionFromIdle(audio)) return;
     if (
       audio &&
       audio.paused &&
       !getCurrentPlayableAudioSrc(audio) &&
-      document.body.classList.contains("home-screen") &&
+      !hasPlaybackSession() &&
       !audioState.globalRandomStartInFlight
     ) {
       if (canStartInitialGlobalRandomPlayback() && startGlobalRandomPlayback()) return;
-      ensurePlayablePlaylistContext();
-      if (audioState.playlist && audioState.playlist.length) {
-        const startIndex = Number.isInteger(audioState.currentIndex) && audioState.currentIndex >= 0
-          ? audioState.currentIndex
-          : 0;
-        startTrack(startIndex, {
-          seamless: true,
-          immediatePlay: true,
-          userGesture: true,
-          resume: true,
-          surface: "mini_restore"
-        });
+      const coldCollection = getCurrentPageCollectionContext();
+      if (
+        coldCollection &&
+        coldCollection.collection[0] &&
+        startSelectedTrackInRadioFromCold(coldCollection.collection[0], {
+          surface: "global_cold_radio"
+        })
+      ) {
         return;
       }
       prepareInitialGlobalRandomPlayback("cold_tap_not_ready");
       return;
     }
+    if (startCurrentPageCollectionFromIdle(audio)) return;
     togglePlayPause();
   }
 
@@ -3884,6 +3946,7 @@
       syncRadioQueueToPlaylist,
       ensureRadioQueue,
       injectCurrentTrackIntoRadioQueue,
+      startSelectedTrackInRadioFromCold,
       ensureRadioPlaylistForNavigation,
       setHomePlayMode,
       activateRadioModeFromTransport,
@@ -3951,6 +4014,7 @@
       syncRadioQueueToPlaylist: function () {},
       ensureRadioQueue: function () { return false; },
       injectCurrentTrackIntoRadioQueue: function () { return -1; },
+      startSelectedTrackInRadioFromCold: function () { return false; },
       ensureRadioPlaylistForNavigation: function () { return true; },
       setHomePlayMode: function () {},
       activateRadioModeFromTransport: function () {},

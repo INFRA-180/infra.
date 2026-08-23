@@ -412,7 +412,13 @@
     function loadDeferredImage(image, sourceAttribute, srcsetAttribute, sizesAttribute) {
       const source = resolveRuntimeAssetUrl(image && image.dataset && image.dataset[sourceAttribute]);
       if (!source) return;
-      image.dataset.coverLoading = "1";
+      const current = resolveRuntimeAssetUrl(image.currentSrc || image.getAttribute("src") || "");
+      if (current && current === source && image.complete && image.naturalWidth > 0) {
+        delete image.dataset[sourceAttribute];
+        revealDeferredImage(image);
+        return;
+      }
+      if (!(image.complete && image.naturalWidth > 0)) image.dataset.coverLoading = "1";
       if (srcsetAttribute) {
         const srcset = resolveRuntimeSrcset(image.dataset[srcsetAttribute]);
         if (srcset) image.setAttribute("srcset", srcset);

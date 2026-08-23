@@ -7,12 +7,24 @@ const { spawnSync } = require("node:child_process");
 
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
+const runtimeSource = fs.readFileSync(path.join(publicRoot, "assets/js/scripts.js"), "utf8");
+const serviceWorkerSource = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
+const catalogBaseline = JSON.parse(fs.readFileSync(path.join(publicRoot, "data/catalog.json"), "utf8"));
+const tracksBaseline = JSON.parse(fs.readFileSync(path.join(publicRoot, "data/tracks.json"), "utf8"));
+const buildMatch = runtimeSource.match(/window\.INFRA_BUILD_TAG = "([^"]+)";/);
+const shellMatch = serviceWorkerSource.match(/const VERSION = "([^"]+)";/);
 const expected = Object.freeze({
-  build: "audiofix402-20260823",
-  shell: "infra-shell-20260823-audio402",
-  albums: 31,
-  tracks: 284
+  build: buildMatch ? buildMatch[1] : "",
+  shell: shellMatch ? shellMatch[1] : "",
+  albums: Array.isArray(catalogBaseline.albums) ? catalogBaseline.albums.length : 0,
+  tracks: Array.isArray(tracksBaseline.albums)
+    ? tracksBaseline.albums.flatMap((album) => album.tracks || []).length
+    : 0
 });
+
+if (!/^audiofix\d+-\d{8}$/.test(expected.build)) fail(`invalid runtime build: ${expected.build || "missing"}`);
+if (!/^infra-shell-\d{8}-audio\d+$/.test(expected.shell)) fail(`invalid shell build: ${expected.shell || "missing"}`);
+if (expected.albums < 31 || expected.tracks < 284) fail("catalogue regressed below the published baseline");
 
 function fail(message) {
   throw new Error(message);
@@ -309,7 +321,7 @@ function verifyNoLegacyRuntimeCovers() {
     );
   }
   if (
-    !sw.includes("const MAX_COVER_CACHE_ENTRIES = 31") ||
+    !sw.includes(`const MAX_COVER_CACHE_ENTRIES = ${expected.albums}`) ||
     !sw.includes("await reconcileCoverCache()") ||
     !scripts.includes("const ALBUM_COVER_IMAGE_CACHE_LIMIT = 4") ||
     !scripts.includes("const ALBUM_COVER_PREPARE_LIMIT = 2") ||

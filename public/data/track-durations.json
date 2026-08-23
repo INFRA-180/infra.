@@ -1,8 +1,17 @@
 {
-  "version": "audiofix402-20260823",
-  "generatedAt": "2026-08-21",
-  "trackCount": 284,
+  "version": "audiofix403-20260824",
+  "generatedAt": "2026-08-24",
+  "trackCount": 285,
   "tracks": [
+    {
+      "album": "D 2.0141",
+      "albumPage": "music/d-2-0141-infra.html",
+      "index": 1,
+      "title": "MARJOLAINE",
+      "src": "assets/music/streams/v20260823T224523Z-d20141/d-2-0141/01-marjolaine.m4a",
+      "seconds": 164.003,
+      "duration": "2:44"
+    },
     {
       "album": "V-23π56",
       "albumPage": "music/v-23pi56-infra.html",

@@ -54,6 +54,16 @@
   ],
   "albums": [
     {
+      "id": "d-2-0141",
+      "title": "D 2.0141",
+      "editKey": "album_d_2_0141",
+      "page": "music/d-2-0141-infra.html",
+      "thumb": "assets/music/responsive/d-2-0141-2dfeb783-cover-1200.webp",
+      "thumbAlt": "Cover INFRA. - D 2.0141",
+      "width": 800,
+      "height": 800
+    },
+    {
       "id": "v-23pi56",
       "title": "V-23π56",
       "editKey": "album_v_23pi56",

@@ -55,28 +55,40 @@ async function testIosSwapUsesSingleRouteAtomicCommit() {
   const atomicSwap = spaSource.slice(atomicSwapStart, atomicSwapEnd);
   const bodyIndex = atomicSwap.indexOf("document.body.className = bodyClassName");
   const beforeCountIndex = atomicSwap.indexOf("routeLayersBeforeCommit =");
+  const retainIndex = atomicSwap.indexOf("const retainConnectedHome");
+  const appendIndex = atomicSwap.indexOf("routeHost.appendChild(destinationRoute)");
   const replaceIndex = atomicSwap.indexOf("routeHost.replaceChildren(destinationRoute)");
   const afterCountIndex = atomicSwap.indexOf("routeLayersAfterCommit =");
-  const preserveIndex = atomicSwap.indexOf("preserveDetachedSourceRoute()");
+  const preserveIndex = atomicSwap.indexOf("preserveSourceRoute()");
   const prepaintSyncIndex = atomicSwap.indexOf("runPersistentUiPrepaintSync()");
   const scrollRestoreIndex = atomicSwap.indexOf("applyRequestedScroll()");
   assert.ok(atomicSwapStart >= 0 && atomicSwapEnd > atomicSwapStart, "atomic swap implementation is missing");
   assert.ok(bodyIndex >= 0 && bodyIndex < beforeCountIndex, "destination classes must be fixed before commit");
-  assert.ok(beforeCountIndex < replaceIndex && replaceIndex < afterCountIndex, "route replacement must be one measured DOM operation");
-  assert.ok(afterCountIndex < preserveIndex, "the detached Home route must be preserved only after the atomic commit");
+  assert.ok(
+    beforeCountIndex < retainIndex && retainIndex < appendIndex && appendIndex < afterCountIndex,
+    "the live Home route must remain connected while the album route is committed"
+  );
+  assert.ok(
+    retainIndex < replaceIndex && replaceIndex < afterCountIndex,
+    "non-Home routes must still use one measured replacement"
+  );
+  assert.ok(afterCountIndex < preserveIndex, "the retained Home route must be registered after the atomic commit");
   assert.ok(
     preserveIndex < prepaintSyncIndex && prepaintSyncIndex < scrollRestoreIndex,
     "the final iPhone/PWA geometry must settle before scroll restoration"
   );
   assert.ok(spaSource.includes('return finish("atomic_swap")'));
-  assert.ok(spaSource.includes('"single_route_atomic"'));
+  assert.ok(spaSource.includes('"connected_route_stack"'));
   assert.ok(spaSource.includes("route_layers_before_commit"), "pre-commit route count is not measured");
   assert.ok(spaSource.includes("route_layers_after_commit"), "post-commit route count is not measured");
   assert.ok(spaSource.includes("single_route_invariant"), "the one-route invariant is not measured");
   assert.ok(!spaSource.includes("applyPaintedHandoff"), "legacy dual-route handoff must be absent");
   assert.ok(!spaSource.includes('destinationRoute.classList.add("is-staged")'), "destination must never use a transparent staged layer");
   assert.ok(!stylesSource.includes(".spa-route-layer.is-staged"), "staged route compositor CSS must be absent");
-  assert.ok(!stylesSource.includes(".spa-route-layer.is-retained-source"), "retained fixed route CSS must be absent");
+  assert.ok(
+    stylesSource.includes('[data-spa-route-state="retained"]'),
+    "the connected Home route must stay paint-suppressed while the album is current"
+  );
   assert.ok(!stylesSource.includes("translate3d(0, var(--spa-route-offset-y"), "route swaps must not promote fixed GPU layers");
   const liveCaptureStart = spaSource.indexOf("function captureLiveHomeRoute");
   const liveCaptureEnd = spaSource.indexOf("function canRestoreLiveHomeRoute", liveCaptureStart);

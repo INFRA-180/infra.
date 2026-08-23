@@ -1,16 +1,16 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 23 août 2026.
+État de référence : 24 août 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix402-20260823`
-- Service Worker : `infra-shell-20260823-audio402`
-- CSS : `audiofix402-20260823` — géométrie mobile déterministe avant JavaScript
-- Catalogue : 31 albums et 284 pistes
+- Runtime : `audiofix403-20260824`
+- Service Worker : `infra-shell-20260824-audio403`
+- CSS : `audiofix403-20260824` — géométrie mobile déterministe avant JavaScript
+- Catalogue : 32 albums et 285 pistes
 - Origine audio : proxy R2 Range `https://infra180-api.pages.dev/audio/`
 - Cache audio : `infra-next-track-segments-v9`
 - Couverture : une URL WebP 1200×1200 canonique par album
@@ -23,7 +23,7 @@ GitHub Pages publie exclusivement `public/`.
 ```text
 public/
 ├── index.html
-├── music/                    31 pages album
+├── music/                    32 pages album
 ├── playlists/                4 pages de playlists Music
 ├── apps/                     3 applications
 ├── assets/
@@ -51,8 +51,8 @@ Principaux composants :
 - `audio-prefetch.js` : requêtes Range et cache segmenté ;
 - `catalog-loader.js` : catalogue live, cache local et fallback Git ;
 - `spa-router.js` et `spa-renderer.js` : navigation album sans perdre le lecteur global ; la
-  destination et sa cover critique sont préparées hors DOM, puis une unique couche de route est
-  remplacée atomiquement, sans couche fixe, opacité de staging ni promotion `translate3d` ;
+  destination et sa cover critique sont préparées hors DOM, tandis que la Home connectée reste
+  hors peinture jusqu'au retour afin de conserver exactement son DOM et son scroll ;
 - `transport-ui.js`, `now-playing.js`, `album-player-ui.js` : interfaces du lecteur ;
 - `audio-visualizer.js` : analyse Web Audio live et animation fullscreen desktop ;
 - `media-session.js` : commandes iOS, écran verrouillé et centre de contrôle ;

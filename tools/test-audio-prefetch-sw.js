@@ -6,6 +6,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
+const publicRoot = path.resolve(__dirname, "../public");
+const catalogAlbumCount = (JSON.parse(fs.readFileSync(path.join(publicRoot, "data/tracks.json"), "utf8")).albums || []).length;
+const runtimeSource = fs.readFileSync(path.join(publicRoot, "assets/js/scripts.js"), "utf8");
+const runtimeRelease = (runtimeSource.match(/window\.INFRA_BUILD_TAG = "([^"]+)";/) || [])[1] || "";
+const serviceWorkerSource = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
+const shellRelease = (serviceWorkerSource.match(/const VERSION = "([^"]+)";/) || [])[1] || "";
+
 let fetchHandler = null;
 let installHandler = null;
 let activateHandler = null;
@@ -251,10 +258,10 @@ async function dispatchSiteFetch(request) {
   await installPromise;
   assert.strictEqual(skipWaitingCalls, 0, "install must not replace the active controller during playback");
   const installedAlbumPages = shellPutRequests.filter((asset) => /\/music\/[^/]+-infra\.html$/.test(asset));
-  assert.strictEqual(installedAlbumPages.length, 31, "all album documents must be installed with the PWA shell");
+  assert.strictEqual(installedAlbumPages.length, catalogAlbumCount, "all album documents must be installed with the PWA shell");
   assert(installedAlbumPages.includes("https://site.test/music/salam-infra.html"));
   assert(installedAlbumPages.includes("https://site.test/music/trou-noir-infra.html"));
-  assert(installedShellAssets.includes("./assets/js/scripts.js?v=audiofix402-20260823"));
+  assert(installedShellAssets.includes(`./assets/js/scripts.js?v=${runtimeRelease}`));
   assert(
     installedOptionalShellAssets.includes("./assets/vendor/qr-creator.min.js?v=1.0.0"),
     "optional shell resources must still be attempted"
@@ -326,12 +333,14 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260821-audio395-runtime",
     "infra-shell-20260821-audio395-shell",
     "infra-shell-20260822-audio396-runtime",
-    "infra-shell-20260822-audio396-shell"
+    "infra-shell-20260822-audio396-shell",
+    "infra-shell-20260823-audio402-runtime",
+    "infra-shell-20260823-audio402-shell"
   ]);
   assert(!deletedCaches.includes("infra-next-track-segments-v9"));
   assert(!deletedCaches.includes("infra-covers-v2"));
-  assert(!deletedCaches.includes("infra-shell-20260823-audio402-shell"));
-  assert(!deletedCaches.includes("infra-shell-20260823-audio402-runtime"));
+  assert(!deletedCaches.includes(`${shellRelease}-shell`));
+  assert(!deletedCaches.includes(`${shellRelease}-runtime`));
   assert.deepStrictEqual(deletedCoverEntries.sort(), [
     "https://other.test/assets/music/responsive/abricot-cover-1200.webp",
     "https://site.test/assets/music/responsive/obsolete-cover-1200.webp"
@@ -487,7 +496,7 @@ async function dispatchSiteFetch(request) {
     mode: "navigate",
     destination: "document"
   });
-  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), "infra-shell-20260823-audio402");
+  assert.strictEqual(response.headers.get("X-Infra-SW-Version"), shellRelease);
   assert.strictEqual(response.headers.get("X-Infra-HTML-Strategy"), "shell_cache");
   assert.strictEqual(response.headers.get("X-Infra-HTML-Cache"), "hit");
   assert.strictEqual(

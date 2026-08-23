@@ -1,6 +1,6 @@
 # Plan de maintenance — SITE INFRA
 
-État de référence : 21 août 2026.
+État de référence : 24 août 2026.
 
 Origine audio de production actuelle : proxy Worker
 `https://infra180-api.pages.dev/audio/`. Aucun runtime actif ne doit réintroduire le endpoint
@@ -36,10 +36,10 @@ télémétrie exploitable.
 - Le LaunchAgent est relancé après chaque maintenance.
 - La purge distante conservatrice du 21 août est sauvegardée sous
   `/Users/infra/CODEX_APP/SITE_INFRA./BACKUPS/r2-dedup-20260821/` : 4 402 copies exactes
-  retirées sans toucher aux 284 pistes actives.
+  retirées sans toucher aux 284 pistes alors actives.
 - La rétention minimale finale a ensuite retiré 209 audios inactifs et 3 602 JSON historiques.
-  État vérifié : 285 objets / 2,098 Go, soit 284 audios actifs et `catalog/latest.json` ; les
-  284 contrôles de lecture Range passent. Le tampon local historique a été supprimé après
+  État vérifié après `D 2.0141` : 286 objets / 2,104 Go, soit 285 audios actifs et
+  `catalog/latest.json` ; les 285 contrôles de lecture Range passent. Le tampon local historique a été supprimé après
   vérification et seuls les rapports légers restent dans
   `/Users/infra/CODEX_APP/SITE_INFRA./BACKUPS/r2-minimal-retention-20260821/`.
 - Avant tout upload audio, `sync-itunes-r2-catalog.js` recalcule l'inventaire distant, avertit à
@@ -53,25 +53,25 @@ La bibliothèque Music reste strictement en lecture seule.
 
 ## Priorité 3 — nettoyage des pochettes historiques — terminé
 
-- 31 WebP 1200 canoniques conservés : exactement une cover par album.
+- 32 WebP 1200 canoniques conservés : exactement une cover par album.
 - Les quatre originaux de `public/assets/music/sources/` sont conservés.
 - 69 anciennes variantes WebP 480/900 et 37 anciens JPG/PNG non référencés sont retirés.
 - `tools/release-audit.js` refuse désormais toute cover physique supplémentaire, manquante
   ou différente du catalogue.
 
-## Priorité 4 — source de vérité générée
+## Priorité 4 — source de vérité générée — active
 
-À moyen terme, réduire les mises à jour mécaniques en générant depuis un manifest unique :
+Le générateur local met désormais à jour depuis Music et le manifest synchronisé :
 
 - `public/data/catalog.json`
 - `public/data/tracks.json`
 - `public/data/track-durations.json`
-- les 31 pages album ;
+- les 32 pages album, avec découverte automatique des futurs dossiers ;
 - `catalog-fallback.js` ;
 - les références versionnées du runtime et du Service Worker.
 
-Cette évolution doit rester un outil de génération hors runtime. Elle ne justifie ni framework,
-ni bundler, ni réécriture du lecteur.
+La surveillance conserve une publication Git en attente et ne la poursuit que sur la branche
+attendue avec un dépôt propre. Cet outil reste hors runtime, sans framework ni bundler.
 
 ## Priorité 5 — dette de code
 

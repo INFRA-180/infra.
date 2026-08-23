@@ -49,6 +49,7 @@
     const syncRadioQueueToPlaylist = method(ctx, "syncRadioQueueToPlaylist");
     const buildPreservedTrack = method(ctx, "buildPreservedTrack", function () { return null; });
     const injectCurrentTrackIntoRadioQueue = method(ctx, "injectCurrentTrackIntoRadioQueue", function () { return -1; });
+    const startSelectedTrackInRadioFromCold = method(ctx, "startSelectedTrackInRadioFromCold", function () { return false; });
     const toggleCurrentPageCollection = method(ctx, "toggleCurrentPageCollection", function () { return false; });
 
   function formatTrackDuration(secondsValue) {
@@ -483,6 +484,10 @@
           return;
         }
 
+        if (startSelectedTrackInRadioFromCold(ui.playlist[index], { surface: "album_track_cold_radio" })) {
+          return;
+        }
+
         const playIndex = prepareAlbumUiTrackForPlayback(ui, index);
         startTrack(playIndex, {
           seamless: true,
@@ -528,6 +533,9 @@
         const isSame = currentSrc && srcMatches(currentSrc, track.src);
         if (isSame) {
           togglePlayPause();
+          return;
+        }
+        if (startSelectedTrackInRadioFromCold(ui.playlist[index], { surface: "album_row_cold_radio" })) {
           return;
         }
         const playIndex = prepareAlbumUiTrackForPlayback(ui, index);

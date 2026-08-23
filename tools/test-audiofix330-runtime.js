@@ -2530,10 +2530,25 @@ function testPersistentAlbumAndFullscreenContracts() {
   );
 
   const radioSource = fs.readFileSync(RADIO_PATH, "utf8");
+  const globalTransportStart = radioSource.indexOf("function handleGlobalTransportToggle");
+  const globalTransportEnd = radioSource.indexOf("function ensureGlobalAudio", globalTransportStart);
+  const globalTransportBody = radioSource.slice(globalTransportStart, globalTransportEnd);
   assert(
-    radioSource.includes("startCurrentPageCollectionFromIdle(audio)"),
-    "The global transport must inspect the current collection before cold Radio"
+    globalTransportBody.indexOf("startGlobalRandomPlayback()") >= 0 &&
+      globalTransportBody.indexOf("startGlobalRandomPlayback()") < globalTransportBody.indexOf("startCurrentPageCollectionFromIdle(audio)"),
+    "The global transport must start cold Radio before adopting the current collection"
   );
+  assert(
+    globalTransportBody.includes('surface: "global_cold_radio"'),
+    "The cold global transport must keep a gesture-safe Radio fallback while metadata loads"
+  );
+  const coldCapabilityStart = radioSource.indexOf("function canStartInitialGlobalRandomPlayback");
+  const coldCapabilityEnd = radioSource.indexOf("function startSelectedTrackInRadioFromCold", coldCapabilityStart);
+  assert(!/document\.body\.classList\.contains\("home-screen"\)/.test(
+    radioSource.slice(coldCapabilityStart, coldCapabilityEnd)
+  ), "Cold Radio must be available from album and playlist routes");
+  assert(albumUiSource.includes("startSelectedTrackInRadioFromCold"), "A selected cold track must enter the Radio queue first");
+  assert(radioSource.includes("ensureRadioPlaylistLoaded().then"), "A one-track cold Radio queue must be completed in the background");
 
   const modeStylesSource = fs.readFileSync(STYLES_PATH, "utf8");
   assert(

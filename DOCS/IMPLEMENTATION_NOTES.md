@@ -1,5 +1,32 @@
 # Implementation Notes
 
+## 2026-08-24 — audiofix403 catalogue auto, covers persistantes et Play Radio froid
+
+- Le nouvel album `D 2.0141` est intégré sous le slug déterministe `d-2-0141` : 1 piste
+  `MARJOLAINE`, 32 albums et 285 pistes au total. Quand Music ne fournit plus de chemin de
+  fichier exploitable, le générateur recroise l'identifiant déjà connu puis le dossier, le nom et
+  la durée du master en lecture seule. Un album inconnu reçoit sa page, son entrée Home, son
+  sitemap, son manifest PWA et, en l'absence d'artwork embarqué, la cover de marque INFRA.
+- La surveillance locale ne s'arrête plus au catalogue live : elle conserve une publication de
+  site en attente, puis génère, audite, committe uniquement `public/` et pousse la branche quand le
+  dépôt est propre. Un dépôt occupé, une branche différente ou un push interrompu reporte le lot
+  sans écraser le travail en cours.
+- La Home vivante reste connectée mais totalement hors peinture pendant l'album. Le retour la
+  repasse courante dans le même verrou de peinture, restaure le scroll et l'ancre avant de retirer
+  l'album. Une cover déjà décodée n'est plus réassignée ni oubliée par le LRU ; la route source
+  reste visible jusqu'au décodage de la cover destination, sans timeout blanc sur mobile.
+- Le premier Play d'une session démarre désormais Radio depuis toute route audio. Si la file
+  globale n'est pas encore prête dans le geste utilisateur, la piste visible démarre
+  immédiatement comme tête de file Radio, puis le reste du catalogue est ajouté en arrière-plan.
+- Validation : suite de release complète (20 contrôles), 40 documents, 32 covers canoniques,
+  frontière publique et syntaxe. En navigateur local 390×844, un vrai tap puis Retour conserve
+  `2250 px` exactement (ancre à 1 px d'arrondi), le premier Play fait avancer `MARJOLAINE` à
+  `0,87 s` avec Radio active et aucune erreur console. La confirmation finale de composition reste
+  à faire sur la PWA iPhone réelle.
+- Identifiants atomiques : runtime/CSS `audiofix403-20260824`, Service Worker
+  `infra-shell-20260824-audio403`, audio `v20260823T224523Z-d20141`, catalogue live
+  `catalog-20260823T224523Z-d20141`.
+
 ## 2026-08-23 — audiofix402 navigation PWA mono-couche
 
 - La télémétrie iPhone de la dernière session disponible utilisait encore `audiofix399` et

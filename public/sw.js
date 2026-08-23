@@ -1,9 +1,9 @@
-const VERSION = "infra-shell-20260823-audio402";
+const VERSION = "infra-shell-20260824-audio403";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const COVERS_CACHE = "infra-covers-v2";
 const NEXT_TRACK_CACHE = "infra-next-track-segments-v9";
-const MAX_COVER_CACHE_ENTRIES = 31;
+const MAX_COVER_CACHE_ENTRIES = 32;
 const CANONICAL_COVER_PATHS = new Set([
   "assets/music/responsive/abricot-cover-1200.webp",
   "assets/music/responsive/adc-13-6e983f31-cover-1200.webp",
@@ -15,6 +15,7 @@ const CANONICAL_COVER_PATHS = new Set([
   "assets/music/responsive/black-stallion-cover-1200.webp",
   "assets/music/responsive/cerises-cover-1200.webp",
   "assets/music/responsive/cyberpunk-cover-1200.webp",
+  "assets/music/responsive/d-2-0141-2dfeb783-cover-1200.webp",
   "assets/music/responsive/etoiles-cover-1200.webp",
   "assets/music/responsive/fond-diffus-e28f5aa2-cover-1200.webp",
   "assets/music/responsive/gaia-cover-1200.webp",
@@ -44,33 +45,33 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix402-20260823",
-  "./assets/js/covers.js?v=audiofix402-20260823",
-  "./assets/js/favorites.js?v=audiofix402-20260823",
-  "./assets/js/favorites-ui.js?v=audiofix402-20260823",
-  "./assets/js/audio-visualizer.js?v=audiofix402-20260823",
-  "./assets/js/transport-ui.js?v=audiofix402-20260823",
-  "./assets/js/now-playing.js?v=audiofix402-20260823",
-  "./assets/js/album-player-ui.js?v=audiofix402-20260823",
-  "./assets/js/spa-renderer.js?v=audiofix402-20260823",
-  "./assets/js/audio-radio.js?v=audiofix402-20260823",
-  "./assets/js/media-session.js?v=audiofix402-20260823",
-  "./assets/js/audio-prefetch.js?v=audiofix402-20260823",
-  "./assets/js/spa-router.js?v=audiofix402-20260823",
-  "./assets/js/catalog-fallback.js?v=audiofix402-20260823",
-  "./assets/js/catalog-loader.js?v=audiofix402-20260823",
-  "./assets/js/audio-telemetry.js?v=audiofix402-20260823",
-  "./assets/js/downloads.js?v=audiofix402-20260823",
-  "./assets/js/home-catalog.js?v=audiofix402-20260823",
-  "./assets/js/audio-core.js?v=audiofix402-20260823",
-  "./assets/js/pwa-install.js?v=audiofix402-20260823",
-  "./assets/js/share-qr.js?v=audiofix402-20260823",
-  "./assets/js/scripts.js?v=audiofix402-20260823",
+  "./assets/css/styles.css?v=audiofix403-20260824",
+  "./assets/js/covers.js?v=audiofix403-20260824",
+  "./assets/js/favorites.js?v=audiofix403-20260824",
+  "./assets/js/favorites-ui.js?v=audiofix403-20260824",
+  "./assets/js/audio-visualizer.js?v=audiofix403-20260824",
+  "./assets/js/transport-ui.js?v=audiofix403-20260824",
+  "./assets/js/now-playing.js?v=audiofix403-20260824",
+  "./assets/js/album-player-ui.js?v=audiofix403-20260824",
+  "./assets/js/spa-renderer.js?v=audiofix403-20260824",
+  "./assets/js/audio-radio.js?v=audiofix403-20260824",
+  "./assets/js/media-session.js?v=audiofix403-20260824",
+  "./assets/js/audio-prefetch.js?v=audiofix403-20260824",
+  "./assets/js/spa-router.js?v=audiofix403-20260824",
+  "./assets/js/catalog-fallback.js?v=audiofix403-20260824",
+  "./assets/js/catalog-loader.js?v=audiofix403-20260824",
+  "./assets/js/audio-telemetry.js?v=audiofix403-20260824",
+  "./assets/js/downloads.js?v=audiofix403-20260824",
+  "./assets/js/home-catalog.js?v=audiofix403-20260824",
+  "./assets/js/audio-core.js?v=audiofix403-20260824",
+  "./assets/js/pwa-install.js?v=audiofix403-20260824",
+  "./assets/js/share-qr.js?v=audiofix403-20260824",
+  "./assets/js/scripts.js?v=audiofix403-20260824",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix402-20260823",
-  "./data/track-durations.json?v=audiofix402-20260823",
-  "./data/tracks.json?v=audiofix402-20260823",
+  "./data/catalog.json?v=audiofix403-20260824",
+  "./data/track-durations.json?v=audiofix403-20260824",
+  "./data/tracks.json?v=audiofix403-20260824",
   "./data/playlists.json?v=playlist-collage-20260802",
   "./assets/css/playlists.css?v=playlist-collage-20260802",
   "./assets/branding/infra-logo-white-photoroom-title.png",
@@ -90,7 +91,7 @@ const SHELL_ASSETS = [
 // audio. A missing admin/QR/Sphragis file must therefore never invalidate the
 // complete shell installation.
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/scripts.admin.js?v=audiofix402-20260823",
+  "./assets/js/scripts.admin.js?v=audiofix403-20260824",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./sphragis/",
   "./sphragis/index.html",
@@ -112,6 +113,7 @@ const ALBUM_PAGES = [
   "./music/black-stallion-infra.html",
   "./music/cerises-infra.html",
   "./music/cyberpunk-infra.html",
+  "./music/d-2-0141-infra.html",
   "./music/etoiles-infra.html",
   "./music/fond-diffus-infra.html",
   "./music/gaia-infra.html",
@@ -133,10 +135,10 @@ const ALBUM_PAGES = [
   "./music/trou-noir-infra.html",
   "./music/v-23pi56-infra.html",
   "./music/voyager-infra.html",
+  "./playlists/infra-falcon.html",
   "./playlists/infra-moon.html",
-  "./playlists/infra-sun.html",
   "./playlists/infra-snow.html",
-  "./playlists/infra-falcon.html"
+  "./playlists/infra-sun.html"
 ];
 
 async function precacheAlbumDocuments(cache) {

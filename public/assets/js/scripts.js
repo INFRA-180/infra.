@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix402-20260823";
+window.INFRA_BUILD_TAG = "audiofix403-20260824";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -479,7 +479,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260823-audio402";
+  const SPA_SHELL_VERSION = "infra-shell-20260824-audio403";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -487,7 +487,7 @@ function openAppDownloadGatekeeper(appName, url) {
     : 240;
   const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix402-20260823";
+  const LOCAL_CATALOG_VERSION = "audiofix403-20260824";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -508,7 +508,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix402-20260823";
+  const runtimeVersion = "audiofix403-20260824";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -777,6 +777,7 @@ function openAppDownloadGatekeeper(appName, url) {
       syncRadioQueueToPlaylist: function () {},
       ensureRadioQueue: function () {},
       injectCurrentTrackIntoRadioQueue: function () {},
+      startSelectedTrackInRadioFromCold: function () { return false; },
       ensureRadioPlaylistForNavigation: function () {},
       setHomePlayMode: function () {},
       activateRadioModeFromTransport: function () {},
@@ -1090,6 +1091,7 @@ function openAppDownloadGatekeeper(appName, url) {
       syncRadioQueueToPlaylist,
       buildPreservedTrack,
       injectCurrentTrackIntoRadioQueue,
+      startSelectedTrackInRadioFromCold,
       toggleCurrentPageCollection
     });
   }
@@ -2074,6 +2076,9 @@ function openAppDownloadGatekeeper(appName, url) {
   function injectCurrentTrackIntoRadioQueue() {
     return callAudioRadio("injectCurrentTrackIntoRadioQueue", arguments);
   }
+  function startSelectedTrackInRadioFromCold() {
+    return callAudioRadio("startSelectedTrackInRadioFromCold", arguments);
+  }
   function ensureRadioPlaylistForNavigation() {
     return callAudioRadio("ensureRadioPlaylistForNavigation", arguments);
   }
@@ -2224,8 +2229,8 @@ function openAppDownloadGatekeeper(appName, url) {
         width: 1200
       });
     });
-    // The catalogue now has 31 albums. Keep every responsive cover eligible so
-    // late catalogue entries are not excluded from the persistent cover cache.
+    // Keep the entire catalogue eligible so late entries are never excluded
+    // from the persistent decoded-cover cache.
     return urls;
   }
 
@@ -2497,9 +2502,6 @@ function openAppDownloadGatekeeper(appName, url) {
       const oldest = audioState.albumCoverImageCache.keys().next();
       if (oldest.done) break;
       audioState.albumCoverImageCache.delete(oldest.value);
-      if (audioState.albumCoverReadyUrls && typeof audioState.albumCoverReadyUrls.delete === "function") {
-        audioState.albumCoverReadyUrls.delete(oldest.value);
-      }
     }
   }
 
@@ -6154,9 +6156,9 @@ function openAppDownloadGatekeeper(appName, url) {
       initAudioSessionTelemetry();
       ensurePlayablePlaylistContext();
     }
-    const initialRadioMetadataReady = isHomeScreen
+    const initialRadioMetadataReady = audioFeaturesNeeded
       ? tracksDataReady.then(function () {
-        return prepareInitialGlobalRandomPlayback("home_init");
+        return prepareInitialGlobalRandomPlayback(isHomeScreen ? "home_init" : "route_init");
       })
       : Promise.resolve(null);
 
@@ -6193,10 +6195,8 @@ function openAppDownloadGatekeeper(appName, url) {
       });
       initMinimalPlayers();
       syncTransportUi();
-      if (isHomeScreen) {
-        await initialRadioMetadataReady;
-        syncTransportUi();
-      }
+      await initialRadioMetadataReady;
+      syncTransportUi();
     }
 
     if (adminMode) {

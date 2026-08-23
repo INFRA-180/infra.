@@ -1,6 +1,7 @@
-const VERSION = "infra-shell-20260824-audio404";
+const VERSION = "infra-shell-20260824-audio405";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
+const LIVE_CATALOG_CACHE = `${VERSION}-catalog`;
 const COVERS_CACHE = "infra-covers-v2";
 const NEXT_TRACK_CACHE = "infra-next-track-segments-v9";
 const MAX_COVER_CACHE_ENTRIES = 32;
@@ -45,33 +46,33 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix404-20260824",
-  "./assets/js/covers.js?v=audiofix404-20260824",
-  "./assets/js/favorites.js?v=audiofix404-20260824",
-  "./assets/js/favorites-ui.js?v=audiofix404-20260824",
-  "./assets/js/audio-visualizer.js?v=audiofix404-20260824",
-  "./assets/js/transport-ui.js?v=audiofix404-20260824",
-  "./assets/js/now-playing.js?v=audiofix404-20260824",
-  "./assets/js/album-player-ui.js?v=audiofix404-20260824",
-  "./assets/js/spa-renderer.js?v=audiofix404-20260824",
-  "./assets/js/audio-radio.js?v=audiofix404-20260824",
-  "./assets/js/media-session.js?v=audiofix404-20260824",
-  "./assets/js/audio-prefetch.js?v=audiofix404-20260824",
-  "./assets/js/spa-router.js?v=audiofix404-20260824",
-  "./assets/js/catalog-fallback.js?v=audiofix404-20260824",
-  "./assets/js/catalog-loader.js?v=audiofix404-20260824",
-  "./assets/js/audio-telemetry.js?v=audiofix404-20260824",
-  "./assets/js/downloads.js?v=audiofix404-20260824",
-  "./assets/js/home-catalog.js?v=audiofix404-20260824",
-  "./assets/js/audio-core.js?v=audiofix404-20260824",
-  "./assets/js/pwa-install.js?v=audiofix404-20260824",
-  "./assets/js/share-qr.js?v=audiofix404-20260824",
-  "./assets/js/scripts.js?v=audiofix404-20260824",
+  "./assets/css/styles.css?v=audiofix405-20260824",
+  "./assets/js/covers.js?v=audiofix405-20260824",
+  "./assets/js/favorites.js?v=audiofix405-20260824",
+  "./assets/js/favorites-ui.js?v=audiofix405-20260824",
+  "./assets/js/audio-visualizer.js?v=audiofix405-20260824",
+  "./assets/js/transport-ui.js?v=audiofix405-20260824",
+  "./assets/js/now-playing.js?v=audiofix405-20260824",
+  "./assets/js/album-player-ui.js?v=audiofix405-20260824",
+  "./assets/js/spa-renderer.js?v=audiofix405-20260824",
+  "./assets/js/audio-radio.js?v=audiofix405-20260824",
+  "./assets/js/media-session.js?v=audiofix405-20260824",
+  "./assets/js/audio-prefetch.js?v=audiofix405-20260824",
+  "./assets/js/spa-router.js?v=audiofix405-20260824",
+  "./assets/js/catalog-fallback.js?v=audiofix405-20260824",
+  "./assets/js/catalog-loader.js?v=audiofix405-20260824",
+  "./assets/js/audio-telemetry.js?v=audiofix405-20260824",
+  "./assets/js/downloads.js?v=audiofix405-20260824",
+  "./assets/js/home-catalog.js?v=audiofix405-20260824",
+  "./assets/js/audio-core.js?v=audiofix405-20260824",
+  "./assets/js/pwa-install.js?v=audiofix405-20260824",
+  "./assets/js/share-qr.js?v=audiofix405-20260824",
+  "./assets/js/scripts.js?v=audiofix405-20260824",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix404-20260824",
-  "./data/track-durations.json?v=audiofix404-20260824",
-  "./data/tracks.json?v=audiofix404-20260824",
+  "./data/catalog.json?v=audiofix405-20260824",
+  "./data/track-durations.json?v=audiofix405-20260824",
+  "./data/tracks.json?v=audiofix405-20260824",
   "./data/playlists.json?v=playlist-collage-20260802",
   "./assets/css/playlists.css?v=playlist-collage-20260802",
   "./assets/branding/infra-logo-white-photoroom-title.png",
@@ -91,7 +92,7 @@ const SHELL_ASSETS = [
 // audio. A missing admin/QR/Sphragis file must therefore never invalidate the
 // complete shell installation.
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/scripts.admin.js?v=audiofix404-20260824",
+  "./assets/js/scripts.admin.js?v=audiofix405-20260824",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./sphragis/",
   "./sphragis/index.html",
@@ -197,7 +198,9 @@ self.addEventListener("activate", (event) => {
         keys
           .filter((key) => (
             (isVersionedSiteCache(key) && key !== SHELL_CACHE && key !== RUNTIME_CACHE) ||
+            (isVersionedCatalogCache(key) && key !== LIVE_CATALOG_CACHE) ||
             (isAudioPrefetchCache(key) && key !== NEXT_TRACK_CACHE) ||
+            key === "infra-live-catalog-v1" ||
             key === "infra-covers"
           ))
           .map((key) => caches.delete(key))
@@ -250,6 +253,10 @@ function isAudioAsset(request, url) {
 
 function isVersionedSiteCache(key) {
   return String(key || "").startsWith("infra-shell-") && /-(?:shell|runtime)$/.test(String(key || ""));
+}
+
+function isVersionedCatalogCache(key) {
+  return String(key || "").startsWith("infra-shell-") && String(key || "").endsWith("-catalog");
 }
 
 function isAudioPrefetchCache(key) {

@@ -1,5 +1,18 @@
 # Implementation Notes
 
+## 2026-08-24 — audiofix405 cache catalogue isolé par shell
+
+- La cover `D 2.0141` était correcte dans GitHub Pages, mais le catalogue dynamique live pointait
+  encore vers l'ancienne URL. Après publication du catalogue corrigé, un snapshot CacheStorage
+  valide mais ancien pouvait encore remplacer la Home fraîche et produire une image cassée.
+- Le catalogue live publié est désormais `catalog-20260823T233559Z-d20141-cover`. Son entrée album
+  et son entrée pistes pointent toutes deux vers `d-2-0141-560ec418-cover-1200.webp`.
+- Le cache du snapshot catalogue est maintenant lié à la version du shell. À l'activation, le
+  Service Worker retire le cache historique `infra-live-catalog-v1` et les snapshots des anciens
+  shells ; une mise à jour du site ne peut donc plus réinjecter une ancienne URL de cover.
+- Identifiants atomiques : runtime/CSS `audiofix405-20260824`, Service Worker
+  `infra-shell-20260824-audio405`, audio inchangé `v20260823T224523Z-d20141`.
+
 ## 2026-08-24 — audiofix404 cover définitive de D 2.0141
 
 - La cover de secours de `D 2.0141` est remplacée par le master carré fourni, conservé sous

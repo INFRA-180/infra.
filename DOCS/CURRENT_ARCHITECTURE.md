@@ -7,12 +7,13 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix404-20260824`
-- Service Worker : `infra-shell-20260824-audio404`
-- CSS : `audiofix404-20260824` — géométrie mobile déterministe avant JavaScript
+- Runtime : `audiofix405-20260824`
+- Service Worker : `infra-shell-20260824-audio405`
+- CSS : `audiofix405-20260824` — géométrie mobile déterministe avant JavaScript
 - Catalogue : 32 albums et 285 pistes
 - Origine audio : proxy R2 Range `https://infra180-api.pages.dev/audio/`
 - Cache audio : `infra-next-track-segments-v9`
+- Cache catalogue live : isolé par version de shell (`<shell>-catalog`)
 - Couverture : une URL WebP 1200×1200 canonique par album
 - Sauvegarde comparative : tag `backup-audiofix373-20260724`
 

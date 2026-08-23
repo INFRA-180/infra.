@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix404-20260824";
+window.INFRA_BUILD_TAG = "audiofix405-20260824";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -479,15 +479,18 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20260824-audio404";
+  const SPA_SHELL_VERSION = "infra-shell-20260824-audio405";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
     ? Math.max(100, Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
     : 240;
-  const LIVE_CATALOG_CACHE_NAME = "infra-live-catalog-v1";
+  // Tie the live snapshot to the installed shell. A previous release may be
+  // structurally valid while still pointing at a cover URL removed by the
+  // current deployment; reusing that cache would overwrite the fresh Home.
+  const LIVE_CATALOG_CACHE_NAME = `${SPA_SHELL_VERSION}-catalog`;
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix404-20260824";
+  const LOCAL_CATALOG_VERSION = "audiofix405-20260824";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -508,7 +511,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix404-20260824";
+  const runtimeVersion = "audiofix405-20260824";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||

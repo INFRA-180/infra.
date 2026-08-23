@@ -435,6 +435,10 @@ expect(scripts.includes('releasePwaCoverHold("replace");'), "album taps do not c
 expect(catalogLoader.includes("readCachedLiveCatalogLatest()"), "validated live CacheStorage is not consulted at startup");
 expect(catalogLoader.includes('catalogState.catalogBundleSource = cachedLive ? "live-cache" : "local"'), "catalogue startup does not preserve cached live releases");
 expect(catalogLoader.includes("fetchLiveCatalogLatest().catch(function () {})"), "live catalogue refresh is not detached from startup");
+expect(scripts.includes('const LIVE_CATALOG_CACHE_NAME = `${SPA_SHELL_VERSION}-catalog`'), "live catalogue cache is not isolated per installed shell");
+expect(sw.includes('const LIVE_CATALOG_CACHE = `${VERSION}-catalog`'), "Service Worker catalogue cache contract is missing");
+expect(sw.includes('(isVersionedCatalogCache(key) && key !== LIVE_CATALOG_CACHE)'), "obsolete shell catalogue caches are not cleared on activation");
+expect(sw.includes('key === "infra-live-catalog-v1"'), "legacy live catalogue cache is not retired on activation");
 expect(nowPlaying.includes('trackAudioRuntimeEvent("fullscreen_viewport"'), "iOS fullscreen viewport telemetry is missing");
 expect(nowPlaying.includes("fullscreenViewportProbeSent"), "fullscreen viewport telemetry is not bounded per launch");
 expect(telemetry.includes('"fullscreen_viewport"'), "fullscreen viewport telemetry is not journaled");

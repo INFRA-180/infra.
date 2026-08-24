@@ -948,6 +948,70 @@ function testAlbumButtonAdoptsDisplayedAlbum() {
   assert.strictEqual(sameState.shuffleOn, false);
 }
 
+function testColdAlbumButtonStartsSelectedTrackInRadio() {
+  const collection = makeTracks(2).map((track) => Object.assign({}, track, {
+    album: "Cold album"
+  }));
+  const restoredQueueTrack = Object.assign({}, makeTracks(1)[0], {
+    src: "https://media.test/restored-queue-only.m4a"
+  });
+  const sandbox = createSandbox();
+  sandbox.document.body.classList.contains = (name) => name === "album-screen";
+  loadScript(sandbox, RADIO_PATH);
+  const audio = makeAudio();
+  const startCalls = [];
+  let toggleCalls = 0;
+  const state = {
+    audio,
+    activeLogicalSrc: "",
+    homeModeInitialized: true,
+    homeMode: "album",
+    homeModeStorageKey: "infra_home_mode_album_button_cold",
+    queueStorageKey: "infra_queue_album_button_cold",
+    resumeStorageKey: "infra_resume_album_button_cold",
+    playlist: [restoredQueueTrack],
+    playlistKind: "album",
+    currentIndex: 0,
+    ui: { playlistKind: "album", playlist: collection.slice() },
+    radioPlaylist: [],
+    radioQueue: [],
+    radioQueueCursor: -1,
+    initialRandomPlaylist: [],
+    initialRandomReady: false,
+    initialRandomPrepareToken: 0,
+    recentPlayed: [],
+    radioQueueBatchSize: 8,
+    shuffleOn: false
+  };
+  const radio = sandbox.InfraAudioRadio.createAudioRadio({
+    audioState: state,
+    getCurrentLogicalAudioSrc: () => state.activeLogicalSrc,
+    getCurrentPlayableAudioSrc: (element) => element.currentSrc || element.src || "",
+    toAbsoluteUrlOrEmpty: (value) => String(value || ""),
+    normalizeAudioSourceUrl: (value) => String(value || ""),
+    normalizeAlbumTitle: (value) => String(value || "").trim().toUpperCase(),
+    normalizeTrackTitle: (value) => String(value || "").trim().toUpperCase(),
+    srcMatches: (left, right) => left === right,
+    buildPreservedTrack: (track) => Object.assign({}, track),
+    syncPlaylistContext() {},
+    syncMediaSessionMetadata() {},
+    syncAudioUi() {},
+    togglePlayPause() { toggleCalls += 1; },
+    startTrack(index, options) { startCalls.push({ index, options }); }
+  });
+
+  assert.strictEqual(radio.toggleCurrentPageCollection(), true);
+  assert.strictEqual(toggleCalls, 0);
+  assert.strictEqual(startCalls.length, 1);
+  assert.strictEqual(startCalls[0].index, 0);
+  assert.strictEqual(startCalls[0].options.surface, "album_button_cold_radio");
+  assert.strictEqual(startCalls[0].options.coldStart, true);
+  assert.strictEqual(state.homeMode, "radio");
+  assert.strictEqual(state.playlistKind, "radio");
+  assert.strictEqual(state.playlist[0].src, collection[0].src);
+  assert.strictEqual(state.radioQueue[0].src, collection[0].src);
+}
+
 function createDeferredRadioNavigationHarness() {
   let resolveTracksData;
   const tracksDataPromise = new Promise((resolve) => {
@@ -2678,6 +2742,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   testInMemoryColdPlayIsSynchronous();
   testColdCollectionPlayUsesCurrentAlbumOrPlaylist();
   testAlbumButtonAdoptsDisplayedAlbum();
+  testColdAlbumButtonStartsSelectedTrackInRadio();
   testRadioIdlePlayUsesSynchronousPreparedQueueAndDedupesPendingPlay();
   await testQueuedRadioNavigationReplaysInOrderAndInvalidatesOnModeChange();
   await testCachedPrefixIsMaterializedBeforeColdTap();

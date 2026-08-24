@@ -17,6 +17,7 @@ const audioTelemetry = read("public/assets/js/audio-telemetry.js");
 const transport = read("public/assets/js/transport-ui.js");
 const scripts = read("public/assets/js/scripts.js");
 const audioRadio = read("public/assets/js/audio-radio.js");
+const albumPlayerUi = read("public/assets/js/album-player-ui.js");
 
 const genericMobileGridAt = css.indexOf("@media (max-width: 560px)");
 const standaloneGridAt = css.indexOf("@media (max-width: 980px) and (display-mode: standalone)");
@@ -81,10 +82,16 @@ assert.match(audioTelemetry, /"spa_hydration_done"/);
 assert.match(audioTelemetry, /transition\.hydration_ms = Math\.round/);
 assert.match(audioTelemetry, /hydration_ms: transition\.hydration_ms \|\| 0/);
 assert.match(spaRenderer, /const pwaCoverMode = isCompactCoverNavigation\(\);/);
-assert.match(spaRenderer, /const timeoutMs = pwaCoverMode \? 0 : 55;/);
+assert.match(spaRenderer, /const timeoutMs = 0;/);
+assert.match(spaRenderer, /const animateEntry = false;/);
 assert.match(audioRadio + spaRenderer, /startSelectedTrackInRadioFromCold/);
 assert.match(audioRadio, /surface: "global_cold_radio"/);
+assert.match(audioRadio, /"album_button_cold_radio"/);
+assert.match(audioRadio, /surface: "global_dom_cold_radio"/);
 assert.match(audioRadio, /ensureRadioPlaylistLoaded\(\)\.then/);
+assert.match(albumPlayerUi, /\.spa-route-layer\.album-screen\[data-spa-route-state='current'\]/);
+assert.match(scripts, /\.spa-route-layer\.album-screen\[data-spa-route-state='current'\]/);
+assert.doesNotMatch(albumPlayerUi, /querySelector\("\.album-layout h1, \.album-hero h1, main h1, h1"\)/);
 assert.doesNotMatch(css, /\[data-cover-loading="1"\][\s\S]{0,120}visibility:\s*hidden/);
 
 console.log("Fluidity contracts passed: connected Home, decoded destination cover, exact scroll and cold Radio.");

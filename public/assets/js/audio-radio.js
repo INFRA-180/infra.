@@ -1161,11 +1161,12 @@
   function startSelectedTrackInRadioFromCold(track, options) {
     const opts = options || {};
     const audio = audioState.audio || ensureGlobalAudio();
+    const logicalSrc = getCurrentLogicalAudioSrc() || audioState.activeLogicalSrc || "";
     if (
       !track ||
       !track.src ||
       !audio ||
-      hasPlaybackSession() ||
+      logicalSrc ||
       getCurrentPlayableAudioSrc(audio) ||
       audioState.trackStartInFlight
     ) {
@@ -2401,6 +2402,45 @@
     };
   }
 
+  function getCurrentPageColdTrackFromDom() {
+    if (!document.body || !document.body.classList.contains("album-screen")) return null;
+    const routeHost = document.getElementById("infraSpaRouteHost");
+    const routeRoot = document.querySelector(
+      "#infraSpaRouteHost .spa-route-layer.album-screen[data-spa-route-state='current']"
+    ) || (!routeHost ? document : null);
+    if (!routeRoot || typeof routeRoot.querySelector !== "function") return null;
+
+    const row = routeRoot.querySelector(".tracks .track-player");
+    const audioElement = row && row.querySelector("audio");
+    const rawSrc = audioElement
+      ? String(audioElement.getAttribute("data-src") || audioElement.getAttribute("src") || "").trim()
+      : "";
+    const src = rawSrc ? resolveManagedAudioSrc(rawSrc, window.location.href) : "";
+    if (!src) return null;
+
+    const name = row.querySelector(".track-name");
+    const heading = routeRoot.querySelector("main.page > h1, main > h1, .album-hero h1");
+    const cover = routeRoot.querySelector(".album-layout .cover, .album-hero .cover");
+    const rawArtwork = cover
+      ? String(cover.currentSrc || cover.getAttribute("src") || "").trim()
+      : "";
+    let artwork = "";
+    try {
+      artwork = rawArtwork ? new URL(rawArtwork, window.location.href).href : "";
+    } catch (_err) {
+      artwork = rawArtwork;
+    }
+
+    return {
+      src,
+      name: normalizeTrackTitle(name ? name.textContent : ""),
+      album: normalizeAlbumTitle(heading ? heading.textContent : ""),
+      page: window.location.href,
+      artist: "INFRA.",
+      artwork
+    };
+  }
+
   function adoptCurrentPageCollection(context, startIndex) {
     if (!context || !Array.isArray(context.collection) || !context.collection.length) return -1;
     const nextPlaylist = context.collection.map(function (track) {
@@ -2470,6 +2510,19 @@
     if (!audio || !context) return false;
 
     const currentSrc = getCurrentLogicalAudioSrc() || getCurrentPlayableAudioSrc(audio);
+    if (
+      !currentSrc &&
+      audio.paused &&
+      !audioState.trackStartInFlight &&
+      context.collection[0] &&
+      startSelectedTrackInRadioFromCold(context.collection[0], {
+        surface: context.collectionKind === "playlist"
+          ? "playlist_button_cold_radio"
+          : "album_button_cold_radio"
+      })
+    ) {
+      return true;
+    }
     const currentIndex = currentSrc
       ? context.collection.findIndex(function (track) { return track && srcMatches(track.src, currentSrc); })
       : -1;
@@ -2506,11 +2559,12 @@
 
   function handleGlobalTransportToggle() {
     const audio = audioState.audio || ensureGlobalAudio();
+    const logicalSrc = getCurrentLogicalAudioSrc() || audioState.activeLogicalSrc || "";
     if (
       audio &&
       audio.paused &&
       !getCurrentPlayableAudioSrc(audio) &&
-      !hasPlaybackSession() &&
+      !logicalSrc &&
       !audioState.globalRandomStartInFlight
     ) {
       if (canStartInitialGlobalRandomPlayback() && startGlobalRandomPlayback()) return;
@@ -2520,6 +2574,15 @@
         coldCollection.collection[0] &&
         startSelectedTrackInRadioFromCold(coldCollection.collection[0], {
           surface: "global_cold_radio"
+        })
+      ) {
+        return;
+      }
+      const domColdTrack = getCurrentPageColdTrackFromDom();
+      if (
+        domColdTrack &&
+        startSelectedTrackInRadioFromCold(domColdTrack, {
+          surface: "global_dom_cold_radio"
         })
       ) {
         return;

@@ -585,10 +585,9 @@
     const target = getImagePreferredSrc(image, sourceUrl, {
       preferredWidth: coverWidth
     });
-    // In the installed mobile app the source route stays visible until the
-    // destination cover is actually decoded. A timeout-to-swap reintroduced a
-    // blank hero even when the response was already in CacheStorage.
-    const timeoutMs = pwaCoverMode ? 0 : 55;
+    // Keep the source route visible on every client until the destination cover
+    // is decoded. Even a short desktop timeout can expose an empty hero frame.
+    const timeoutMs = 0;
     if (!target) {
       trackAudioRuntimeEvent("cover_decode_duration", Object.assign({}, telemetry || {}, {
         image_count: 1,
@@ -941,7 +940,9 @@
     const opts = options || {};
     const entering = fragment && fragment.querySelector ? fragment.querySelector("main") : null;
     const instantPwaSwap = isMobilePwaCoverNavigation();
-    const animateEntry = Boolean(entering && !instantPwaSwap);
+    // The connected route swap is already atomic. Fading the new main from
+    // opacity 0 adds a visible white flash without improving the transition.
+    const animateEntry = false;
     const requestedScroll = opts.restoreScroll
       ? getScrollFromHistoryState(opts.restoreScroll)
       : (opts.resetScroll ? { x: 0, y: 0 } : null);

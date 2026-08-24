@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix405-20260824`
-- Service Worker : `infra-shell-20260824-audio405`
-- CSS : `audiofix405-20260824` — géométrie mobile déterministe avant JavaScript
+- Runtime : `audiofix406-20260824`
+- Service Worker : `infra-shell-20260824-audio406`
+- CSS : `audiofix406-20260824` — géométrie mobile déterministe avant JavaScript
 - Catalogue : 32 albums et 285 pistes
 - Origine audio : proxy R2 Range `https://infra180-api.pages.dev/audio/`
 - Cache audio : `infra-next-track-segments-v9`
@@ -52,8 +52,9 @@ Principaux composants :
 - `audio-prefetch.js` : requêtes Range et cache segmenté ;
 - `catalog-loader.js` : catalogue live, cache local et fallback Git ;
 - `spa-router.js` et `spa-renderer.js` : navigation album sans perdre le lecteur global ; la
-  destination et sa cover critique sont préparées hors DOM, tandis que la Home connectée reste
-  hors peinture jusqu'au retour afin de conserver exactement son DOM et son scroll ;
+  destination et sa cover critique sont préparées et décodées hors DOM sans fondu d'entrée,
+  tandis que la Home connectée reste hors peinture jusqu'au retour afin de conserver exactement
+  son DOM, son titre et son scroll ;
 - `transport-ui.js`, `now-playing.js`, `album-player-ui.js` : interfaces du lecteur ;
 - `audio-visualizer.js` : analyse Web Audio live et animation fullscreen desktop ;
 - `media-session.js` : commandes iOS, écran verrouillé et centre de contrôle ;
@@ -61,6 +62,8 @@ Principaux composants :
 - `home-catalog.js` : hydratation de l'accueil et swipe gauche/droite des cartes album.
 
 Un seul élément `<audio>` global est autorisé.
+Le premier Play sans source audio active amorce Radio depuis la piste sélectionnée ou visible,
+même si une ancienne file sans source a été restaurée au démarrage de la PWA.
 Sur les navigateurs exposant Audio Session, ce lecteur déclare le type `playback` avant son
 initialisation. La déclaration reste inactive tant qu’aucun son n’est joué ; Media Session
 continue de publier séparément les métadonnées et commandes système. Après une interruption

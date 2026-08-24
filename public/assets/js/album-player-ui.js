@@ -677,7 +677,12 @@
 
   function hydrateCurrentAlbumTrackRows(tracksData) {
     if (!document.body.classList.contains("album-screen") || document.body.classList.contains("playlist-screen")) return;
-    const section = document.querySelector(".tracks");
+    const routeHost = document.getElementById("infraSpaRouteHost");
+    const routeRoot = document.querySelector(
+      "#infraSpaRouteHost .spa-route-layer.album-screen[data-spa-route-state='current']"
+    ) || (!routeHost ? document : null);
+    if (!routeRoot) return;
+    const section = routeRoot.querySelector(".tracks");
     if (!section) return;
     const currentFile = decodeURIComponent(String(window.location.pathname || "").split("/").pop() || "");
     const albums = Array.isArray(tracksData && tracksData.albums) ? tracksData.albums : [];
@@ -686,7 +691,7 @@
     });
     if (!album || !Array.isArray(album.tracks) || !album.tracks.length) return;
 
-    const heading = document.querySelector(".album-layout h1, .album-hero h1, main h1, h1");
+    const heading = routeRoot.querySelector("main.page > h1, main > h1, .album-hero h1");
     if (heading && album.title && heading.textContent.trim() !== album.title) {
       heading.textContent = album.title;
       const titleSeparator = document.title.indexOf("|");

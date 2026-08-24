@@ -1,5 +1,22 @@
 # Implementation Notes
 
+## 2026-08-24 — audiofix406 retour fidèle, cover atomique et Play Radio froid
+
+- Une hydratation album tardive pouvait sélectionner le premier `h1` global et modifier la Home
+  connectée, pourtant retenue hors peinture. Les lectures et écritures de titre sont maintenant
+  strictement limitées à la couche album courante ; Retour restitue donc le titre `INFRA.` avec le
+  même DOM et la même position de scroll.
+- Toute navigation album conserve désormais la route source jusqu'au décodage réel de la cover,
+  y compris sur desktop. Le fondu d'entrée à opacité nulle est supprimé : la promotion de la route
+  déjà préparée reste atomique et n'ajoute plus de frame blanche.
+- Le Play principal d'un album froid place immédiatement sa première piste en tête de Radio. Une
+  file restaurée sans source audio active ne bloque plus ce geste, et le transport global dispose
+  d'un secours DOM synchrone pour un tap PWA effectué avant la fin de l'hydratation.
+- Régression couverte par les tests runtime et fluidité. Identifiants atomiques : runtime/CSS
+  `audiofix406-20260824`, Service Worker `infra-shell-20260824-audio406`, audio inchangé
+  `v20260823T224523Z-d20141`, catalogue live inchangé
+  `catalog-20260823T233559Z-d20141-cover`.
+
 ## 2026-08-24 — audiofix405 cache catalogue isolé par shell
 
 - La cover `D 2.0141` était correcte dans GitHub Pages, mais le catalogue dynamique live pointait

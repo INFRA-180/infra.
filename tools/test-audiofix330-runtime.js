@@ -1627,6 +1627,123 @@ function testPendingSourceShowsZeroTimeInMiniAndOverlay() {
   assert.strictEqual(state.transport.miniProgress.disabled, false);
 }
 
+function testMiniProgressCommitsOnceOnPointerRelease() {
+  const windowListeners = new Map();
+  const sandbox = createSandbox({
+    addEventListener(type, listener) {
+      if (!windowListeners.has(type)) windowListeners.set(type, []);
+      windowListeners.get(type).push(listener);
+    }
+  });
+  loadScript(sandbox, TRANSPORT_UI_PATH);
+
+  const listeners = new Map();
+  const miniProgress = {
+    dataset: {},
+    disabled: false,
+    capturedPointerId: null,
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push(listener);
+    },
+    getBoundingClientRect() {
+      return { left: 0, width: 100 };
+    },
+    setPointerCapture(pointerId) {
+      this.capturedPointerId = pointerId;
+    },
+    releasePointerCapture(pointerId) {
+      if (this.capturedPointerId === pointerId) this.capturedPointerId = null;
+    }
+  };
+  const miniCurrent = { textContent: "" };
+  const miniDuration = { textContent: "" };
+  const miniFill = { style: {} };
+  const audio = makeAudio();
+  audio.src = "https://media.test/seek.m4a";
+  audio.currentSrc = audio.src;
+  audio.currentTime = 20;
+  audio.duration = 200;
+  const state = {
+    audio,
+    sourceMetadataPending: false,
+    miniPlayerSeeking: false,
+    transport: {
+      nowMini: { hidden: false },
+      miniCurrent,
+      miniDuration,
+      miniFill,
+      miniProgress
+    }
+  };
+  const seekRatios = [];
+  const telemetry = [];
+  let transportApi = null;
+  transportApi = sandbox.InfraTransportUi.createTransportUi({
+    audioState: state,
+    getCurrentPlayableAudioSrc: () => audio.src,
+    formatTrackDuration(seconds) {
+      const total = Math.max(0, Math.round(Number(seconds) || 0));
+      return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+    },
+    seekCurrentAudioToRatio(ratio) {
+      seekRatios.push(ratio);
+      audio.currentTime = ratio * audio.duration;
+    },
+    updateProgressUi() {
+      transportApi.syncTransportMiniUi();
+    },
+    trackAudioRuntimeEvent(type, payload) {
+      telemetry.push(Object.assign({ type }, payload));
+    }
+  });
+
+  function dispatch(type, fields) {
+    const event = Object.assign({
+      pointerId: 7,
+      pointerType: "touch",
+      clientX: 0,
+      preventDefault() {},
+      stopPropagation() {}
+    }, fields || {});
+    (listeners.get(type) || []).forEach((listener) => listener(event));
+  }
+
+  transportApi.bindMiniProgressSeek(miniProgress, miniFill, miniCurrent, miniDuration);
+  assert.strictEqual((listeners.get("click") || []).length, 0, "A synthetic click must not seek a second time");
+
+  dispatch("pointerdown", { clientX: 25 });
+  assert.strictEqual(state.miniPlayerSeeking, true);
+  assert.strictEqual(seekRatios.length, 0, "Pointer down must only preview the target position");
+  assert.strictEqual(miniFill.style.width, "25%");
+  assert.strictEqual(miniCurrent.textContent, "0:50");
+  transportApi.syncTransportMiniUi();
+  assert.strictEqual(miniFill.style.width, "25%", "Runtime progress updates must not overwrite an active preview");
+
+  dispatch("pointermove", { clientX: 75 });
+  assert.strictEqual(seekRatios.length, 0, "Pointer moves must not repeatedly assign currentTime");
+  assert.strictEqual(miniFill.style.width, "75%");
+  dispatch("pointercancel", { clientX: 75 });
+  assert.strictEqual(state.miniPlayerSeeking, false);
+  assert.strictEqual(seekRatios.length, 0, "A cancelled Android gesture must not commit a partial seek");
+  assert.strictEqual(miniFill.style.width, "10%", "Cancellation must restore the real playback position");
+  assert.strictEqual(telemetry[0].phase, "cancel");
+
+  dispatch("pointerdown", { clientX: 20 });
+  dispatch("pointermove", { clientX: 60 });
+  dispatch("pointerup", { clientX: 60 });
+  assert.deepStrictEqual(seekRatios, [0.6], "A completed drag must commit exactly once through the shared seek helper");
+  assert.strictEqual(audio.currentTime, 120);
+  assert.strictEqual(miniFill.style.width, "60%");
+  assert.strictEqual(telemetry[1].type, "seek_gesture");
+  assert.strictEqual(telemetry[1].surface, "mini");
+  assert.strictEqual(telemetry[1].phase, "commit");
+  assert.strictEqual(telemetry[1].result, "committed");
+  assert.strictEqual(telemetry[1].input_type, "touch");
+  assert.strictEqual(telemetry[1].from_ms, 20000);
+  assert.strictEqual(telemetry[1].to_ms, 120000);
+}
+
 async function testIntegratedFivePreparedTransportSkips() {
   const sandbox = createSandbox();
   loadScript(sandbox, RADIO_PATH);
@@ -2755,6 +2872,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   testShuffleScopesTheCurrentAlbumWhenRadioIsOff();
   testShuffleFromRadioSwitchesToCurrentAlbumWithoutRestart();
   testPendingSourceShowsZeroTimeInMiniAndOverlay();
+  testMiniProgressCommitsOnceOnPointerRelease();
   await testIntegratedFivePreparedTransportSkips();
   testMaterializedShuffleOrder();
   testPreviousUsesSharedThreeSecondRestartRule();

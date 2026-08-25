@@ -75,6 +75,7 @@
     "play_rejected",
     "playing",
     "seek",
+    "seek_gesture",
     "cover_decode_duration",
     "mini_player_visibility",
     "spa_swap_done",
@@ -99,6 +100,7 @@
     "fullscreen_viewport",
     "mini_player_visibility",
     "prefetch_error",
+    "seek_gesture",
     "sw_controllerchange",
     "sw_reload_executed",
     "system_auto_resume_blocked"

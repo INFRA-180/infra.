@@ -1,5 +1,19 @@
 # Implementation Notes
 
+## 2026-08-25 — audiofix407 seek compact Android à validation unique
+
+- Le seek du lecteur compact ne modifie plus `audio.currentTime` à chaque `pointermove`. Comme le
+  lecteur plein écran, il prévisualise la position pendant le glissement puis valide une seule fois
+  au `pointerup` via le helper audio partagé, qui conserve la reprise et resynchronise Media Session.
+- Un `pointercancel` ou une perte de capture restaure la position réellement lue sans valider la
+  cible intermédiaire. Le clic synthétique qui produisait un second seek a été supprimé.
+- La zone tactile passe de 18 à 26 px sans modifier l'encombrement du player. La télémétrie compacte
+  `seek_gesture` distingue `commit` et `cancel`, la surface `mini` et le type de pointeur.
+- Régression couverte par le test runtime : aucun seek au tap initial ni pendant le drag, aucune
+  validation après annulation et exactement une validation au relâchement.
+- Identifiants atomiques : runtime/CSS `audiofix407-20260825`, Service Worker
+  `infra-shell-20260825-audio407` ; audio et catalogue inchangés.
+
 ## 2026-08-24 — audiofix406 retour fidèle, cover atomique et Play Radio froid
 
 - Une hydratation album tardive pouvait sélectionner le premier `h1` global et modifier la Home

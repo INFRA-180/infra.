@@ -945,12 +945,12 @@ body.home-screen {
 
 .global-transport-mini-progress {
   position: relative;
-  height: 18px;
+  height: 26px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   padding: 0;
-  margin: 0;
+  margin: -4px 0;
   cursor: pointer;
   overflow: visible;
   box-shadow: none;

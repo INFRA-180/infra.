@@ -37,7 +37,7 @@ const release = (scripts.match(/window\.INFRA_BUILD_TAG = "([^"]+)";/) || [])[1]
 const shellRelease = (sw.match(/const VERSION = "([^"]+)";/) || [])[1] || "";
 const cssRelease = release;
 const catalogAlbumCount = (JSON.parse(read("public/data/tracks.json")).albums || []).length;
-const frozenCssSha256 = "a82a5bdbac1fc504c515eeac64600eb48cc95a1a6330990b7647aab4ec2e38e6";
+const frozenCssSha256 = "2dcf3151ace49a6d4da81b4c072d42144e75301a506ef6a52f1dce08ca019252";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -447,6 +447,10 @@ expect(!telemetry.includes('"fullscreen_compensated"'), "obsolete fullscreen com
 
 const cssHash = crypto.createHash("sha256").update(styles).digest("hex");
 expect(cssHash === frozenCssSha256, "styles.css differs from the approved player appearance");
+expect(
+  /\.global-transport-mini-progress\s*\{[^}]*height:\s*26px;[^}]*margin:\s*-4px 0;/.test(styles),
+  "mini-player seek control does not preserve its enlarged touch target"
+);
 expect(!styles.includes("100lvh"), "forbidden 100lvh geometry was introduced");
 expect(styles.includes(".share-dialog-close:focus-visible"), "QR close control does not keep the pure cross state");
 expect(styles.includes("transform: translateZ(0) scale(1.002)"), "WebKit cover seam guard is missing");

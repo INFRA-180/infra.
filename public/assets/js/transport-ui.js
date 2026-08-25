@@ -81,6 +81,132 @@
     let mobilePlayerSpaceHeight = 0;
     let mobilePlayerSpaceValue = -1;
 
+  function bindMiniProgressSeek(miniProgress, miniFill, miniCurrent, miniDuration) {
+    if (!miniProgress || (miniProgress.dataset && miniProgress.dataset.seekBound === "1")) return;
+
+    let miniSeeking = false;
+    let miniSeekPointerId = null;
+    let miniSeekRatio = 0;
+    let miniSeekFromMs = 0;
+    let miniSeekInputType = "pointer";
+
+    function getMiniProgressRatio(clientX) {
+      const bounds = miniProgress.getBoundingClientRect();
+      if (!bounds.width || miniProgress.disabled) return null;
+      const ratio = (clientX - bounds.left) / bounds.width;
+      return Math.max(0, Math.min(1, ratio));
+    }
+
+    function previewMiniSeek(ratio) {
+      const audio = audioState.audio;
+      if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return false;
+      miniSeekRatio = Math.max(0, Math.min(1, Number(ratio) || 0));
+      const previewTime = miniSeekRatio * audio.duration;
+      if (miniFill) miniFill.style.width = `${miniSeekRatio * 100}%`;
+      if (miniCurrent) miniCurrent.textContent = formatTrackDuration(previewTime);
+      if (miniDuration) miniDuration.textContent = formatTrackDuration(audio.duration);
+      return true;
+    }
+
+    function releaseMiniPointerCapture(pointerId) {
+      if (pointerId === null || typeof miniProgress.releasePointerCapture !== "function") return;
+      try {
+        miniProgress.releasePointerCapture(pointerId);
+      } catch (_err) {
+        // Ignore release errors after Android cancels a captured gesture.
+      }
+    }
+
+    miniProgress.addEventListener("pointerdown", function (event) {
+      const ratio = getMiniProgressRatio(event.clientX);
+      if (ratio === null || !previewMiniSeek(ratio)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      miniSeeking = true;
+      miniSeekPointerId = event.pointerId;
+      miniSeekFromMs = Math.max(0, Math.floor((Number(audioState.audio.currentTime) || 0) * 1000));
+      miniSeekInputType = String(event.pointerType || "pointer");
+      audioState.miniPlayerSeeking = true;
+      if (typeof miniProgress.setPointerCapture === "function") {
+        try {
+          miniProgress.setPointerCapture(event.pointerId);
+        } catch (_err) {
+          // The window-level listeners still finish the gesture.
+        }
+      }
+    });
+
+    function moveMiniSeeking(event) {
+      if (!miniSeeking) return;
+      if (miniSeekPointerId !== null && event.pointerId !== miniSeekPointerId) return;
+      const ratio = getMiniProgressRatio(event.clientX);
+      if (ratio === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      previewMiniSeek(ratio);
+    }
+
+    function finishMiniSeeking(event) {
+      if (!miniSeeking) return;
+      if (event && miniSeekPointerId !== null && event.pointerId !== miniSeekPointerId) return;
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const ratio = getMiniProgressRatio(event.clientX);
+        if (ratio !== null) previewMiniSeek(ratio);
+      }
+      const pointerId = miniSeekPointerId;
+      miniSeeking = false;
+      miniSeekPointerId = null;
+      audioState.miniPlayerSeeking = false;
+      releaseMiniPointerCapture(pointerId);
+      seekCurrentAudioToRatio(miniSeekRatio);
+      const duration = Number(audioState.audio && audioState.audio.duration);
+      trackAudioRuntimeEvent("seek_gesture", {
+        surface: "mini",
+        phase: "commit",
+        result: "committed",
+        input_type: miniSeekInputType,
+        from_ms: miniSeekFromMs,
+        to_ms: Number.isFinite(duration) ? Math.max(0, Math.floor(miniSeekRatio * duration * 1000)) : 0
+      });
+      updateProgressUi();
+    }
+
+    function cancelMiniSeeking(event) {
+      if (!miniSeeking) return;
+      if (event && miniSeekPointerId !== null && event.pointerId !== miniSeekPointerId) return;
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const pointerId = miniSeekPointerId;
+      miniSeeking = false;
+      miniSeekPointerId = null;
+      audioState.miniPlayerSeeking = false;
+      releaseMiniPointerCapture(pointerId);
+      const duration = Number(audioState.audio && audioState.audio.duration);
+      trackAudioRuntimeEvent("seek_gesture", {
+        surface: "mini",
+        phase: "cancel",
+        result: "cancelled",
+        input_type: miniSeekInputType,
+        from_ms: miniSeekFromMs,
+        to_ms: Number.isFinite(duration) ? Math.max(0, Math.floor(miniSeekRatio * duration * 1000)) : 0
+      });
+      updateProgressUi();
+    }
+
+    miniProgress.addEventListener("pointermove", moveMiniSeeking);
+    miniProgress.addEventListener("pointerup", finishMiniSeeking);
+    miniProgress.addEventListener("pointercancel", cancelMiniSeeking);
+    miniProgress.addEventListener("lostpointercapture", cancelMiniSeeking);
+    window.addEventListener("pointermove", moveMiniSeeking, { passive: false });
+    window.addEventListener("pointerup", finishMiniSeeking, { passive: false });
+    window.addEventListener("pointercancel", cancelMiniSeeking, { passive: false });
+    if (miniProgress.dataset) miniProgress.dataset.seekBound = "1";
+  }
+
   function isDesktopTransportViewport() {
     return typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 981px)").matches;
   }
@@ -2666,70 +2792,7 @@
         });
       }
       if (miniProgress && !rootControlsAlreadyBound) {
-        function seekFromMiniProgress(clientX) {
-          const audio = audioState.audio;
-          if (!audio) return;
-          if (!audio.duration || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
-          const bounds = miniProgress.getBoundingClientRect();
-          if (!bounds.width) return;
-          const ratio = (clientX - bounds.left) / bounds.width;
-          const clamped = Math.max(0, Math.min(1, ratio));
-          audio.currentTime = clamped * audio.duration;
-          updateProgressUi();
-        }
-
-        let miniSeeking = false;
-        let miniSeekPointerId = null;
-        miniProgress.addEventListener("pointerdown", function (event) {
-          if (miniProgress.disabled) return;
-          event.preventDefault();
-          event.stopPropagation();
-          miniSeeking = true;
-          miniSeekPointerId = event.pointerId;
-          if (typeof miniProgress.setPointerCapture === "function") {
-            try {
-              miniProgress.setPointerCapture(event.pointerId);
-            } catch (_err) {
-              // Ignore capture errors.
-            }
-          }
-          seekFromMiniProgress(event.clientX);
-        });
-        function moveMiniSeeking(event) {
-          if (!miniSeeking) return;
-          if (miniSeekPointerId !== null && event.pointerId !== miniSeekPointerId) return;
-          event.preventDefault();
-          event.stopPropagation();
-          seekFromMiniProgress(event.clientX);
-        }
-        function stopMiniSeeking(event) {
-          if (!miniSeeking) return;
-          if (event && miniSeekPointerId !== null && event.pointerId !== miniSeekPointerId) return;
-          if (event) {
-            event.preventDefault();
-            event.stopPropagation();
-          }
-          miniSeeking = false;
-          miniSeekPointerId = null;
-          if (event && typeof miniProgress.releasePointerCapture === "function") {
-            try {
-              miniProgress.releasePointerCapture(event.pointerId);
-            } catch (_err) {
-              // Ignore release errors.
-            }
-          }
-        }
-        miniProgress.addEventListener("pointermove", moveMiniSeeking);
-        miniProgress.addEventListener("pointerup", stopMiniSeeking);
-        miniProgress.addEventListener("pointercancel", stopMiniSeeking);
-        window.addEventListener("pointermove", moveMiniSeeking, { passive: false });
-        window.addEventListener("pointerup", stopMiniSeeking, { passive: false });
-        window.addEventListener("pointercancel", stopMiniSeeking, { passive: false });
-        miniProgress.addEventListener("click", function (event) {
-          event.preventDefault();
-          event.stopPropagation();
-          seekFromMiniProgress(event.clientX);
-        });
+        bindMiniProgressSeek(miniProgress, miniFill, miniCurrent, miniDuration);
       }
       root.dataset.controlsBound = "1";
       if (!audioState.transportResizeBound) {
@@ -2839,9 +2902,11 @@
     const duration = hasDuration ? formatTrackDuration(audio.duration) : "0:00";
     const percent = hasDuration ? Math.max(0, Math.min(100, (audio.currentTime / audio.duration) * 100)) : 0;
 
-    if (transport.miniCurrent) transport.miniCurrent.textContent = currentTime;
-    if (transport.miniDuration) transport.miniDuration.textContent = duration;
-    if (transport.miniFill) transport.miniFill.style.width = `${percent}%`;
+    if (!audioState.miniPlayerSeeking) {
+      if (transport.miniCurrent) transport.miniCurrent.textContent = currentTime;
+      if (transport.miniDuration) transport.miniDuration.textContent = duration;
+      if (transport.miniFill) transport.miniFill.style.width = `${percent}%`;
+    }
     if (transport.miniProgress) transport.miniProgress.disabled = !hasDuration;
     syncTransportPictureInPictureProgress();
     syncNowPlayingOverlayProgress();
@@ -3107,6 +3172,7 @@
       requestTransportPictureInPicture: requestTransportPictureInPicture,
       closeTransportPictureInPicture: closeTransportPictureInPicture,
       syncTransportPictureInPictureUi: syncTransportPictureInPictureUi,
+      bindMiniProgressSeek: bindMiniProgressSeek,
       ensureGlobalTransportUi: ensureGlobalTransportUi,
       syncTransportMiniUi: syncTransportMiniUi,
       syncMobilePlayerSpace: syncMobilePlayerSpace,

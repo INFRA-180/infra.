@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <script>(function(){var now=Date.now(),key="infra:launch-watchdog:v1",id=now.toString(36)+"-"+Math.random().toString(36).slice(2,10),path=location.pathname,p={head_ms:(window.performance&&typeof performance.now==="function"?performance.now():0),service_worker_activity_count:0,launch_id:id,started_at_epoch_ms:now};p.route_kind=path.indexOf("/music/")>=0?"album":path.indexOf("/playlists/")>=0?"playlist":path.indexOf("/apps/")>=0?"app":"home";try{var previous=JSON.parse(localStorage.getItem(key)||"null"),age=now-Number(previous&&previous.started_at_ms);if(previous&&previous.state==="pending"&&age>=0&&age<=259200000){p.previous_incomplete_launch=true;p.previous_incomplete_launch_age_ms=age;p.previous_launch_build=String(previous.build||"");p.previous_launch_route_kind=String(previous.route_kind||"");}localStorage.setItem(key,JSON.stringify({id:id,state:"pending",started_at_ms:now,build:"audiofix406-20260824",route_kind:p.route_kind}));}catch(_err){}p.complete=function(){try{var current=JSON.parse(localStorage.getItem(key)||"null");if(current&&current.id===id)localStorage.removeItem(key);}catch(_err){}};window.__infraLaunchProbe=p;if(navigator.serviceWorker){navigator.serviceWorker.addEventListener("controllerchange",function(){p.service_worker_activity_count+=1;});}})();</script>
+  <script>(function(){var now=Date.now(),key="infra:launch-watchdog:v1",id=now.toString(36)+"-"+Math.random().toString(36).slice(2,10),path=location.pathname,p={head_ms:(window.performance&&typeof performance.now==="function"?performance.now():0),service_worker_activity_count:0,launch_id:id,started_at_epoch_ms:now};p.route_kind=path.indexOf("/music/")>=0?"album":path.indexOf("/playlists/")>=0?"playlist":path.indexOf("/apps/")>=0?"app":"home";try{var previous=JSON.parse(localStorage.getItem(key)||"null"),age=now-Number(previous&&previous.started_at_ms);if(previous&&previous.state==="pending"&&age>=0&&age<=259200000){p.previous_incomplete_launch=true;p.previous_incomplete_launch_age_ms=age;p.previous_launch_build=String(previous.build||"");p.previous_launch_route_kind=String(previous.route_kind||"");}localStorage.setItem(key,JSON.stringify({id:id,state:"pending",started_at_ms:now,build:"audiofix407-20260825",route_kind:p.route_kind}));}catch(_err){}p.complete=function(){try{var current=JSON.parse(localStorage.getItem(key)||"null");if(current&&current.id===id)localStorage.removeItem(key);}catch(_err){}};window.__infraLaunchProbe=p;if(navigator.serviceWorker){navigator.serviceWorker.addEventListener("controllerchange",function(){p.service_worker_activity_count+=1;});}})();</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#f6f6f6" />
@@ -114,7 +114,7 @@
   <link rel="apple-touch-icon-precomposed" sizes="180x180" href="../assets/pwa/apple-touch-icon-180-logo-white.png" />
   <link rel="preload" href="../assets/fonts/antique-olive-nord.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="../assets/music/responsive/nahda-cover-1200.webp" as="image" type="image/webp" fetchpriority="high" />
-  <link rel="stylesheet" href="../assets/css/styles.css?v=audiofix406-20260824" />
+  <link rel="stylesheet" href="../assets/css/styles.css?v=audiofix407-20260825" />
 </head>
 <body class="album-screen">
   <div id="infraSpaRouteHost" class="spa-route-host">
@@ -147,26 +147,26 @@
   </main>
     </div>
   </div>
-  <script src="../assets/js/covers.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/favorites.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/favorites-ui.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/audio-visualizer.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/transport-ui.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/now-playing.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/album-player-ui.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/spa-renderer.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/audio-radio.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/media-session.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/audio-prefetch.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/spa-router.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/catalog-fallback.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/catalog-loader.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/audio-telemetry.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/downloads.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/home-catalog.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/audio-core.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/pwa-install.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/share-qr.js?v=audiofix406-20260824" defer></script>
-  <script src="../assets/js/scripts.js?v=audiofix406-20260824" defer></script>
+  <script src="../assets/js/covers.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/favorites.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/favorites-ui.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/audio-visualizer.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/transport-ui.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/now-playing.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/album-player-ui.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/spa-renderer.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/audio-radio.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/media-session.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/audio-prefetch.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/spa-router.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/catalog-fallback.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/catalog-loader.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/audio-telemetry.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/downloads.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/home-catalog.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/audio-core.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/pwa-install.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/share-qr.js?v=audiofix407-20260825" defer></script>
+  <script src="../assets/js/scripts.js?v=audiofix407-20260825" defer></script>
 </body>
 </html>

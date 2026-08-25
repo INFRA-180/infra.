@@ -1681,7 +1681,95 @@
 
 
 
+  function getVisiblePlaylistShuffleCollection() {
+    if (
+      typeof document === "undefined" ||
+      !document.body ||
+      !document.body.classList.contains("playlist-screen")
+    ) {
+      return null;
+    }
+    const ui = audioState.ui;
+    if (!ui || ui.playlistKind !== "playlist" || !Array.isArray(ui.playlist)) return [];
+    if (ui.pageHref && typeof window !== "undefined" && window.location) {
+      try {
+        const uiUrl = new URL(ui.pageHref, window.location.href);
+        const routeUrl = new URL(window.location.href);
+        if (uiUrl.pathname !== routeUrl.pathname) return [];
+      } catch (_err) {
+        return [];
+      }
+    }
+    return ui.playlist.filter(function (track) { return track && track.src; });
+  }
+
+
+
+  function toggleVisiblePlaylistShuffle(visiblePlaylist) {
+    const wasRadio = audioState.homeMode === "radio";
+    const nextShuffleOn = wasRadio ? true : !audioState.shuffleOn;
+    const activeSrc = normalizeAudioSourceUrl(getCurrentLogicalAudioSrc());
+
+    if (wasRadio) {
+      setHomePlayMode("album", { force: true, deferPrefetch: true });
+    }
+
+    audioState.homeMode = "album";
+    persistHomePlayMode("album");
+    audioState.playlist = visiblePlaylist.slice();
+    audioState.playlistKind = "playlist";
+    audioState.shuffleOn = nextShuffleOn;
+    audioState.upcomingTrackPlan = null;
+    syncPlaylistContext(audioState.playlist);
+
+    const activeIndex = activeSrc
+      ? audioState.playlist.findIndex(function (track) { return srcMatches(track.src, activeSrc); })
+      : -1;
+    let startIndex = -1;
+    if (activeIndex >= 0) {
+      audioState.currentIndex = activeIndex;
+    } else {
+      const preferredIndex = nextShuffleOn ? getRandomIndex(-1) : 0;
+      startIndex = Number.isInteger(preferredIndex) && preferredIndex >= 0 && preferredIndex < audioState.playlist.length
+        ? preferredIndex
+        : (nextShuffleOn ? Math.floor(Math.random() * audioState.playlist.length) : 0);
+      audioState.currentIndex = startIndex;
+    }
+
+    const startTrackSrc = startIndex >= 0 && audioState.playlist[startIndex]
+      ? audioState.playlist[startIndex].src
+      : "";
+    reseedShuffleHistoryForCurrentTrack({
+      renewSeed: true,
+      currentSrc: startTrackSrc || activeSrc
+    });
+    savePlaybackQueueContext();
+    syncMediaSessionMetadata({ forcePosition: true });
+    syncAudioUi();
+
+    if (startIndex >= 0) {
+      startTrack(startIndex, {
+        seamless: true,
+        immediatePlay: true,
+        userGesture: true,
+        fromTransportControl: true,
+        surface: "playlist_shuffle"
+      });
+    } else {
+      maybePrefetchNextTrack("shuffle_mode_change");
+    }
+    return true;
+  }
+
+
+
   function toggleAlbumShuffleMode() {
+    const visiblePlaylist = getVisiblePlaylistShuffleCollection();
+    if (visiblePlaylist !== null) {
+      if (visiblePlaylist.length) toggleVisiblePlaylistShuffle(visiblePlaylist);
+      return;
+    }
+
     if (audioState.homeMode === "radio") {
       audioState.shuffleOn = true;
       audioState.upcomingTrackPlan = null;
@@ -1716,8 +1804,9 @@
       audioState.shuffleSessionSeed = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
     }
     const currentTrack = getCurrentPlaylistTrack();
+    const preferredSrc = normalizeAudioSourceUrl(opts.currentSrc || "");
     const currentSrc = normalizeAudioSourceUrl(
-      getCurrentLogicalAudioSrc() || (currentTrack && currentTrack.src) || ""
+      preferredSrc || getCurrentLogicalAudioSrc() || (currentTrack && currentTrack.src) || ""
     );
     audioState.shuffleHistory = currentSrc ? [currentSrc] : [];
     audioState.shuffleHistoryCursor = audioState.shuffleHistory.length - 1;

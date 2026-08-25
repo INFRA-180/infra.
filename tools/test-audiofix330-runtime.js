@@ -1567,6 +1567,165 @@ function testShuffleFromRadioSwitchesToCurrentAlbumWithoutRestart() {
   assert.strictEqual(state.radioPlaylist.length, 3, "A restored Radio session must rebuild album context from tracksData");
 }
 
+function testPlaylistShuffleAlwaysAdoptsVisiblePlaylist() {
+  const visiblePlaylist = [
+    { src: "https://media.test/list-a.m4a", name: "List A", album: "Album A", page: "https://site.test/music/a.html" },
+    { src: "https://media.test/list-b.m4a", name: "List B", album: "Album B", page: "https://site.test/music/b.html" },
+    { src: "https://media.test/list-c.m4a", name: "List C", album: "Album C", page: "https://site.test/music/c.html" }
+  ];
+
+  function createPlaylistShuffleHarness(options) {
+    const opts = options || {};
+    const sandbox = createSandbox();
+    sandbox.document.body.classList.contains = (name) => name === "playlist-screen" || name === "album-screen";
+    loadScript(sandbox, RADIO_PATH);
+    const audio = makeAudio();
+    const initialPlaylist = (opts.playlist || visiblePlaylist).slice();
+    const activeSrc = String(opts.activeSrc || "");
+    audio.src = activeSrc;
+    audio.currentSrc = activeSrc;
+    const state = {
+      audio,
+      activeLogicalSrc: activeSrc,
+      homeModeInitialized: true,
+      homeMode: opts.homeMode || "album",
+      homeModeStorageKey: `infra_home_mode_playlist_shuffle_${opts.name}`,
+      queueStorageKey: `infra_queue_playlist_shuffle_${opts.name}`,
+      resumeStorageKey: `infra_resume_playlist_shuffle_${opts.name}`,
+      playlist: initialPlaylist,
+      playlistKind: opts.playlistKind || "playlist",
+      currentIndex: Number.isInteger(opts.currentIndex) ? opts.currentIndex : 0,
+      ui: { playlistKind: "playlist", playlist: visiblePlaylist.slice() },
+      radioPlaylist: (opts.radioPlaylist || []).slice(),
+      radioQueue: (opts.radioQueue || []).slice(),
+      radioQueueCursor: Number.isInteger(opts.radioQueueCursor) ? opts.radioQueueCursor : -1,
+      shuffleOn: Boolean(opts.shuffleOn),
+      shuffleSessionSeed: opts.shuffleOn ? "old-seed" : "",
+      shuffleHistory: opts.shuffleOn && activeSrc ? [activeSrc] : [],
+      shuffleHistoryCursor: opts.shuffleOn && activeSrc ? 0 : -1,
+      recentPlayed: [],
+      recentPlayedLimit: 12,
+      playlistToken: initialPlaylist.map((track) => track.src).join("|")
+    };
+    const startCalls = [];
+    const radio = sandbox.InfraAudioRadio.createAudioRadio({
+      audioState: state,
+      runtime: { baseUrl: new URL("https://site.test/") },
+      getCurrentLogicalAudioSrc: () => state.activeLogicalSrc,
+      getCurrentPlaylistTrack: () => state.playlist[state.currentIndex] || null,
+      buildPreservedTrack(track, src) {
+        return Object.assign({}, track || {}, { src: String(src || (track && track.src) || "") });
+      },
+      toAbsoluteUrlOrEmpty: (value) => String(value || ""),
+      toAbsoluteUrl: (value) => String(value || ""),
+      normalizeAudioSourceUrl: (value) => String(value || ""),
+      normalizeTrackTitle: (value) => String(value || ""),
+      normalizeAlbumTitle: (value) => String(value || ""),
+      srcMatches: (left, right) => String(left || "") === String(right || ""),
+      syncPlaylistContext(list) {
+        state.playlistToken = list.map((track) => track.src).join("|");
+      },
+      syncMediaSessionMetadata() {},
+      syncAudioUi() {},
+      getRandomIndex: () => 2,
+      startTrack(index, startOptions) {
+        startCalls.push({ index, options: startOptions });
+      }
+    });
+    return { sandbox, state, startCalls, radio };
+  }
+
+  const direct = createPlaylistShuffleHarness({
+    name: "direct",
+    playlist: visiblePlaylist,
+    playlistKind: "playlist",
+    activeSrc: visiblePlaylist[0].src,
+    currentIndex: 0
+  });
+  direct.radio.toggleAlbumShuffleMode();
+  assert.strictEqual(direct.state.shuffleOn, true);
+  assert.strictEqual(direct.state.playlistKind, "playlist");
+  assert.deepStrictEqual(Array.from(direct.state.playlist, (track) => track.src), visiblePlaylist.map((track) => track.src));
+  assert.strictEqual(direct.state.currentIndex, 0);
+  assert.strictEqual(direct.startCalls.length, 0, "Enabling Shuffle inside the active playlist must not restart its current track");
+  direct.radio.toggleAlbumShuffleMode();
+  assert.strictEqual(direct.state.shuffleOn, false);
+  assert.strictEqual(direct.state.playlistKind, "playlist");
+  assert.strictEqual(direct.startCalls.length, 0, "Disabling playlist Shuffle must not restart its current track");
+
+  const staleAlbumTrack = visiblePlaylist[1];
+  const fromAlbum = createPlaylistShuffleHarness({
+    name: "from_album",
+    playlist: [
+      staleAlbumTrack,
+      { src: "https://media.test/album-b-sibling.m4a", name: "Sibling", album: "Album B", page: staleAlbumTrack.page }
+    ],
+    playlistKind: "album",
+    activeSrc: staleAlbumTrack.src,
+    currentIndex: 0
+  });
+  fromAlbum.radio.toggleAlbumShuffleMode();
+  assert.strictEqual(fromAlbum.state.shuffleOn, true);
+  assert.strictEqual(fromAlbum.state.playlistKind, "playlist");
+  assert.deepStrictEqual(Array.from(fromAlbum.state.playlist, (track) => track.src), visiblePlaylist.map((track) => track.src));
+  assert.strictEqual(fromAlbum.state.currentIndex, 1, "The active playlist member must be re-anchored in the full visible playlist");
+  assert.strictEqual(fromAlbum.startCalls.length, 0, "Adopting a playlist must preserve an active member without replaying it");
+  const persisted = JSON.parse(fromAlbum.sandbox.sessionStorage.getItem(fromAlbum.state.queueStorageKey));
+  assert.strictEqual(persisted.playlistKind, "playlist");
+  assert.strictEqual(persisted.shuffleOn, true);
+
+  const fromRadio = createPlaylistShuffleHarness({
+    name: "from_radio",
+    playlist: visiblePlaylist.slice(1),
+    playlistKind: "radio",
+    activeSrc: visiblePlaylist[2].src,
+    currentIndex: 1,
+    homeMode: "radio",
+    radioPlaylist: visiblePlaylist,
+    radioQueue: visiblePlaylist.slice(1),
+    radioQueueCursor: 1
+  });
+  fromRadio.radio.toggleAlbumShuffleMode();
+  assert.strictEqual(fromRadio.state.homeMode, "album", "Playlist Shuffle must explicitly leave Radio mode");
+  assert.strictEqual(fromRadio.state.shuffleOn, true);
+  assert.strictEqual(fromRadio.state.playlistKind, "playlist", "Leaving Radio from a playlist must not fall back to the track album");
+  assert.deepStrictEqual(Array.from(fromRadio.state.playlist, (track) => track.src), visiblePlaylist.map((track) => track.src));
+  assert.strictEqual(fromRadio.state.currentIndex, 2);
+  assert.strictEqual(fromRadio.startCalls.length, 0);
+
+  const outsideTrack = { src: "https://media.test/outside.m4a", name: "Outside", album: "Outside album" };
+  const outside = createPlaylistShuffleHarness({
+    name: "outside",
+    playlist: [outsideTrack],
+    playlistKind: "album",
+    activeSrc: outsideTrack.src,
+    currentIndex: 0
+  });
+  outside.radio.toggleAlbumShuffleMode();
+  assert.strictEqual(outside.state.playlistKind, "playlist");
+  assert.strictEqual(outside.state.shuffleOn, true);
+  assert.strictEqual(outside.state.currentIndex, 2);
+  assert.strictEqual(outside.startCalls.length, 1, "A track outside the visible playlist must start one random playlist entry");
+  assert.strictEqual(outside.startCalls[0].index, 2);
+  assert.strictEqual(outside.startCalls[0].options.surface, "playlist_shuffle");
+  assert.strictEqual(outside.startCalls[0].options.immediatePlay, true);
+  assert.strictEqual(outside.startCalls[0].options.userGesture, true);
+  assert.deepStrictEqual(Array.from(outside.state.shuffleHistory), [visiblePlaylist[2].src]);
+
+  const unready = createPlaylistShuffleHarness({
+    name: "unready",
+    playlist: [outsideTrack],
+    playlistKind: "album",
+    activeSrc: outsideTrack.src,
+    currentIndex: 0
+  });
+  unready.state.ui = null;
+  unready.radio.toggleAlbumShuffleMode();
+  assert.strictEqual(unready.state.shuffleOn, false, "A playlist route must not fall back to album Shuffle before its UI queue is ready");
+  assert.strictEqual(unready.state.playlistKind, "album");
+  assert.strictEqual(unready.startCalls.length, 0);
+}
+
 function testPendingSourceShowsZeroTimeInMiniAndOverlay() {
   const sandbox = createSandbox();
   loadScript(sandbox, NOW_PLAYING_PATH);
@@ -2871,6 +3030,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   testLargeRadioQueuePersistenceRetainsActiveTrack();
   testShuffleScopesTheCurrentAlbumWhenRadioIsOff();
   testShuffleFromRadioSwitchesToCurrentAlbumWithoutRestart();
+  testPlaylistShuffleAlwaysAdoptsVisiblePlaylist();
   testPendingSourceShowsZeroTimeInMiniAndOverlay();
   testMiniProgressCommitsOnceOnPointerRelease();
   await testIntegratedFivePreparedTransportSkips();

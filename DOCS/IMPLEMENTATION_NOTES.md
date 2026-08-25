@@ -1,5 +1,20 @@
 # Implementation Notes
 
+## 2026-08-25 — audiofix408 Shuffle limité à la playlist affichée
+
+- Sur une route playlist, le bouton Shuffle adopte désormais la file UI complète avant tout
+  changement de mode. Une ancienne file album ne peut plus réduire l'aléatoire à l'album de la
+  piste active.
+- Depuis Radio, Shuffle quitte Radio puis restaure directement la playlist affichée au lieu de
+  passer par `constrainPlaybackToCurrentAlbum()`.
+- Si la piste active appartient à la playlist, sa lecture et son index sont conservés. Sinon, le
+  geste démarre immédiatement une piste aléatoire de cette playlist et initialise l'historique
+  Shuffle sur cette cible.
+- Régressions couvertes : playlist déjà active, navigation depuis une file album, sortie de Radio
+  et piste active extérieure à la playlist. La persistance conserve `playlistKind: "playlist"`.
+- Identifiants atomiques : runtime/CSS `audiofix408-20260825`, Service Worker
+  `infra-shell-20260825-audio408` ; audio et catalogue inchangés.
+
 ## 2026-08-25 — audiofix407 seek compact Android à validation unique
 
 - Le seek du lecteur compact ne modifie plus `audio.currentTime` à chaque `pointermove`. Comme le

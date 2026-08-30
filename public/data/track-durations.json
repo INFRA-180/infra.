@@ -1,5 +1,5 @@
 {
-  "version": "audiofix409-20260830",
+  "version": "audiofix410-20260830",
   "generatedAt": "2026-08-30",
   "trackCount": 286,
   "tracks": [
@@ -8,9 +8,9 @@
       "albumPage": "music/d-2-0141-infra.html",
       "index": 1,
       "title": "MARJOLAINE",
-      "src": "assets/music/streams/v20260823T224523Z-d20141/d-2-0141/01-marjolaine.m4a",
-      "seconds": 164.003,
-      "duration": "2:44"
+      "src": "assets/music/streams/v20260830T182907Z-1daea99a54/d-2-0141/01-marjolaine.m4a",
+      "seconds": 160.009,
+      "duration": "2:40"
     },
     {
       "album": "D 2.0141",

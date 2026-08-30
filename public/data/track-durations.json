@@ -1,7 +1,7 @@
 {
-  "version": "audiofix408-20260825",
-  "generatedAt": "2026-08-24",
-  "trackCount": 285,
+  "version": "audiofix409-20260830",
+  "generatedAt": "2026-08-30",
+  "trackCount": 286,
   "tracks": [
     {
       "album": "D 2.0141",
@@ -11,6 +11,15 @@
       "src": "assets/music/streams/v20260823T224523Z-d20141/d-2-0141/01-marjolaine.m4a",
       "seconds": 164.003,
       "duration": "2:44"
+    },
+    {
+      "album": "D 2.0141",
+      "albumPage": "music/d-2-0141-infra.html",
+      "index": 2,
+      "title": "SOLVABLE",
+      "src": "assets/music/streams/v20260830T180238Z-45f41aff7c/d-2-0141/02-solvable.m4a",
+      "seconds": 156.456,
+      "duration": "2:36"
     },
     {
       "album": "V-23π56",

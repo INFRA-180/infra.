@@ -1,5 +1,26 @@
 # Implementation Notes
 
+## 2026-08-30 — authentification durable de la synchronisation Music/R2
+
+- La piste `D 2.0141 / SOLVABLE` était correctement détectée et convertie, mais l’ancien OAuth
+  Wrangler avait expiré le 25 août. Les deux essais du 29 août échouaient avant l’upload, puis le
+  lot identique était mis en quarantaine comme une erreur de contenu.
+- L’automatisation utilise désormais un jeton de compte dédié à la seule permission
+  `Workers R2 Storage Write`, sans expiration et conservé exclusivement dans le fichier local
+  ignoré `.secrets/audio-r2-sync.env` en mode `600`. Aucun secret ni identifiant de jeton n’entre
+  dans Git ou dans les journaux.
+- Le synchroniseur prévalide l’accès au bucket avant toute conversion. Une expiration, une panne
+  réseau ou un runtime Wrangler absent est classé comme indisponibilité d’infrastructure : la
+  track reste retentable toutes les dix minutes et n’est plus mise en quarantaine.
+- Wrangler est épinglé à `4.127.1` comme dépendance de développement du projet, ce qui retire le
+  téléchargement implicite et non déterministe de `npx` dans le LaunchAgent.
+- Validation : syntaxe Node/plist, tests du chargeur de secret et de la classification, refus d’un
+  secret aux permissions trop ouvertes, prévalidation sans création de staging quand
+  l’authentification manque, signature de la bibliothèque Music inchangée et accès R2 réel avec le
+  nouveau jeton.
+- Le test de retry N+1 vérifie désormais l’événement précis du troisième timeout plutôt qu’un champ
+  global éphémère, remis à zéro dès que le préchargement poursuit normalement avec N+2/N+3.
+
 ## 2026-08-25 — audiofix408 Shuffle limité à la playlist affichée
 
 - Sur une route playlist, le bouton Shuffle adopte désormais la file UI complète avant tout

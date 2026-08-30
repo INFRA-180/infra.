@@ -2721,6 +2721,7 @@ async function testCacheTimeoutInspectsSerializedPutBeforeNetworkRetry() {
 
 async function testPrefetchNPlusOneRetriesAfterTwoTransientFailures() {
   const fetchUrls = [];
+  const runtimeEvents = [];
   let bufferedEnd = 30;
   let nPlusOneUrl = "";
   const sandbox = createSandbox({
@@ -2789,7 +2790,9 @@ async function testPrefetchNPlusOneRetriesAfterTwoTransientFailures() {
     getCurrentPlaylistIndexSafe: () => state.currentIndex,
     getQueuePreviewIndices: (limit) => Array.from({ length: Math.min(5, limit) }, (_unused, offset) => offset + 1),
     buildAudioMonitorPayload: () => ({}),
-    trackAudioRuntimeEvent() {}
+    trackAudioRuntimeEvent(type, payload) {
+      runtimeEvents.push({ type, payload });
+    }
   });
 
   radio.maybePrefetchNextTrack("timeout_test");
@@ -2809,7 +2812,16 @@ async function testPrefetchNPlusOneRetriesAfterTwoTransientFailures() {
     "N+1 must receive one bounded recovery attempt after two transient timeouts"
   );
   assert.strictEqual(state.nextPrefetchAttemptCounts.get(playlist[1].src), 3);
-  assert.strictEqual(state.nextPrefetchFailureReason, "timeout");
+  assert(
+    runtimeEvents.some((event) => (
+      event.type === "prefetch_error" &&
+      event.payload &&
+      event.payload.next_index === 1 &&
+      event.payload.attempt === 3 &&
+      event.payload.reason === "timeout"
+    )),
+    "The bounded N+1 recovery attempt must report its third timeout before the tail queue continues"
+  );
   assert(
     fetchUrls.includes(playlist[2].src) && fetchUrls.includes(playlist[3].src),
     "An exhausted N+1 must not starve N+2 through N+5"

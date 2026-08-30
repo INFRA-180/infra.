@@ -9,5 +9,8 @@
     "test": "node tools/release-audit.js",
     "audit:release": "node tools/release-audit.js",
     "check:boundary": "node tools/verify-public-boundary.js"
+  },
+  "devDependencies": {
+    "wrangler": "4.127.1"
   }
 }

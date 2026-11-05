@@ -60,3 +60,12 @@ GitHub Pages publie uniquement `public/`. Toute modification validée est commit
 
 Les secrets, bases SQLite, outils privés, sauvegardes et sources Music restent hors du
 dépôt public.
+
+## Mise à jour musicale automatique
+
+Le Mac surveille Music en lecture seule et vérifie les morceaux et pochettes toutes les
+cinq minutes en complément des événements fichiers. Les pages sont préparées séparément,
+contrôlées, puis publiées ; la réussite de GitHub Pages et les covers sont vérifiées.
+Les travaux utilisateur présents dans le dépôt suspendent la publication, et les échecs
+restent en attente de reprise. Politique validée le 5 novembre 2026 :
+`DOCS/GIT_WORKFLOW.md`. La surveillance nécessite que ce Mac soit allumé.

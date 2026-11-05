@@ -15,6 +15,16 @@
 - Le travail en attente garde les empreintes de ses fichiers pour une reprise après audit
   échoué sans inclure une modification étrangère. Le pending n'est retiré qu'après succès
   Pages et vérification HTTP des données et des 32 pochettes canoniques.
+- La génération complète se fait dans un dossier privé. Le plan base/empreintes finales
+  est durable avant application des fichiers ; chaque remplacement est atomique et une
+  interruption reprend sans écraser une édition utilisateur. Un commit créé juste avant
+  une interruption n'est adopté qu'après contrôle du parent et du contenu exact.
+- Relecture ciblée : les cas audio + artwork, nouveau premier ID Music, nouvel album et
+  interruption pendant génération/application/commit ont été corrigés et couverts.
+- Vérification réelle : Pages réussi au commit `75c35a7`, 32 covers HTTP contrôlées par
+  empreinte, catalogue live `catalog-20261105T220200Z-covers412` identique aux pages,
+  sept pistes D 2.0141 en Range HTTP 206. Le LaunchAgent activé exécute un cycle sans
+  changement et annonce son contrôle toutes les cinq minutes.
 - Le dernier master SHKADOV, resynchronisé pendant l'intervention, est repris depuis le
   catalogue actuel. Audiofix412 remplace audiofix411 avec les mêmes 32 albums / 291 pistes.
 - Les étapes R2 et Pages convergent sous contrôle ; elles ne constituent pas une transaction
@@ -1671,3 +1681,10 @@
 - Live Web Inspector measurements on the installed PWA showed a `844px` screen but a `797px` viewport and matching `html`, `body`, overlay, and panel bottoms; the missing `47px` matched the top safe-area inset.
 - No mobile overlay or panel height, bottom anchor, or bottom filler changed. The removed status-bar overlay layer, safe top control spacing, and artwork-only top extension remain intact.
 - Release shell: `infra-shell-20260715-audio328`; the unchanged fullscreen stylesheet remains `audiofix327-20260715`.
+
+## 2026-11-05 — Claude : accès, audit UX/code et maquette bibliothèque (lecture seule)
+
+- Aucun code modifié, aucun commit. Seuls des `.md` et une maquette HTML ajoutés dans `DOCS/`.
+- `DOCS/ACCES_CLAUDE_20261105.md` : accès vérifiés (gh, wrangler OAuth, Pages ; R2 refusé via OAuth) + questions pour Codex.
+- `DOCS/AUDIT_UX_CODE_20261105.md` : 10 points UX/code (accueil mobile 1 colonne, pochettes 1200 px sans srcset, favoris cachés, accents manquants…).
+- `DOCS/maquettes/MAQUETTE_BIBLIOTHEQUE_20261105.html` + `MAQUETTE_20261105.md` : bibliothèque proposée ; lecteur plein écran validé par INFRA, inchangé.

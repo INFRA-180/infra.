@@ -1,5 +1,5 @@
 {
-  "version": "audiofix411-20261105",
+  "version": "audiofix412-20261105",
   "generatedAt": "2026-11-05",
   "source": "Music macOS masters AAC 320 R2",
   "audioPrefix": "mixed",
@@ -21,7 +21,7 @@
     "assets/music/streams/v20261104T214034Z-5881b0502d",
     "assets/music/streams/v20261104T221522Z-184ea076a0",
     "assets/music/streams/v20261104T222428Z-ce60d2fdb9",
-    "assets/music/streams/v20261105T185257Z-bba1732af7"
+    "assets/music/streams/v20261105T214910Z-32b24f8477"
   ],
   "albums": [
     {
@@ -75,9 +75,9 @@
         {
           "index": 7,
           "title": "SHKADOV",
-          "src": "assets/music/streams/v20261105T185257Z-bba1732af7/d-2-0141/07-shkadov.m4a",
-          "duration": "3:16",
-          "seconds": 196.07
+          "src": "assets/music/streams/v20261105T214910Z-32b24f8477/d-2-0141/07-shkadov.m4a",
+          "duration": "3:15",
+          "seconds": 195.141
         }
       ]
     },

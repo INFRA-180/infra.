@@ -68,9 +68,16 @@ en cache. Le test réel de la PWA installée sur iPhone reste une validation uti
 4. Pousser sans réécrire l'historique.
 5. Pour un jalon stable, créer un tag annoté explicite.
 
-Aucun force-push, commit automatique ou erreur de push ignorée n'est admis sur la branche
-publiée. Un outil automatique peut auditer et signaler ; il ne doit pas décider du contenu
-d'un commit.
+Aucun force-push ni erreur de push ignorée n'est admis sur la branche publiée.
+
+Exception autorisée par INFRA le 5 novembre 2026 : le watcher Music peut générer, contrôler,
+commiter et publier les seules données et ressources musicales sous `public/`, sur
+`codex/beta-site`, à partir d'un dépôt propre. Le contrôle intégral précède chaque commit ;
+les changements utilisateur étrangers bloquent la publication. Les publications interrompues
+sont conservées localement, avec les empreintes des fichiers générés ; leur reprise refuse
+un fichier modifié depuis la génération. Le succès exige GitHub Pages réussi et un contrôle
+HTTP du catalogue et de toutes les covers. Cette exception remplace le gel du 2 octobre 2026
+et ne couvre aucune modification d'interface ni aucun secret ou outil privé.
 
 ## Sauvegardes et entretien
 

@@ -1,5 +1,28 @@
 # Implementation Notes
 
+## 2026-11-05 — rétablissement de l’automatique contrôlé, audiofix412
+
+- INFRA confirme : « Oui, rétablir l’automatique contrôlé ». Cette validation remplace
+  explicitement le gel du 2 octobre ; l'exception bornée est consignée dans GIT_WORKFLOW.
+- Le watcher existant suit aussi les artworks Music via les identifiants persistants des
+  premières pistes. Première observation : baseline sans remplacer les covers déjà validées ;
+  ensuite un changement d'empreinte conserve une source privée et produit une nouvelle URL.
+- Le contrôle de sécurité passe de six heures à cinq minutes. L'audio reste événementiel ;
+  Music est en lecture seule, les overrides Music sont durables et les covers remplacées sont
+  archivées sous le runtime privé, sans suppression de la bibliothèque.
+- Une pochette différente suffit désormais à changer le catalogue. La génération de l'image
+  publique se fait avec le site, pour ne pas salir le dépôt avant sa vérification initiale.
+- Le travail en attente garde les empreintes de ses fichiers pour une reprise après audit
+  échoué sans inclure une modification étrangère. Le pending n'est retiré qu'après succès
+  Pages et vérification HTTP des données et des 32 pochettes canoniques.
+- Le dernier master SHKADOV, resynchronisé pendant l'intervention, est repris depuis le
+  catalogue actuel. Audiofix412 remplace audiofix411 avec les mêmes 32 albums / 291 pistes.
+- Les étapes R2 et Pages convergent sous contrôle ; elles ne constituent pas une transaction
+  distribuée instantanée. La validation visuelle/lecture sur iPhone demeure utilisateur.
+- Preuve documentaire APP_NETWORK : proof_id 3849, sources locales retenues tier B.
+  Tests locaux : changement artwork seul, absence de changement, reprise, état invalide,
+  cover seule dans le catalogue et conservation du pending après échec Pages.
+
 ## 2026-11-05 — remise à jour du catalogue et de la cover D 2.0141, audiofix411
 
 - Demande : publier les morceaux et la nouvelle pochette du dernier album, puis vérifier le site.

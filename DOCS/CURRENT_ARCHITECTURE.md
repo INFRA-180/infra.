@@ -7,9 +7,9 @@ Ce document décrit uniquement le système actif. Les anciennes décisions reste
 
 ## Baseline
 
-- Runtime : `audiofix411-20261105`
-- Service Worker : `infra-shell-20261105-audio411`
-- CSS : `audiofix411-20261105` — seek compact à validation unique et zone tactile de 26 px
+- Runtime : `audiofix412-20261105`
+- Service Worker : `infra-shell-20261105-audio412`
+- CSS : `audiofix412-20261105` — seek compact à validation unique et zone tactile de 26 px
 - Catalogue : 32 albums et 291 pistes
 - Origine audio : proxy R2 Range `https://infra180-api.pages.dev/audio/`
 - Cache audio : `infra-next-track-segments-v9`

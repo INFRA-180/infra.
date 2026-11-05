@@ -1,5 +1,5 @@
 {
-  "version": "audiofix411-20261105",
+  "version": "audiofix412-20261105",
   "generatedAt": "2026-11-05",
   "trackCount": 291,
   "tracks": [
@@ -62,9 +62,9 @@
       "albumPage": "music/d-2-0141-infra.html",
       "index": 7,
       "title": "SHKADOV",
-      "src": "assets/music/streams/v20261105T185257Z-bba1732af7/d-2-0141/07-shkadov.m4a",
-      "seconds": 196.07,
-      "duration": "3:16"
+      "src": "assets/music/streams/v20261105T214910Z-32b24f8477/d-2-0141/07-shkadov.m4a",
+      "seconds": 195.141,
+      "duration": "3:15"
     },
     {
       "album": "V-23π56",

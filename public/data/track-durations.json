@@ -1,7 +1,7 @@
 {
-  "version": "audiofix410-20260830",
-  "generatedAt": "2026-08-30",
-  "trackCount": 286,
+  "version": "audiofix411-20261105",
+  "generatedAt": "2026-11-05",
+  "trackCount": 291,
   "tracks": [
     {
       "album": "D 2.0141",
@@ -17,9 +17,54 @@
       "albumPage": "music/d-2-0141-infra.html",
       "index": 2,
       "title": "SOLVABLE",
-      "src": "assets/music/streams/v20260830T180238Z-45f41aff7c/d-2-0141/02-solvable.m4a",
+      "src": "assets/music/streams/v20261104T214034Z-5881b0502d/d-2-0141/02-solvable.m4a",
       "seconds": 156.456,
       "duration": "2:36"
+    },
+    {
+      "album": "D 2.0141",
+      "albumPage": "music/d-2-0141-infra.html",
+      "index": 3,
+      "title": "78Pt",
+      "src": "assets/music/streams/v20261104T222428Z-ce60d2fdb9/d-2-0141/03-78pt.m4a",
+      "seconds": 196.209,
+      "duration": "3:16"
+    },
+    {
+      "album": "D 2.0141",
+      "albumPage": "music/d-2-0141-infra.html",
+      "index": 4,
+      "title": "CANDANA",
+      "src": "assets/music/streams/v20261012T202357Z-906cb1f7e8/d-2-0141/04-candana.m4a",
+      "seconds": 375.653,
+      "duration": "6:16"
+    },
+    {
+      "album": "D 2.0141",
+      "albumPage": "music/d-2-0141-infra.html",
+      "index": 5,
+      "title": "SI",
+      "src": "assets/music/streams/v20261104T212939Z-4b6984b3c3/d-2-0141/05-si.m4a",
+      "seconds": 147.703,
+      "duration": "2:28"
+    },
+    {
+      "album": "D 2.0141",
+      "albumPage": "music/d-2-0141-infra.html",
+      "index": 6,
+      "title": "SAKURAI",
+      "src": "assets/music/streams/v20261104T221522Z-184ea076a0/d-2-0141/06-sakurai.m4a",
+      "seconds": 218.547,
+      "duration": "3:39"
+    },
+    {
+      "album": "D 2.0141",
+      "albumPage": "music/d-2-0141-infra.html",
+      "index": 7,
+      "title": "SHKADOV",
+      "src": "assets/music/streams/v20261105T185257Z-bba1732af7/d-2-0141/07-shkadov.m4a",
+      "seconds": 196.07,
+      "duration": "3:16"
     },
     {
       "album": "V-23π56",

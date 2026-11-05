@@ -20,10 +20,10 @@ validation, publication et sauvegarde est décrite dans `DOCS/GIT_WORKFLOW.md`.
 
 - Site publié : `public/`
 - Branche : `codex/beta-site`
-- Baseline publiée : `audiofix388-20260807`
-- Service Worker : `infra-shell-20260807-audio388`
-- CSS publié : `audiofix388-20260807`
-- Catalogue : 31 albums, 283 pistes
+- Baseline publiée : `audiofix411-20261105`
+- Service Worker : `infra-shell-20261105-audio411`
+- CSS publié : `audiofix411-20261105`
+- Catalogue : 32 albums, 291 pistes
 - Playlists : 4 pages, 234 occurrences, 225 pistes uniques
 - Play à froid contextuel : Radio sur l’accueil, piste 1 sur un album ou une playlist
 - Accueil tactile : swipe droit sur une carte album ; page album : bouton Play/Pause dédié

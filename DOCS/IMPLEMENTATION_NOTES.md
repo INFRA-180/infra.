@@ -1,5 +1,27 @@
 # Implementation Notes
 
+## 2026-11-05 — remise à jour du catalogue et de la cover D 2.0141, audiofix411
+
+- Demande : publier les morceaux et la nouvelle pochette du dernier album, puis vérifier le site.
+- Les pages étaient restées à 286 pistes ; le catalogue audio comptait déjà 291 pistes.
+  Le gel volontaire du 2 octobre avait conservé Music/R2 actif et désactivé la publication GitHub.
+- D 2.0141 passe de deux à sept pistes : MARJOLAINE, SOLVABLE, 78Pt, CANDANA, SI,
+  SAKURAI et SHKADOV. SOLVABLE utilise sa version audio récente ; les cinq ajouts utilisent
+  les objets déjà publiés. Les 32 albums, les durées, les quatre playlists, les pages,
+  le fallback et les versions du shell sont régénérés ensemble.
+- La pochette actuelle est extraite en lecture seule depuis Music : JPEG carré 3000×3000,
+  SHA-256 `9947b3d6fc80dc8e0794067994ea5424dc97e698b02a9f441332b0c1250e27df`.
+  Source conservée et override privé actualisé ; URL canonique WebP 1200×1200 contenant
+  `9947b3d6`, commune à l'accueil, à l'album et au lecteur. L'ancienne cover est archivée localement.
+- Sources retenues : dépôt vivant, politique Git et état local ; recherche APP_NETWORK
+  retrouvant ces notes en trust tier B. Pas de nouveau choix de technologie ni dépendance.
+- Limite identifiée : le watcher ne suit pas les artworks gérés uniquement par Music,
+  et un override manuel reste prioritaire. Le rétablissement de l'automatique contrôlé est
+  proposé en réponse à la remarque d'INFRA ; le gel historique n'est pas annulé implicitement.
+- Contrôles : accès Range 0–1023 en HTTP 206 pour les six objets nouveaux ou remplacés ;
+  audit complet après intégration de la cover réussi (20 suites), frontière publique et diff Git
+  vérifiés. La validation sur iPhone reste utilisateur.
+
 ## 2026-08-30 — authentification durable de la synchronisation Music/R2
 
 - La piste `D 2.0141 / SOLVABLE` était correctement détectée et convertie, mais l’ancien OAuth

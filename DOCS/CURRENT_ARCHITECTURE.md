@@ -1,16 +1,16 @@
 # Architecture courante — SITE INFRA
 
-État de référence : 25 août 2026.
+État de référence : 5 novembre 2026.
 
 Ce document décrit uniquement le système actif. Les anciennes décisions restent dans
 `IMPLEMENTATION_NOTES.md`, mais ne remplacent pas cette référence.
 
 ## Baseline
 
-- Runtime : `audiofix408-20260825`
-- Service Worker : `infra-shell-20260825-audio408`
-- CSS : `audiofix408-20260825` — seek compact à validation unique et zone tactile de 26 px
-- Catalogue : 32 albums et 285 pistes
+- Runtime : `audiofix411-20261105`
+- Service Worker : `infra-shell-20261105-audio411`
+- CSS : `audiofix411-20261105` — seek compact à validation unique et zone tactile de 26 px
+- Catalogue : 32 albums et 291 pistes
 - Origine audio : proxy R2 Range `https://infra180-api.pages.dev/audio/`
 - Cache audio : `infra-next-track-segments-v9`
 - Cache catalogue live : isolé par version de shell (`<shell>-catalog`)

@@ -1,6 +1,6 @@
 {
-  "version": "audiofix410-20260830",
-  "generatedAt": "2026-08-30",
+  "version": "audiofix411-20261105",
+  "generatedAt": "2026-11-05",
   "source": "Music macOS masters AAC 320 R2",
   "audioPrefix": "mixed",
   "audioPrefixes": [
@@ -15,15 +15,20 @@
     "assets/music/streams/v20260717T112959Z-30b7200f03",
     "assets/music/streams/v20260801T185702Z-9b0202f2f9",
     "assets/music/streams/v20260802T183541Z-53dd6082c0",
-    "assets/music/streams/v20260830T180238Z-45f41aff7c",
-    "assets/music/streams/v20260830T182907Z-1daea99a54"
+    "assets/music/streams/v20260830T182907Z-1daea99a54",
+    "assets/music/streams/v20261012T202357Z-906cb1f7e8",
+    "assets/music/streams/v20261104T212939Z-4b6984b3c3",
+    "assets/music/streams/v20261104T214034Z-5881b0502d",
+    "assets/music/streams/v20261104T221522Z-184ea076a0",
+    "assets/music/streams/v20261104T222428Z-ce60d2fdb9",
+    "assets/music/streams/v20261105T185257Z-bba1732af7"
   ],
   "albums": [
     {
       "slug": "d-2-0141",
       "title": "D 2.0141",
       "page": "music/d-2-0141-infra.html",
-      "cover": "assets/music/responsive/d-2-0141-560ec418-cover-1200.webp",
+      "cover": "assets/music/responsive/d-2-0141-9947b3d6-cover-1200.webp",
       "tracks": [
         {
           "index": 1,
@@ -35,9 +40,44 @@
         {
           "index": 2,
           "title": "SOLVABLE",
-          "src": "assets/music/streams/v20260830T180238Z-45f41aff7c/d-2-0141/02-solvable.m4a",
+          "src": "assets/music/streams/v20261104T214034Z-5881b0502d/d-2-0141/02-solvable.m4a",
           "duration": "2:36",
           "seconds": 156.456
+        },
+        {
+          "index": 3,
+          "title": "78Pt",
+          "src": "assets/music/streams/v20261104T222428Z-ce60d2fdb9/d-2-0141/03-78pt.m4a",
+          "duration": "3:16",
+          "seconds": 196.209
+        },
+        {
+          "index": 4,
+          "title": "CANDANA",
+          "src": "assets/music/streams/v20261012T202357Z-906cb1f7e8/d-2-0141/04-candana.m4a",
+          "duration": "6:16",
+          "seconds": 375.653
+        },
+        {
+          "index": 5,
+          "title": "SI",
+          "src": "assets/music/streams/v20261104T212939Z-4b6984b3c3/d-2-0141/05-si.m4a",
+          "duration": "2:28",
+          "seconds": 147.703
+        },
+        {
+          "index": 6,
+          "title": "SAKURAI",
+          "src": "assets/music/streams/v20261104T221522Z-184ea076a0/d-2-0141/06-sakurai.m4a",
+          "duration": "3:39",
+          "seconds": 218.547
+        },
+        {
+          "index": 7,
+          "title": "SHKADOV",
+          "src": "assets/music/streams/v20261105T185257Z-bba1732af7/d-2-0141/07-shkadov.m4a",
+          "duration": "3:16",
+          "seconds": 196.07
         }
       ]
     },

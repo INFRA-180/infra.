@@ -947,7 +947,7 @@
   "use strict";
   if (typeof document === "undefined" || typeof window === "undefined") return;
   if (typeof document.createElement !== "function" || !document.head) return;
-  var VERSION = "bibliotheque-v3-lot2d";
+  var VERSION = "bibliotheque-v3-lot3c";
   try {
     var script = document.currentScript;
     if (!script || !script.src) return;

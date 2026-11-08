@@ -40,6 +40,13 @@ expect(/api\.playPaths\(/.test(js), "les titres ne lancent pas la lecture");
 // Titres écrits tels quels
 expect(/text-transform: none !important/.test(css), "les titres sont remis en majuscules");
 
+// Lot 3 : lecteur de navigation en barre basse (flex, pas grid : la ligne de progression doit rester en haut)
+const bar = css.slice(css.indexOf("lot 3"));
+expect(/bottom: 0 !important/.test(bar) && /border-radius: 0 !important/.test(bar) && /box-shadow: none !important/.test(bar), "la barre basse n'est plus posée en bas sans carte");
+expect(/display: flex !important; \/\* flex, pas grid/.test(bar), "la barre doit rester en flex");
+expect(/global-transport-btn\[data-transport-shuffle\]/.test(bar) && /global-transport-btn\.global-transport-mode/.test(bar), "Aléatoire et Radio doivent quitter la barre");
+expect(/is-playing \.global-transport-now-title::after/.test(bar), "point rouge de lecture absent");
+
 // Le script ne plante pas hors navigateur (bancs d'essai des autres tests)
 try { vm.runInNewContext(js, { window: {}, document: {} }); } catch (err) { failures.push("bibliotheque.js plante hors navigateur : " + err.message); }
 

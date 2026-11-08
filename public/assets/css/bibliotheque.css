@@ -260,3 +260,108 @@ body.home-screen[data-bib-view="playlists"] .playlists-grid {
 .bib-letter { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: rgba(17, 17, 17, 0.4); padding: 14px 0 4px; }
 .bib-empty { text-align: center; color: rgba(17, 17, 17, 0.62); padding: 60px 20px; margin: 0; }
 .bib-empty b { display: block; color: var(--ink); font-size: 17px; margin-bottom: 6px; }
+
+/* ==========================================================================
+   Bibliothèque V3 — lot 3 : lecteur de navigation en barre basse (validé par INFRA le 08/11/2026)
+   Même verre blanc que la ligne d'onglets, sans carte, ombre ni coins. Titre + album à gauche
+   (point rouge à droite du titre pendant la lecture), Précédent / Lecture / Suivant à droite,
+   fine ligne de progression en haut. Aléatoire, Radio, cœur et pochette : dans le plein écran.
+   Les !important battent les tailles/positions posées en ligne par le déplacement sur ordinateur.
+   ========================================================================== */
+.global-transport,
+#infraSpaPersist .global-transport {
+  position: fixed !important;
+  top: auto !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  min-height: calc(60px + env(safe-area-inset-bottom)) !important;
+  display: flex !important; /* flex, pas grid : la ligne de progression (absolue) se place alors sur le bord haut */
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  padding: 0 max(6px, calc((100vw - 1080px) / 2 + 10px)) env(safe-area-inset-bottom) max(16px, calc((100vw - 1080px) / 2 + 20px)) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: rgba(255, 255, 255, 0.86) !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: saturate(1.4) blur(18px) !important;
+  backdrop-filter: saturate(1.4) blur(18px) !important;
+  color: var(--ink) !important;
+  text-shadow: none !important;
+  pointer-events: auto !important;
+}
+@media (min-width: 640px) and (max-width: 1119px) {
+  .global-transport, #infraSpaPersist .global-transport { padding-left: 20px !important; padding-right: 10px !important; }
+}
+.global-transport::before, .global-transport::after { content: none !important; display: none !important; }
+html body .global-transport .global-transport-cover-frame,
+html body .global-transport .global-transport-favorite,
+html body .global-transport .global-transport-btn.global-transport-mode,
+html body .global-transport .global-transport-btn[data-transport-shuffle],
+html body .global-transport .global-transport-mini-time,
+html body .global-transport .global-transport-resize { display: none !important; }
+
+/* Titre et album, alignés à gauche au même pixel */
+.global-transport-now {
+  flex: 1 1 auto; width: auto !important; min-width: 0 !important; max-width: none !important;
+  display: block !important; padding: 0 !important; margin: 0 !important; position: static !important;
+}
+.global-transport-now-meta, .global-transport-now-line {
+  display: flex !important; flex-direction: column !important; align-items: flex-start !important; justify-content: center !important;
+  gap: 1px !important; text-align: left !important; min-width: 0; width: 100%;
+}
+.global-transport-now-title {
+  max-width: 100% !important; font-size: 14px !important; font-weight: 600 !important; letter-spacing: 0.02em !important;
+  text-transform: none !important; color: var(--ink) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.global-transport-now-album {
+  max-width: 100% !important; font-size: 12px !important; font-weight: 400 !important; letter-spacing: 0 !important;
+  text-transform: none !important; color: rgba(17, 17, 17, 0.62) !important; text-decoration: none !important;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.global-transport.is-playing .global-transport-now-title::after {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 8px; border-radius: 50%;
+  background: #e0353b; vertical-align: middle; position: relative; top: -1px;
+}
+
+/* Ligne de progression : 2 px tout en haut de la barre, zone de toucher de 14 px */
+html body .global-transport .global-transport-now-mini {
+  position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; height: 2px !important;
+  margin: 0 !important; padding: 0 !important; display: block !important; width: auto !important;
+}
+html body .global-transport .global-transport-mini-progress {
+  position: absolute !important; left: 0 !important; right: 0 !important; top: -6px !important; height: 14px !important;
+  width: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important;
+  background: none !important; box-shadow: none !important; cursor: pointer;
+}
+html body .global-transport .global-transport-mini-progress::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 6px; height: 2px; background: rgba(17, 17, 17, 0.08);
+}
+html body .global-transport .global-transport-mini-fill {
+  position: absolute !important; left: 0 !important; top: 6px !important; height: 2px !important;
+  border-radius: 0 !important; background: var(--ink) !important; box-shadow: none !important;
+}
+
+/* Précédent, Lecture, Suivant */
+.global-transport-controls {
+  flex: none; width: auto !important; display: flex !important; align-items: center !important;
+  gap: 0 !important; margin: 0 !important; padding: 0 !important;
+}
+.global-transport-main { display: flex !important; align-items: center !important; gap: 0 !important; }
+.global-transport .global-transport-btn {
+  width: 44px !important; min-width: 44px !important; height: 44px !important; padding: 0 !important;
+  display: grid !important; place-items: center !important; color: var(--ink) !important; background: none !important;
+  border: 0 !important; box-shadow: none !important;
+}
+.global-transport .global-transport-btn svg { width: 19px !important; height: 19px !important; }
+.global-transport [data-transport-toggle] svg { width: 22px !important; height: 22px !important; }
+
+/* Le contenu laisse la place de la barre */
+body.has-mobile-player .one-page-layout,
+body.has-mobile-player main { scroll-padding-bottom: 80px; }

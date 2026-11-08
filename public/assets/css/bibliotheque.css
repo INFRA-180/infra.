@@ -618,3 +618,33 @@ html body .global-transport.bib-idle .global-transport-mini-time { visibility: h
    la colonne explicite écrasait la 1re playlist. La rangée garde ses colonnes automatiques partout. */
 html body.home-screen:not([data-bib-view="playlists"]) .playlists-grid { grid-template-columns: none !important; }
 html body.home-screen .playlists-grid .playlist-card { max-width: none !important; margin: 0 !important; }
+
+/* Fenêtre d'installation (INFRA, 08/11/2026) : sans cadre, posée au-dessus du lecteur, même verre blanc ;
+   une ligne + étapes en pictogrammes, une croix. Montrée une seule fois (pwa-install.js). */
+.bib-install {
+  position: fixed; left: 0; right: 0; z-index: 9990;
+  bottom: calc(60px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.94);
+  -webkit-backdrop-filter: saturate(1.4) blur(18px); backdrop-filter: saturate(1.4) blur(18px);
+  color: var(--ink, #111);
+  transform: translateY(16px); opacity: 0; visibility: hidden; pointer-events: none;
+  transition: transform .25s cubic-bezier(.2,.8,.2,1), opacity .2s ease, visibility 0s linear .25s;
+}
+.bib-install.is-open { transform: none; opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
+.bib-install-in {
+  display: flex; align-items: center; gap: 12px; min-height: 64px; box-sizing: border-box;
+  padding: 8px 3px 8px 16px; max-width: 1480px; margin: 0 auto;
+}
+@media (min-width: 640px) { .bib-install-in { padding-left: 20px; padding-right: 8px; } }
+.bib-install-tx { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.bib-install-tx strong { font-size: 14px; font-weight: 600; letter-spacing: 0.02em; }
+.bib-install-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; color: rgba(17, 17, 17, 0.62); }
+.bib-install-step { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.bib-install-step svg { width: 17px; height: 17px; flex: none; color: var(--ink, #111); }
+.bib-install-sep { color: rgba(17, 17, 17, 0.4); }
+.bib-install-close {
+  flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; padding: 0;
+  color: rgba(17, 17, 17, 0.62); cursor: pointer;
+}
+.bib-install-close svg { width: 18px; height: 18px; }
+@media (prefers-reduced-motion: reduce) { .bib-install, .bib-install.is-open { transition: none; } }

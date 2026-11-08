@@ -195,117 +195,73 @@
       }
     }
 
+    // Fenêtre d'installation (INFRA, 08/11/2026) : montrée une seule fois, jamais quand le site est
+    // déjà installé, sans cadre ; une ligne et les étapes en pictogrammes, une croix pour fermer.
+    const ICON_SHARE = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m-4 4 4-4 4 4M8 11H5v10h14V11h-3"/></svg>';
+    const ICON_ADD = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/></svg>';
+    const ICON_MENU = '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><circle cx="12" cy="5.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="18.5" r="1.7"/></g></svg>';
+    const ICON_CLOSE = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+    function getInstallSteps(browserKind) {
+      if (browserKind === "ios-safari") {
+        return [[ICON_SHARE, "Partager"], [ICON_ADD, "Sur l’écran d’accueil"]];
+      }
+      if (browserKind === "ios-chrome" || browserKind === "ios-brave") {
+        return [[ICON_SHARE, "Partager"], [ICON_ADD, "Ajouter à l’écran d’accueil"]];
+      }
+      if (String(browserKind).indexOf("android-") === 0) {
+        return [[ICON_MENU, "Menu"], [ICON_ADD, "Installer l’application"]];
+      }
+      return [[ICON_SHARE, "Partager"], [ICON_ADD, "Sur l’écran d’accueil"]];
+    }
+
     function ensurePwaInstallPromptUi() {
       let root = document.getElementById("infraPwaInstallModal");
       if (root) return root;
 
       root = document.createElement("div");
       root.id = "infraPwaInstallModal";
-      root.className = "pwa-install-modal";
+      root.className = "bib-install";
+      root.setAttribute("role", "dialog");
+      root.setAttribute("aria-label", "Ajouter INFRA. à l’écran d’accueil");
       root.setAttribute("aria-hidden", "true");
       root.innerHTML = [
-        "<div class=\"pwa-install-card\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Installer INFRA\">",
-        "  <div class=\"pwa-install-head\">",
-        "    <h3>Installer INFRA.</h3>",
-        "    <p>iPhone (Safari) et Android: installation sur l'ecran d'accueil.</p>",
+        "<div class=\"bib-install-in\">",
+        "  <div class=\"bib-install-tx\">",
+        "    <strong>Ajouter INFRA. à l’écran d’accueil</strong>",
+        "    <span class=\"bib-install-steps\" data-pwa-steps></span>",
         "  </div>",
-        "  <div class=\"pwa-choice-grid\">",
-        "    <button class=\"pwa-choice-btn is-primary\" type=\"button\" data-pwa-install>",
-        "      <span class=\"pwa-choice-badge\">APP</span>",
-        "      <strong>Installer</strong>",
-        "      <span>Ecran d'accueil</span>",
-        "    </button>",
-        "    <button class=\"pwa-choice-btn\" type=\"button\" data-pwa-browser>",
-        "      <span class=\"pwa-choice-badge\">WEB</span>",
-        "      <strong>Navigateur</strong>",
-        "      <span>Continuer ici</span>",
-        "    </button>",
-        "  </div>",
-        "  <div class=\"pwa-install-guide\" data-pwa-guide hidden>",
-        "    <p data-pwa-guide-text>iPhone et Android: instructions d'installation.</p>",
-        "    <ol data-pwa-guide-steps>",
-        "      <li>Appuie sur le bouton <strong>Partager</strong> (carre + fleche).</li>",
-        "      <li>Choisis <strong>Sur l'ecran d'accueil</strong>.</li>",
-        "      <li>Valide avec <strong>Ajouter</strong>.</li>",
-        "    </ol>",
-        "    <div class=\"pwa-install-foot\">",
-        "      <button class=\"mini-btn mini-btn-dark\" type=\"button\" data-pwa-done>OK</button>",
-        "    </div>",
-        "  </div>",
+        "  <button class=\"bib-install-close\" type=\"button\" data-pwa-browser aria-label=\"Fermer\" title=\"Fermer\">" + ICON_CLOSE + "</button>",
         "</div>"
       ].join("");
 
       document.body.appendChild(root);
 
-      const installBtn = root.querySelector("[data-pwa-install]");
-      const browserBtn = root.querySelector("[data-pwa-browser]");
-      const guide = root.querySelector("[data-pwa-guide]");
-      const guideText = root.querySelector("[data-pwa-guide-text]");
-      const guideSteps = root.querySelector("[data-pwa-guide-steps]");
-      const doneBtn = root.querySelector("[data-pwa-done]");
-
-      function closePrompt(markSessionDismissed) {
-        root.classList.remove("is-open");
-        root.setAttribute("aria-hidden", "true");
-        if (markSessionDismissed) {
+      const closeBtn = root.querySelector("[data-pwa-browser]");
+      if (closeBtn) {
+        closeBtn.addEventListener("click", function () {
+          root.classList.remove("is-open");
+          root.setAttribute("aria-hidden", "true");
           pwaState.sessionDismissed = true;
-        }
-      }
-
-      root.addEventListener("click", function (event) {
-        if (event.target === root) {
-          closePrompt(true);
-        }
-      });
-
-      if (browserBtn) {
-        browserBtn.addEventListener("click", function () {
-          if (!isSafariOnIos()) {
-            persistPwaChoice("browser");
-          }
-          closePrompt(true);
+          persistPwaChoice("browser");
         });
       }
-
-      if (installBtn) {
-        installBtn.addEventListener("click", function () {
-          if (!isSafariOnIos()) {
-            persistPwaChoice("install");
-          }
-          if (!guide) {
-            closePrompt(true);
-            return;
-          }
-
-          fillPwaGuide(guideText, guideSteps, getInstallBrowserKind());
-
-          guide.hidden = false;
-        });
-      }
-
-      if (doneBtn) {
-        doneBtn.addEventListener("click", function () {
-          closePrompt(true);
-        });
-      }
-
       return root;
     }
 
     function initPwaInstallPrompt(adminMode) {
       const existing = document.getElementById("infraPwaInstallModal");
       const browserKind = getInstallBrowserKind();
-      const showEveryLaunch = browserKind === "ios-safari";
       const savedChoice = readPwaChoice();
       const canShow = !adminMode &&
         document.body.classList.contains("home-screen") &&
         (isIosDevice() || isAndroidDevice()) &&
         !isStandaloneDisplayMode() &&
         !pwaState.sessionDismissed &&
-        (showEveryLaunch || !savedChoice);
+        !savedChoice;
 
       if (!canShow) {
-        if (existing) {
+        if (existing && (!pwaState.shownThisSession || !document.body.classList.contains("home-screen"))) {
           existing.classList.remove("is-open");
           existing.setAttribute("aria-hidden", "true");
         }
@@ -313,13 +269,17 @@
       }
 
       const root = ensurePwaInstallPromptUi();
-      const guide = root.querySelector("[data-pwa-guide]");
-      const guideSteps = root.querySelector("[data-pwa-guide-steps]");
-      const guideText = root.querySelector("[data-pwa-guide-text]");
-      if (guide) guide.hidden = true;
-      fillPwaGuide(guideText, guideSteps, browserKind);
+      const steps = root.querySelector("[data-pwa-steps]");
+      if (steps) {
+        steps.innerHTML = getInstallSteps(browserKind).map(function (step) {
+          return "<span class=\"bib-install-step\">" + step[0] + "<span>" + step[1] + "</span></span>";
+        }).join("<span class=\"bib-install-sep\" aria-hidden=\"true\">›</span>");
+      }
       root.classList.add("is-open");
       root.setAttribute("aria-hidden", "false");
+      // Une seule fois : le choix est retenu dès l'affichage (la fenêtre reste ouverte pour cette visite).
+      pwaState.shownThisSession = true;
+      persistPwaChoice("seen");
     }
 
 
@@ -330,6 +290,7 @@
       isSafariOnIos,
       getPwaGuideContent,
       fillPwaGuide,
+      getInstallSteps,
       readPwaChoice,
       persistPwaChoice,
       ensurePwaInstallPromptUi,

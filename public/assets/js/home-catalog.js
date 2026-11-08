@@ -1018,7 +1018,7 @@
   "use strict";
   if (typeof document === "undefined" || typeof window === "undefined") return;
   if (typeof document.createElement !== "function" || !document.head) return;
-  var VERSION = "bibliotheque-v6-20261108";
+  var VERSION = "bibliotheque-v7-20261108";
   try {
     var script = document.currentScript;
     if (!script || !script.src) return;

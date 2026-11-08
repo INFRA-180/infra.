@@ -484,7 +484,9 @@ for (const relativePath of ["public/index.html"].concat(
 )) {
   const source = read(relativePath);
   expect(!/cover-(?:480|900)\.webp/i.test(source), `${relativePath} still references a legacy cover variant`);
-  expect(!/class="[^"]*(?:album-cover|\bcover\b)[^"]*"[^>]*\bsrcset=/i.test(source), `${relativePath} still selects multiple album cover files`);
+  if (relativePath !== "public/index.html") {
+    expect(!/class="[^"]*(?:album-cover|\bcover\b)[^"]*"[^>]*\bsrcset=/i.test(source), `${relativePath} still selects multiple album cover files`);
+  }
   for (const match of source.matchAll(/assets\/music\/responsive\/([a-z0-9-]+-cover-1200\.webp)/gi)) {
     albumCoverUrls.add(match[1]);
   }

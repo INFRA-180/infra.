@@ -253,7 +253,7 @@
       }
       return {
         href: getComparableSpaUrl(card.getAttribute("href")),
-        source: image ? preferPwaCoverSource(image.currentSrc || image.src || "") : "",
+        source: image ? preferPwaCoverSource(image.src || "") : "",
         displayWidth: image ? Math.max(1, Math.round(imageRect.width)) : 0,
         displayHeight: image ? Math.max(1, Math.round(imageRect.height)) : 0,
         viewportLeft: Math.round(imageRect.left),
@@ -560,7 +560,9 @@
     return Array.from(fragment.querySelectorAll("img.album-cover"))
       .slice(0, maxImages)
       .reduce(function (count, image, index) {
-        const locked = lockSpaCoverSource(image, sourceUrl, width);
+        // Responsive Home cards can decode the browser's selected resource.
+        // Only the album hero requires a single locked canonical source.
+        const locked = image.getAttribute("srcset") || lockSpaCoverSource(image, sourceUrl, width);
         if (locked && index > 0) image.setAttribute("fetchpriority", "auto");
         return count + (locked ? 1 : 0);
       }, 0);
@@ -1293,9 +1295,10 @@
     const bodyClassName = sanitizeSpaBodyClassName(
       doc.body ? doc.body.className : document.body.className
     );
-    const fragment = buildSpaDocumentFragment(doc);
     const isAlbumPage = doc.body && doc.body.classList && doc.body.classList.contains("album-screen");
     const isHomePage = doc.body && doc.body.classList && doc.body.classList.contains("home-screen");
+    if (isHomePage) freezeLiveHomeResourceUrls(doc.body, sourceUrl || window.location.href);
+    const fragment = buildSpaDocumentFragment(doc);
     if (isAlbumPage) {
       await waitForSpaAlbumCoverReady(fragment, sourceUrl, telemetry);
     } else if (isHomePage && isMobilePwaCoverNavigation()) {

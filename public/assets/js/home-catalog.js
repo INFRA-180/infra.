@@ -1,6 +1,45 @@
 (function () {
   "use strict";
 
+  // BEGIN GENERATED HOME THUMBNAILS (tools/generate-bibliotheque-thumbnails.js)
+  const HOME_ALBUM_COVER_SIZES = "(max-width: 639px) calc(50vw - 23px), (max-width: 959px) calc(33.33vw - 24px), (max-width: 1080px) calc(20vw - 24px), 192px";
+  const HOME_MOSAIC_COVER_SIZES = "(max-width: 639px) 25vw, 130px";
+  const HOME_THUMBNAILS = new Set([
+    "abricot",
+    "adc-13-6e983f31",
+    "anunnaki",
+    "anunnaki-instru-6a799ef0",
+    "asase-yaa",
+    "aspasie",
+    "ballades",
+    "black-stallion",
+    "cerises",
+    "cyberpunk",
+    "d-2-0141-9947b3d6",
+    "etoiles",
+    "fond-diffus-e28f5aa2",
+    "gaia",
+    "h-1-008",
+    "he-4-0026",
+    "impression",
+    "kali",
+    "ldc13",
+    "mami-wata",
+    "moremi-ajasoro",
+    "nahda",
+    "naviguer",
+    "osiris",
+    "pbb",
+    "peches",
+    "rue-de-paris",
+    "salam",
+    "sanguin",
+    "trou-noir",
+    "v-23pi56",
+    "voyager"
+  ]);
+  // END GENERATED HOME THUMBNAILS
+
   function call(ctx, name) {
     if (!ctx || typeof ctx[name] !== "function") return undefined;
     return ctx[name].apply(ctx, Array.prototype.slice.call(arguments, 2));
@@ -57,6 +96,34 @@
         })
         .filter(Boolean)
         .join(", ");
+    }
+
+    function setHomeCoverCandidates(image, source, deferred) {
+      const match = source.match(/\/assets\/music\/responsive\/([a-z0-9-]+)-cover-1200\.webp(?:[?#].*)?$/);
+      const stem = match && match[1];
+      const small = HOME_THUMBNAILS.has(stem) && source.startsWith(resolveRuntimeAssetUrl("assets/music/responsive/"))
+        ? resolveRuntimeAssetUrl(`assets/thumbnails/music/${stem}-400.webp`)
+        : "";
+      const srcset = small ? `${small} 400w, ${source} 1200w` : "";
+      const sizes = image.classList.contains("playlist-cover-tile") ? HOME_MOSAIC_COVER_SIZES : HOME_ALBUM_COVER_SIZES;
+
+      if (deferred) {
+        image.removeAttribute("srcset");
+        image.removeAttribute("sizes");
+        if (srcset) {
+          image.dataset.coverSrcset = srcset;
+          image.dataset.coverSizes = sizes;
+          return;
+        }
+      } else if (srcset) {
+        if (image.getAttribute("sizes") !== sizes) image.setAttribute("sizes", sizes);
+        if (resolveRuntimeSrcset(image.getAttribute("srcset")) !== srcset) image.setAttribute("srcset", srcset);
+      } else {
+        image.removeAttribute("srcset");
+        image.removeAttribute("sizes");
+      }
+      delete image.dataset.coverSrcset;
+      delete image.dataset.coverSizes;
     }
 
     function displayAlbumCardTitle(title) {
@@ -357,6 +424,7 @@
       const eagerCount = isApp ? 0 : 2;
       const shouldEager = index < eagerCount;
       const thumb = resolveRuntimeAssetUrl(item.thumb);
+      if (!isApp) setHomeCoverCandidates(image, thumb, !shouldEager);
       if (shouldEager) image.src = thumb;
       else if (isApp) image.dataset.appCoverSrc = thumb;
       else image.dataset.coverSrc = thumb;
@@ -419,15 +487,15 @@
         return;
       }
       if (!(image.complete && image.naturalWidth > 0)) image.dataset.coverLoading = "1";
-      if (srcsetAttribute) {
-        const srcset = resolveRuntimeSrcset(image.dataset[srcsetAttribute]);
-        if (srcset) image.setAttribute("srcset", srcset);
-        delete image.dataset[srcsetAttribute];
-      }
       if (sizesAttribute) {
         const sizes = String(image.dataset[sizesAttribute] || "").trim();
         if (sizes) image.setAttribute("sizes", sizes);
         delete image.dataset[sizesAttribute];
+      }
+      if (srcsetAttribute) {
+        const srcset = resolveRuntimeSrcset(image.dataset[srcsetAttribute]);
+        if (srcset) image.setAttribute("srcset", srcset);
+        delete image.dataset[srcsetAttribute];
       }
       if (sourceAttribute === "appCoverSrc") image.loading = "eager";
       image.setAttribute("src", source);
@@ -457,7 +525,10 @@
       const images = Array.from(scope.querySelectorAll("img[data-cover-src]"));
       if (!images.length) return;
       const load = function (image) {
-        loadDeferredImage(image, "coverSrc");
+        if (image.classList.contains("album-cover") || image.classList.contains("playlist-cover-tile")) {
+          setHomeCoverCandidates(image, resolveRuntimeAssetUrl(image.dataset.coverSrc), !image.getAttribute("src"));
+        }
+        loadDeferredImage(image, "coverSrc", "coverSrcset", "coverSizes");
       };
       if (!("IntersectionObserver" in window)) {
         images.forEach(load);
@@ -615,6 +686,7 @@
 
       card.setAttribute("href", String(item.page || ""));
       card.setAttribute("aria-label", `Ouvrir l'album ${displayTitle}`);
+      setHomeCoverCandidates(image, expectedThumb, sameCover ? !image.getAttribute("src") : index >= 2);
       if (!sameCover) {
         if (index < 2) {
           image.setAttribute("src", expectedThumb);
@@ -625,8 +697,6 @@
         }
         delete image.dataset.spaCoverLocked;
       }
-      image.removeAttribute("srcset");
-      image.removeAttribute("sizes");
       image.setAttribute("width", String(item.width || 1200));
       image.setAttribute("height", String(item.height || 1200));
       image.style.aspectRatio = `${item.width || 1200} / ${item.height || 1200}`;
@@ -696,15 +766,13 @@
 
         if (getCardAttribute(card, "href") !== String(item.page || "").trim()) return false;
         const currentCover = getCardAttribute(image, "src") || getCardAttribute(image, "data-cover-src");
-        if (!lockedCover && currentCover !== String(item.thumb || "").trim()) return false;
+        if (!lockedCover && resolveRuntimeAssetUrl(currentCover) !== resolveRuntimeAssetUrl(item.thumb)) return false;
         if (shouldEager && !getCardAttribute(image, "src")) return false;
         if (getCardAttribute(image, "alt") !== String(item.thumbAlt || item.title || "").trim()) return false;
         if (getCardAttribute(image, "width") !== String(item.width || "")) return false;
         if (getCardAttribute(image, "height") !== String(item.height || "")) return false;
         if (getCardAttribute(image, "loading") !== (shouldEager ? "eager" : "lazy")) return false;
         if (getCardAttribute(image, "fetchpriority") !== expectedPriority) return false;
-        if (getCardAttribute(image, "srcset")) return false;
-        if (getCardAttribute(image, "sizes")) return false;
         if (String(label.textContent || "").trim() !== displayTitle) return false;
         return true;
       });
@@ -714,6 +782,9 @@
       if (!homeAlbumGridMatchesCatalog(grid, albums)) return false;
       resetProgressiveAlbumGrid();
       grid.dataset.catalogReady = "1";
+      grid.querySelectorAll("img.album-cover[src]").forEach(function (image) {
+        setHomeCoverCandidates(image, resolveRuntimeAssetUrl(image.getAttribute("src")), false);
+      });
       observeDeferredAlbumCovers(document);
       return true;
     }

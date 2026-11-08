@@ -2609,6 +2609,13 @@
     });
   }
 
+  function isCurrentPagePlaylistActive(collection) {
+    return audioState.playlistKind === "playlist" &&
+      Array.isArray(audioState.playlist) &&
+      audioState.playlist.length === collection.length &&
+      collection.every(function (track, index) { return srcMatches(track.src, audioState.playlist[index]?.src); });
+  }
+
   function toggleCurrentPageCollection() {
     const audio = audioState.audio || ensureGlobalAudio();
     const context = getCurrentPageCollectionContext();
@@ -2616,22 +2623,25 @@
 
     const currentSrc = getCurrentLogicalAudioSrc() || getCurrentPlayableAudioSrc(audio);
     if (
+      context.collectionKind === "album" &&
       !currentSrc &&
       audio.paused &&
       !audioState.trackStartInFlight &&
       context.collection[0] &&
       startSelectedTrackInRadioFromCold(context.collection[0], {
-        surface: context.collectionKind === "playlist"
-          ? "playlist_button_cold_radio"
-          : "album_button_cold_radio"
+        surface: "album_button_cold_radio"
       })
     ) {
       return true;
     }
-    const currentIndex = currentSrc
+    const isPlaylist = context.collectionKind === "playlist";
+    const isActivePlaylist = isPlaylist && isCurrentPagePlaylistActive(context.collection);
+    const currentIndex = currentSrc && (!isPlaylist || isActivePlaylist)
       ? context.collection.findIndex(function (track) { return track && srcMatches(track.src, currentSrc); })
       : -1;
-    const startIndex = adoptCurrentPageCollection(context, currentIndex >= 0 ? currentIndex : 0);
+    const startIndex = isActivePlaylist && currentIndex >= 0
+      ? currentIndex
+      : adoptCurrentPageCollection(context, currentIndex >= 0 ? currentIndex : 0);
     if (startIndex < 0) return false;
 
     if (currentIndex >= 0) {
@@ -4150,6 +4160,7 @@
       startCurrentPageCollectionFromIdle,
       toggleCurrentPageCollection,
       playCurrentPageCollectionShuffled,
+      isCurrentPagePlaylistActive,
       handleGlobalTransportToggle,
       ensureGlobalAudio,
       stopAudioRaf,
@@ -4219,6 +4230,7 @@
       startCurrentPageCollectionFromIdle: function () { return false; },
       toggleCurrentPageCollection: function () { return false; },
       playCurrentPageCollectionShuffled: function () {},
+      isCurrentPagePlaylistActive: function () { return false; },
       handleGlobalTransportToggle: function () {},
       ensureGlobalAudio: function () { return null; },
       stopAudioRaf: function () {},

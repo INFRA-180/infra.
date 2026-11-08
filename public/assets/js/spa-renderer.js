@@ -71,7 +71,7 @@
     if (!clone || typeof clone.querySelector !== "function") return;
     const body = clone.querySelector("body");
     if (body) body.className = sanitizeSpaBodyClassName(body.className);
-    clone.querySelectorAll(".favorites-view").forEach(function (node) {
+    clone.querySelectorAll(".favorites-view, [data-album-favorite-toolbar], [data-track-favorite], [data-track-select]").forEach(function (node) {
       node.remove();
     });
     clone.querySelectorAll(".favorites-selecting, .album-favorite-selecting, .is-dragging, .is-drop-before, .is-drop-after").forEach(function (node) {

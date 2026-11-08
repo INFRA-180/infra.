@@ -59,6 +59,14 @@ for (const page of ["music/d-2-0141-infra.html", "playlists/infra-moon.html"]) {
   expect(/<main class="page">[\s\S]*<h1[^>]*>[\s\S]*<section class="tracks"[^>]*>[\s\S]*<audio preload="none" data-src=/.test(html), page + " ne fournit plus la fiche directe");
 }
 
+// Lot 6 : le même couple CSS/JS doit être disponible depuis les pages directes et le shell hors ligne.
+const sw = read("public/sw.js");
+const version = home.match(/var VERSION = "(bibliotheque-v3-\d{8})"/)?.[1];
+expect(Boolean(version), "version datée de la Bibliothèque absente");
+expect(index.includes("bibliotheque.css?v=" + version), "version CSS différente entre l’accueil et le chargeur");
+expect(sw.includes("./assets/css/bibliotheque.css?v=" + version), "CSS de la Bibliothèque absent du précache");
+expect(sw.includes("./assets/js/bibliotheque.js?v=" + version), "JS de la Bibliothèque absent du précache");
+
 // Le script ne plante pas hors navigateur (bancs d'essai des autres tests)
 try { vm.runInNewContext(js, { window: {}, document: {} }); } catch (err) { failures.push("bibliotheque.js plante hors navigateur : " + err.message); }
 

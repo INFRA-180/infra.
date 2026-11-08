@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix412-20261105";
+window.INFRA_BUILD_TAG = "audiofix413-20261108";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -480,7 +480,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20261105-audio412";
+  const SPA_SHELL_VERSION = "infra-shell-20261108-audio413";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -491,7 +491,7 @@ function openAppDownloadGatekeeper(appName, url) {
   // current deployment; reusing that cache would overwrite the fresh Home.
   const LIVE_CATALOG_CACHE_NAME = `${SPA_SHELL_VERSION}-catalog`;
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix412-20261105";
+  const LOCAL_CATALOG_VERSION = "audiofix413-20261108";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -512,7 +512,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix412-20261105";
+  const runtimeVersion = "audiofix413-20261108";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -1097,7 +1097,8 @@ function openAppDownloadGatekeeper(appName, url) {
       injectCurrentTrackIntoRadioQueue,
       startSelectedTrackInRadioFromCold,
       toggleCurrentPageCollection,
-      playCurrentPageCollectionShuffled: function () { return callAudioRadio("playCurrentPageCollectionShuffled", arguments); }
+      playCurrentPageCollectionShuffled: function () { return callAudioRadio("playCurrentPageCollectionShuffled", arguments); },
+      isCurrentPagePlaylistActive: function (collection) { return callAudioRadio("isCurrentPagePlaylistActive", [collection]); }
     });
   }
 
@@ -3257,11 +3258,13 @@ function openAppDownloadGatekeeper(appName, url) {
     const href = String(urlLike || window.location.href);
     const x = Math.max(0, Math.round(Number(scrollX) || 0));
     const y = Math.max(0, Math.round(Number(scrollY) || 0));
+    const previousHref = mode === "push" ? window.location.href : history.state?.__infraPreviousUrl;
+    const baseState = Object.assign({}, history.state, { __infraPreviousUrl: previousHref || "" });
     let result = null;
     if (spaRouterApi && typeof spaRouterApi.writeHistoryState === "function") {
       result = spaRouterApi.writeHistoryState({
         historyRef: history,
-        baseState: history.state,
+        baseState,
         mode,
         url: href,
         scrollX: x,
@@ -3270,7 +3273,7 @@ function openAppDownloadGatekeeper(appName, url) {
     } else {
       try {
         if (mode === "push") {
-          history.pushState(buildSpaHistoryState(href, x, y), "", href);
+          history.pushState(Object.assign(buildSpaHistoryState(href, x, y), { __infraPreviousUrl: baseState.__infraPreviousUrl }), "", href);
         } else if (mode === "replace") {
           history.replaceState(buildSpaHistoryState(href, x, y), "", href);
         }
@@ -6057,10 +6060,14 @@ function openAppDownloadGatekeeper(appName, url) {
 
       const wantsBackLink = link.classList && link.classList.contains("back");
       const currentState = history.state && typeof history.state === "object" ? history.state : null;
-      if (wantsBackLink && currentState && currentState.__infraSpa && window.history.length > 1) {
-        event.preventDefault();
-        history.back();
-        return;
+      if (wantsBackLink && currentState?.__infraPreviousUrl && window.history.length > 1) {
+        const previous = new URL(currentState.__infraPreviousUrl, window.location.href);
+        const pagePath = (route) => route.pathname.replace(/\/index\.html$/, "/");
+        if (previous.origin === url.origin && pagePath(previous) === pagePath(url) && previous.search === url.search) {
+          event.preventDefault();
+          history.back();
+          return;
+        }
       }
 
       event.preventDefault();

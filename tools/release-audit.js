@@ -380,6 +380,7 @@ function runRegressionSuite() {
     "tools/test-queue-reorder-input.js",
     "tools/test-favorites-page-ui.js",
     "tools/test-bibliotheque.js",
+    "tools/test-bibliotheque-thumbnails.js",
     "tools/test-share-qr-ui.js",
     "tools/test-spa-page-cache.js",
     "tools/test-service-worker-update-lifecycle.js",

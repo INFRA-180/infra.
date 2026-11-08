@@ -948,7 +948,7 @@ function testAlbumButtonAdoptsDisplayedAlbum() {
   assert.strictEqual(sameState.shuffleOn, false);
 }
 
-function testColdAlbumButtonStartsSelectedTrackInRadio() {
+function testColdCollectionButton(playlistKind) {
   const collection = makeTracks(2).map((track) => Object.assign({}, track, {
     album: "Cold album"
   }));
@@ -972,7 +972,7 @@ function testColdAlbumButtonStartsSelectedTrackInRadio() {
     playlist: [restoredQueueTrack],
     playlistKind: "album",
     currentIndex: 0,
-    ui: { playlistKind: "album", playlist: collection.slice() },
+    ui: { playlistKind, playlist: collection.slice() },
     radioPlaylist: [],
     radioQueue: [],
     radioQueueCursor: -1,
@@ -1004,6 +1004,18 @@ function testColdAlbumButtonStartsSelectedTrackInRadio() {
   assert.strictEqual(toggleCalls, 0);
   assert.strictEqual(startCalls.length, 1);
   assert.strictEqual(startCalls[0].index, 0);
+  if (playlistKind === "playlist") {
+    assert.strictEqual(startCalls[0].options.surface, "playlist_button");
+    assert.strictEqual(state.playlistKind, "playlist");
+    assert.deepStrictEqual(Array.from(state.playlist, (track) => track.src), collection.map((track) => track.src));
+    assert.strictEqual(radio.isCurrentPagePlaylistActive(collection), true);
+    state.activeLogicalSrc = collection[0].src;
+    state.shuffleOn = true;
+    assert.strictEqual(radio.toggleCurrentPageCollection(), true);
+    assert.strictEqual(toggleCalls, 1, "pausing the active playlist uses the current track");
+    assert.strictEqual(state.shuffleOn, true, "pausing the same playlist preserves shuffle");
+    return;
+  }
   assert.strictEqual(startCalls[0].options.surface, "album_button_cold_radio");
   assert.strictEqual(startCalls[0].options.coldStart, true);
   assert.strictEqual(state.homeMode, "radio");
@@ -3029,7 +3041,8 @@ function testPersistentAlbumAndFullscreenContracts() {
   testInMemoryColdPlayIsSynchronous();
   testColdCollectionPlayUsesCurrentAlbumOrPlaylist();
   testAlbumButtonAdoptsDisplayedAlbum();
-  testColdAlbumButtonStartsSelectedTrackInRadio();
+  testColdCollectionButton("album");
+  testColdCollectionButton("playlist");
   testRadioIdlePlayUsesSynchronousPreparedQueueAndDedupesPendingPlay();
   await testQueuedRadioNavigationReplaysInOrderAndInvalidatesOnModeChange();
   await testCachedPrefixIsMaterializedBeforeColdTap();

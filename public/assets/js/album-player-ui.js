@@ -52,6 +52,7 @@
     const startSelectedTrackInRadioFromCold = method(ctx, "startSelectedTrackInRadioFromCold", function () { return false; });
     const toggleCurrentPageCollection = method(ctx, "toggleCurrentPageCollection", function () { return false; });
     const playCurrentPageCollectionShuffled = method(ctx, "playCurrentPageCollectionShuffled");
+    const isCurrentPagePlaylistActive = method(ctx, "isCurrentPagePlaylistActive", function () { return false; });
 
   function formatTrackDuration(secondsValue) {
     const seconds = Number(secondsValue);
@@ -222,7 +223,8 @@
     });
 
     if (ui.albumPlayBtn) {
-      const albumPlaying = uiIndex >= 0 && (isPlaying || audioState.trackStartInFlight);
+      const sameCollection = ui.playlistKind !== "playlist" || isCurrentPagePlaylistActive(ui.playlist);
+      const albumPlaying = sameCollection && uiIndex >= 0 && (isPlaying || audioState.trackStartInFlight);
       ui.albumPlayBtn.innerHTML = albumPlaying ? PLAYER_ICON_STOP : PLAYER_ICON_PLAY;
       ui.albumPlayBtn.classList.toggle("is-on", albumPlaying);
       const collection = ui.playlistKind === "playlist" ? "la playlist" : "l’album";
@@ -673,6 +675,7 @@
     if (
       (document.body.classList.contains("album-screen") || document.body.classList.contains("playlist-screen")) &&
       activeSrc &&
+      ui.playlistKind === "album" &&
       audioState.homeMode !== "radio" &&
       audioState.playlistKind === ui.playlistKind
     ) {

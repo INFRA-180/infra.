@@ -1027,6 +1027,42 @@
     startFavoritesPlaybackAt(0);
   }
 
+  // Bibliothèque V3 — lot 2 (INFRA, 08/11/2026) : lire une liste de titres de plusieurs albums
+  // (onglet Titres, recherche). Même chemin que la lecture des favoris : liste de type
+  // « playlist » (non limitée à un album), puis startTrack. Le moteur audio n'est pas modifié.
+  function startLibraryPlaybackAt(paths, startIndex) {
+    const seen = new Set();
+    const playlist = [];
+    (Array.isArray(paths) ? paths : []).forEach(function (srcLike) {
+      const path = normalizeFavoritePath(srcLike, runtime.baseUrl.href);
+      if (!path || seen.has(path)) return;
+      const meta = getTrackMetaByAssetPath(path, runtime.baseUrl.href);
+      if (!meta || !meta.src) return;
+      seen.add(path);
+      playlist.push(Object.assign({}, meta, { src: meta.src || resolveManagedAudioSrc(path, runtime.baseUrl.href) }));
+    });
+    if (!playlist.length) return false;
+    audioState.homeMode = "album";
+    audioState.playlistKind = "playlist";
+    clearRadioQueue();
+    persistHomePlayMode("album");
+    audioState.playlist = playlist;
+    audioState.currentIndex = -1;
+    audioState.albumPlaylistSnapshot = [];
+    audioState.albumIndexSnapshot = -1;
+    syncPlaylistContext(audioState.playlist);
+    syncMediaSessionMetadata({ forcePosition: true });
+    syncAudioUi();
+    let index = Number.isFinite(Number(startIndex)) ? Number(startIndex) : 0;
+    if (index < 0 || index >= playlist.length) index = 0;
+    trackAudioRuntimeEvent("library_play", { track: "library", album: "library", count: playlist.length, start_index: index });
+    startTrack(index, { seamless: true, immediatePlay: true, userGesture: true, surface: "library_row" });
+    return true;
+  }
+  if (typeof window !== "undefined" && window) {
+    window.InfraLibraryPlayback = { playPaths: startLibraryPlaybackAt };
+  }
+
   function initHomeFavoritesButton() {
     if (audioState.homeFavoritesDelegatedBound) return;
     audioState.homeFavoritesDelegatedBound = true;

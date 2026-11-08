@@ -150,7 +150,7 @@
   <meta name="twitter:image" content="https://infra-180.github.io/infra./assets/pwa/icon-512-logo-white.png" />
   <link rel="stylesheet" href="assets/css/styles.css?v=audiofix412-20261105" />
   <link rel="stylesheet" href="assets/css/playlists.css?v=playlist-collage-20260802" />
-  <link rel="stylesheet" href="assets/css/bibliotheque.css?v=bibliotheque-v3-lot1b" data-bib-css />
+  <link rel="stylesheet" href="assets/css/bibliotheque.css?v=bibliotheque-v3-lot2d" data-bib-css />
 </head>
 <body class="home-screen">
   <div id="infraSpaRouteHost" class="spa-route-host">
@@ -178,11 +178,20 @@
 
   <nav class="bib-tabs" aria-label="Bibliothèque" data-bib-tabs>
     <div class="bib-tabs-row">
-      <button class="bib-tab" type="button" data-bib-tab="top" aria-current="true">Accueil</button>
+      <button class="bib-tab" type="button" data-bib-tab="accueil" aria-current="true">Accueil</button>
       <button class="bib-tab" type="button" data-bib-tab="albums">Albums</button>
       <button class="bib-tab" type="button" data-bib-tab="playlists">Playlists</button>
+      <button class="bib-tab" type="button" data-bib-tab="titres">Titres</button>
+      <button class="bib-tab" type="button" data-bib-tab="favoris">Favoris</button>
       <button class="bib-tab" type="button" data-bib-tab="apps">Apps &amp; clips</button>
     </div>
+    <label class="bib-search">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span class="bib-sr">Rechercher</span>
+      <input type="search" data-bib-search placeholder="Titre, album, playlist" autocomplete="off" enterkeyhint="search" />
+    </label>
+    <button class="bib-ico bib-searchbtn" type="button" data-bib-searchbtn aria-label="Rechercher" title="Rechercher"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <button class="bib-cancel" type="button" data-bib-cancel>Annuler</button>
   </nav>
 
   <main class="container one-page-layout">

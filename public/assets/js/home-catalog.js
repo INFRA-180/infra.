@@ -941,69 +941,29 @@
   };
 })();
 
-// Bibliothèque V3 — lot 1 (INFRA, 08/11/2026) : ligne d'onglets de l'accueil.
-// Boutons (pas des liens) : la navigation interne du site ne les intercepte pas.
+// Bibliothèque V3 (INFRA, 08/11/2026) : charge la feuille et le script de la bibliothèque
+// s'ils manquent (arrivée par une page album puis retour à l'accueil par la navigation interne).
 (function () {
   "use strict";
   if (typeof document === "undefined" || typeof window === "undefined") return;
-  if (typeof document.addEventListener !== "function" || typeof window.addEventListener !== "function") return;
-  var SECTIONS = ["albums", "playlists", "apps"];
-  // Arrivée par une page album : la feuille de l'accueil n'est pas dans <head> ; on l'ajoute une fois.
+  if (typeof document.createElement !== "function" || !document.head) return;
+  var VERSION = "bibliotheque-v3-lot2d";
   try {
     var script = document.currentScript;
-    if (script && script.src && !document.querySelector("link[data-bib-css]") && document.head) {
+    if (!script || !script.src) return;
+    if (!document.querySelector("link[data-bib-css]")) {
       var link = document.createElement("link");
       link.rel = "stylesheet";
-      link.href = new URL("../css/bibliotheque.css?v=bibliotheque-v3-lot1b", script.src).href;
+      link.href = new URL("../css/bibliotheque.css?v=" + VERSION, script.src).href;
       link.setAttribute("data-bib-css", "");
       document.head.appendChild(link);
     }
+    if (!document.querySelector("script[data-bib-js]")) {
+      var js = document.createElement("script");
+      js.src = new URL("bibliotheque.js?v=" + VERSION, script.src).href;
+      js.defer = true;
+      js.setAttribute("data-bib-js", "");
+      document.head.appendChild(js);
+    }
   } catch (_err) {}
-  var ticking = false;
-
-  function tabsRoot() { return document.querySelector("[data-bib-tabs]"); }
-  function setCurrent(key) {
-    var root = tabsRoot(); if (!root) return;
-    var tabs = root.querySelectorAll("[data-bib-tab]");
-    for (var i = 0; i < tabs.length; i++) {
-      var on = tabs[i].getAttribute("data-bib-tab") === key;
-      if (on) tabs[i].setAttribute("aria-current", "true"); else tabs[i].removeAttribute("aria-current");
-    }
-  }
-  function section(key) {
-    return document.querySelector('.home-screen .one-page-layout > [data-module-id="' + key + '"]');
-  }
-  function reduced() {
-    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  }
-  // L'onglet actif suit la section visible sous la ligne d'onglets.
-  function syncFromScroll() {
-    ticking = false;
-    if (!document.body || !document.body.classList.contains("home-screen")) return;
-    var root = tabsRoot(); if (!root) return;
-    var line = root.getBoundingClientRect().bottom + 12;
-    var current = "top", best = -Infinity;
-    for (var i = 0; i < SECTIONS.length; i++) {
-      var el = section(SECTIONS[i]); if (!el) continue;
-      var top = el.getBoundingClientRect().top;
-      if (top <= line && top > best) { best = top; current = SECTIONS[i]; }
-    }
-    if (window.scrollY < 4) current = "top";
-    setCurrent(current);
-  }
-  document.addEventListener("click", function (event) {
-    var btn = event.target && event.target.closest ? event.target.closest("[data-bib-tab]") : null;
-    if (!btn) return;
-    var key = btn.getAttribute("data-bib-tab");
-    var behavior = reduced() ? "auto" : "smooth";
-    setCurrent(key);
-    if (key === "top") { window.scrollTo({ top: 0, behavior: behavior }); return; }
-    var el = section(key);
-    if (el) el.scrollIntoView({ behavior: behavior, block: "start" });
-  });
-  window.addEventListener("scroll", function () {
-    if (ticking) return;
-    ticking = true;
-    window.requestAnimationFrame(syncFromScroll);
-  }, { passive: true });
 })();

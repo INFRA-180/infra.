@@ -550,6 +550,59 @@ body.album-screen .page > .back[data-bib-back] {
 @media (hover: none) { .bib-coverplay { opacity: 1; } }
 .home-screen .albums-grid.bib-list .bib-coverplay { display: none; }
 @media (prefers-reduced-motion: reduce) { .bib-coverplay { transition: none; } }
-.home-screen .playlist-card .playlist-card-meta { font-weight: 400; }
+html body.home-screen .playlist-card .playlist-card-meta { font-weight: 400 !important; }
 /* Au repos, Précédent et Suivant restent visibles comme sur la maquette */
 .global-transport.bib-idle .global-transport-btn[disabled] { opacity: 1 !important; }
+
+/* ==========================================================================
+   Retours INFRA du 08/11/2026 (soir) — « Go, les 4 »
+   ========================================================================== */
+/* Ordinateur : contenu jusqu'à 1440 px (au lieu de 1080), centré au-delà ; 6 colonnes d'albums dès 1440 px */
+.home-screen .bib-tabs,
+.home-screen main.container.one-page-layout { max-width: 1440px; }
+@media (min-width: 1440px) {
+  .home-screen .albums-grid:not(.playlists-grid) { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+/* La barre du lecteur suit la même largeur que le contenu */
+@media (min-width: 640px) {
+  .global-transport,
+  #infraSpaPersist .global-transport {
+    padding-left: max(20px, calc((100vw - 1440px) / 2 + 20px)) !important;
+    padding-right: max(20px, calc((100vw - 1440px) / 2 + 20px)) !important;
+  }
+  .global-transport-now { max-width: calc(50% - 66px - max(20px, calc((100vw - 1440px) / 2 + 20px)) - 12px) !important; }
+}
+
+/* Barre : progression en rouge (même rouge que le point), sans fond gris qui se confondait avec les traits de séparation */
+html body .global-transport .global-transport-mini-progress::before { background: transparent !important; }
+html body .global-transport .global-transport-mini-fill { background: #e0353b !important; }
+
+/* Barre : durée « 1:12 / 2:40 » à droite (colonne libre depuis que les commandes sont au milieu) */
+html body .global-transport .global-transport-now-mini {
+  display: flex !important; justify-content: flex-end !important; align-items: center !important;
+  padding: 0 16px !important; box-sizing: border-box !important; pointer-events: none;
+}
+@media (min-width: 640px) {
+  html body .global-transport .global-transport-now-mini { padding: 0 max(20px, calc((100vw - 1440px) / 2 + 20px)) !important; }
+}
+html body .global-transport .global-transport-now-mini .global-transport-mini-progress { pointer-events: auto; }
+html body .global-transport .global-transport-mini-time {
+  display: inline-block !important; position: relative !important; top: calc(30px - 1px) !important;
+  margin: 0 !important; padding: 0 !important; width: auto !important; min-width: 0 !important;
+  font-size: 12px !important; font-weight: 400 !important; letter-spacing: 0 !important; line-height: 1 !important;
+  color: rgba(17, 17, 17, 0.4) !important; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+html body .global-transport .global-transport-mini-time[data-transport-mini-current]::after { content: "\00a0/\00a0"; }
+html body .global-transport.bib-idle .global-transport-mini-time { visibility: hidden !important; }
+
+/* Toute la barre se touche pour ouvrir le grand lecteur ; léger retour visuel au toucher */
+.global-transport { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.global-transport .global-transport-btn { cursor: pointer; }
+.global-transport.bib-press .global-transport-now { opacity: 0.55; transition: opacity .12s ease; }
+@media (prefers-reduced-motion: reduce) { .global-transport.bib-press .global-transport-now { transition: none; } }
+
+/* Point rouge « en lecture » toujours visible, même quand le titre est coupé par « … » */
+.global-transport.is-playing .global-transport-now-title { position: relative; padding-right: 14px !important; box-sizing: border-box; }
+.global-transport.is-playing .global-transport-now-title::after {
+  position: absolute !important; right: 0; top: 50% !important; margin: -3px 0 0 !important;
+}

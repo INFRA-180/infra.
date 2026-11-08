@@ -427,8 +427,10 @@ expect(sw.includes("HTML_NETWORK_INFLIGHT"), "Service Worker HTML cache misses a
 expect(sw.includes('headers.set("X-Infra-SW-Version", VERSION)'), "HTML responses do not identify the active Service Worker");
 expect(sw.includes('headers.set("X-Infra-HTML-Cache"'), "HTML responses do not identify cache hits");
 expect(!scripts.includes("maybeActivateWaitingServiceWorker"), "the visible client still forces a waiting Service Worker to activate");
-expect(!sw.includes("skipWaiting"), "the Service Worker bypasses the safe native waiting lifecycle");
-expect(!scripts.includes("window.location.reload()"), "a Service Worker controller change can still reload the PWA");
+// INFRA 08/11/2026 : l'iPhone gardait l'ancienne version (PWA jamais fermée). Exception unique :
+// activation demandée par la page visible et sans lecture, puis un seul rechargement gardé.
+expect((sw.match(/skipWaiting/g) || []).length === 1 && /INFRA_SW_ACTIVATE_IDLE[\s\S]{0,80}self\.skipWaiting\(\)/.test(sw), "the Service Worker bypasses the safe native waiting lifecycle");
+expect((scripts.match(/window\.location\.reload\(\)/g) || []).length === 1 && /if \(isBusyForServiceWorkerUpdate\(\)\) return;\s*window\.location\.reload\(\);/.test(scripts), "a Service Worker controller change can still reload the PWA during playback");
 expect(scripts.includes('strategy: "natural_lifecycle"'), "controller changes do not identify the natural lifecycle strategy");
 expect(!scripts.includes("showPwaCoverHold(link, coverPlaceholderSrc);"), "album taps still display a foreground cover clone before navigation is ready");
 expect(scripts.includes('releasePwaCoverHold("replace");'), "album taps do not clear a stale transition visual");

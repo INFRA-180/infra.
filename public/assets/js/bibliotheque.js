@@ -446,6 +446,41 @@
       }
     }, function () {});
   }, true);
+  // ---------- Toucher la barre (INFRA, 08/11/2026) ----------
+  // Toute la barre ouvre le grand lecteur, sauf Précédent / Lecture / Suivant et la ligne de progression.
+  // Au repos (rien de chargé), toucher la barre lance la dernière écoute puis ouvre le grand lecteur.
+  var BAR_SKIP = "[data-transport-prev],[data-transport-toggle],[data-transport-next],[data-transport-mini-progress],[data-transport-favorite],[data-transport-mode],[data-transport-shuffle]";
+  var openingFromBar = false;
+  function openBigPlayer() {
+    var t = transport(); if (!t) return;
+    var title = $("[data-transport-now-title]", t); if (!title) return;
+    openingFromBar = true;
+    try { title.click(); } finally { openingFromBar = false; }
+  }
+  document.addEventListener("click", function (event) {
+    if (openingFromBar) return;
+    var t = transport(); if (!t) return;
+    var target = event.target;
+    if (!target || !target.closest || !t.contains(target) || target.closest(BAR_SKIP)) return;
+    if (document.documentElement.classList.contains("now-playing-open")) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (t.classList.contains("bib-idle")) {
+      var toggle = $("[data-transport-toggle]", t);
+      if (toggle) toggle.click();
+      window.setTimeout(openBigPlayer, 350);
+      return;
+    }
+    openBigPlayer();
+  }, true);
+  document.addEventListener("pointerdown", function (event) {
+    var t = transport(); if (!t || !event.target || !event.target.closest || !t.contains(event.target) || event.target.closest(BAR_SKIP)) return;
+    t.classList.add("bib-press");
+    var off = function () { t.classList.remove("bib-press"); document.removeEventListener("pointerup", off, true); document.removeEventListener("pointercancel", off, true); };
+    document.addEventListener("pointerup", off, true);
+    document.addEventListener("pointercancel", off, true);
+  }, true);
+
   var idleWatched = null;
   function watchIdle() {
     var t = transport(); if (!t || t === idleWatched || typeof MutationObserver !== "function") return;

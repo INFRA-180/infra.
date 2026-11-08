@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix414-20261108";
+window.INFRA_BUILD_TAG = "audiofix415-20261108";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -480,7 +480,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20261108-audio414";
+  const SPA_SHELL_VERSION = "infra-shell-20261108-audio415";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -491,7 +491,7 @@ function openAppDownloadGatekeeper(appName, url) {
   // current deployment; reusing that cache would overwrite the fresh Home.
   const LIVE_CATALOG_CACHE_NAME = `${SPA_SHELL_VERSION}-catalog`;
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix414-20261108";
+  const LOCAL_CATALOG_VERSION = "audiofix415-20261108";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -512,7 +512,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix414-20261108";
+  const runtimeVersion = "audiofix415-20261108";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -3060,6 +3060,7 @@ function openAppDownloadGatekeeper(appName, url) {
     if (document.visibilityState !== "visible") return;
     callAudioRadio("scheduleSystemInterruptionResumeAfterActive", ["visibility_sample"]);
     requestServiceWorkerUpdateCheck("visible");
+    window.setTimeout(applyWaitingServiceWorkerWhenIdle, 1200);
   });
 
   function requestServiceWorkerUpdateCheck(reason) {
@@ -3072,6 +3073,55 @@ function openAppDownloadGatekeeper(appName, url) {
     serviceWorkerRegistrationRef.update().catch(function () {
       // Ignore update probe failures; the app keeps using the active shell.
     });
+  }
+
+  // Mise à jour iPhone (INFRA, 08/11/2026) : iOS met la PWA en veille sans jamais fermer sa fenêtre,
+  // si bien qu'une nouvelle version attendait sans fin. Quand l'app est visible et que rien ne joue,
+  // la version en attente est activée puis la page rechargée une fois. Jamais pendant la lecture.
+  let serviceWorkerIdleUpdateRequested = false;
+  function isBusyForServiceWorkerUpdate() {
+    if (document.visibilityState !== "visible") return true;
+    const audio = audioState.audio;
+    if (audio && !audio.paused && !audio.ended) return true;
+    if (Number.isFinite(audioState.pendingStartTime) && audioState.pendingStartTime !== null) return true;
+    const root = document.documentElement;
+    if (root.classList.contains("now-playing-open") || root.classList.contains("pwa-swap-active")) return true;
+    return false;
+  }
+
+  function applyWaitingServiceWorkerWhenIdle() {
+    const registration = serviceWorkerRegistrationRef;
+    if (!registration || !registration.waiting || serviceWorkerIdleUpdateRequested) return;
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+    if (isBusyForServiceWorkerUpdate()) return;
+    serviceWorkerIdleUpdateRequested = true;
+    try {
+      registration.waiting.postMessage({ type: "INFRA_SW_ACTIVATE_IDLE" });
+    } catch (_err) {
+      serviceWorkerIdleUpdateRequested = false;
+    }
+  }
+
+  function watchServiceWorkerInstall(registration) {
+    if (!registration || typeof registration.addEventListener !== "function") return;
+    registration.addEventListener("updatefound", function () {
+      const worker = registration.installing;
+      if (!worker) return;
+      worker.addEventListener("statechange", function () {
+        if (worker.state === "installed") window.setTimeout(applyWaitingServiceWorkerWhenIdle, 600);
+      });
+    });
+  }
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (!serviceWorkerIdleUpdateRequested) return;
+      if (isBusyForServiceWorkerUpdate()) return;
+      window.location.reload();
+    });
+    document.addEventListener("pause", function (event) {
+      if (event.target && event.target.tagName === "AUDIO") window.setTimeout(applyWaitingServiceWorkerWhenIdle, 1500);
+    }, true);
   }
 
   function requestActiveServiceWorkerVersion() {
@@ -3108,6 +3158,8 @@ function openAppDownloadGatekeeper(appName, url) {
       .register(swUrl, { scope: runtime.baseUrl.pathname, updateViaCache: "none" })
       .then(function (registration) {
         serviceWorkerRegistrationRef = registration;
+        watchServiceWorkerInstall(registration);
+        window.setTimeout(applyWaitingServiceWorkerWhenIdle, 1200);
         requestActiveServiceWorkerVersion();
         requestServiceWorkerUpdateCheck("registered");
       })

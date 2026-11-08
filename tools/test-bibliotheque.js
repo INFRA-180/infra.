@@ -72,7 +72,7 @@ const albumUi = read("public/assets/js/album-player-ui.js");
 expect(/\.global-transport-controls \{\s*position: absolute !important; left: 50% !important;/.test(css), "commandes du lecteur pas centrées");
 expect(/\.spa-route-layer\.album-screen::before[\s\S]{0,200}background-image: none !important/.test(css), "fond des fiches pas blanc");
 expect(css.includes(".bib-meta-row") && albumUi.includes("bib-meta-row"), "boutons de la fiche pas à droite de la ligne d’infos");
-expect(albumUi.includes("data-bib-css") && albumUi.includes("bibliotheque-v4-20261108"), "feuille Bibliothèque non chargée sur une fiche ouverte directement");
+expect(albumUi.includes("data-bib-css") && albumUi.includes("bibliotheque.css?v=" + version), "feuille Bibliothèque non chargée sur une fiche ouverte directement");
 expect(js.includes("bib-idle") && js.includes("[data-transport-toggle]"), "lecteur au repos absent");
 expect(js.includes("data-bib-albumplay"), "▶ sur les pochettes absent");
 expect(js.includes('data-bib-goto="playlists">Tout voir'), "« Tout voir » des playlists absent");

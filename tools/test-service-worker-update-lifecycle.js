@@ -15,8 +15,14 @@ const audioRadio = read("public/assets/js/audio-radio.js");
 const nowPlaying = read("public/assets/js/now-playing.js");
 const runtime = [scripts, worker, audioRadio, nowPlaying].join("\n");
 
-assert.doesNotMatch(runtime, /window\.location\.reload\s*\(/, "a Service Worker update must never reload the visible PWA");
-assert.doesNotMatch(runtime, /SKIP_WAITING|skipWaiting\s*\(/, "updates must use the native waiting lifecycle");
+// INFRA 08/11/2026 : l'iPhone ne fermait jamais la PWA, la nouvelle version attendait sans fin.
+// Une seule exception à l'attente naturelle : la page la demande, visible et sans lecture, puis recharge.
+assert.doesNotMatch(runtime, /SKIP_WAITING/, "no unconditional skip-waiting message");
+assert.equal((worker.match(/skipWaiting\s*\(/g) || []).length, 1, "the worker skips waiting only on the idle request");
+assert.match(worker, /INFRA_SW_ACTIVATE_IDLE[\s\S]{0,80}self\.skipWaiting\(\)/);
+assert.equal((runtime.match(/window\.location\.reload\s*\(/g) || []).length, 1, "a single guarded reload");
+assert.match(scripts, /if \(!serviceWorkerIdleUpdateRequested\) return;\s*if \(isBusyForServiceWorkerUpdate\(\)\) return;\s*window\.location\.reload\(\);/);
+assert.match(scripts, /if \(audio && !audio\.paused && !audio\.ended\) return true;/, "never update while audio plays");
 assert.doesNotMatch(runtime, /SERVICE_WORKER_RELOAD_|attemptDeferredServiceWorkerReload|scheduleDeferredServiceWorkerReload/);
 assert.doesNotMatch(runtime, /sw_reload_pending|sw_reload_executed/, "audiofix402 must not emit reload events");
 
@@ -33,4 +39,4 @@ assert.doesNotMatch(scripts, /function scheduleSpaPagePrefetch|function schedule
 assert.match(scripts, /document\.addEventListener\("pointerdown", prefetchFromLinkIntent/);
 assert.match(scripts, /prefetchSpaPage\(url\.href, \{ cacheMode: "default" \}\)/);
 
-console.log("Service Worker lifecycle checks passed: natural waiting, no reload, intent-only route prefetch.");
+console.log("Service Worker lifecycle checks passed: natural waiting, idle-only activation and single reload, intent-only route prefetch.");

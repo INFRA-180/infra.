@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20261108-audio414";
+const VERSION = "infra-shell-20261108-audio415";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const LIVE_CATALOG_CACHE = `${VERSION}-catalog`;
@@ -46,35 +46,35 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix414-20261108",
-  "./assets/css/bibliotheque.css?v=bibliotheque-v4-20261108",
-  "./assets/js/bibliotheque.js?v=bibliotheque-v4-20261108",
-  "./assets/js/covers.js?v=audiofix414-20261108",
-  "./assets/js/favorites.js?v=audiofix414-20261108",
-  "./assets/js/favorites-ui.js?v=audiofix414-20261108",
-  "./assets/js/audio-visualizer.js?v=audiofix414-20261108",
-  "./assets/js/transport-ui.js?v=audiofix414-20261108",
-  "./assets/js/now-playing.js?v=audiofix414-20261108",
-  "./assets/js/album-player-ui.js?v=audiofix414-20261108",
-  "./assets/js/spa-renderer.js?v=audiofix414-20261108",
-  "./assets/js/audio-radio.js?v=audiofix414-20261108",
-  "./assets/js/media-session.js?v=audiofix414-20261108",
-  "./assets/js/audio-prefetch.js?v=audiofix414-20261108",
-  "./assets/js/spa-router.js?v=audiofix414-20261108",
-  "./assets/js/catalog-fallback.js?v=audiofix414-20261108",
-  "./assets/js/catalog-loader.js?v=audiofix414-20261108",
-  "./assets/js/audio-telemetry.js?v=audiofix414-20261108",
-  "./assets/js/downloads.js?v=audiofix414-20261108",
-  "./assets/js/home-catalog.js?v=audiofix414-20261108",
-  "./assets/js/audio-core.js?v=audiofix414-20261108",
-  "./assets/js/pwa-install.js?v=audiofix414-20261108",
-  "./assets/js/share-qr.js?v=audiofix414-20261108",
-  "./assets/js/scripts.js?v=audiofix414-20261108",
+  "./assets/css/styles.css?v=audiofix415-20261108",
+  "./assets/css/bibliotheque.css?v=bibliotheque-v5-20261108",
+  "./assets/js/bibliotheque.js?v=bibliotheque-v5-20261108",
+  "./assets/js/covers.js?v=audiofix415-20261108",
+  "./assets/js/favorites.js?v=audiofix415-20261108",
+  "./assets/js/favorites-ui.js?v=audiofix415-20261108",
+  "./assets/js/audio-visualizer.js?v=audiofix415-20261108",
+  "./assets/js/transport-ui.js?v=audiofix415-20261108",
+  "./assets/js/now-playing.js?v=audiofix415-20261108",
+  "./assets/js/album-player-ui.js?v=audiofix415-20261108",
+  "./assets/js/spa-renderer.js?v=audiofix415-20261108",
+  "./assets/js/audio-radio.js?v=audiofix415-20261108",
+  "./assets/js/media-session.js?v=audiofix415-20261108",
+  "./assets/js/audio-prefetch.js?v=audiofix415-20261108",
+  "./assets/js/spa-router.js?v=audiofix415-20261108",
+  "./assets/js/catalog-fallback.js?v=audiofix415-20261108",
+  "./assets/js/catalog-loader.js?v=audiofix415-20261108",
+  "./assets/js/audio-telemetry.js?v=audiofix415-20261108",
+  "./assets/js/downloads.js?v=audiofix415-20261108",
+  "./assets/js/home-catalog.js?v=audiofix415-20261108",
+  "./assets/js/audio-core.js?v=audiofix415-20261108",
+  "./assets/js/pwa-install.js?v=audiofix415-20261108",
+  "./assets/js/share-qr.js?v=audiofix415-20261108",
+  "./assets/js/scripts.js?v=audiofix415-20261108",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix414-20261108",
-  "./data/track-durations.json?v=audiofix414-20261108",
-  "./data/tracks.json?v=audiofix414-20261108",
+  "./data/catalog.json?v=audiofix415-20261108",
+  "./data/track-durations.json?v=audiofix415-20261108",
+  "./data/tracks.json?v=audiofix415-20261108",
   "./data/playlists.json?v=playlist-collage-20260802",
   "./assets/css/playlists.css?v=playlist-collage-20260802",
   "./assets/branding/infra-logo-white-photoroom-title.png",
@@ -94,7 +94,7 @@ const SHELL_ASSETS = [
 // audio. A missing admin/QR/Sphragis file must therefore never invalidate the
 // complete shell installation.
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/scripts.admin.js?v=audiofix414-20261108",
+  "./assets/js/scripts.admin.js?v=audiofix415-20261108",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./sphragis/",
   "./sphragis/index.html",
@@ -214,6 +214,11 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("message", (event) => {
+  // Demandé par la page seulement quand elle est visible et que rien ne joue (INFRA, 08/11/2026).
+  if (event && event.data && event.data.type === "INFRA_SW_ACTIVATE_IDLE") {
+    self.skipWaiting();
+    return;
+  }
   if (event && event.data && event.data.type === "INFRA_SW_VERSION_REQUEST") {
     if (event.source && typeof event.source.postMessage === "function") {
       event.source.postMessage({

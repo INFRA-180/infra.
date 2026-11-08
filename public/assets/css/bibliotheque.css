@@ -365,3 +365,85 @@ html body .global-transport .global-transport-mini-fill {
 /* Le contenu laisse la place de la barre */
 body.has-mobile-player .one-page-layout,
 body.has-mobile-player main { scroll-padding-bottom: 80px; }
+
+/* Lot 4 — fiches dans les routes album et playlist existantes. */
+.spa-route-layer.album-screen .page {
+  width: 100%;
+  max-width: 1080px;
+}
+.spa-route-layer.album-screen .page > .back {
+  align-self: flex-start;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.album-screen .album-layout:has(.bib-collection-hero) {
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 0;
+}
+.album-screen .tracks:has(.bib-collection-hero) {
+  padding: 0;
+  margin-top: 0;
+  content-visibility: visible;
+}
+.album-screen .album-header-row.bib-collection-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: end;
+  margin: 0 0 18px;
+}
+.bib-collection-hero > .cover,
+.bib-collection-hero > .playlist-hero-art {
+  width: 100%;
+  max-width: none;
+  border-radius: 12px;
+}
+.album-screen .page .bib-collection-info h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.65rem, 4vw, 1.9rem);
+  line-height: 1.05;
+  letter-spacing: .01em;
+  text-align: left;
+  text-transform: none;
+}
+.bib-collection-info .playlist-visible-title::before { content: none; }
+.album-screen .bib-collection-info h2 {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+.album-screen .bib-collection-info .album-header-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 0;
+  margin: 8px 0 0 -10px;
+}
+.bib-collection-action {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.bib-collection-action:hover { color: var(--ink); }
+.bib-collection-action svg { width: 20px; height: 20px; }
+.album-screen .tracks:has(.bib-collection-hero) .track-player {
+  min-height: 56px;
+}
+.album-screen .tracks:has(.bib-collection-hero) .track-name {
+  text-transform: none;
+}
+
+@media (min-width: 640px) {
+  .album-screen .album-header-row.bib-collection-hero {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}

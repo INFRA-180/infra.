@@ -2593,6 +2593,22 @@
     return true;
   }
 
+  function playCurrentPageCollectionShuffled() {
+    const context = getCurrentPageCollectionContext();
+    if (!context) return;
+    const index = adoptCurrentPageCollection(context, Math.floor(Math.random() * context.collection.length));
+    if (index < 0) return;
+    audioState.shuffleOn = true;
+    reseedShuffleHistoryForCurrentTrack({ renewSeed: true, currentSrc: context.collection[index].src });
+    savePlaybackQueueContext();
+    startTrack(index, {
+      seamless: true,
+      immediatePlay: true,
+      userGesture: true,
+      surface: context.collectionKind === "playlist" ? "playlist_shuffle" : "album_shuffle"
+    });
+  }
+
   function toggleCurrentPageCollection() {
     const audio = audioState.audio || ensureGlobalAudio();
     const context = getCurrentPageCollectionContext();
@@ -4133,6 +4149,7 @@
       playFromExternalControl,
       startCurrentPageCollectionFromIdle,
       toggleCurrentPageCollection,
+      playCurrentPageCollectionShuffled,
       handleGlobalTransportToggle,
       ensureGlobalAudio,
       stopAudioRaf,
@@ -4201,6 +4218,7 @@
       playFromExternalControl: function () {},
       startCurrentPageCollectionFromIdle: function () { return false; },
       toggleCurrentPageCollection: function () { return false; },
+      playCurrentPageCollectionShuffled: function () {},
       handleGlobalTransportToggle: function () {},
       ensureGlobalAudio: function () { return null; },
       stopAudioRaf: function () {},

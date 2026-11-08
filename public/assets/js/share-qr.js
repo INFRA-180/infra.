@@ -461,6 +461,14 @@
   document.addEventListener("pointerup", endLongPress, { capture: true, passive: false });
   document.addEventListener("pointercancel", endLongPress, { capture: true, passive: false });
   document.addEventListener("click", suppressActivatedClick, true);
+  document.addEventListener("click", function (event) {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest("[data-bib-share]");
+    const page = button && button.closest("main.page");
+    const heading = page && page.querySelector("h1");
+    if (!heading) return;
+    openShare({ element: button, title: heading.textContent.trim(), url: cleanUrl(window.location.href) }, button);
+  });
   document.addEventListener("contextmenu", function (event) {
     if (resolveShareIntent(event.target, false)) event.preventDefault();
   }, true);

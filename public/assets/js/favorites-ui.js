@@ -816,7 +816,7 @@
       row.setAttribute("data-album-header-row", "");
       heading.insertAdjacentElement("beforebegin", row);
       row.appendChild(heading);
-    } else if (heading.parentNode !== row) {
+    } else if (!row.contains(heading)) {
       row.insertBefore(heading, row.firstChild);
     }
     let actions = row.querySelector("[data-album-header-actions]");

@@ -9,6 +9,7 @@
   if (typeof document.addEventListener !== "function" || typeof window.addEventListener !== "function") return;
   if (window.__infraBibliotheque) return;
   window.__infraBibliotheque = true;
+  var scriptUrl = document.currentScript && document.currentScript.src;
 
   var VIEWS = ["accueil", "albums", "playlists", "titres", "favoris", "apps"];
   var SORTS = { site: "Ordre du site", az: "A → Z", duree: "Durée", titres: "Nombre de titres" };
@@ -52,8 +53,10 @@
   function loadData() {
     if (data) return Promise.resolve(data);
     if (dataPromise) return dataPromise;
-    var url;
-    try { url = new URL("data/tracks.json", document.baseURI).href; } catch (_e) { url = "data/tracks.json"; }
+    var url = scriptUrl
+      ? new URL("../../data/tracks.json", scriptUrl)
+      : new URL("data/tracks.json", document.baseURI);
+    if (window.INFRA_BUILD_TAG) url.searchParams.set("v", window.INFRA_BUILD_TAG);
     dataPromise = fetch(url, { credentials: "same-origin" })
       .then(function (r) { if (!r.ok) throw new Error("tracks " + r.status); return r.json(); })
       .then(function (json) {
@@ -344,15 +347,18 @@
   var observed = null;
   function watchGrid() {
     var grid = albumsGrid();
-    if (!grid || grid === observed || typeof MutationObserver !== "function") return;
+    if (!grid || grid === observed) return;
     observed = grid;
-    new MutationObserver(function () { decorateAlbums(); }).observe(grid, { childList: true });
+    if (typeof MutationObserver === "function") {
+      new MutationObserver(function () { decorateAlbums(); }).observe(grid, { childList: true });
+    }
+    return true;
   }
 
   function boot() {
-    if (!isHome()) return;
-    watchGrid();
-    if (String(window.location.hash || "") === "#favoris") { state.view = "favoris"; setCurrent("favoris"); }
+    if (!isHome() || !watchGrid()) return;
+    if (String(window.location.hash || "") === "#favoris") state.view = "favoris";
+    setCurrent(state.view);
     document.body.setAttribute("data-bib-view", state.view);
     render();
     loadData().then(render, function () {});
@@ -361,7 +367,7 @@
   else boot();
   // Retour à l'accueil par la navigation interne : la couche d'accueil est réinsérée.
   if (typeof MutationObserver === "function" && document.body) {
-    new MutationObserver(function () { if (isHome()) { watchGrid(); document.body.setAttribute("data-bib-view", state.view); setCurrent(state.view); } })
+    new MutationObserver(boot)
       .observe(document.body, { attributes: true, attributeFilter: ["class"] });
   }
 })();

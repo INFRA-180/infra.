@@ -2869,9 +2869,8 @@ function testPersistentAlbumAndFullscreenContracts() {
   assert(!albumUiSource.includes("data-track-prev"));
   assert(!albumUiSource.includes("data-track-next"));
   assert(albumUiSource.includes('setAttribute("data-album-play", "")'));
-  assert(albumUiSource.includes('className = "album-play-toggle"'));
+  assert(albumUiSource.includes('collectionButton("album-play-toggle"'));
   assert(albumUiSource.includes("toggleCurrentPageCollection()"));
-  assert(albumUiSource.includes('!document.body.classList.contains("playlist-screen")'));
   assert(
     albumUiSource.includes("audioState.playlistKind === ui.playlistKind"),
     "A collection page may rebind only its already-active album or playlist queue"

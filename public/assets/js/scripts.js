@@ -1096,7 +1096,8 @@ function openAppDownloadGatekeeper(appName, url) {
       buildPreservedTrack,
       injectCurrentTrackIntoRadioQueue,
       startSelectedTrackInRadioFromCold,
-      toggleCurrentPageCollection
+      toggleCurrentPageCollection,
+      playCurrentPageCollectionShuffled: function () { return callAudioRadio("playCurrentPageCollectionShuffled", arguments); }
     });
   }
 

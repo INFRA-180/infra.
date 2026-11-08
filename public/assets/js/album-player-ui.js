@@ -51,6 +51,7 @@
     const injectCurrentTrackIntoRadioQueue = method(ctx, "injectCurrentTrackIntoRadioQueue", function () { return -1; });
     const startSelectedTrackInRadioFromCold = method(ctx, "startSelectedTrackInRadioFromCold", function () { return false; });
     const toggleCurrentPageCollection = method(ctx, "toggleCurrentPageCollection", function () { return false; });
+    const playCurrentPageCollectionShuffled = method(ctx, "playCurrentPageCollectionShuffled");
 
   function formatTrackDuration(secondsValue) {
     const seconds = Number(secondsValue);
@@ -224,9 +225,10 @@
       const albumPlaying = uiIndex >= 0 && (isPlaying || audioState.trackStartInFlight);
       ui.albumPlayBtn.innerHTML = albumPlaying ? PLAYER_ICON_STOP : PLAYER_ICON_PLAY;
       ui.albumPlayBtn.classList.toggle("is-on", albumPlaying);
-      ui.albumPlayBtn.setAttribute("aria-label", albumPlaying ? "Pause de l'album" : "Lire l'album");
+      const collection = ui.playlistKind === "playlist" ? "la playlist" : "l’album";
+      ui.albumPlayBtn.setAttribute("aria-label", (albumPlaying ? "Mettre en pause " : "Lire ") + collection);
       ui.albumPlayBtn.setAttribute("aria-pressed", albumPlaying ? "true" : "false");
-      ui.albumPlayBtn.setAttribute("title", albumPlaying ? "Pause" : "Lire l'album");
+      ui.albumPlayBtn.title = ui.albumPlayBtn.getAttribute("aria-label");
     }
 
     updateProgressUi();
@@ -286,6 +288,34 @@
     return 0;
   }
 
+  function prepareCollectionHeader(section, actions) {
+    const page = section.closest("main.page");
+    const header = actions.closest("[data-album-header-row]");
+    const artwork = page && page.querySelector(".album-layout .cover, .playlist-hero-art");
+    const heading = page && page.querySelector(":scope > h1, .album-hero h1");
+    const metadata = header && header.querySelector("h2");
+    if (!artwork || !heading || !metadata || header.classList.contains("bib-collection-hero")) return;
+
+    if (heading.classList.contains("playlist-visible-title") && heading.hasAttribute("aria-label")) {
+      heading.textContent = heading.getAttribute("aria-label");
+    }
+    const info = document.createElement("div");
+    info.className = "album-hero bib-collection-info";
+    info.append(heading, metadata, actions);
+    header.classList.add("bib-collection-hero");
+    header.append(artwork, info);
+  }
+
+  function collectionButton(className, label, icon) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.innerHTML = icon;
+    return button;
+  }
+
   function initMinimalPlayers() {
     const sections = Array.from(document.querySelectorAll(".tracks"));
     ensureGlobalAudio();
@@ -302,26 +332,25 @@
       return;
     }
 
+    const actions = ensureAlbumHeaderActions(section);
     let albumPlayBtn = null;
-    if (!document.body.classList.contains("playlist-screen")) {
-      const actions = ensureAlbumHeaderActions(section);
-      const staleButton = section.querySelector("[data-album-play]");
-      if (staleButton) staleButton.remove();
-      if (actions) {
-        albumPlayBtn = document.createElement("button");
-        albumPlayBtn.className = "album-play-toggle";
-        albumPlayBtn.type = "button";
-        albumPlayBtn.setAttribute("data-album-play", "");
-        albumPlayBtn.setAttribute("aria-label", "Lire l'album");
-        albumPlayBtn.setAttribute("aria-pressed", "false");
-        albumPlayBtn.setAttribute("title", "Lire l'album");
-        albumPlayBtn.innerHTML = PLAYER_ICON_PLAY;
-        actions.insertBefore(albumPlayBtn, actions.firstChild);
-      }
+    let shuffleBtn = null;
+    if (actions) {
+      prepareCollectionHeader(section, actions);
+      actions.querySelectorAll("[data-album-play], [data-bib-shuffle], [data-bib-share]").forEach(function (button) {
+        button.remove();
+      });
+      albumPlayBtn = collectionButton("album-play-toggle", "Lire", PLAYER_ICON_PLAY);
+      albumPlayBtn.setAttribute("data-album-play", "");
+      shuffleBtn = collectionButton("bib-collection-action", "Lecture aléatoire",
+        '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h2c6 0 7 12 13 12h3m-4-4 4 4-4 4M3 18h2c2.6 0 4.2-2.4 5.6-5M14 8c1-1.3 2.1-2 4-2h3m-4-4 4 4-4 4"/></svg>');
+      shuffleBtn.setAttribute("data-bib-shuffle", "");
+      const shareBtn = collectionButton("bib-collection-action", "Partager",
+        '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m-4 4 4-4 4 4M8 11H5v10h14V11h-3"/></svg>');
+      shareBtn.setAttribute("data-bib-share", "");
+      actions.prepend(albumPlayBtn, shuffleBtn, shareBtn);
     }
 
-    // The persistent global transport owns previous/next/shuffle. Album pages
-    // expose one explicit Play/Pause action plus track, favorite and download actions.
     ensureAlbumFavoriteSelectionToolbar(section);
 
     const pageHref = toAbsoluteUrl(window.location.pathname);
@@ -333,6 +362,7 @@
     const ui = {
       section,
       albumPlayBtn,
+      shuffleBtn,
       albumTitle,
       albumArtwork,
       playlistKind,
@@ -628,6 +658,13 @@
       ui.albumPlayBtn.addEventListener("click", function () {
         audioState.ui = ui;
         toggleCurrentPageCollection();
+      });
+    }
+
+    if (ui.shuffleBtn) {
+      ui.shuffleBtn.addEventListener("click", function () {
+        audioState.ui = ui;
+        playCurrentPageCollectionShuffled();
       });
     }
 

@@ -47,6 +47,18 @@ expect(/display: flex !important; \/\* flex, pas grid/.test(bar), "la barre doit
 expect(/global-transport-btn\[data-transport-shuffle\]/.test(bar) && /global-transport-btn\.global-transport-mode/.test(bar), "Aléatoire et Radio doivent quitter la barre");
 expect(/is-playing \.global-transport-now-title::after/.test(bar), "point rouge de lecture absent");
 
+// Lot 4 : fiches existantes, commandes explicites et titre complet de playlist.
+const player = read("public/assets/js/album-player-ui.js");
+const share = read("public/assets/js/share-qr.js");
+expect(player.includes('heading.textContent = heading.getAttribute("aria-label")'), "titre complet de playlist absent");
+expect(player.includes('playCurrentPageCollectionShuffled()'), "commande de lecture aléatoire de la fiche absente");
+expect(share.includes('closest("[data-bib-share]")'), "partage explicite de la fiche absent");
+expect(css.includes(".bib-collection-hero") && css.includes(".bib-collection-info"), "mise en page de la fiche absente");
+for (const page of ["music/d-2-0141-infra.html", "playlists/infra-moon.html"]) {
+  const html = read("public/" + page);
+  expect(/<main class="page">[\s\S]*<h1[^>]*>[\s\S]*<section class="tracks"[^>]*>[\s\S]*<audio preload="none" data-src=/.test(html), page + " ne fournit plus la fiche directe");
+}
+
 // Le script ne plante pas hors navigateur (bancs d'essai des autres tests)
 try { vm.runInNewContext(js, { window: {}, document: {} }); } catch (err) { failures.push("bibliotheque.js plante hors navigateur : " + err.message); }
 

@@ -6116,7 +6116,8 @@ function openAppDownloadGatekeeper(appName, url) {
     if (!document.body.classList.contains("home-screen")) return;
     const appsMenu = document.querySelector(".apps-menu");
     if (!appsMenu) return;
-    appsMenu.open = false;
+    // Bibliothèque V3 (validée par INFRA le 08/11/2026) : Applications reste visible sur l'accueil.
+    appsMenu.open = true;
   }
 
   function resumeLiveHomeRoute() {

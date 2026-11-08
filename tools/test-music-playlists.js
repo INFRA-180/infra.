@@ -151,8 +151,9 @@ if (playlistsPosition < 0 || albumsPosition < 0 || albumsPosition > playlistsPos
 if (!/<section class="module one-col" data-module-id="albums">\s*<details class="albums-menu" open>/.test(index)) {
   fail("Albums is not open by default");
 }
-if (!/<section class="module one-col" data-module-id="playlists">\s*<details class="albums-menu playlists-menu">/.test(index) || /<details class="albums-menu playlists-menu" open>/.test(index)) {
-  fail("Playlists is not closed by default");
+// Bibliothèque V3 (INFRA, 08/11/2026) : Playlists est visible sur l'accueil, au-dessus des albums (ordre visuel CSS).
+if (!/<section class="module one-col" data-module-id="playlists">\s*<details class="albums-menu playlists-menu" open>/.test(index)) {
+  fail("Playlists is not open by default");
 }
 
 const runtime = read("public/assets/js/scripts.js");

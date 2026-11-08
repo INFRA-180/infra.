@@ -150,6 +150,7 @@
   <meta name="twitter:image" content="https://infra-180.github.io/infra./assets/pwa/icon-512-logo-white.png" />
   <link rel="stylesheet" href="assets/css/styles.css?v=audiofix412-20261105" />
   <link rel="stylesheet" href="assets/css/playlists.css?v=playlist-collage-20260802" />
+  <link rel="stylesheet" href="assets/css/bibliotheque.css?v=bibliotheque-v3-lot1b" data-bib-css />
 </head>
 <body class="home-screen">
   <div id="infraSpaRouteHost" class="spa-route-host">
@@ -172,9 +173,17 @@
     <button class="home-favorites-btn" type="button" data-home-favorites hidden aria-label="Ouvrir les favoris" aria-pressed="false">
       <svg class="heart-icon heart-icon-outline" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M19.5 12.572 12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.566Z"/></svg>
     </button>
-    <p class="hero-sub" data-edit-key="subtitle">Playlists, albums, applications et clips en telechargement direct</p>
     <div class="admin-mount" id="adminMount"></div>
   </header>
+
+  <nav class="bib-tabs" aria-label="Bibliothèque" data-bib-tabs>
+    <div class="bib-tabs-row">
+      <button class="bib-tab" type="button" data-bib-tab="top" aria-current="true">Accueil</button>
+      <button class="bib-tab" type="button" data-bib-tab="albums">Albums</button>
+      <button class="bib-tab" type="button" data-bib-tab="playlists">Playlists</button>
+      <button class="bib-tab" type="button" data-bib-tab="apps">Apps &amp; clips</button>
+    </div>
+  </nav>
 
   <main class="container one-page-layout">
     <section class="module one-col" data-module-id="albums">
@@ -380,7 +389,7 @@
     </section>
 
     <section class="module one-col" data-module-id="playlists">
-      <details class="albums-menu playlists-menu">
+      <details class="albums-menu playlists-menu" open>
         <summary class="module-head albums-menu-toggle">
           <h2>Playlists</h2>
         </summary>
@@ -439,7 +448,7 @@
     </section>
 
     <section class="module one-col" data-module-id="apps">
-      <details class="apps-menu">
+      <details class="apps-menu" open>
         <summary class="module-head apps-menu-toggle">
           <h2 data-edit-key="heading_apps">Applications</h2>
         </summary>

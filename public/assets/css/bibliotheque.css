@@ -1,0 +1,164 @@
+/* Bibliothèque V3 — feuille séparée : styles.css est figé par empreinte (apparence validée du lecteur,
+   tools/verify-audio-stability.js). Chargée par index.html et, pour les arrivées par une page album
+   puis retour à l'accueil, ajoutée par home-catalog.js si elle manque. */
+
+/* Fond blanc (thème « blanc », celui de l'accueil) */
+:root, :root[data-theme="blanc"], body[data-theme="blanc"] {
+  --bg-mid: #ffffff;
+  --bg-end: #ffffff;
+}
+
+/* ==========================================================================
+   Bibliothèque V3 — lot 1 (accueil) — maquette validée par INFRA le 08/11/2026
+   DOCS/maquettes/MAQUETTE_V3_20261108.md
+   L'ordre du HTML ne change pas (outil de mise à jour du catalogue) : l'ordre
+   Playlists → Albums → Apps → Clips est fait ici, à l'affichage.
+   ========================================================================== */
+.home-screen .hero { padding-bottom: 6px; }
+
+.bib-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: saturate(1.4) blur(16px);
+  backdrop-filter: saturate(1.4) blur(16px);
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+.bib-tabs-row {
+  display: flex;
+  gap: 22px;
+  min-height: 48px;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+.bib-tabs-row::-webkit-scrollbar { display: none; }
+.bib-tab {
+  position: relative;
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 6px 0 10px;
+  margin: 0;
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bib-tab[aria-current="true"] { color: var(--ink); font-weight: 700; }
+.bib-tab[aria-current="true"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: #e0353b;
+}
+.bib-tab:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 4px; }
+
+/* Ordre d'affichage de l'accueil */
+.home-screen .one-page-layout > [data-module-id="playlists"] { order: 1; }
+.home-screen .one-page-layout > [data-module-id="albums"] { order: 2; }
+.home-screen .one-page-layout > [data-module-id="apps"] { order: 3; }
+.home-screen .one-page-layout > [data-module-id="clips"] { order: 4; }
+.home-screen .one-page-layout > .seo-direct-links { order: 5; }
+.home-screen .one-page-layout::after { order: 99; } /* espace de fin de page : reste en bas */
+.home-screen .one-page-layout > .module { scroll-margin-top: 56px; }
+
+/* Titres de section : petites capitales grises, sans flèche ni « ouvrir/fermer » */
+.home-screen [data-module-id="albums"] .albums-menu-toggle,
+.home-screen [data-module-id="playlists"] .albums-menu-toggle,
+.home-screen [data-module-id="apps"] .apps-menu-toggle {
+  pointer-events: none;
+  cursor: default;
+  padding: 18px 0 10px;
+}
+.home-screen [data-module-id="albums"] .albums-menu-toggle::after,
+.home-screen [data-module-id="playlists"] .albums-menu-toggle::after,
+.home-screen [data-module-id="apps"] .apps-menu-toggle::after,
+.home-screen [data-module-id="albums"] .albums-menu-toggle h2::before,
+.home-screen [data-module-id="playlists"] .albums-menu-toggle h2::before,
+.home-screen [data-module-id="apps"] .apps-menu-toggle h2::before { content: none; display: none; }
+.home-screen [data-module-id="albums"] .module-head h2,
+.home-screen [data-module-id="playlists"] .module-head h2,
+.home-screen [data-module-id="apps"] .module-head h2 {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(17, 17, 17, 0.4);
+}
+.home-screen .albums-menu > .albums-grid { margin-top: 0; }
+
+/* Albums : 2 colonnes sur téléphone, 3 sur tablette, 5 sur ordinateur */
+.home-screen .albums-grid:not(.playlists-grid) {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 28px 20px;
+  justify-content: stretch;
+}
+.home-screen .albums-grid .album-card { max-width: none; }
+.home-screen .albums-grid .album-thumb { border-radius: 10px; }
+@media (max-width: 959px) {
+  .home-screen .albums-grid:not(.playlists-grid) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 639px) {
+  .home-screen .albums-grid:not(.playlists-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 14px; }
+  .bib-tabs { padding: 0 16px; }
+}
+
+/* Playlists : rangée horizontale de mosaïques, nom « INFRA ☾ » en texte */
+.home-screen .playlists-grid {
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: calc((100% - 3 * 14px) / 4);
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  justify-content: start;
+}
+.home-screen .playlists-grid::-webkit-scrollbar { display: none; }
+.home-screen .playlists-grid { padding-bottom: 0 !important; } /* la réserve pour le lecteur ne sert qu'en bas de page */
+.home-screen .playlists-grid > li { scroll-snap-align: start; }
+.home-screen .playlists-grid .playlist-card { max-width: none; }
+.home-screen .playlists-grid .playlist-thumb { border-radius: 10px; }
+@media (max-width: 639px) {
+  .home-screen .playlists-grid {
+    grid-auto-columns: 42%;
+    margin: 0 -16px;
+    padding: 0 16px;
+    scroll-padding-inline: 16px;
+  }
+}
+.home-screen .playlist-card .playlist-card-title {
+  font-size: 14px !important;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+  text-align: left;
+  margin-top: 0;
+}
+.home-screen .playlist-card .playlist-card-title::before {
+  content: "INFRA\00a0";
+  display: inline;
+  width: auto;
+  height: auto;
+  margin: 0;
+  background: none !important;
+}
+.home-screen .playlist-card .playlist-card-meta {
+  font-size: 12px;
+  color: rgba(17, 17, 17, 0.4);
+  text-align: left;
+}

@@ -46,6 +46,7 @@
   var ICON = {
     sort: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 19V5M4.5 8.5 8 5l3.5 3.5M16 5v14M12.5 15.5 16 19l3.5-3.5"/></svg>',
     grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></g></svg>',
+    play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>',
     list: '<svg viewBox="0 0 24 24" aria-hidden="true"><g stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 6.5h11M9 12h11M9 17.5h11"/></g><g fill="currentColor"><circle cx="4.8" cy="6.5" r="1.3"/><circle cx="4.8" cy="12" r="1.3"/><circle cx="4.8" cy="17.5" r="1.3"/></g></svg>'
   };
 
@@ -131,6 +132,7 @@
     renderCounts();
     decorateAlbums();
     renderAlbumTools();
+    renderPlaylistTools();
     if (state.view === "titres" || state.q) renderTracksView();
     else clearPanel();
   }
@@ -169,6 +171,16 @@
         meta.textContent = album.tracks.length + " titres · " + fmtLong(album.secs);
         card.appendChild(meta);
       }
+      if (album && !$(".bib-coverplay", li)) {
+        var play = document.createElement("button");
+        play.type = "button";
+        play.className = "bib-coverplay";
+        play.setAttribute("data-bib-albumplay", pageKey(card.getAttribute("href")));
+        play.setAttribute("aria-label", "Lire " + album.title);
+        play.title = "Lire";
+        play.innerHTML = ICON.play;
+        li.appendChild(play);
+      }
       var key = pageKey(card.getAttribute("href"));
       li.style.order = state.view === "albums" && rank[key] != null ? String(rank[key]) : "";
       li.classList.toggle("bib-hide-home", state.view === "accueil" && i >= HOME_ALBUMS);
@@ -195,6 +207,18 @@
       if (!row) { row = document.createElement("div"); row.className = "bib-sortrow"; head.parentNode.insertBefore(row, head.nextSibling); }
       row.innerHTML = sortRow(["site", "az", "duree", "titres"], state.albumSort, "album");
     } else if (row) { row.remove(); }
+  }
+  // Maquette V4 : « Tout voir » à droite du titre Playlists (accueil) ; durées « 5 h 14 ».
+  function renderPlaylistTools() {
+    var head = $('.home-screen [data-module-id="playlists"] .module-head'); if (!head) return;
+    var tools = $(".bib-sectools", head);
+    if (!tools) { tools = document.createElement("span"); tools.className = "bib-sectools"; head.appendChild(tools); }
+    var html = state.view === "accueil" ? '<button type="button" class="bib-link" data-bib-goto="playlists">Tout voir</button>' : "";
+    if (tools.innerHTML !== html) tools.innerHTML = html;
+    $$(".home-screen .playlist-card-meta").forEach(function (m) {
+      var t = String(m.textContent || ""), f = t.replace(/(\d+) h (\d+) min/, function (_x, h, mn) { return h + " h " + String(mn).padStart(2, "0"); });
+      if (f !== t) m.textContent = f;
+    });
   }
   function sortButton(current) {
     var label = "Trier : " + SORTS[current];
@@ -299,7 +323,7 @@
   // ---------- Événements ----------
   document.addEventListener("click", function (event) {
     if (!isHome()) return;
-    var el = event.target && event.target.closest ? event.target.closest("[data-bib-tab],[data-bib-goto],[data-bib-sortbtn],[data-bib-sort],[data-bib-layout],[data-bib-play],[data-bib-playall],[data-bib-searchbtn],[data-bib-cancel]") : null;
+    var el = event.target && event.target.closest ? event.target.closest("[data-bib-tab],[data-bib-goto],[data-bib-sortbtn],[data-bib-sort],[data-bib-layout],[data-bib-play],[data-bib-playall],[data-bib-albumplay],[data-bib-searchbtn],[data-bib-cancel]") : null;
     if (!el) return;
     if (el.closest("summary")) event.preventDefault(); // les outils sont dans le titre de section (<summary>)
     if (el.hasAttribute("data-bib-tab")) { var v = el.getAttribute("data-bib-tab"); selectView(v === "top" ? "accueil" : v); return; }
@@ -316,6 +340,15 @@
       if (!api || typeof api.playPaths !== "function") return;
       var index = el.hasAttribute("data-bib-play") ? Number(el.getAttribute("data-bib-play")) : 0;
       api.playPaths(shownTracks.map(function (t) { return t.src; }), index);
+      return;
+    }
+    if (el.hasAttribute("data-bib-albumplay")) {
+      event.preventDefault();
+      var pb = window.InfraLibraryPlayback;
+      loadData().then(function (d) {
+        var al = d.byPage[el.getAttribute("data-bib-albumplay")];
+        if (al && pb && typeof pb.playPaths === "function") pb.playPaths(al.tracks.map(function (t) { return t.src; }), 0);
+      }, function () {});
       return;
     }
     if (el.hasAttribute("data-bib-searchbtn")) { openSearch(); return; }
@@ -355,7 +388,74 @@
     return true;
   }
 
+  // ---------- Lecteur au repos (maquette V4, INFRA 08/11/2026) ----------
+  // Tant que rien n'est chargé, la barre du bas montre la dernière écoute (sinon le 1er titre du 1er album)
+  // et Lecture la lance directement, avec la suite de son album.
+  var IDLE_KEY = "last";
+  function transport() { return $("[data-transport-pip-root]") || $(".global-transport"); }
+  function idleTrack(d) {
+    var last = store.get(IDLE_KEY, null);
+    if (last && last.src) {
+      for (var i = 0; i < d.tracks.length; i += 1) {
+        if (d.tracks[i].src === last.src) return d.tracks[i];
+      }
+    }
+    return d.tracks[0] || null;
+  }
+  function paintIdle() {
+    var t = transport(); if (!t || !data) return;
+    var title = $("[data-transport-now-title]", t), album = $("[data-transport-now-album]", t);
+    if (!title || !album) return;
+    if (String(title.textContent || "").trim() && !title.hasAttribute("data-bib-idle")) { t.classList.remove("bib-idle"); return; }
+    var tr = idleTrack(data); if (!tr) return;
+    t.classList.add("bib-idle");
+    title.setAttribute("data-bib-idle", "");
+    if (title.textContent !== tr.title) title.textContent = tr.title;
+    if (album.textContent !== tr.album.title) album.textContent = tr.album.title;
+    if (album.hidden) { album.hidden = false; album.setAttribute("data-bib-idle", ""); }
+  }
+  function clearIdleMark() {
+    var t = transport(); if (!t) return;
+    var title = $("[data-transport-now-title]", t);
+    if (title) title.removeAttribute("data-bib-idle");
+    var album = $("[data-transport-now-album]", t);
+    if (album && album.hasAttribute("data-bib-idle")) album.removeAttribute("data-bib-idle");
+    t.classList.remove("bib-idle");
+  }
+  document.addEventListener("click", function (event) {
+    var t = transport(); if (!t || !t.classList.contains("bib-idle")) return;
+    var btn = event.target && event.target.closest ? event.target.closest("[data-transport-toggle],[data-transport-next],[data-transport-prev]") : null;
+    if (!btn || !t.contains(btn) || !data) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    var tr = idleTrack(data), pb = window.InfraLibraryPlayback;
+    if (!tr || !pb || typeof pb.playPaths !== "function") return;
+    var srcs = tr.album.tracks.map(function (x) { return x.src; });
+    clearIdleMark();
+    pb.playPaths(srcs, Math.max(0, srcs.indexOf(tr.src)));
+  }, true);
+  // Retient la dernière écoute (pour la retrouver à la prochaine visite).
+  document.addEventListener("play", function (event) {
+    var a = event.target; if (!a || a.tagName !== "AUDIO") return;
+    clearIdleMark();
+    loadData().then(function (d) {
+      var src = decodeURIComponent(String(a.currentSrc || a.src || ""));
+      for (var i = 0; i < d.tracks.length; i += 1) {
+        var s2 = d.tracks[i].src.replace(/^(\.\.\/|\.\/)+/, "");
+        if (s2 && src.indexOf(s2) >= 0) { store.set(IDLE_KEY, { src: d.tracks[i].src }); return; }
+      }
+    }, function () {});
+  }, true);
+  var idleWatched = null;
+  function watchIdle() {
+    var t = transport(); if (!t || t === idleWatched || typeof MutationObserver !== "function") return;
+    idleWatched = t;
+    new MutationObserver(function () { if (data) paintIdle(); })
+      .observe(t, { childList: true, subtree: true, characterData: true });
+  }
+
   function boot() {
+    loadData().then(function () { watchIdle(); paintIdle(); }, function () {});
     if (!isHome() || !watchGrid()) return;
     if (String(window.location.hash || "") === "#favoris") state.view = "favoris";
     setCurrent(state.view);

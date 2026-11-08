@@ -61,11 +61,21 @@ for (const page of ["music/d-2-0141-infra.html", "playlists/infra-moon.html"]) {
 
 // Lot 6 : le même couple CSS/JS doit être disponible depuis les pages directes et le shell hors ligne.
 const sw = read("public/sw.js");
-const version = home.match(/var VERSION = "(bibliotheque-v3-\d{8})"/)?.[1];
+const version = home.match(/var VERSION = "(bibliotheque-v\d+-\d{8})"/)?.[1];
 expect(Boolean(version), "version datée de la Bibliothèque absente");
 expect(index.includes("bibliotheque.css?v=" + version), "version CSS différente entre l’accueil et le chargeur");
 expect(sw.includes("./assets/css/bibliotheque.css?v=" + version), "CSS de la Bibliothèque absent du précache");
 expect(sw.includes("./assets/js/bibliotheque.js?v=" + version), "JS de la Bibliothèque absent du précache");
+
+// Maquette V4 (INFRA, 08/11/2026)
+const albumUi = read("public/assets/js/album-player-ui.js");
+expect(/\.global-transport-controls \{\s*position: absolute !important; left: 50% !important;/.test(css), "commandes du lecteur pas centrées");
+expect(/\.spa-route-layer\.album-screen::before[\s\S]{0,200}background-image: none !important/.test(css), "fond des fiches pas blanc");
+expect(css.includes(".bib-meta-row") && albumUi.includes("bib-meta-row"), "boutons de la fiche pas à droite de la ligne d’infos");
+expect(albumUi.includes("data-bib-css") && albumUi.includes("bibliotheque-v4-20261108"), "feuille Bibliothèque non chargée sur une fiche ouverte directement");
+expect(js.includes("bib-idle") && js.includes("[data-transport-toggle]"), "lecteur au repos absent");
+expect(js.includes("data-bib-albumplay"), "▶ sur les pochettes absent");
+expect(js.includes('data-bib-goto="playlists">Tout voir'), "« Tout voir » des playlists absent");
 
 // Le script ne plante pas hors navigateur (bancs d'essai des autres tests)
 try { vm.runInNewContext(js, { window: {}, document: {} }); } catch (err) { failures.push("bibliotheque.js plante hors navigateur : " + err.message); }
@@ -74,4 +84,4 @@ if (failures.length) {
   console.error("Bibliothèque : " + failures.length + " échec(s)\n- " + failures.join("\n- "));
   process.exit(1);
 }
-console.log("Bibliothèque V3 checks passed: tabs, order, frozen styles, loader, list playback, titles as-is.");
+console.log("Bibliothèque V4 checks passed: tabs, order, frozen styles, loader, list playback, titles as-is, white sheets, centered player, idle player.");

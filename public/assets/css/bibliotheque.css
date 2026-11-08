@@ -447,3 +447,109 @@ body.has-mobile-player main { scroll-padding-bottom: 80px; }
     grid-template-columns: 240px minmax(0, 1fr);
   }
 }
+
+/* ==========================================================================
+   Bibliothèque V4 — maquette validée par INFRA le 08/11/2026 (DOCS/maquettes/MAQUETTE_V4_20261108.md)
+   Fond blanc partout ; fiche : « ‹ Bibliothèque », titre 30 px, « INFRA. · 7 titres · 24 min »
+   avec les boutons à droite ; cœur sur chaque titre ; lecteur de navigation en bas partout.
+   ========================================================================== */
+html, body.home-screen, body.album-screen, body.playlist-screen { background-color: #ffffff; }
+.spa-route-layer.home-screen::before,
+.spa-route-layer.album-screen::before,
+.spa-route-layer.playlist-screen::before,
+body.home-screen::before,
+body.album-screen::before,
+body.playlist-screen::before {
+  background-color: #ffffff !important;
+  background-image: none !important;
+}
+body.album-screen, body.playlist-screen { --pwa-status-bg: #ffffff; }
+
+/* Fiche : retour */
+.spa-route-layer.album-screen .page > .back[data-bib-back],
+body.album-screen .page > .back[data-bib-back] {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+  color: rgba(17, 17, 17, 0.62); font-size: 14px; font-weight: 400; letter-spacing: 0; text-transform: none; text-decoration: none;
+}
+.page > .back[data-bib-back] svg { width: 16px; height: 16px; flex: none; }
+
+/* Fiche : titre */
+.album-screen .page .bib-collection-info h1 {
+  font-family: "Antique Olive Nord Bold", var(--font-display, inherit);
+  font-size: 30px; font-weight: 800; line-height: 1.05; letter-spacing: 0.01em; text-wrap: balance;
+}
+
+/* Fiche : ligne d'infos à gauche, boutons à droite */
+.bib-meta-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; }
+.album-screen .bib-meta-row h2,
+.album-screen .bib-collection-info .bib-meta-row h2 {
+  margin: 0; flex: 1 1 auto; min-width: 0;
+  font-size: 13px; font-weight: 400; letter-spacing: 0; color: rgba(17, 17, 17, 0.62); text-transform: none;
+}
+.album-screen .bib-collection-info .bib-meta-row .album-header-actions {
+  flex: none; display: flex; justify-content: flex-end; gap: 4px; margin: 0 -10px 0 0;
+}
+.bib-meta-row .album-header-actions > * { order: 5; }
+.bib-meta-row .album-header-actions [data-album-play] { order: 1; color: var(--ink); }
+.bib-meta-row .album-header-actions [data-album-play] svg,
+.bib-meta-row .album-header-actions [data-album-play] .player-glyph { width: 22px; height: 22px; }
+.bib-meta-row .album-header-actions [data-bib-shuffle] { order: 2; }
+.bib-meta-row .album-header-actions [data-download-url] { order: 3; }
+.bib-meta-row .album-header-actions [data-bib-share] { order: 4; }
+.bib-meta-row .album-header-actions .bib-collection-action,
+.bib-meta-row .album-header-actions [data-download-url] { color: rgba(17, 17, 17, 0.62); }
+.bib-meta-row .album-header-actions .bib-collection-action svg { width: 21px; height: 21px; }
+/* La sélection multiple laisse la place au cœur de chaque titre (maquette V4) */
+.bib-meta-row .album-selection-toolbar { display: none !important; }
+
+/* Fiche : lignes de titres — numéro, titre tel quel, durée, cœur */
+.album-screen .tracks:has(.bib-collection-hero) .track-player { min-height: 52px; }
+.album-screen .tracks:has(.bib-collection-hero) .track-name,
+.album-screen .tracks:has(.bib-collection-hero) .track-player .track-name {
+  text-transform: none !important; color: var(--ink); font-size: 14px; font-weight: 500; letter-spacing: 0.02em;
+}
+.album-screen .tracks:has(.bib-collection-hero) .play-btn { color: rgba(17, 17, 17, 0.4); font-size: 12px; }
+.album-screen .tracks:has(.bib-collection-hero) .track-duration { font-size: 12px; color: rgba(17, 17, 17, 0.4); margin-right: 44px; }
+.album-screen .tracks:has(.bib-collection-hero) .track-favorite-btn {
+  opacity: 1 !important; pointer-events: auto !important; width: 44px; right: -12px; color: rgba(17, 17, 17, 0.4);
+}
+.album-screen .tracks:has(.bib-collection-hero) .track-favorite-btn.is-on { color: #e0353b; }
+.album-screen .tracks:has(.bib-collection-hero) .track-favorite-btn .heart-icon { width: 18px; height: 18px; }
+
+/* Lecteur de navigation (INFRA, 08/11/2026) : Précédent / Lecture / Suivant au milieu de la barre,
+   titre + album à gauche. La barre reste en flex (en grid, la ligne de progression tombe en bas) :
+   les commandes sont centrées en position absolue, le titre s'arrête avant elles. */
+.global-transport-controls {
+  position: absolute !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important;
+}
+.global-transport,
+#infraSpaPersist .global-transport { position: fixed !important; }
+.global-transport-now { max-width: calc(50% - 66px - 16px - 12px) !important; }
+@media (min-width: 1120px) {
+  .global-transport-now { max-width: calc(50% - 66px - (100vw - 1080px) / 2 - 20px - 12px) !important; }
+}
+.global-transport { padding-bottom: env(safe-area-inset-bottom) !important; }
+.global-transport-controls { margin-top: calc(env(safe-area-inset-bottom) / -2) !important; }
+
+/* Fiche : préfixes de la ligne d'infos ; cœurs visibles aussi sur téléphone */
+.bib-meta-row h2[data-bib-meta="album"]::before { content: "INFRA.\00a0·\00a0"; }
+.bib-meta-row h2[data-bib-meta="playlist"]::before { content: "Playlist\00a0·\00a0"; }
+.album-screen .tracks:has(.bib-collection-hero) .track-favorite-btn { display: grid !important; }
+
+/* Accueil V4 : ▶ en bas à gauche de chaque pochette d'album (visible au toucher, au survol sur ordinateur) */
+.home-screen .albums-grid:not(.bib-list) > li { position: relative; container-type: inline-size; }
+.bib-coverplay {
+  position: absolute; left: 2px; width: 40px; height: 40px; margin: 0; padding: 0; border: 0; background: none;
+  display: grid; place-items: center; color: #fff; cursor: pointer;
+  filter: drop-shadow(0 1px 6px rgba(0, 0, 0, 0.55)); opacity: 0; transition: opacity .18s ease;
+  top: calc(100cqw - 42px);
+}
+.bib-coverplay svg { width: 15px; height: 15px; }
+.home-screen .albums-grid > li:hover .bib-coverplay,
+.home-screen .albums-grid > li:focus-within .bib-coverplay { opacity: 1; }
+@media (hover: none) { .bib-coverplay { opacity: 1; } }
+.home-screen .albums-grid.bib-list .bib-coverplay { display: none; }
+@media (prefers-reduced-motion: reduce) { .bib-coverplay { transition: none; } }
+.home-screen .playlist-card .playlist-card-meta { font-weight: 400; }
+/* Au repos, Précédent et Suivant restent visibles comme sur la maquette */
+.global-transport.bib-idle .global-transport-btn[disabled] { opacity: 1 !important; }

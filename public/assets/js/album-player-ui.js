@@ -85,7 +85,9 @@
     }, 0);
     const label = count === 1 ? "1 titre" : `${count} titres`;
     const minutes = totalSeconds > 0 ? Math.max(1, Math.round(totalSeconds / 60)) : 0;
-    heading.textContent = minutes ? `${label} · ${minutes} min` : label;
+    // Maquette V4 : « 24 min », « 5 h 14 » au-delà d'une heure.
+    const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")}` : `${minutes} min`;
+    heading.textContent = minutes ? `${label} · ${duration}` : label;
   }
 
   function rememberTrackDuration(srcLike, displayValue, baseUrl) {
@@ -301,12 +303,39 @@
     if (heading.classList.contains("playlist-visible-title") && heading.hasAttribute("aria-label")) {
       heading.textContent = heading.getAttribute("aria-label");
     }
+    // Maquette V4 validée par INFRA (08/11/2026) : « ‹ Bibliothèque », « INFRA. · 7 titres · 24 min »,
+    // boutons à droite de cette ligne (Lire, Aléatoire, Télécharger s'il existe, Partager).
+    const back = page.querySelector(":scope > .back");
+    if (back && !back.hasAttribute("data-bib-back")) {
+      back.setAttribute("data-bib-back", "");
+      back.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 6-6 6 6 6"/></svg>Bibliothèque';
+    }
+    const isPlaylist = document.body.classList.contains("playlist-screen") || !!page.querySelector(".playlist-hero-art");
+    // Le préfixe « INFRA. · » / « Playlist · » est posé en CSS : d'autres scripts réécrivent ce texte.
+    metadata.setAttribute("data-bib-meta", isPlaylist ? "playlist" : "album");
     const info = document.createElement("div");
     info.className = "album-hero bib-collection-info";
-    info.append(heading, metadata, actions);
+    const metaRow = document.createElement("div");
+    metaRow.className = "bib-meta-row";
+    metaRow.append(metadata, actions);
+    info.append(heading, metaRow);
     header.classList.add("bib-collection-hero");
     header.append(artwork, info);
   }
+
+  // Bibliothèque V4 : la feuille de styles est aussi chargée quand on arrive directement par une fiche.
+  (function ensureBibliothequeCss() {
+    try {
+      if (typeof document === "undefined" || !document.head || document.querySelector("link[data-bib-css]")) return;
+      const script = document.currentScript;
+      if (!script || !script.src) return;
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = new URL("../css/bibliotheque.css?v=bibliotheque-v4-20261108", script.src).href;
+      link.setAttribute("data-bib-css", "");
+      document.head.appendChild(link);
+    } catch (_err) {}
+  })();
 
   function collectionButton(className, label, icon) {
     const button = document.createElement("button");
@@ -408,8 +437,10 @@
           // Ignore.
         }
       }
-      const cleanedName = normalizeTrackTitle(nameEl.textContent);
-      if (cleanedName) nameEl.textContent = cleanedName;
+      const rawName = String(nameEl.textContent || "").trim();
+      const cleanedName = normalizeTrackTitle(rawName);
+      // Maquette V4 : le titre s'écrit tel quel (« 78Pt ») ; on ne garde le nettoyage que s'il change autre chose que la casse.
+      if (cleanedName && cleanedName !== rawName.toUpperCase()) nameEl.textContent = cleanedName;
       const meta = getTrackMetaByAssetPath(absSrc, window.location.href) || {};
       const rowAlbum = normalizeTrackTitle(row.dataset.trackAlbum || meta.album || ui.albumTitle);
       const rowPage = toAbsoluteUrl(row.dataset.trackPage || meta.page || ui.pageHref);

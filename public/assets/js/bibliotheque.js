@@ -178,7 +178,7 @@
         play.setAttribute("data-bib-albumplay", pageKey(card.getAttribute("href")));
         play.setAttribute("aria-label", "Lire " + album.title);
         play.title = "Lire";
-        play.innerHTML = ICON.play;
+        play.innerHTML = '<span class="bib-coverplay-hit">' + ICON.play + "</span>";
         li.appendChild(play);
       }
       var key = pageKey(card.getAttribute("href"));

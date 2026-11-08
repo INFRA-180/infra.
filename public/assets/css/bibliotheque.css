@@ -536,19 +536,25 @@ body.album-screen .page > .back[data-bib-back] {
 .bib-meta-row h2[data-bib-meta="playlist"]::before { content: "Playlist\00a0·\00a0"; }
 .album-screen .tracks:has(.bib-collection-hero) .track-favorite-btn { display: grid !important; }
 
-/* Accueil V4 : ▶ en bas à gauche de chaque pochette d'album (visible au toucher, au survol sur ordinateur) */
-.home-screen .albums-grid:not(.bib-list) > li { position: relative; container-type: inline-size; }
+/* Accueil V4 : ▶ en bas à gauche de chaque pochette d'album (visible au toucher, au survol sur ordinateur).
+   Calque carré posé sur la pochette (aspect-ratio), sans requête de conteneur : celle-ci cassait
+   la grille dans Safari iOS (playlist écrasée, albums invisibles — INFRA, 08/11/2026). */
+.home-screen .albums-grid:not(.playlists-grid):not(.bib-list) > li { position: relative; }
 .bib-coverplay {
-  position: absolute; left: 2px; width: 40px; height: 40px; margin: 0; padding: 0; border: 0; background: none;
-  display: grid; place-items: center; color: #fff; cursor: pointer;
-  filter: drop-shadow(0 1px 6px rgba(0, 0, 0, 0.55)); opacity: 0; transition: opacity .18s ease;
-  top: calc(100cqw - 42px);
+  position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: 1 / 1; margin: 0; padding: 0; border: 0; background: none;
+  display: flex; align-items: flex-end; justify-content: flex-start; pointer-events: none; color: #fff;
+  opacity: 0; transition: opacity .18s ease;
+}
+.bib-coverplay-hit {
+  width: 40px; height: 40px; margin: 0 0 2px 2px; display: grid; place-items: center; pointer-events: auto; cursor: pointer;
+  filter: drop-shadow(0 1px 6px rgba(0, 0, 0, 0.55));
 }
 .bib-coverplay svg { width: 15px; height: 15px; }
 .home-screen .albums-grid > li:hover .bib-coverplay,
 .home-screen .albums-grid > li:focus-within .bib-coverplay { opacity: 1; }
 @media (hover: none) { .bib-coverplay { opacity: 1; } }
-.home-screen .albums-grid.bib-list .bib-coverplay { display: none; }
+.home-screen .albums-grid.bib-list .bib-coverplay,
+.home-screen .playlists-grid .bib-coverplay { display: none; }
 @media (prefers-reduced-motion: reduce) { .bib-coverplay { transition: none; } }
 html body.home-screen .playlist-card .playlist-card-meta { font-weight: 400 !important; }
 /* Au repos, Précédent et Suivant restent visibles comme sur la maquette */
@@ -606,3 +612,9 @@ html body .global-transport.bib-idle .global-transport-mini-time { visibility: h
 .global-transport.is-playing .global-transport-now-title::after {
   position: absolute !important; right: 0; top: 50% !important; margin: -3px 0 0 !important;
 }
+
+/* iPhone (INFRA, 08/11/2026) : sur iOS, scripts.js ajoute `ios-device` au body et styles.css impose alors
+   une grille à 1 colonne (`.home-screen.ios-device .albums-grid`), plus précise que la rangée de playlists :
+   la colonne explicite écrasait la 1re playlist. La rangée garde ses colonnes automatiques partout. */
+html body.home-screen:not([data-bib-view="playlists"]) .playlists-grid { grid-template-columns: none !important; }
+html body.home-screen .playlists-grid .playlist-card { max-width: none !important; margin: 0 !important; }

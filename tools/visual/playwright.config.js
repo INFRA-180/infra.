@@ -6,11 +6,11 @@ const { defineConfig, devices } = require("@playwright/test");
 const PORT = Number(process.env.VISUAL_PORT || 8793);
 
 module.exports = defineConfig({
-  testDir: "tools/visual",
-  snapshotPathTemplate: "tools/visual/references/{projectName}/{arg}{ext}",
+  testDir: ".",
+  snapshotPathTemplate: "{testDir}/references/{projectName}/{arg}{ext}",
   fullyParallel: true,
   reporter: [["list"]],
-  outputDir: "tools/visual/.resultats",
+  outputDir: ".resultats",
   expect: {
     toHaveScreenshot: { maxDiffPixels: 0, animations: "disabled", caret: "hide", scale: "css" }
   },
@@ -28,7 +28,7 @@ module.exports = defineConfig({
     { name: "ordinateur", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } }
   ],
   webServer: {
-    command: `node tools/visual/static-server.js`,
+    command: `node static-server.js`,
     url: `http://127.0.0.1:${PORT}/index.html`,
     env: { VISUAL_PORT: String(PORT) },
     reuseExistingServer: false

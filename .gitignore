@@ -87,3 +87,4 @@ DOCS/PLAN_*.md
 # Captures du lot 1 : résultats d’essai locaux (les références, elles, sont suivies)
 tools/visual/.resultats/
 playwright-report/
+package-lock.json

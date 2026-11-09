@@ -36,13 +36,21 @@ const SCREENS = [
   { name: "accueil", path: "/" },
   { name: "accueil-defile", path: "/", scroll: 900 },
   { name: "album-kali", path: "/music/kali-infra.html" },
-  { name: "playlist-moon", path: "/playlists/infra-moon.html" }
+  { name: "playlist-moon", path: "/playlists/infra-moon.html" },
+  { name: "onglet-albums", path: "/", click: '[data-bib-tab="albums"]' },
+  { name: "onglet-titres", path: "/", click: '[data-bib-tab="titres"]' },
+  { name: "grand-lecteur", path: "/", click: "[data-transport-now]" },
+  { name: "application-vizu", path: "/apps/vizu.html" }
 ];
 
 for (const screen of SCREENS) {
   test(screen.name, async ({ page }) => {
     await page.goto(screen.path);
     await settle(page);
+    if (screen.click) {
+      await page.locator(screen.click).first().click();
+      await settle(page);
+    }
     if (screen.scroll) {
       await page.evaluate((y) => window.scrollTo(0, y), screen.scroll);
       await settle(page);

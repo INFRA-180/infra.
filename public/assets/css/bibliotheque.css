@@ -16,9 +16,27 @@
    ========================================================================== */
 .home-screen .hero { padding-bottom: 6px; }
 
+/* Zone de l'heure (INFRA, 09/11/2026) : l'app installée dessine sous la barre d'état
+   (black-translucent). Les onglets collent sous l'heure, et un voile du même verre couvre
+   la zone de l'heure : rien ne passe sous l'heure, la batterie ou le réseau en défilant.
+   Dans Safari, env(safe-area-inset-top) vaut 0 : rien ne change. */
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 21;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: saturate(1.4) blur(16px);
+  backdrop-filter: saturate(1.4) blur(16px);
+}
+
 .bib-tabs {
   position: sticky;
-  top: 0;
+  top: env(safe-area-inset-top, 0px);
   z-index: 20;
   background: rgba(255, 255, 255, 0.92);
   -webkit-backdrop-filter: saturate(1.4) blur(16px);
@@ -707,3 +725,19 @@ body.home-screen:not(.bib-clips-open) [data-module-id="clips"].is-playing .bib-c
   [data-module-id="clips"].is-playing .bib-cliprow { grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; gap: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .bib-vid img { transition: none; } }
+
+/* Retour à l'accueil sans trame blanche (INFRA, 09/11/2026) : la page quittée reste posée
+   par-dessus l'accueil, figée (spa-renderer.js, restoreLiveHomeRoute), puis s'efface. */
+.spa-route-layer[data-spa-route-state="covering"] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 1;
+}
+.spa-route-layer[data-spa-route-state="covering"].is-covering-fade {
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}

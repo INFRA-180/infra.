@@ -52,6 +52,17 @@ assert.match(restoreSource, /retainedHome\.setAttribute\("data-spa-route-state",
 assert.match(restoreSource, /resumeLiveHomeRoute\(\);\s*window\.scrollTo\(requested\.x, requested\.y\);/);
 assert.match(restoreSource, /anchorCorrection = Math\.round\(anchor\.getBoundingClientRect\(\)\.top - route\.anchorViewportTop\)/);
 assert.match(restoreSource, /outgoing\.remove\(\)/);
+// Retour sans trame blanche (INFRA, 09/11/2026) : la page quittée reste par-dessus puis s'efface.
+assert.match(restoreSource, /outgoing\.setAttribute\("data-spa-route-state", "covering"\)/);
+assert.match(restoreSource, /nextSpaAnimationFrame\(\)\.then\(nextSpaAnimationFrame\)/);
+assert.doesNotMatch(restoreSource, /"retiring"/);
+{
+  const bibCss = read("public/assets/css/bibliotheque.css");
+  assert.match(bibCss, /data-spa-route-state="covering"/);
+  // Zone de l'heure de l'app installée : onglets sous l'heure, voile sur l'heure.
+  assert.match(bibCss, /\.bib-tabs \{\s*position: sticky;\s*top: env\(safe-area-inset-top, 0px\);/);
+  assert.match(bibCss, /body::after \{[^}]*height: env\(safe-area-inset-top, 0px\);/);
+}
 
 const mobileSpaceStart = transport.indexOf("function syncMobilePlayerSpace");
 const mobileSpaceEnd = transport.indexOf("function getMiniPlayerVisibilityReason", mobileSpaceStart);

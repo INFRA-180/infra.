@@ -1592,13 +1592,10 @@
           }
 
           if (shouldClose) {
-            audioState.nowPlayingClosing = true;
-            overlayPanel.style.transition = "transform 220ms cubic-bezier(0.32, 0.72, 0, 1), opacity 180ms ease-out";
-            overlayPanel.style.transform = "translateY(110%) scale(0.97)";
-            overlayPanel.style.opacity = "0";
-            setTimeout(function () {
-              disableNowPlayingOverlayUi();
-            }, 220);
+            // Lâché : le lecteur part de là où le doigt l'a laissé et se réduit dans la barre
+            // (même fermeture que le bouton, INFRA 09/11/2026).
+            overlayPanel.style.transition = "";
+            closeNowPlayingOverlay();
             return;
           }
 

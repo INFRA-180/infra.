@@ -217,7 +217,9 @@
 
   function captureLiveHomeRoute(targetUrl, renderedUrl) {
     if (!document.body.classList.contains("home-screen")) return null;
-    if (!/\/music\/[^/]+\.html$/i.test(String(targetUrl && targetUrl.pathname || ""))) return null;
+    // Albums et playlists (INFRA, 09/11/2026) : l'accueil reste en mémoire pour revenir
+    // sans le recharger (sinon les pochettes repartent vides et la page bouge).
+    if (!/\/(?:music|playlists)\/[^/]+\.html$/i.test(String(targetUrl && targetUrl.pathname || ""))) return null;
     if (String(window.location.search || "").includes("edit=1")) return null;
 
     const cards = Array.from(document.querySelectorAll("a.album-card[href]"));
@@ -286,10 +288,23 @@
       anchorHref: getComparableSpaUrl(targetUrl && targetUrl.href),
       anchorViewportTop: targetRect ? Math.round(targetRect.top) : null,
       coverStates,
+      visibleImages: collectVisibleRouteImages(currentRoute),
       frozenResourceCount,
       layer: currentRoute,
       fragment: null
     };
+  }
+
+  // Images à l'écran au moment de quitter l'accueil (pochettes d'albums, collages de
+  // playlists, vignettes) : elles seront décodées avant de réafficher l'accueil.
+  function collectVisibleRouteImages(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return [];
+    const viewportHeight = window.innerHeight || 0;
+    return Array.from(root.querySelectorAll("img")).filter(function (image) {
+      if (!image.getAttribute("src") && !image.getAttribute("srcset")) return false;
+      const rect = image.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && rect.bottom > -24 && rect.top < viewportHeight + 24;
+    }).slice(0, 32);
   }
 
   function canRestoreLiveHomeRoute(urlLike) {
@@ -353,16 +368,23 @@
   function prepareLiveHomeRouteCovers(route) {
     const states = Array.isArray(route && route.coverStates) ? route.coverStates : [];
     const routeRoot = route && route.layer && route.layer.isConnected ? route.layer : route && route.fragment;
-    if (!routeRoot || !states.length) {
+    if (!routeRoot) {
       return Promise.resolve({ requested: 0, decoded: 0, timedOut: false });
     }
 
-    const images = states.slice(0, 2).map(function (state, index) {
+    const lockedImages = states.map(function (state, index) {
       const card = findAlbumCardByUrl(routeRoot, state.href);
       const image = card && card.querySelector("img.album-cover");
       if (image) lockLiveHomeCover(image, state, index);
       return image;
     }).filter(Boolean);
+    // Toutes les images qui étaient à l'écran, pas seulement 2 pochettes (INFRA, 09/11/2026) :
+    // une image « chargée » (complete) n'est pas forcément décodée ; sans décodage, iOS
+    // peut afficher une case blanche le temps d'une trame au retour.
+    const visibleImages = Array.isArray(route && route.visibleImages) ? route.visibleImages : [];
+    const images = Array.from(new Set(lockedImages.concat(visibleImages.filter(function (image) {
+      return image && typeof routeRoot.contains === "function" && routeRoot.contains(image);
+    }))));
     if (!images.length) {
       return Promise.resolve({ requested: 0, decoded: 0, timedOut: false });
     }
@@ -371,10 +393,6 @@
     let timeoutId = 0;
     let timedOut = false;
     const decodePromise = Promise.all(images.map(function (image) {
-      if (image.complete && image.naturalWidth > 0) {
-        decoded += 1;
-        return Promise.resolve(true);
-      }
       return decodeSpaImage(image).then(function (ready) {
         if (ready) decoded += 1;
         return ready;
@@ -384,7 +402,7 @@
       timeoutId = window.setTimeout(function () {
         timedOut = true;
         resolve();
-      }, 260);
+      }, 300);
     });
 
     return Promise.race([decodePromise, timeoutPromise]).then(function () {

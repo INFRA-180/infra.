@@ -362,6 +362,81 @@
     animation.oncancel = finalize;
   }
 
+  function getNowPlayingBarRect() {
+    const transport = audioState.transport;
+    const source = transport && transport.root;
+    if (!source || typeof source.getBoundingClientRect !== "function") return null;
+    const rect = source.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+  }
+
+  // Fermeture (INFRA, 09/11/2026) : le grand lecteur se réduit dans la barre du lecteur
+  // pendant que le fond sombre s'efface, au bouton comme au glisser. Le glisser part de
+  // la position laissée par le doigt. « Réduire les animations » : simple fondu.
+  function animateNowPlayingClose(done) {
+    const transport = audioState.transport;
+    const panel = transport && transport.overlayPanel;
+    const overlay = transport && transport.overlay;
+    if (!panel || typeof panel.animate !== "function") {
+      if (typeof done === "function") done();
+      return;
+    }
+
+    const startTransform = panel.style.transform || "translate3d(0, 0, 0) scale(1)";
+    const startOpacity = panel.style.opacity || "1";
+    cancelNowPlayingPanelAnimations(panel);
+    cancelNowPlayingPanelAnimations(overlay);
+    panel.style.transition = "";
+    panel.style.transform = "";
+    const panelRect = panel.getBoundingClientRect();
+    const barRect = getNowPlayingBarRect() || audioState.nowPlayingMiniRect;
+    const reduce = prefersReducedMotion();
+    const duration = reduce ? 160 : 340;
+    const easing = reduce ? "ease-out" : "cubic-bezier(0.32, 0.72, 0, 1)";
+
+    let endTransform = "translate3d(0, 24px, 0) scale(0.96)";
+    if (!reduce && panelRect.width && panelRect.height && barRect) {
+      const dx = (barRect.left + barRect.width / 2) - (panelRect.left + panelRect.width / 2);
+      const dy = (barRect.top + barRect.height / 2) - (panelRect.top + panelRect.height / 2);
+      const scale = Math.max(0.12, Math.min(0.4, (barRect.height * 2.5) / panelRect.height));
+      endTransform = `translate3d(${dx}px, ${dy}px, 0) scale(${scale})`;
+    }
+    panel.style.transformOrigin = "center center";
+
+    // Mouvement et fondu séparés : le lecteur reste visible pendant qu'il se réduit et ne
+    // s'efface qu'en arrivant sur la barre.
+    const animation = reduce
+      ? panel.animate([{ opacity: startOpacity }, { opacity: 0 }], { duration, easing, fill: "both" })
+      : panel.animate([{ transform: startTransform }, { transform: endTransform }], { duration, easing, fill: "both" });
+    if (!reduce) {
+      panel.animate([{ opacity: startOpacity }, { opacity: 0 }], {
+        duration,
+        easing: "cubic-bezier(0.7, 0, 0.84, 0)",
+        fill: "both"
+      });
+    }
+    if (overlay && typeof overlay.animate === "function") {
+      overlay.animate([{ opacity: 1 }, { opacity: 0 }], { duration, easing: "ease-out", fill: "both" });
+    }
+
+    let finalized = false;
+    let fallbackTimer = 0;
+    const finalize = function () {
+      if (finalized) return;
+      finalized = true;
+      if (fallbackTimer) window.clearTimeout(fallbackTimer);
+      if (typeof done === "function") done();
+      panel.style.transform = "";
+      panel.style.opacity = "";
+      panel.style.transformOrigin = "";
+      panel.style.willChange = "";
+    };
+    fallbackTimer = window.setTimeout(finalize, duration + 80);
+    animation.onfinish = finalize;
+    animation.oncancel = finalize;
+  }
+
   function disableNowPlayingOverlayUi() {
     const wasOpen = Boolean(audioState.nowPlayingOpen);
     audioState.nowPlayingOpen = false;
@@ -390,6 +465,8 @@
         transport.overlayQueueToggle.setAttribute("aria-expanded", "false");
       }
       transport.overlay.hidden = true;
+      // Le fondu de fermeture garde opacity 0 (fill both) : on l'annule une fois caché.
+      cancelNowPlayingPanelAnimations(transport.overlay);
     }
 
     const overlayEl = document.getElementById("infraNowPlayingOverlay");
@@ -433,6 +510,7 @@
     transport.overlay.removeAttribute("aria-hidden");
     transport.overlay.style.removeProperty("display");
     transport.overlay.style.removeProperty("pointer-events");
+    cancelNowPlayingPanelAnimations(transport.overlay);
     if (transport.overlayPanel) {
       cancelNowPlayingPanelAnimations(transport.overlayPanel);
       transport.overlayPanel.scrollTop = 0;
@@ -465,7 +543,7 @@
       setNowPlayingQueueOpen(false);
     }
     audioState.nowPlayingClosing = true;
-    animateNowPlayingPanel("close", function () {
+    animateNowPlayingClose(function () {
       disableNowPlayingOverlayUi();
     });
   }

@@ -425,15 +425,7 @@
         isCurrentFavorite ? "Retirer des favoris" : "Ajouter aux favoris"
       );
     }
-
-    const homeFavoriteButton = document.querySelector("[data-home-favorites]");
-    if (homeFavoriteButton) {
-      const count = audioState.favoriteEntries.length;
-      homeFavoriteButton.hidden = count <= 0;
-      homeFavoriteButton.disabled = count <= 0;
-      setFavoriteButtonState(homeFavoriteButton, count > 0);
-      homeFavoriteButton.setAttribute("aria-label", `Ouvrir les favoris (${count})`);
-    }
+    // Le cœur à côté du logo a été retiré (INFRA, 09/11/2026) : l'onglet Favoris le remplace.
   }
 
   function syncFavoriteButtons() {

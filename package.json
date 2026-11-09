@@ -8,7 +8,8 @@
     "dev": "python3 -m http.server 8080 --directory public",
     "test": "node tools/release-audit.js",
     "audit:release": "node tools/release-audit.js",
-    "check:boundary": "node tools/verify-public-boundary.js"
+    "check:boundary": "node tools/verify-public-boundary.js",
+    "bump": "node tools/bump-version.js"
   },
   "devDependencies": {
     "wrangler": "4.127.1"

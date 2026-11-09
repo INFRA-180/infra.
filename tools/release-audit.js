@@ -386,6 +386,7 @@ function runRegressionSuite() {
     "tools/test-service-worker-update-lifecycle.js",
     "tools/test-audiofix402-fluidity.js",
     "tools/test-transport-pip.js",
+    "tools/test-bump-version.js",
     "tools/verify-audio-stability.js",
     "tools/verify-public-boundary.js"
   ];

@@ -331,7 +331,7 @@
       if (!script || !script.src) return;
       const link = document.createElement("link");
       link.rel = "stylesheet";
-      link.href = new URL("../css/bibliotheque.css?v=bibliotheque-v9-20261109", script.src).href;
+      link.href = new URL("../css/bibliotheque.css?v=bibliotheque-v10-20261109", script.src).href;
       link.setAttribute("data-bib-css", "");
       document.head.appendChild(link);
     } catch (_err) {}

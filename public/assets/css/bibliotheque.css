@@ -10,7 +10,7 @@
 
 /* ==========================================================================
    Bibliothèque V3 — lot 1 (accueil) — maquette validée par INFRA le 08/11/2026
-   DOCS/maquettes/MAQUETTE_V3_20261108.md
+   DOCS/maquettes/archives/MAQUETTE_V3_20261108.md
    L'ordre du HTML ne change pas (outil de mise à jour du catalogue) : l'ordre
    Playlists → Albums → Vos favoris → Clips → Applications (V5) est fait ici, à l’affichage.
    ========================================================================== */
@@ -448,7 +448,7 @@ body.has-mobile-player main { scroll-padding-bottom: 80px; }
 }
 
 /* ==========================================================================
-   Bibliothèque V4 — maquette validée par INFRA le 08/11/2026 (DOCS/maquettes/MAQUETTE_V4_20261108.md)
+   Bibliothèque V4 — maquette validée par INFRA le 08/11/2026 (DOCS/maquettes/archives/MAQUETTE_V4_20261108.md)
    Fond blanc partout ; fiche : « ‹ Bibliothèque », titre 30 px, « INFRA. · 7 titres · 24 min »
    avec les boutons à droite ; cœur sur chaque titre ; lecteur de navigation en bas partout.
    ========================================================================== */

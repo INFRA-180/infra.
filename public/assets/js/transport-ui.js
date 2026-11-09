@@ -45,7 +45,6 @@
     const toggleCurrentFavorite = method(ctx, "toggleCurrentFavorite");
     const openNowPlayingOverlay = method(ctx, "openNowPlayingOverlay");
     const closeNowPlayingOverlay = method(ctx, "closeNowPlayingOverlay");
-    const disableNowPlayingOverlayUi = method(ctx, "disableNowPlayingOverlayUi");
     const togglePlayPause = method(ctx, "togglePlayPause");
     const setNowPlayingQueueOpen = method(ctx, "setNowPlayingQueueOpen");
     const startTrack = method(ctx, "startTrack");

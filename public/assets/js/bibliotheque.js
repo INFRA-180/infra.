@@ -1,4 +1,4 @@
-// Bibliothèque V3 (maquette validée par INFRA le 08/11/2026 — DOCS/maquettes/MAQUETTE_V3_20261108.md)
+// Bibliothèque V3 (maquette validée par INFRA le 08/11/2026 — DOCS/maquettes/archives/MAQUETTE_V3_20261108.md)
 // Lot 1 : ligne d'onglets. Lot 2 : vues Albums / Playlists / Titres / Favoris,
 // recherche, tri, grille ou liste, nombres, titres écrits tels quels.
 // Maquette V5 (validée par INFRA le 09/11/2026, DOCS/maquettes/MAQUETTE_V5_20261109.md) : onglet

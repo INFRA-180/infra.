@@ -138,7 +138,7 @@
     if (element.classList && element.classList.length) {
       parts.push(`.${Array.from(element.classList).slice(0, 3).join(".")}`);
     }
-    ["data-track-select", "data-track-favorite", "data-transport-favorite", "data-now-playing-favorite", "data-home-favorites"].some(function (attr) {
+    ["data-track-select", "data-track-favorite", "data-transport-favorite", "data-now-playing-favorite"].some(function (attr) {
       if (element.hasAttribute && element.hasAttribute(attr)) {
         parts.push(`[${attr}]`);
         return true;
@@ -1075,27 +1075,6 @@
     };
   }
 
-  function initHomeFavoritesButton() {
-    if (audioState.homeFavoritesDelegatedBound) return;
-    audioState.homeFavoritesDelegatedBound = true;
-    document.addEventListener("click", function (event) {
-      const target = event.target;
-      if (!target || !(target instanceof Element)) return;
-      const button = target.closest("[data-home-favorites]");
-      if (!button) return;
-      event.preventDefault();
-      event.stopPropagation();
-      trackAudioRuntimeEvent("home_fav_tap", {
-        track: "favorites",
-        album: "favorites",
-        count: audioState.favoriteEntries.length,
-        hidden_attr: Boolean(button.hidden),
-        disabled_attr: Boolean(button.disabled),
-        route: String(window.location.hash || "")
-      });
-      openFavoritesPage();
-    });
-  }
 
   function enhanceAlbumDownloadButtons() {
     if (infraDownloadsApi && typeof infraDownloadsApi.enhanceAlbumDownloadButtons === "function") {
@@ -1677,7 +1656,6 @@
       setFavoritesPlaylist: setFavoritesPlaylist,
       startFavoritesPlaybackAt: startFavoritesPlaybackAt,
       startFavoritesPlayback: startFavoritesPlayback,
-      initHomeFavoritesButton: initHomeFavoritesButton,
       enhanceAlbumDownloadButtons: enhanceAlbumDownloadButtons,
       scheduleFavoritesPreload: scheduleFavoritesPreload,
       isFavoritesRoute: isFavoritesRoute,

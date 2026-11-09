@@ -393,7 +393,6 @@ function openAppDownloadGatekeeper(appName, url) {
     favoritesResetPromise: null,
     favoritesResetApplied: false,
     favoritePendingPaths: new Set(),
-    homeFavoritesDelegatedBound: false,
     albumCoverCacheWarmupScheduled: false,
     albumCoverCacheWarmupDone: false,
     albumCoverWarmupResumePending: false,
@@ -1785,9 +1784,6 @@ function openAppDownloadGatekeeper(appName, url) {
     return callFavoritesUi("startFavoritesPlayback", arguments);
   }
 
-  function initHomeFavoritesButton() {
-    return callFavoritesUi("initHomeFavoritesButton", arguments);
-  }
 
   function enhanceAlbumDownloadButtons() {
     return callFavoritesUi("enhanceAlbumDownloadButtons", arguments);
@@ -6232,7 +6228,6 @@ function openAppDownloadGatekeeper(appName, url) {
       : Promise.resolve(null);
 
     if (isHomeScreen) {
-      initHomeFavoritesButton();
       initFavoritesRoute();
       scheduleFavoritesPreload("home_init");
       loadFavoritesWithReset().catch(function () {

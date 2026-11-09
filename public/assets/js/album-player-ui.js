@@ -300,8 +300,10 @@
     const metadata = header && header.querySelector("h2");
     if (!artwork || !heading || !metadata || header.classList.contains("bib-collection-hero")) return;
 
+    // Titre de playlist = le picto seul (« ☾ »), sans « INFRA » (INFRA, 09/11/2026) ;
+    // le nom complet reste lu par VoiceOver (aria-label).
     if (heading.classList.contains("playlist-visible-title") && heading.hasAttribute("aria-label")) {
-      heading.textContent = heading.getAttribute("aria-label");
+      heading.textContent = heading.getAttribute("aria-label").replace(/^INFRA\s+/, "");
     }
     // Maquette V4 validée par INFRA (08/11/2026) : « ‹ Bibliothèque », « INFRA. · 7 titres · 24 min »,
     // boutons à droite de cette ligne (Lire, Aléatoire, Télécharger s'il existe, Partager).
@@ -331,7 +333,7 @@
       if (!script || !script.src) return;
       const link = document.createElement("link");
       link.rel = "stylesheet";
-      link.href = new URL("../css/bibliotheque.css?v=bibliotheque-v10-20261109", script.src).href;
+      link.href = new URL("../css/bibliotheque.css?v=bibliotheque-v11-20261109", script.src).href;
       link.setAttribute("data-bib-css", "");
       document.head.appendChild(link);
     } catch (_err) {}

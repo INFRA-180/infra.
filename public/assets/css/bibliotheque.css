@@ -135,7 +135,7 @@ body::after {
   .bib-tabs { padding: 0 16px; }
 }
 
-/* Playlists : rangée horizontale de mosaïques, nom « INFRA ☾ » en texte */
+/* Playlists : rangée horizontale de mosaïques, nom = le picto seul « ☾ » (INFRA, 09/11/2026) */
 .home-screen .playlists-grid {
   display: grid;
   grid-template-columns: none;
@@ -169,7 +169,7 @@ body::after {
   margin-top: 0;
 }
 .home-screen .playlist-card .playlist-card-title::before {
-  content: "INFRA\00a0";
+  content: none; /* plus de « INFRA » devant le picto (INFRA, 09/11/2026) */
   display: inline;
   width: auto;
   height: auto;

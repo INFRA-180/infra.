@@ -1688,3 +1688,13 @@
 - `DOCS/ACCES_CLAUDE_20261105.md` : accès vérifiés (gh, wrangler OAuth, Pages ; R2 refusé via OAuth) + questions pour Codex.
 - `DOCS/AUDIT_UX_CODE_20261105.md` : 10 points UX/code (accueil mobile 1 colonne, pochettes 1200 px sans srcset, favoris cachés, accents manquants…).
 - `DOCS/maquettes/MAQUETTE_BIBLIOTHEQUE_20261105.html` + `MAQUETTE_20261105.md` : bibliothèque proposée ; lecteur plein écran validé par INFRA, inchangé.
+
+## 2026-11-08 → 09 — Bibliothèque V3 → V5 (Claude)
+
+- Publications : V3 `dc6fa1e` (`audiofix413`) ; conformité maquette V4 `06c34e1` (`audiofix414`) ; lecteur et mise à jour iPhone `ea5d194` (`audiofix415`, activation du Worker en attente seulement app visible et sans lecture, puis un rechargement) ; accueil iPhone `555bfcc` (`audiofix416`) ; fenêtre d’installation montrée une fois `8619052` (`audiofix417`).
+- 09/11 `77ad3b0` (`audiofix418`) : cœur à côté du logo retiré (doublon de l’onglet Favoris) ; l’accueil reste en mémoire aussi au retour d’une playlist, images visibles décodées avant réaffichage ; le grand lecteur se réduit dans la barre en fermant (bouton et glisser), fond qui s’efface.
+- 09/11 `6923646` (`audiofix419`, `bibliotheque-v8`) : maquette V5 validée par INFRA. Onglet « Apps & clips » retiré ; accueil Playlists, Albums, Vos favoris, Clips, Applications ; Clips et Applications repliés par défaut (« Tout voir » / « Masquer », choix retenu) ; clips en vignettes 16:9 locales (`public/assets/clips/`), lus sur place, musique mise en pause au lancement et clip mis en pause quand la musique repart (`enablejsapi`).
+- Règle : `styles.css` est figé par empreinte (`tools/verify-audio-stability.js`) ; toute retouche d’apparence va dans `bibliotheque.css`.
+- L’ordre des clips suit le catalogue du site ; `/catalog/latest` (Worker) garde l’ancien ordre jusqu’à la prochaine synchronisation `sync-itunes-r2-catalog.js`, qui recopie les clips du `catalog.json` local.
+- Les documents de travail (maquettes, suivis, sources, audits) restent locaux, hors Git.
+- Non vérifié : iPhone réel (validation d’INFRA).

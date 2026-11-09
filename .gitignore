@@ -75,3 +75,10 @@ cache/
 tmp/
 .idea/
 .vscode/
+
+# Documents de travail locaux (maquettes, suivis, sources, audits, accès) : jamais publiés
+DOCS/maquettes/
+DOCS/SUIVI_*.md
+DOCS/SOURCES_*.md
+DOCS/AUDIT_*.md
+DOCS/ACCES_*.md

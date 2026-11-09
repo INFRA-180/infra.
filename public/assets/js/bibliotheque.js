@@ -576,4 +576,36 @@
     new MutationObserver(boot)
       .observe(document.body, { attributes: true, attributeFilter: ["class"] });
   }
+
+  // ---------- Gestes iPhone (INFRA, 09/11/2026) ----------
+  // 1. Fiche album/playlist : glisser depuis le bord gauche = retour à la Bibliothèque.
+  // 2. Barre du lecteur : glisser ← / → = titre suivant / précédent ; glisser ↑ = grand lecteur.
+  (function gestures() {
+    var g = null;
+    function currentLayer() { return document.querySelector(".spa-route-layer[data-spa-route-state='current']") || document.body; }
+    document.addEventListener("touchstart", function (e) {
+      if (!e.touches || e.touches.length !== 1) { g = null; return; }
+      var t = e.touches[0], target = e.target && e.target.closest ? e.target : null;
+      var bar = transport();
+      if (bar && target && bar.contains(target) && !target.closest("[data-transport-mini-progress], input")) {
+        g = { kind: "bar", x: t.clientX, y: t.clientY };
+      } else if (t.clientX < 24 && currentLayer().querySelector(".back")) {
+        g = { kind: "edge", x: t.clientX, y: t.clientY };
+      } else g = null;
+    }, { passive: true, capture: true });
+    document.addEventListener("touchend", function (e) {
+      if (!g || !e.changedTouches || !e.changedTouches[0]) { g = null; return; }
+      var t = e.changedTouches[0], dx = t.clientX - g.x, dy = t.clientY - g.y, kind = g.kind; g = null;
+      if (kind === "edge" && dx > 70 && Math.abs(dy) < dx / 2) {
+        var back = currentLayer().querySelector(".back"); if (back) back.click();
+      } else if (kind === "bar") {
+        var bar = transport(); if (!bar) return;
+        var btn = null;
+        if (Math.abs(dx) > 60 && Math.abs(dy) < Math.abs(dx) / 2) btn = bar.querySelector(dx < 0 ? "[data-transport-next]" : "[data-transport-prev]");
+        else if (dy < -50 && Math.abs(dx) < -dy / 2) btn = bar.querySelector("[data-transport-now]");
+        if (btn) { btn.click(); if (e.cancelable) e.preventDefault(); }
+      }
+    }, { passive: false, capture: true });
+    document.addEventListener("touchcancel", function () { g = null; }, true);
+  })();
 })();

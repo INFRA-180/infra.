@@ -95,6 +95,9 @@ for (const c of cat.clips) {
   expect(fs.existsSync(path.join(ROOT, "public/assets/clips/" + id + "-480.webp")), "vignette locale absente : " + id);
 }
 
+// Gestes iPhone (INFRA, 09/11/2026)
+expect(js.includes("// ---------- Gestes iPhone") && js.includes("[data-transport-next]") && js.includes('kind === "edge"'), "gestes iPhone absents");
+
 // Le script ne plante pas hors navigateur (bancs d'essai des autres tests)
 try { vm.runInNewContext(js, { window: {}, document: {} }); } catch (err) { failures.push("bibliotheque.js plante hors navigateur : " + err.message); }
 

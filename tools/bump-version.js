@@ -4,7 +4,7 @@
 // Une seule commande pour monter les trois versions du site (INFRA, 09/11/2026, lot 2) :
 //   - audiofixNNN-AAAAMMJJ        (scripts et feuilles, ?v=…)
 //   - infra-shell-AAAAMMJJ-audioNNN (Service Worker et contrat SPA)
-//   - bibliotheque-vN-AAAAMMJJ    (bibliotheque.css / bibliotheque.js)
+//   - bibliotheque-vN-AAAAMMJJ    (bibliotheque.js ; styles dans styles.css depuis le lot 3)
 // Oublier l'une d'elles laisse l'iPhone sur d'anciens fichiers.
 // Usage : npm run bump            (écrit)
 //         npm run bump -- --dry   (montre sans écrire)
@@ -36,12 +36,12 @@ function walk(directory, files = []) {
 function readCurrent(publicRoot) {
   const scripts = fs.readFileSync(path.join(publicRoot, "assets/js/scripts.js"), "utf8");
   const sw = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
-  const index = fs.readFileSync(path.join(publicRoot, "index.html"), "utf8");
+  const homeCatalog = fs.readFileSync(path.join(publicRoot, "assets/js/home-catalog.js"), "utf8");
   const build = (scripts.match(/window\.INFRA_BUILD_TAG = "(audiofix(\d+)-\d{8})";/) || []);
   const shell = (sw.match(/const VERSION = "(infra-shell-\d{8}-audio\d+)";/) || []);
-  const bib = (index.match(/(bibliotheque-v(\d+)-\d{8})/) || []);
+  const bib = (homeCatalog.match(/var VERSION = "(bibliotheque-v(\d+)-\d{8})"/) || []);
   if (!build[1] || !shell[1] || !bib[1]) {
-    throw new Error("versions introuvables (scripts.js, sw.js ou index.html)");
+    throw new Error("versions introuvables (scripts.js, sw.js ou home-catalog.js)");
   }
   return { build: build[1], buildNumber: Number(build[2]), shell: shell[1], bib: bib[1], bibNumber: Number(bib[2]) };
 }

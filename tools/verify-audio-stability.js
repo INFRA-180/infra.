@@ -37,7 +37,6 @@ const release = (scripts.match(/window\.INFRA_BUILD_TAG = "([^"]+)";/) || [])[1]
 const shellRelease = (sw.match(/const VERSION = "([^"]+)";/) || [])[1] || "";
 const cssRelease = release;
 const catalogAlbumCount = (JSON.parse(read("public/data/tracks.json")).albums || []).length;
-const frozenCssSha256 = "2dcf3151ace49a6d4da81b4c072d42144e75301a506ef6a52f1dce08ca019252";
 
 function functionBody(source, name, nextName) {
   const start = source.indexOf(`function ${name}`);
@@ -447,8 +446,8 @@ expect(telemetry.includes('"fullscreen_viewport"'), "fullscreen viewport telemet
 expect(!nowPlaying.includes("ios-standalone-viewport-gap"), "ineffective iOS viewport compensation is still active");
 expect(!telemetry.includes('"fullscreen_compensated"'), "obsolete fullscreen compensation telemetry remains");
 
-const cssHash = crypto.createHash("sha256").update(styles).digest("hex");
-expect(cssHash === frozenCssSha256, "styles.css differs from the approved player appearance");
+// Lot 3 (INFRA, 09/11/2026) : l'empreinte de styles.css est remplacée par les captures comparées au pixel
+// (npm run visual, grand lecteur compris) ; les contrôles précis ci-dessous restent.
 expect(
   /\.global-transport-mini-progress\s*\{[^}]*height:\s*26px;[^}]*margin:\s*-4px 0;/.test(styles),
   "mini-player seek control does not preserve its enlarged touch target"

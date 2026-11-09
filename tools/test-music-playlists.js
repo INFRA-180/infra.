@@ -219,7 +219,7 @@ if (JSON.stringify(seoOrder) !== JSON.stringify(expected.map((contract) => contr
   fail(`SEO playlist order is incorrect: ${seoOrder.join(" -> ")}`);
 }
 
-const playlistStyles = read("public/assets/css/playlists.css");
+const playlistStyles = read("public/assets/css/styles.css"); // playlists.css fusionné au lot 3
 if (!playlistStyles.includes(".playlist-cover-tile") || !playlistStyles.includes("grid-template-columns: repeat(2") || playlistStyles.includes(".playlist-cover-image")) {
   fail("playlist album mosaics are not styled correctly");
 }

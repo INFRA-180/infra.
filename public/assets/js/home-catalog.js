@@ -1093,17 +1093,11 @@
   "use strict";
   if (typeof document === "undefined" || typeof window === "undefined") return;
   if (typeof document.createElement !== "function" || !document.head) return;
-  var VERSION = "bibliotheque-v11-20261109";
+  var VERSION = "bibliotheque-v12-20261109";
   try {
     var script = document.currentScript;
     if (!script || !script.src) return;
-    if (!document.querySelector("link[data-bib-css]")) {
-      var link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = new URL("../css/bibliotheque.css?v=" + VERSION, script.src).href;
-      link.setAttribute("data-bib-css", "");
-      document.head.appendChild(link);
-    }
+    // Styles : dans styles.css depuis le lot 3 (INFRA, 09/11/2026).
     if (!document.querySelector("script[data-bib-js]")) {
       var js = document.createElement("script");
       js.src = new URL("bibliotheque.js?v=" + VERSION, script.src).href;

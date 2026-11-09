@@ -10,7 +10,7 @@ const failures = [];
 const expect = (ok, msg) => { if (!ok) failures.push(msg); };
 
 const index = read("public/index.html");
-const css = read("public/assets/css/bibliotheque.css");
+const css = read("public/assets/css/styles.css");
 const js = read("public/assets/js/bibliotheque.js");
 const home = read("public/assets/js/home-catalog.js");
 const fav = read("public/assets/js/favorites-ui.js");
@@ -25,10 +25,10 @@ expect(/data-bib-search/.test(index) && /data-bib-searchbtn/.test(index), "reche
 expect(index.indexOf('data-module-id="albums"') < index.indexOf('data-module-id="playlists"'), "l'ordre du HTML a changé");
 expect(/\[data-module-id="playlists"\] \{ order: 1; \}/.test(css), "Playlists n'est plus affichée en premier");
 expect(/one-page-layout::after \{ order: 99; \}/.test(css), "l'espace de fin de page n'est plus en dernier");
-// styles.css reste intact (empreinte du lecteur validé)
-expect(!/Bibliothèque V3/.test(styles), "styles.css ne doit pas contenir la bibliothèque");
+// Lot 3 (INFRA, 09/11/2026) : la Bibliothèque est fusionnée dans styles.css, après playlists.css
+expect(styles.indexOf("Ex-playlists.css") > 0 && styles.indexOf("Ex-bibliotheque.css") > styles.indexOf("Ex-playlists.css"), "ordre de fusion des styles changé");
 // Chargement depuis une page album (retour à l'accueil par la navigation interne)
-expect(/data-bib-css/.test(home) && /data-bib-js/.test(home), "home-catalog.js ne charge plus la bibliothèque");
+expect(/data-bib-js/.test(home), "home-catalog.js ne charge plus la bibliothèque");
 // Les onglets sont des boutons : la navigation interne ne les intercepte pas
 expect(!/<a[^>]+data-bib-tab/.test(index), "un onglet est un lien");
 // Lecture d'une liste : même chemin que les favoris, liste non limitée à un album
@@ -63,8 +63,9 @@ for (const page of ["music/d-2-0141-infra.html", "playlists/infra-moon.html"]) {
 const sw = read("public/sw.js");
 const version = home.match(/var VERSION = "(bibliotheque-v\d+-\d{8})"/)?.[1];
 expect(Boolean(version), "version datée de la Bibliothèque absente");
-expect(index.includes("bibliotheque.css?v=" + version), "version CSS différente entre l’accueil et le chargeur");
-expect(sw.includes("./assets/css/bibliotheque.css?v=" + version), "CSS de la Bibliothèque absent du précache");
+// Lot 3 (INFRA, 09/11/2026) : les styles de la Bibliothèque sont dans styles.css, plus de feuille à part.
+expect(!index.includes("bibliotheque.css"), "lien bibliotheque.css encore présent sur l’accueil");
+expect(!sw.includes("bibliotheque.css"), "bibliotheque.css encore dans le précache");
 expect(sw.includes("./assets/js/bibliotheque.js?v=" + version), "JS de la Bibliothèque absent du précache");
 
 // Maquette V4 (INFRA, 08/11/2026)
@@ -72,7 +73,7 @@ const albumUi = read("public/assets/js/album-player-ui.js");
 expect(/\.global-transport-controls \{\s*position: absolute !important; left: 50% !important;/.test(css), "commandes du lecteur pas centrées");
 expect(/\.spa-route-layer\.album-screen::before[\s\S]{0,200}background-image: none !important/.test(css), "fond des fiches pas blanc");
 expect(css.includes(".bib-meta-row") && albumUi.includes("bib-meta-row"), "boutons de la fiche pas à droite de la ligne d’infos");
-expect(albumUi.includes("data-bib-css") && albumUi.includes("bibliotheque.css?v=" + version), "feuille Bibliothèque non chargée sur une fiche ouverte directement");
+expect(!albumUi.includes("bibliotheque.css") && !home.includes("bibliotheque.css"), "ajout dynamique de bibliotheque.css encore présent");
 expect(js.includes("bib-idle") && js.includes("[data-transport-toggle]"), "lecteur au repos absent");
 expect(js.includes("data-bib-albumplay"), "▶ sur les pochettes absent");
 expect(js.includes('data-bib-goto="playlists">Tout voir'), "« Tout voir » des playlists absent");

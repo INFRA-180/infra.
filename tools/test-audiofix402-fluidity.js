@@ -57,7 +57,7 @@ assert.match(restoreSource, /outgoing\.setAttribute\("data-spa-route-state", "co
 assert.match(restoreSource, /nextSpaAnimationFrame\(\)\.then\(nextSpaAnimationFrame\)/);
 assert.doesNotMatch(restoreSource, /"retiring"/);
 {
-  const bibCss = read("public/assets/css/bibliotheque.css");
+  const bibCss = read("public/assets/css/styles.css");
   assert.match(bibCss, /data-spa-route-state="covering"/);
   // Zone de l'heure de l'app installée : onglets sous l'heure, voile sur l'heure.
   assert.match(bibCss, /\.bib-tabs \{\s*position: sticky;\s*top: env\(safe-area-inset-top, 0px\);/);

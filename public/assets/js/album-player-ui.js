@@ -325,19 +325,7 @@
     header.append(artwork, info);
   }
 
-  // Bibliothèque V4 : la feuille de styles est aussi chargée quand on arrive directement par une fiche.
-  (function ensureBibliothequeCss() {
-    try {
-      if (typeof document === "undefined" || !document.head || document.querySelector("link[data-bib-css]")) return;
-      const script = document.currentScript;
-      if (!script || !script.src) return;
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = new URL("../css/bibliotheque.css?v=bibliotheque-v11-20261109", script.src).href;
-      link.setAttribute("data-bib-css", "");
-      document.head.appendChild(link);
-    } catch (_err) {}
-  })();
+  // Les styles de la Bibliothèque sont dans styles.css depuis le lot 3 (INFRA, 09/11/2026).
 
   function collectionButton(className, label, icon) {
     const button = document.createElement("button");

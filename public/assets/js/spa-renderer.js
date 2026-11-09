@@ -1213,7 +1213,7 @@
       // Trame blanche au retour (INFRA, 09/11/2026 ; vidéo du simulateur) : l'accueil gardé
       // se repeint par morceaux pendant ~3 trames après être redevenu visible. La page quittée
       // reste donc posée par-dessus, figée à sa position, le temps que l'accueil soit peint
-      // dessous, puis s'efface (« covering », styles dans bibliotheque.css).
+      // dessous, puis s'efface (« covering », styles dans styles.css).
       let coveringOutgoing = null;
       const coverScrollY = Math.max(0, Number(window.scrollY) || 0);
       setSpaSwapPaintLock(true);

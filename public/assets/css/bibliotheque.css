@@ -12,7 +12,7 @@
    Bibliothèque V3 — lot 1 (accueil) — maquette validée par INFRA le 08/11/2026
    DOCS/maquettes/MAQUETTE_V3_20261108.md
    L'ordre du HTML ne change pas (outil de mise à jour du catalogue) : l'ordre
-   Playlists → Albums → Apps → Clips est fait ici, à l'affichage.
+   Playlists → Albums → Vos favoris → Clips → Applications (V5) est fait ici, à l’affichage.
    ========================================================================== */
 .home-screen .hero { padding-bottom: 6px; }
 
@@ -68,9 +68,10 @@
 /* Ordre d'affichage de l'accueil */
 .home-screen .one-page-layout > [data-module-id="playlists"] { order: 1; }
 .home-screen .one-page-layout > [data-module-id="albums"] { order: 2; }
-.home-screen .one-page-layout > [data-module-id="apps"] { order: 3; }
+.home-screen .one-page-layout > [data-module-id="favoris"] { order: 3; }
 .home-screen .one-page-layout > [data-module-id="clips"] { order: 4; }
-.home-screen .one-page-layout > .seo-direct-links { order: 5; }
+.home-screen .one-page-layout > [data-module-id="apps"] { order: 5; }
+.home-screen .one-page-layout > .seo-direct-links { order: 6; }
 .home-screen .one-page-layout::after { order: 99; } /* espace de fin de page : reste en bas */
 .home-screen .one-page-layout > .module { scroll-margin-top: 56px; }
 
@@ -213,14 +214,12 @@
 .home-screen .albums-grid .album-card > span.bib-meta { font-size: 12px; font-weight: 400; letter-spacing: 0; color: rgba(17, 17, 17, 0.4); margin-top: -6px; font-variant-numeric: tabular-nums; }
 
 /* Vues : chaque onglet montre ses sections */
-.home-screen .bib-panel { order: 6; }
+.home-screen .bib-panel { order: 7; }
 body.home-screen:not([data-bib-view="titres"]):not(.bib-searching) .bib-panel { display: none; }
-body.home-screen[data-bib-view="accueil"] .one-page-layout > [data-module-id="clips"] { display: none; }
 body.home-screen[data-bib-view="accueil"] .albums-grid > li.bib-hide-home { display: none; }
 body.home-screen[data-bib-view="albums"] .one-page-layout > .module:not([data-module-id="albums"]) { display: none; }
 body.home-screen[data-bib-view="playlists"] .one-page-layout > .module:not([data-module-id="playlists"]) { display: none; }
 body.home-screen[data-bib-view="titres"] .one-page-layout > .module:not(.bib-panel) { display: none; }
-body.home-screen[data-bib-view="apps"] .one-page-layout > .module:not([data-module-id="apps"]):not([data-module-id="clips"]) { display: none; }
 body.home-screen.bib-searching .one-page-layout > .module:not(.bib-panel) { display: none; }
 
 /* Onglet Playlists : grille 2 colonnes (4 sur ordinateur) au lieu de la rangée */
@@ -648,3 +647,63 @@ html body.home-screen .playlists-grid .playlist-card { max-width: none !importan
 }
 .bib-install-close svg { width: 18px; height: 18px; }
 @media (prefers-reduced-motion: reduce) { .bib-install, .bib-install.is-open { transition: none; } }
+
+/* ==========================================================================
+   Maquette V5 — validée par INFRA le 09/11/2026 (DOCS/maquettes/MAQUETTE_V5_20261109.md)
+   Accueil : Playlists, Albums, Vos favoris, Clips, Applications. Clips et Applications repliés
+   par défaut (« Tout voir » / « Masquer », bibliotheque.js). Clip lu sur place, titre une seule fois.
+   ========================================================================== */
+.home-screen .bib-head { margin: 0; padding: 18px 0 10px; border: 0; }
+.home-screen .bib-head h2,
+.home-screen [data-module-id="apps"] .module-head h2 {
+  margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(17, 17, 17, 0.4);
+}
+.home-screen .bib-head h2::before, .home-screen .bib-head::after { content: none; display: none; }
+/* Les albums ne sont plus en bas de page : la réserve du lecteur reste à la fin (one-page-layout) */
+html body.home-screen .albums-grid:not(.playlists-grid) { padding-bottom: 0 !important; }
+body.home-screen:not(.bib-clips-open) [data-module-id="clips"] .bib-clips,
+body.home-screen:not(.bib-apps-open) [data-module-id="apps"] .apps-grid { display: none; }
+
+/* Vos favoris : lignes de titres + cœur plein (retirer) */
+.home-screen .bib-favs .bib-list-rows > li { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; }
+.home-screen .bib-favs .bib-row .t { text-transform: none; }
+.bib-noimg { width: 44px; height: 44px; border-radius: 6px; background: #e9e9e9; }
+.bib-heart {
+  width: 44px; height: 44px; margin-right: -13px; justify-self: end; display: grid; place-items: center;
+  border: 0; background: none; padding: 0; color: #e0353b; cursor: pointer;
+}
+.bib-heart svg { width: 18px; height: 18px; }
+
+/* Clips : vignettes 16:9, rangée qui défile au téléphone, 2 côte à côte dès 640 px */
+.bib-cliprow { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; grid-auto-flow: column; grid-auto-columns: calc((100% - 14px) / 2); overflow-x: auto; scrollbar-width: none; scroll-snap-type: x mandatory; }
+.bib-cliprow::-webkit-scrollbar { display: none; }
+.bib-cliprow > li { min-width: 0; scroll-snap-align: start; }
+.bib-cliprow > li[hidden] { display: none; }
+@media (max-width: 639px) {
+  .bib-cliprow { grid-auto-columns: 80%; margin: 0 -16px; padding: 0 16px; scroll-padding-inline: 16px; }
+}
+.bib-clipcard { display: block; width: 100%; border: 0; background: none; padding: 0; margin: 0; font: inherit; color: var(--ink, #111); text-align: left; cursor: pointer; }
+.bib-vid { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #111; }
+.bib-vid img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .25s ease; }
+.bib-clipcard:hover .bib-vid img { transform: scale(1.025); }
+.bib-vidplay { position: absolute; left: 2px; bottom: 2px; width: 40px; height: 40px; display: grid; place-items: center; color: #fff; filter: drop-shadow(0 1px 6px rgba(0, 0, 0, 0.55)); }
+.bib-vidplay svg { width: 15px; height: 15px; }
+.bib-clipcard .bib-cliptitle {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  padding-top: 8px; font-size: 14px; font-weight: 600; letter-spacing: 0.02em; line-height: 1.3;
+}
+.bib-clipplayer[hidden] { display: none; }
+.bib-clipplayer .bib-vid { background: #000; }
+.bib-clipplayer iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.bib-clipbar { display: flex; align-items: flex-start; gap: 8px; padding-top: 8px; }
+.bib-clipbar .bib-cliptitle { flex: 1 1 auto; min-width: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.02em; line-height: 1.3; padding-top: 1px; }
+.bib-clipbar .bib-cliptitle::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #e0353b; margin-right: 6px; vertical-align: middle; }
+.bib-clipclose { flex: none; width: 44px; height: 44px; margin: -12px -13px 0 0; display: grid; place-items: center; border: 0; background: none; padding: 0; color: rgba(17, 17, 17, 0.62); cursor: pointer; }
+.bib-clipclose svg { width: 18px; height: 18px; }
+.home-screen [data-module-id="clips"].is-playing .bib-clips { display: grid; gap: 18px; }
+body.home-screen:not(.bib-clips-open) [data-module-id="clips"].is-playing .bib-clips { display: none; }
+@media (min-width: 960px) {
+  .home-screen [data-module-id="clips"].is-playing .bib-clips { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  [data-module-id="clips"].is-playing .bib-cliprow { grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; gap: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .bib-vid img { transition: none; } }

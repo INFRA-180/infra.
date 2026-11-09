@@ -1,6 +1,10 @@
 (function () {
   "use strict";
 
+  const CLIP_SCRIPT_URL = typeof document !== "undefined" && document.currentScript && document.currentScript.src
+    ? document.currentScript.src
+    : "";
+
   // BEGIN GENERATED HOME THUMBNAILS (tools/generate-bibliotheque-thumbnails.js)
   const HOME_ALBUM_COVER_SIZES = "(max-width: 639px) calc(50vw - 23px), (max-width: 959px) calc(33.33vw - 24px), (max-width: 1080px) calc(20vw - 24px), 192px";
   const HOME_MOSAIC_COVER_SIZES = "(max-width: 639px) 25vw, 130px";
@@ -793,70 +797,144 @@
       return Array.isArray(albums) ? albums.filter(Boolean) : [];
     }
 
+    // Clips sur l'accueil (maquette V5 validée par INFRA le 09/11/2026, DOCS/maquettes/MAQUETTE_V5_20261109.md) :
+    // vignettes 16:9 ; toucher = le clip se lit sur place à la place de sa vignette (titre affiché une seule fois) ;
+    // la musique se met en pause au lancement du clip, et le clip se met en pause quand la musique repart.
     function buildYouTubeEmbedUrl(videoId, autoplay) {
       const params = new URLSearchParams({
         rel: "0",
         modestbranding: "1",
-        playsinline: "1"
+        playsinline: "1",
+        enablejsapi: "1"
       });
       if (autoplay) params.set("autoplay", "1");
       return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?${params.toString()}`;
     }
 
+    function getClipThumbUrl(videoId) {
+      const name = `../clips/${encodeURIComponent(videoId)}-480.webp`;
+      try {
+        return CLIP_SCRIPT_URL ? new URL(name, CLIP_SCRIPT_URL).href : `assets/clips/${encodeURIComponent(videoId)}-480.webp`;
+      } catch (_err) {
+        return `assets/clips/${encodeURIComponent(videoId)}-480.webp`;
+      }
+    }
+
+    function getClipParts() {
+      const module = document.querySelector('[data-module-id="clips"]');
+      if (!module || typeof module.querySelector !== "function") return null;
+      return {
+        module,
+        grid: document.querySelector('[data-catalog-grid="clips"]'),
+        shell: module.querySelector("[data-clip-shell]"),
+        iframe: document.querySelector("[data-clip-iframe]"),
+        title: module.querySelector("[data-clip-title]")
+      };
+    }
+
+    function pauseActiveClip() {
+      const parts = getClipParts();
+      const frame = parts && parts.iframe;
+      if (!frame || !clipState.currentSrc || !frame.contentWindow) return;
+      try {
+        frame.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":[]}', "*");
+      } catch (_err) {
+        // The YouTube frame may not be ready yet.
+      }
+    }
+
+    function pauseMusicForClip() {
+      const toggle = document.querySelector(".global-transport.is-playing [data-transport-toggle]");
+      if (toggle && typeof toggle.click === "function") toggle.click();
+    }
+
+    function revealClipPlayer(shell) {
+      if (!shell || typeof shell.getBoundingClientRect !== "function" || typeof window.scrollBy !== "function") return;
+      const rect = shell.getBoundingClientRect();
+      const bar = document.querySelector(".bib-tabs");
+      const transport = document.querySelector(".global-transport");
+      const top = (bar ? bar.getBoundingClientRect().bottom : 0) + 8;
+      const bottom = (transport && transport.getBoundingClientRect().top > 0
+        ? transport.getBoundingClientRect().top
+        : window.innerHeight) - 8;
+      const delta = rect.top < top ? rect.top - top : (rect.bottom > bottom ? Math.min(rect.bottom - bottom, rect.top - top) : 0);
+      if (!delta) return;
+      const reduce = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollBy({ top: delta, behavior: reduce ? "auto" : "smooth" });
+    }
+
     function setActiveClip(clipId, opts) {
-      const iframe = document.querySelector("[data-clip-iframe]");
-      const shell = iframe ? iframe.closest(".clip-player-shell") : null;
-      if (!iframe) return;
-
+      const parts = getClipParts();
+      if (!parts || !parts.iframe) return;
       const active = clipState.clips.find((clip) => clip.id === clipId);
-      if (!active || !active.youtubeId) return;
+      const options = opts || {};
 
-      const shouldLoad = !(opts && opts.loadPlayer === false);
-      const autoplay = Boolean(opts && opts.autoplay);
-      if (shouldLoad) {
-        const embedUrl = buildYouTubeEmbedUrl(active.youtubeId, autoplay);
+      if (!active || !active.youtubeId) {
+        parts.iframe.removeAttribute("src");
+        clipState.currentSrc = "";
+        clipState.activeId = "";
+        if (parts.shell) parts.shell.hidden = true;
+        if (parts.module.classList) parts.module.classList.remove("is-playing");
+      } else {
+        const embedUrl = buildYouTubeEmbedUrl(active.youtubeId, Boolean(options.autoplay));
         if (embedUrl !== clipState.currentSrc) {
-          iframe.src = embedUrl;
+          parts.iframe.src = embedUrl;
           clipState.currentSrc = embedUrl;
         }
-        if (shell) shell.classList.remove("is-idle");
-      } else {
-        iframe.removeAttribute("src");
-        clipState.currentSrc = "";
-        if (shell) shell.classList.add("is-idle");
+        parts.iframe.setAttribute("title", active.title || "Clip INFRA");
+        clipState.activeId = active.id;
+        if (parts.title) parts.title.textContent = active.title || "";
+        if (parts.shell) parts.shell.hidden = false;
+        if (parts.module.classList) parts.module.classList.add("is-playing");
       }
-      clipState.activeId = active.id;
 
-      const buttons = Array.from(document.querySelectorAll(".clip-card[data-clip-id]"));
-      buttons.forEach((button) => {
-        const isActive = button.dataset.clipId === active.id;
-        button.classList.toggle("is-active", isActive);
-        button.setAttribute("aria-pressed", isActive ? "true" : "false");
+      const items = parts.grid && Array.isArray(parts.grid.children) ? parts.grid.children : (parts.grid ? Array.from(parts.grid.children || []) : []);
+      items.forEach(function (li) {
+        const button = li && li.firstChild ? li.firstChild : (li && li.children ? li.children[0] : null);
+        const isActive = Boolean(button && button.dataset && button.dataset.clipId === clipState.activeId);
+        li.hidden = isActive;
       });
+      if (clipState.activeId && options.reveal) revealClipPlayer(parts.shell);
+    }
+
+    function closeActiveClip() {
+      setActiveClip("", {});
     }
 
     function buildClipItem(item) {
       const li = document.createElement("li");
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "clip-card";
+      button.className = "bib-clipcard";
       button.dataset.clipId = item.id;
-      button.setAttribute("aria-label", `Lire ${item.title}`);
-      button.setAttribute("aria-pressed", "false");
+      button.setAttribute("aria-label", `Lire le clip ${item.title}`);
+
+      const frame = document.createElement("span");
+      frame.className = "bib-vid";
+      frame.setAttribute("aria-hidden", "true");
+      const image = document.createElement("img");
+      image.setAttribute("src", getClipThumbUrl(item.youtubeId));
+      image.setAttribute("alt", "");
+      image.setAttribute("width", "480");
+      image.setAttribute("height", "270");
+      image.setAttribute("loading", "lazy");
+      image.setAttribute("decoding", "async");
+      const play = document.createElement("span");
+      play.className = "bib-vidplay";
+      play.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>';
+      frame.appendChild(image);
+      frame.appendChild(play);
 
       const title = document.createElement("span");
-      title.className = "clip-title";
+      title.className = "bib-cliptitle";
       if (item.editKey) title.setAttribute("data-edit-key", item.editKey);
       title.textContent = item.title;
 
-      const source = document.createElement("span");
-      source.className = "clip-source";
-      source.textContent = "YouTube";
-
+      button.appendChild(frame);
       button.appendChild(title);
-      button.appendChild(source);
       button.addEventListener("click", function () {
-        setActiveClip(item.id, { autoplay: true });
+        pauseMusicForClip();
+        setActiveClip(item.id, { autoplay: true, reveal: true });
       });
 
       li.appendChild(button);
@@ -864,22 +942,26 @@
     }
 
     function renderClipsSection(clips) {
-      const module = document.querySelector('[data-module-id="clips"]');
-      const grid = document.querySelector('[data-catalog-grid="clips"]');
-      const iframe = document.querySelector("[data-clip-iframe]");
-      if (!module || !grid || !iframe) return;
-      const menu = module.querySelector(".clips-menu");
+      const parts = getClipParts();
+      if (!parts || !parts.grid || !parts.iframe) return;
 
-      const safe = Array.isArray(clips) ? clips.filter((entry) => entry && entry.id && entry.youtubeId) : [];
+      // Ordre voulu par INFRA (09/11/2026, VOLDEMORT d'abord) = ordre du catalogue du site ; le
+      // catalogue en ligne garde l'ancien ordre jusqu'à sa prochaine synchronisation.
+      const clipKey = (entry) => String((entry && (entry.youtubeId || ((String(entry.youtubeUrl || "").match(/[?&]v=([\w-]+)/) || [])[1]))) || "");
+      const siteOrder = (sanitizeCatalog(fallbackCatalog).clips || []).map(clipKey);
+      const rank = (entry) => { const i = siteOrder.indexOf(clipKey(entry)); return i < 0 ? siteOrder.length : i; };
+      const safe = (Array.isArray(clips) ? clips.filter((entry) => entry && entry.id && entry.youtubeId) : [])
+        .map((entry, index) => ({ entry, index }))
+        .sort((a, b) => rank(a.entry) - rank(b.entry) || a.index - b.index)
+        .map((item) => item.entry);
+      const previousActive = clipState.activeId;
       clipState.clips = safe.slice();
-      clipState.activeId = "";
-      clipState.currentSrc = "";
 
       if (!safe.length) {
-        module.hidden = true;
-        grid.replaceChildren();
-        iframe.removeAttribute("src");
-        grid.dataset.catalogReady = "1";
+        parts.module.hidden = true;
+        parts.grid.replaceChildren();
+        closeActiveClip();
+        parts.grid.dataset.catalogReady = "1";
         return;
       }
 
@@ -887,34 +969,27 @@
       safe.forEach((item) => {
         fragment.appendChild(buildClipItem(item));
       });
-      grid.replaceChildren(fragment);
-      grid.dataset.catalogReady = "1";
-      module.hidden = false;
+      parts.grid.replaceChildren(fragment);
+      parts.grid.dataset.catalogReady = "1";
+      parts.module.hidden = false;
 
-      const firstId = safe[0].id;
-      const isOpen = menu ? menu.open : false;
-      setActiveClip(firstId, {
-        autoplay: false,
-        loadPlayer: isOpen
-      });
+      // Le catalogue peut être redessiné (catalogue en direct) : un clip en cours continue.
+      // Un accueil reconstruit (iframe vide) repart sans clip ouvert.
+      const playing = Boolean(parts.iframe.getAttribute("src"));
+      if (playing && previousActive && safe.some((clip) => clip.id === previousActive)) setActiveClip(previousActive, {});
+      else closeActiveClip();
 
-      if (menu) {
-        if (menu._infraClipsToggleHandler) {
-          menu.removeEventListener("toggle", menu._infraClipsToggleHandler);
-        }
-        const onToggle = function () {
-          if (menu.open) {
-            const activeId = clipState.activeId || (clipState.clips[0] && clipState.clips[0].id);
-            if (activeId) setActiveClip(activeId, { autoplay: false });
-            return;
-          }
-          iframe.removeAttribute("src");
-          clipState.currentSrc = "";
-          const shell = iframe.closest(".clip-player-shell");
-          if (shell) shell.classList.add("is-idle");
-        };
-        menu._infraClipsToggleHandler = onToggle;
-        menu.addEventListener("toggle", onToggle);
+      const closeButton = parts.module.querySelector("[data-clip-close]");
+      if (closeButton && !closeButton._infraClipCloseBound) {
+        closeButton._infraClipCloseBound = true;
+        closeButton.addEventListener("click", closeActiveClip);
+      }
+      if (!clipState.musicListenerBound && typeof document.addEventListener === "function") {
+        clipState.musicListenerBound = true;
+        document.addEventListener("play", function (event) {
+          const target = event && event.target;
+          if (target && String(target.tagName || "").toUpperCase() === "AUDIO") pauseActiveClip();
+        }, true);
       }
     }
 
@@ -1018,7 +1093,7 @@
   "use strict";
   if (typeof document === "undefined" || typeof window === "undefined") return;
   if (typeof document.createElement !== "function" || !document.head) return;
-  var VERSION = "bibliotheque-v7-20261108";
+  var VERSION = "bibliotheque-v8-20261109";
   try {
     var script = document.currentScript;
     if (!script || !script.src) return;

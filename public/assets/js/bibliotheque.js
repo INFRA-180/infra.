@@ -1,6 +1,9 @@
 // Bibliothèque V3 (maquette validée par INFRA le 08/11/2026 — DOCS/maquettes/MAQUETTE_V3_20261108.md)
-// Lot 1 : ligne d'onglets. Lot 2 : vues Albums / Playlists / Titres / Favoris / Apps & clips,
+// Lot 1 : ligne d'onglets. Lot 2 : vues Albums / Playlists / Titres / Favoris,
 // recherche, tri, grille ou liste, nombres, titres écrits tels quels.
+// Maquette V5 (validée par INFRA le 09/11/2026, DOCS/maquettes/MAQUETTE_V5_20261109.md) : onglet
+// « Apps & clips » retiré ; accueil Playlists, Albums, Vos favoris, Clips, Applications ; Clips et
+// Applications repliés par défaut, « Tout voir » / « Masquer » (choix retenu).
 // Rien ici ne touche au moteur audio : la lecture d'une liste passe par
 // window.InfraLibraryPlayback (favorites-ui.js), le même chemin que les favoris.
 (function () {
@@ -11,7 +14,7 @@
   window.__infraBibliotheque = true;
   var scriptUrl = document.currentScript && document.currentScript.src;
 
-  var VIEWS = ["accueil", "albums", "playlists", "titres", "favoris", "apps"];
+  var VIEWS = ["accueil", "albums", "playlists", "titres", "favoris"];
   var SORTS = { site: "Ordre du site", az: "A → Z", duree: "Durée", titres: "Nombre de titres" };
   var HOME_ALBUMS = 10;
   var store = {
@@ -24,7 +27,8 @@
     trackSort: store.get("trackSort", "site"),
     layout: store.get("layout", "grid"),
     sortOpen: false,
-    q: ""
+    q: "",
+    open: { clips: store.get("clipsOpen", false) === true, apps: store.get("appsOpen", false) === true }
   };
   var data = null; // { albums: [{title, page, cover, tracks:[{title, src, seconds}]}], byPage: {} }
   var dataPromise = null;
@@ -133,6 +137,8 @@
     decorateAlbums();
     renderAlbumTools();
     renderPlaylistTools();
+    renderFoldTools();
+    renderHomeFavorites();
     if (state.view === "titres" || state.q) renderTracksView();
     else clearPanel();
   }
@@ -220,6 +226,58 @@
       if (f !== t) m.textContent = f;
     });
   }
+  // Clips et Applications : repliés par défaut, « Tout voir » / « Masquer » dans le titre de section.
+  function renderFoldTools() {
+    ["clips", "apps"].forEach(function (id) {
+      var open = !!state.open[id];
+      document.body.classList.toggle("bib-" + id + "-open", open);
+      var head = $('.home-screen [data-module-id="' + id + '"] .module-head'); if (!head) return;
+      var tools = $(".bib-sectools", head);
+      if (!tools) { tools = document.createElement("span"); tools.className = "bib-sectools"; head.appendChild(tools); }
+      var html = '<button type="button" class="bib-link" data-bib-fold="' + id + '" aria-expanded="' + open + '">' + (open ? "Masquer" : "Tout voir") + "</button>";
+      if (tools.innerHTML !== html) tools.innerHTML = html;
+    });
+  }
+  function toggleFold(id) {
+    state.open[id] = !state.open[id];
+    store.set(id + "Open", state.open[id]);
+    if (id === "clips" && !state.open.clips) {
+      var close = $('.home-screen [data-module-id="clips"] [data-clip-close]');
+      var player = $('.home-screen [data-module-id="clips"] [data-clip-shell]');
+      if (close && player && !player.hidden) close.click();
+    }
+    renderFoldTools();
+    var again = $('[data-bib-fold="' + id + '"]'); if (again) again.focus({ preventScroll: true });
+  }
+
+  // « Vos favoris » : les 4 premiers favoris, « Tout voir » ouvre l'onglet Favoris ; absente sans favori.
+  var HOME_FAVS = 4;
+  var HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 20s-7.5-4.4-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.6-7.5 10-7.5 10z"/></svg>';
+  var homeFavs = [];
+  function renderHomeFavorites() {
+    var layout = homeLayout(); if (!layout) return;
+    var api = window.InfraHomeFavorites;
+    var all = api && typeof api.list === "function" ? api.list() : [];
+    homeFavs = all.slice(0, HOME_FAVS);
+    var section = module("favoris");
+    if (!homeFavs.length) { if (section) section.hidden = true; return; }
+    if (!section) {
+      section = document.createElement("section");
+      section.className = "module one-col bib-favs";
+      section.setAttribute("data-module-id", "favoris");
+      layout.appendChild(section);
+    }
+    section.hidden = false;
+    var html = '<div class="module-head bib-head"><h2>Vos favoris</h2><span class="bib-sectools"><button type="button" class="bib-link" data-bib-goto="favoris">Tout voir</button></span></div>' +
+      '<ul class="bib-list-rows">' + homeFavs.map(function (t, i) {
+        return '<li><button type="button" class="bib-row" data-bib-favplay="' + i + '" aria-label="' + esc(t.title + ", " + t.album) + '">' +
+          (t.cover ? '<img src="' + esc(t.cover) + '" alt="" loading="lazy" decoding="async">' : '<span class="bib-noimg"></span>') +
+          '<span class="tx"><span class="t">' + esc(t.title) + '</span><span class="a">' + esc(t.album) + '</span></span><span class="d">' + esc(t.duration) + "</span></button>" +
+          '<button type="button" class="bib-heart" data-bib-favheart="' + i + '" aria-pressed="true" aria-label="Retirer ' + esc(t.title) + ' des favoris" title="Retirer des favoris">' + HEART + "</button></li>";
+      }).join("") + "</ul>";
+    if (section.innerHTML !== html) section.innerHTML = html;
+  }
+
   function sortButton(current) {
     var label = "Trier : " + SORTS[current];
     return '<button type="button" class="bib-ico' + (current !== "site" ? " set" : "") + '" data-bib-sortbtn aria-expanded="' + state.sortOpen + '" aria-label="' + esc(label) + '" title="' + esc(label) + '">' + ICON.sort + "</button>";
@@ -323,7 +381,7 @@
   // ---------- Événements ----------
   document.addEventListener("click", function (event) {
     if (!isHome()) return;
-    var el = event.target && event.target.closest ? event.target.closest("[data-bib-tab],[data-bib-goto],[data-bib-sortbtn],[data-bib-sort],[data-bib-layout],[data-bib-play],[data-bib-playall],[data-bib-albumplay],[data-bib-searchbtn],[data-bib-cancel]") : null;
+    var el = event.target && event.target.closest ? event.target.closest("[data-bib-tab],[data-bib-goto],[data-bib-sortbtn],[data-bib-sort],[data-bib-layout],[data-bib-play],[data-bib-playall],[data-bib-albumplay],[data-bib-searchbtn],[data-bib-cancel],[data-bib-fold],[data-bib-favplay],[data-bib-favheart]") : null;
     if (!el) return;
     if (el.closest("summary")) event.preventDefault(); // les outils sont dans le titre de section (<summary>)
     if (el.hasAttribute("data-bib-tab")) { var v = el.getAttribute("data-bib-tab"); selectView(v === "top" ? "accueil" : v); return; }
@@ -351,6 +409,17 @@
       }, function () {});
       return;
     }
+    if (el.hasAttribute("data-bib-fold")) { toggleFold(el.getAttribute("data-bib-fold")); return; }
+    if (el.hasAttribute("data-bib-favplay")) {
+      var lib = window.InfraLibraryPlayback;
+      if (lib && typeof lib.playPaths === "function") lib.playPaths(homeFavs.map(function (t) { return t.src; }), Number(el.getAttribute("data-bib-favplay")));
+      return;
+    }
+    if (el.hasAttribute("data-bib-favheart")) {
+      var favApi = window.InfraHomeFavorites, item = homeFavs[Number(el.getAttribute("data-bib-favheart"))];
+      if (favApi && item && typeof favApi.toggle === "function") favApi.toggle(item.path);
+      return;
+    }
     if (el.hasAttribute("data-bib-searchbtn")) { openSearch(); return; }
     if (el.hasAttribute("data-bib-cancel")) { closeSearch(); return; }
   });
@@ -368,6 +437,8 @@
     if (event.key === "Escape" && (state.q || ($("[data-bib-tabs]") && $("[data-bib-tabs]").classList.contains("searching")))) { closeSearch(); return; }
     if (event.key === "Escape" && state.sortOpen) { state.sortOpen = false; render(); }
   });
+
+  document.addEventListener("infra:favorites-sync", function () { if (isHome()) renderHomeFavorites(); });
 
   // La vue Favoris du site se ferme par son propre bouton retour : on remet l'onglet Accueil.
   window.addEventListener("hashchange", function () {

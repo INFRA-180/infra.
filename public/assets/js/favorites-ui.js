@@ -426,6 +426,10 @@
       );
     }
     // Le cœur à côté du logo a été retiré (INFRA, 09/11/2026) : l'onglet Favoris le remplace.
+    // Accueil V5 : la section « Vos favoris » (bibliotheque.js) se redessine à chaque changement.
+    if (typeof document.dispatchEvent === "function" && typeof CustomEvent === "function") {
+      document.dispatchEvent(new CustomEvent("infra:favorites-sync"));
+    }
   }
 
   function syncFavoriteButtons() {
@@ -1053,6 +1057,22 @@
   }
   if (typeof window !== "undefined" && window) {
     window.InfraLibraryPlayback = { playPaths: startLibraryPlaybackAt };
+    // Accueil V5 (maquette validée par INFRA le 09/11/2026) : les favoris dans l'ordre de l'onglet Favoris.
+    window.InfraHomeFavorites = {
+      list: function () {
+        return buildFavoritesPlaylist(audioState.favoriteEntries || []).map(function (track) {
+          return {
+            src: track.src,
+            path: normalizeFavoritePath(track.src || ""),
+            title: getFavoriteRowTitle(track),
+            album: getFavoriteRowAlbum(track),
+            duration: String(track.duration || "").trim() || formatTrackDuration(track.seconds),
+            cover: resolveCoverUrl(track, { width: 400 }) || ""
+          };
+        });
+      },
+      toggle: function (path) { return toggleFavoriteAndSync(path, "home_favorites"); }
+    };
   }
 
   function initHomeFavoritesButton() {

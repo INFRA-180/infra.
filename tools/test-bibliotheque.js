@@ -16,10 +16,10 @@ const home = read("public/assets/js/home-catalog.js");
 const fav = read("public/assets/js/favorites-ui.js");
 const styles = read("public/assets/css/styles.css");
 
-// Accueil : phrase retirée, six onglets dans l'ordre validé, recherche
+// Accueil : phrase retirée, cinq onglets dans l'ordre validé (V5 : « Apps & clips » retiré), recherche
 expect(!/class="hero-sub"/.test(index), "la phrase sous le logo est revenue");
 const tabs = [...index.matchAll(/data-bib-tab="([a-z]+)"/g)].map((m) => m[1]);
-expect(tabs.join(",") === "accueil,albums,playlists,titres,favoris,apps", "onglets attendus : " + tabs.join(","));
+expect(tabs.join(",") === "accueil,albums,playlists,titres,favoris", "onglets attendus : " + tabs.join(","));
 expect(/data-bib-search/.test(index) && /data-bib-searchbtn/.test(index), "recherche absente");
 // Ordre du HTML gardé pour l'outil de mise à jour du catalogue ; ordre visuel en CSS
 expect(index.indexOf('data-module-id="albums"') < index.indexOf('data-module-id="playlists"'), "l'ordre du HTML a changé");
@@ -77,6 +77,23 @@ expect(js.includes("bib-idle") && js.includes("[data-transport-toggle]"), "lecte
 expect(js.includes("data-bib-albumplay"), "▶ sur les pochettes absent");
 expect(js.includes('data-bib-goto="playlists">Tout voir'), "« Tout voir » des playlists absent");
 
+// Maquette V5 (INFRA, 09/11/2026) : Playlists, Albums, Vos favoris, Clips, Applications ;
+// Clips et Applications repliés par défaut ; clip lu sur place.
+const order = (id) => Number((css.match(new RegExp('\\[data-module-id="' + id + '"\\] \\{ order: (\\d+); \\}')) || [])[1]);
+expect(order("playlists") < order("albums") && order("albums") < order("favoris") && order("favoris") < order("clips") && order("clips") < order("apps"), "ordre V5 de l'accueil absent");
+expect(!/data-bib-view="accueil"\] \.one-page-layout > \[data-module-id="clips"\] \{ display: none/.test(css), "les clips sont encore cachés de l'accueil");
+expect(js.includes('store.get("clipsOpen", false)') && js.includes('store.get("appsOpen", false)'), "Clips / Applications pas repliés par défaut");
+expect(/not\(\.bib-clips-open\)[^{]*\.bib-clips/.test(css) && /not\(\.bib-apps-open\)[^{]*\.apps-grid/.test(css), "repli CSS des Clips / Applications absent");
+expect(js.includes('"Masquer" : "Tout voir"'), "« Tout voir » / « Masquer » absent");
+expect(js.includes("Vos favoris") && fav.includes("window.InfraHomeFavorites"), "section « Vos favoris » absente");
+expect(/data-clip-shell/.test(index) && /data-clip-close/.test(index) && !/clips-menu/.test(index), "lecteur de clip sur place absent");
+const cat = JSON.parse(read("public/data/catalog.json"));
+expect(/VOLDEMORT/.test(cat.clips[0].title), "VOLDEMORT doit être le premier clip");
+for (const c of cat.clips) {
+  const id = (c.youtubeUrl.match(/v=([\w-]+)/) || [])[1];
+  expect(fs.existsSync(path.join(ROOT, "public/assets/clips/" + id + "-480.webp")), "vignette locale absente : " + id);
+}
+
 // Le script ne plante pas hors navigateur (bancs d'essai des autres tests)
 try { vm.runInNewContext(js, { window: {}, document: {} }); } catch (err) { failures.push("bibliotheque.js plante hors navigateur : " + err.message); }
 
@@ -84,4 +101,4 @@ if (failures.length) {
   console.error("Bibliothèque : " + failures.length + " échec(s)\n- " + failures.join("\n- "));
   process.exit(1);
 }
-console.log("Bibliothèque V4 checks passed: tabs, order, frozen styles, loader, list playback, titles as-is, white sheets, centered player, idle player.");
+console.log("Bibliothèque V4 checks passed: tabs, order, frozen styles, loader, list playback, titles as-is, white sheets, centered player, idle player, V5 home (favorites, folded clips and apps).");

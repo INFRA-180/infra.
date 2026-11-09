@@ -463,16 +463,16 @@
   ],
   "clips": [
     {
-      "id": "clip-1",
-      "title": "FREEZE CORLEONE - CHEN LADEN (INFRA. MIX)",
-      "editKey": "clip_1",
-      "youtubeUrl": "https://www.youtube.com/watch?v=_JeILYHPjWE"
-    },
-    {
       "id": "clip-2",
       "title": "FREEZE CORLEONE - VOLDEMORT (INFRA. MIX)",
       "editKey": "clip_2",
       "youtubeUrl": "https://www.youtube.com/watch?v=fLcdQLtVt90"
+    },
+    {
+      "id": "clip-1",
+      "title": "FREEZE CORLEONE - CHEN LADEN (INFRA. MIX)",
+      "editKey": "clip_1",
+      "youtubeUrl": "https://www.youtube.com/watch?v=_JeILYHPjWE"
     }
   ]
 }

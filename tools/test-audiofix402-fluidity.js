@@ -52,6 +52,8 @@ assert.match(restoreSource, /retainedHome\.setAttribute\("data-spa-route-state",
 assert.match(restoreSource, /resumeLiveHomeRoute\(\);\s*window\.scrollTo\(requested\.x, requested\.y\);/);
 assert.match(restoreSource, /anchorCorrection = Math\.round\(anchor\.getBoundingClientRect\(\)\.top - route\.anchorViewportTop\)/);
 assert.match(restoreSource, /outgoing\.remove\(\)/);
+// Pas de « Chargement du fichier audio... » sous le titre choisi (INFRA, 09/11/2026) ; l'échec avec « réessayer » reste.
+assert.match(scripts, /if \(message && !opts\.retry && \/\^Chargement du fichier audio\/\.test\(message\)\) message = "";/);
 // Retour sans trame blanche (INFRA, 09/11/2026) : la page quittée reste par-dessus puis s'efface.
 assert.match(restoreSource, /outgoing\.setAttribute\("data-spa-route-state", "covering"\)/);
 assert.match(restoreSource, /nextSpaAnimationFrame\(\)\.then\(nextSpaAnimationFrame\)/);

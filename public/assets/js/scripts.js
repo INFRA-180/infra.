@@ -1,4 +1,4 @@
-window.INFRA_BUILD_TAG = "audiofix423-20261109";
+window.INFRA_BUILD_TAG = "audiofix424-20261109";
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
   document.documentElement.setAttribute("data-build", window.INFRA_BUILD_TAG);
@@ -479,7 +479,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const PREFETCH_REQUEST_TIMEOUT_MS = 8000;
   const PREFETCH_MAX_ATTEMPTS = 2;
   const WORKER_URL = "https://infra180-api.pages.dev";
-  const SPA_SHELL_VERSION = "infra-shell-20261109-audio423";
+  const SPA_SHELL_VERSION = "infra-shell-20261109-audio424";
   const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
   const SPA_PAGE_FETCH_TIMEOUT_MS = 2500;
   const SPA_SCROLL_HISTORY_DEBOUNCE_MS = Number.isFinite(Number(spaRouterConstants.SCROLL_HISTORY_DEBOUNCE_MS))
@@ -490,7 +490,7 @@ function openAppDownloadGatekeeper(appName, url) {
   // current deployment; reusing that cache would overwrite the fresh Home.
   const LIVE_CATALOG_CACHE_NAME = `${SPA_SHELL_VERSION}-catalog`;
   const LIVE_CATALOG_TIMEOUT_MS = 3500;
-  const LOCAL_CATALOG_VERSION = "audiofix423-20261109";
+  const LOCAL_CATALOG_VERSION = "audiofix424-20261109";
   const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
   function getAudioTelemetryNow() {
@@ -511,7 +511,7 @@ function openAppDownloadGatekeeper(appName, url) {
   const DESKTOP_TRANSPORT_DRAG_THRESHOLD = 6;
   const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
   const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
-  const runtimeVersion = "audiofix423-20261109";
+  const runtimeVersion = "audiofix424-20261109";
   const runtime = (function () {
     const scriptEl =
       document.currentScript ||
@@ -3761,6 +3761,9 @@ function openAppDownloadGatekeeper(appName, url) {
   function setTrackStatus(track, message, options) {
     if (!track || !track.statusEl) return;
     const opts = options || {};
+    // Le simple « Chargement du fichier audio... » n'est plus affiché sous le titre choisi
+    // (INFRA, 09/11/2026 : superflu). Le message d'échec avec « réessayer » reste.
+    if (message && !opts.retry && /^Chargement du fichier audio/.test(message)) message = "";
     track.statusText.textContent = message || "";
     track.retryBtn.hidden = !opts.retry;
     track.statusEl.hidden = !message;

@@ -83,3 +83,7 @@ DOCS/SOURCES_*.md
 DOCS/AUDIT_*.md
 DOCS/ACCES_*.md
 DOCS/PLAN_*.md
+
+# Captures du lot 1 : résultats d’essai locaux (les références, elles, sont suivies)
+tools/visual/.resultats/
+playwright-report/

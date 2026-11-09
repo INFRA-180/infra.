@@ -1698,3 +1698,10 @@
 - L’ordre des clips suit le catalogue du site ; `/catalog/latest` (Worker) garde l’ancien ordre jusqu’à la prochaine synchronisation `sync-itunes-r2-catalog.js`, qui recopie les clips du `catalog.json` local.
 - Les documents de travail (maquettes, suivis, sources, audits) restent locaux, hors Git.
 - Non vérifié : iPhone réel (validation d’INFRA).
+
+## 2026-11-09 — iPhone, versions et captures de référence (Claude)
+
+- `07c1050` : app installée (barre d'état transparente) — onglets collés sous l'heure (`top: env(safe-area-inset-top)`) et voile `body::after` sur la zone de l'heure ; retour à l'accueil sans trame blanche (la page quittée reste par-dessus 2 trames, état `covering`, puis s'efface en 160 ms). Mesuré en vidéo du simulateur iPhone.
+- `73525da` : **`npm run bump`** (`--dry` pour simuler) monte ensemble `audiofixNNN`, `infra-shell-…-audioNNN` et `bibliotheque-vN`. Ne plus monter les versions à la main.
+- Lot 1 : **`npm run visual`** compare 12 écrans (accueil, accueil défilé, album, playlist × téléphone 375 px, iPhone WebKit, ordinateur 1280 px) aux références `tools/visual/references/`, **tolérance 0 pixel**, réseau extérieur coupé. Après un changement d'affichage voulu et validé : `npm run visual:update`, puis regarder les nouvelles images avant de les commiter. Outil : `@playwright/test` 1.64.1 (dépendance de développement, accord d'INFRA du 09/11) ; navigateurs dans `~/Library/Caches/ms-playwright`. Pas dans `npm test` ni dans le déploiement GitHub (qui n'installe rien).
+- Vérifié : l'audio n'est publié que sur Cloudflare ; l'historique GitHub ne contient aucun `.m4a` (seul le miroir local `APP_NETWORK/GIT/remotes/SITE.git` en garde).

@@ -9,9 +9,12 @@
     "test": "node tools/release-audit.js",
     "audit:release": "node tools/release-audit.js",
     "check:boundary": "node tools/verify-public-boundary.js",
-    "bump": "node tools/bump-version.js"
+    "bump": "node tools/bump-version.js",
+    "visual": "playwright test",
+    "visual:update": "playwright test --update-snapshots"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "wrangler": "4.127.1"
   }
 }

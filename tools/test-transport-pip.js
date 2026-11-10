@@ -6,6 +6,7 @@ const { codeAssertMatch, codeHas, codeMatch } = require("./lib/code-text.js"); /
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..");
@@ -13,10 +14,10 @@ const transportPath = path.join(root, "public/assets/js/transport-ui.js");
 const stylesPath = path.join(root, "public/assets/css/styles.css");
 const scriptsPath = path.join(root, "public/assets/js/scripts.js");
 const favoritesPath = path.join(root, "public/assets/js/favorites-ui.js");
-const transportSource = fs.readFileSync(transportPath, "utf8");
+const transportSource = loadScript.sourceText(transportPath);
 const stylesSource = fs.readFileSync(stylesPath, "utf8");
 const scriptsSource = require("./build/app-sources.js").runtimeSource();
-const favoritesSource = fs.readFileSync(favoritesPath, "utf8");
+const favoritesSource = loadScript.sourceText(favoritesPath);
 
 function createClassList() {
   const values = new Set();
@@ -89,7 +90,7 @@ function createSandbox(requestWindow) {
     Element: function Element() {}
   };
   vm.createContext(sandbox);
-  vm.runInContext(transportSource, sandbox, { filename: transportPath });
+  loadScript.runInContext(transportPath, sandbox);
   return sandbox;
 }
 

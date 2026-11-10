@@ -5,6 +5,7 @@ const { codeAssertDoesNotMatch, codeAssertMatch, codeMatch, codeTest } = require
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 
 function read(relativePath) {
   return fs.readFileSync(path.resolve(__dirname, "..", relativePath), "utf8");
@@ -12,7 +13,7 @@ function read(relativePath) {
 
 const scripts = require("./build/app-sources.js").runtimeSource();
 const worker = read("public/sw.js");
-const audioRadio = read("public/assets/js/audio-radio.js");
+const audioRadio = loadScript.sourceText("public/assets/js/audio-radio.js");
 const nowPlaying = read("public/assets/js/now-playing.js");
 const runtime = [scripts, worker, audioRadio, nowPlaying].join("\n");
 

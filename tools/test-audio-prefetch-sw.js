@@ -5,6 +5,7 @@ const { codeHas, codeMatch, codeTest } = require("./lib/code-text.js"); // reche
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("node:vm");
 
 const publicRoot = path.resolve(__dirname, "../public");
@@ -188,7 +189,7 @@ const sandbox = {
   }
 };
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(path.resolve(__dirname, "../public/sw.js"), "utf8"), sandbox);
+loadScript.runInContext("public/sw.js", sandbox);
 
 function validCachedSegment(overrides) {
   const opts = overrides || {};

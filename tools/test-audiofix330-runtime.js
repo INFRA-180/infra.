@@ -6,6 +6,7 @@ const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const loadScriptFile = require("./lib/load-script.js");
 
 const ROOT = path.resolve(__dirname, "..");
 const CORE_PATH = path.join(ROOT, "public/assets/js/audio-core.js");
@@ -95,7 +96,7 @@ function createSandbox(overrides) {
 }
 
 function loadScript(sandbox, filePath) {
-  vm.runInContext(fs.readFileSync(filePath, "utf8"), sandbox, { filename: filePath });
+  loadScriptFile.runInContext(filePath, sandbox); // construit comme app.js (lot B)
 }
 
 function makeTracks(count) {
@@ -154,7 +155,7 @@ function testPlaybackAudioSessionConfiguration() {
 }
 
 function testAudioSessionInterruptionResumeGate() {
-  const radioSource = fs.readFileSync(RADIO_PATH, "utf8");
+  const radioSource = loadScriptFile.sourceText(RADIO_PATH);
   const scriptsSource = require("./build/app-sources.js").runtimeSource();
   assert(
     !codeHas(radioSource, "!audioState.audioSessionTelemetryBound &&"),
@@ -2923,7 +2924,7 @@ function extractFunctionBody(source, name) {
 }
 
 function testNoGlobalPrefetchClear() {
-  const radioSource = fs.readFileSync(RADIO_PATH, "utf8");
+  const radioSource = loadScriptFile.sourceText(RADIO_PATH);
   const clearBody = extractFunctionBody(radioSource, "clearNextTrackPrefetch");
   assert(!codeTest(/caches\s*\.\s*(?:delete|keys)\s*\(/, clearBody));
   assert(!codeTest(/clearCache\s*\(/, clearBody));
@@ -2957,7 +2958,7 @@ function testPersistentAlbumAndFullscreenContracts() {
     "An album route must preserve a foreign active queue instead of replacing it"
   );
 
-  const radioSource = fs.readFileSync(RADIO_PATH, "utf8");
+  const radioSource = loadScriptFile.sourceText(RADIO_PATH);
   const globalTransportStart = codeIndexOf(radioSource, "function handleGlobalTransportToggle");
   const globalTransportEnd = codeIndexOf(radioSource, "function ensureGlobalAudio", globalTransportStart);
   const globalTransportBody = radioSource.slice(globalTransportStart, globalTransportEnd);
@@ -3001,7 +3002,7 @@ function testPersistentAlbumAndFullscreenContracts() {
     "The first cold fullscreen open must immediately synchronize the desktop visualizer"
   );
 
-  const transportSource = fs.readFileSync(TRANSPORT_UI_PATH, "utf8");
+  const transportSource = loadScriptFile.sourceText(TRANSPORT_UI_PATH);
   const transportSyncBody = extractFunctionBody(transportSource, "syncTransportUi");
   assert(
     codeHas(transportSyncBody, 'const isAlbum = document.body.classList.contains("album-screen")') &&

@@ -6,10 +6,11 @@ const { codeHas } = require("./lib/code-text.js"); // recherches insensibles au 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..");
-const source = fs.readFileSync(path.join(root, "public/assets/js/audio-visualizer.js"), "utf8");
+const source = loadScript.sourceText("public/assets/js/audio-visualizer.js");
 const mediaListeners = new Map();
 let requestedAnimationFrame = null;
 let cancelledFrames = 0;
@@ -249,7 +250,7 @@ const sandbox = {
   }
 };
 sandbox.window.window = sandbox.window;
-vm.runInNewContext(source, sandbox, { filename: "audio-visualizer.js" });
+loadScript.runInNewContext("public/assets/js/audio-visualizer.js", sandbox);
 
 async function main() {
   const api = sandbox.window.InfraAudioVisualizer;

@@ -4,6 +4,7 @@ const { codeHas, codeIndexOf, codeMatch, codeTest } = require("./lib/code-text.j
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 
 const root = path.resolve(__dirname, "..");
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -16,14 +17,14 @@ const expect = (condition, message) => {
 };
 
 const scripts = require("./build/app-sources.js").runtimeSource();
-const radio = read("public/assets/js/audio-radio.js");
+const radio = loadScript.sourceText("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");
 const mediaSession = read("public/assets/js/media-session.js");
 const prefetch = read("public/assets/js/audio-prefetch.js");
 const catalogLoader = read("public/assets/js/catalog-loader.js");
 const albumUi = read("public/assets/js/album-player-ui.js");
 const nowPlaying = read("public/assets/js/now-playing.js");
-const transport = read("public/assets/js/transport-ui.js");
+const transport = loadScript.sourceText("public/assets/js/transport-ui.js");
 const visualizer = read("public/assets/js/audio-visualizer.js");
 const telemetry = read("public/assets/js/audio-telemetry.js");
 const covers = read("public/assets/js/covers.js");

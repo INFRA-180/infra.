@@ -4,6 +4,7 @@
 const { codeHas, codeIndexOf, codeMatch, codeTest } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
@@ -248,7 +249,7 @@ for (const contract of expected) {
 
 const albumUi = read("public/assets/js/album-player-ui.js");
 const audioCore = read("public/assets/js/audio-core.js");
-const audioRadio = read("public/assets/js/audio-radio.js");
+const audioRadio = loadScript.sourceText("public/assets/js/audio-radio.js");
 const scripts = require("./build/app-sources.js").runtimeSource();
 if (!codeHas(albumUi, 'document.body.classList.contains("playlist-screen") ? "playlist" : "album"')) {
   fail("playlist pages do not declare their queue type");

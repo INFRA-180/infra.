@@ -5,10 +5,11 @@ const { codeAssertMatch, codeHas, codeMatch, codeTest } = require("./lib/code-te
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("node:vm");
 
 const publicRoot = path.resolve(__dirname, "../public");
-const homeScript = fs.readFileSync(path.join(publicRoot, "assets/js/home-catalog.js"), "utf8");
+const homeScriptPath = path.join(publicRoot, "assets/js/home-catalog.js");
 const catalog = JSON.parse(fs.readFileSync(path.join(publicRoot, "data/catalog.json"), "utf8"));
 const album = catalog.albums.find(({ thumb }) => fs.existsSync(path.join(publicRoot, thumbnailPath(thumb))));
 assert.ok(album, "at least one album must have a published Home thumbnail");
@@ -58,7 +59,7 @@ const document = {
   }
 };
 const window = {};
-vm.runInNewContext(homeScript, { document, window, URL });
+loadScript.runInNewContext(homeScriptPath, { document, window, URL });
 const home = window.InfraHomeCatalog.createHomeCatalog();
 const albumImage = (item, index) => home.buildCatalogCard(item, "album", index).children[0].children[0];
 

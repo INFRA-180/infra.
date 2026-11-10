@@ -5,11 +5,12 @@ const { codeAssertMatch } = require("./lib/code-text.js"); // recherches insensi
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("node:vm");
 
 const ROOT = path.resolve(__dirname, "..");
 const ROUTER_PATH = path.join(ROOT, "public/assets/js/spa-router.js");
-const routerSource = fs.readFileSync(ROUTER_PATH, "utf8");
+const routerSource = loadScript.sourceText(ROUTER_PATH);
 const SHELL_CACHE = "infra-shell-20260823-audio402-shell";
 
 function loadRouter(overrides) {
@@ -31,7 +32,7 @@ function loadRouter(overrides) {
   }, overrides || {});
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(routerSource, sandbox, { filename: ROUTER_PATH });
+  loadScript.runInContext(ROUTER_PATH, sandbox);
   return sandbox.InfraSpaRouter;
 }
 

@@ -4,6 +4,7 @@
 const { codeHas, codeIndexOf, codeMatch, codeTest } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const fs = require("fs");
 const path = require("path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("vm");
 const ROOT = path.resolve(__dirname, "..");
 const read = (p) => fs.readFileSync(path.join(ROOT, p), "utf8");
@@ -100,7 +101,7 @@ for (const c of cat.clips) {
 expect(codeHas(js, "// ---------- Gestes iPhone") && codeHas(js, "[data-transport-next]") && codeHas(js, 'kind === "edge"'), "gestes iPhone absents");
 
 // Le script ne plante pas hors navigateur (bancs d'essai des autres tests)
-try { vm.runInNewContext(js, { window: {}, document: {} }); } catch (err) { failures.push("bibliotheque.js plante hors navigateur : " + err.message); }
+try { loadScript.runInNewContext("public/assets/js/bibliotheque.js", { window: {}, document: {} }); } catch (err) { failures.push("bibliotheque.js plante hors navigateur : " + err.message); }
 
 if (failures.length) {
   console.error("Bibliothèque : " + failures.length + " échec(s)\n- " + failures.join("\n- "));

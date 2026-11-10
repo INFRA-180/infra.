@@ -5,6 +5,7 @@ const { codeHas, codeIndexOf, codeMatch, codeSearch } = require("./lib/code-text
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("node:vm");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -13,10 +14,10 @@ const SCRIPTS_PATH = path.join(ROOT, "public/assets/js/scripts.js");
 const TRANSPORT_PATH = path.join(ROOT, "public/assets/js/transport-ui.js");
 const HOME_CATALOG_PATH = path.join(ROOT, "public/assets/js/home-catalog.js");
 const STYLES_PATH = path.join(ROOT, "public/assets/css/styles.css");
-const spaSource = fs.readFileSync(SPA_PATH, "utf8");
+const spaSource = loadScript.sourceText(SPA_PATH);
 const scriptsSource = require("./build/app-sources.js").runtimeSource();
-const transportSource = fs.readFileSync(TRANSPORT_PATH, "utf8");
-const homeCatalogSource = fs.readFileSync(HOME_CATALOG_PATH, "utf8");
+const transportSource = loadScript.sourceText(TRANSPORT_PATH);
+const homeCatalogSource = loadScript.sourceText(HOME_CATALOG_PATH);
 const stylesSource = fs.readFileSync(STYLES_PATH, "utf8");
 
 function loadSpaFactory(overrides) {
@@ -29,7 +30,7 @@ function loadSpaFactory(overrides) {
   }, overrides || {});
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(spaSource, sandbox, { filename: SPA_PATH });
+  loadScript.runInContext(SPA_PATH, sandbox);
   return sandbox.InfraSpaRenderer.createSpaRenderer;
 }
 

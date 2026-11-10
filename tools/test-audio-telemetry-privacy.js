@@ -4,6 +4,7 @@
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("node:vm");
 
 const requests = [];
@@ -168,10 +169,7 @@ const sandbox = {
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
-vm.runInContext(
-  fs.readFileSync(path.resolve(__dirname, "../public/assets/js/audio-telemetry.js"), "utf8"),
-  sandbox
-);
+loadScript.runInContext("public/assets/js/audio-telemetry.js", sandbox);
 
 function createTelemetry() {
   return sandbox.InfraAudioTelemetry.createTelemetry({

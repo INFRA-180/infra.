@@ -8,6 +8,7 @@ const { codeAssertMatch, codeHas } = require("./lib/code-text.js"); // recherche
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("node:vm");
 
 const SOURCE_PATH = path.resolve(__dirname, "../public/assets/js/home-catalog.js");
@@ -97,7 +98,7 @@ function createHarness(options) {
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(fs.readFileSync(SOURCE_PATH, "utf8"), sandbox, { filename: SOURCE_PATH });
+  loadScript.runInContext(SOURCE_PATH, sandbox);
 
   const clipState = { clips: [], activeId: "", currentSrc: "" };
   const catalog = sandbox.InfraHomeCatalog.createHomeCatalog({ clipState, fallbackCatalog: opts.fallbackCatalog });

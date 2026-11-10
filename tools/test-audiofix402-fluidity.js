@@ -5,6 +5,7 @@ const { codeAssertDoesNotMatch, codeAssertMatch, codeIndexOf, codeTest } = requi
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 
 function read(relativePath) {
   return fs.readFileSync(path.resolve(__dirname, "..", relativePath), "utf8");
@@ -15,9 +16,9 @@ const home = read("public/index.html");
 const homeCatalog = read("public/assets/js/home-catalog.js");
 const spaRenderer = read("public/assets/js/spa-renderer.js");
 const audioTelemetry = read("public/assets/js/audio-telemetry.js");
-const transport = read("public/assets/js/transport-ui.js");
+const transport = loadScript.sourceText("public/assets/js/transport-ui.js");
 const scripts = require("./build/app-sources.js").runtimeSource(); // scripts.js + modules runtime/
-const audioRadio = read("public/assets/js/audio-radio.js");
+const audioRadio = loadScript.sourceText("public/assets/js/audio-radio.js");
 const albumPlayerUi = read("public/assets/js/album-player-ui.js");
 
 const genericMobileGridAt = codeIndexOf(css, "@media (max-width: 560px)");

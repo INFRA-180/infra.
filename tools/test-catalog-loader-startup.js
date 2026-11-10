@@ -5,6 +5,7 @@ const { codeTest } = require("./lib/code-text.js"); // recherches insensibles au
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("node:vm");
 
 const SOURCE_PATH = path.resolve(__dirname, "../public/assets/js/catalog-loader.js");
@@ -132,7 +133,7 @@ function createHarness(options) {
   sandbox.window = sandbox;
   sandbox.self = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(fs.readFileSync(SOURCE_PATH, "utf8"), sandbox, { filename: SOURCE_PATH });
+  loadScript.runInContext(SOURCE_PATH, sandbox);
 
   const catalogState = {};
   const audioState = {};

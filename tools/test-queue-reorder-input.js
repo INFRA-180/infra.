@@ -5,9 +5,10 @@ const { codeHas, codeIndexOf } = require("./lib/code-text.js"); // recherches in
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 
 const root = path.resolve(__dirname, "..");
-const transport = fs.readFileSync(path.join(root, "public/assets/js/transport-ui.js"), "utf8");
+const transport = loadScript.sourceText("public/assets/js/transport-ui.js");
 const nowPlaying = fs.readFileSync(path.join(root, "public/assets/js/now-playing.js"), "utf8");
 const audioCore = fs.readFileSync(path.join(root, "public/assets/js/audio-core.js"), "utf8");
 const styles = fs.readFileSync(path.join(root, "public/assets/css/styles.css"), "utf8");

@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20261109-audio425";
+const VERSION = "infra-shell-20261110-audio426";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const LIVE_CATALOG_CACHE = `${VERSION}-catalog`;
@@ -46,34 +46,14 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix425-20261109",
-  "./assets/js/bibliotheque.js?v=bibliotheque-v14-20261109",
-  "./assets/js/covers.js?v=audiofix425-20261109",
-  "./assets/js/favorites.js?v=audiofix425-20261109",
-  "./assets/js/favorites-ui.js?v=audiofix425-20261109",
-  "./assets/js/audio-visualizer.js?v=audiofix425-20261109",
-  "./assets/js/transport-ui.js?v=audiofix425-20261109",
-  "./assets/js/now-playing.js?v=audiofix425-20261109",
-  "./assets/js/album-player-ui.js?v=audiofix425-20261109",
-  "./assets/js/spa-renderer.js?v=audiofix425-20261109",
-  "./assets/js/audio-radio.js?v=audiofix425-20261109",
-  "./assets/js/media-session.js?v=audiofix425-20261109",
-  "./assets/js/audio-prefetch.js?v=audiofix425-20261109",
-  "./assets/js/spa-router.js?v=audiofix425-20261109",
-  "./assets/js/catalog-fallback.js?v=audiofix425-20261109",
-  "./assets/js/catalog-loader.js?v=audiofix425-20261109",
-  "./assets/js/audio-telemetry.js?v=audiofix425-20261109",
-  "./assets/js/downloads.js?v=audiofix425-20261109",
-  "./assets/js/home-catalog.js?v=audiofix425-20261109",
-  "./assets/js/audio-core.js?v=audiofix425-20261109",
-  "./assets/js/pwa-install.js?v=audiofix425-20261109",
-  "./assets/js/share-qr.js?v=audiofix425-20261109",
-  "./assets/js/scripts.js?v=audiofix425-20261109",
+  "./assets/css/styles.css?v=audiofix426-20261110",
+  "./assets/js/bibliotheque.js?v=bibliotheque-v15-20261110",
+  "./assets/js/app.js?v=audiofix426-20261110",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix425-20261109",
-  "./data/track-durations.json?v=audiofix425-20261109",
-  "./data/tracks.json?v=audiofix425-20261109",
+  "./data/catalog.json?v=audiofix426-20261110",
+  "./data/track-durations.json?v=audiofix426-20261110",
+  "./data/tracks.json?v=audiofix426-20261110",
   "./data/playlists.json?v=playlist-collage-20260802",
   "./assets/css/playlists.css?v=playlist-collage-20260802",
   "./assets/branding/infra-logo-white-photoroom-title.png",
@@ -93,7 +73,7 @@ const SHELL_ASSETS = [
 // audio. A missing admin/QR/Sphragis file must therefore never invalidate the
 // complete shell installation.
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/scripts.admin.js?v=audiofix425-20261109",
+  "./assets/js/scripts.admin.js?v=audiofix426-20261110",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./sphragis/",
   "./sphragis/index.html",

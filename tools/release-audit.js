@@ -121,6 +121,20 @@ function verifyCatalog() {
   console.log(`Catalog checks passed: ${expected.albums} albums / ${expected.tracks} tracks.`);
 }
 
+function verifyBuiltApp() {
+  // app.js doit correspondre à ses sources (sinon : npm run build) et garder l'ordre d'origine.
+  const { sourceFiles, sourcesDigest } = require("./build/app-sources.js");
+  const app = fs.readFileSync(path.join(publicRoot, "assets/js/app.js"), "utf8");
+  const stamp = (app.match(/^\/\*! INFRA\. app\.js [^\n]*sources:([0-9a-f]{16}) \*\//) || [])[1];
+  if (stamp !== sourcesDigest()) fail("public/assets/js/app.js is not up to date with its sources: run npm run build");
+  const order = sourceFiles().map((file) => path.basename(file));
+  const visualizer = order.indexOf("audio-visualizer.js");
+  const transport = order.indexOf("transport-ui.js");
+  if (visualizer < 0 || transport < 0 || visualizer > transport) fail("desktop visualizer is not bundled before transport");
+  if (order[order.length - 1] !== "scripts.js") fail("scripts.js must stay last in app.js");
+  console.log(`Built app.js matches its ${order.length} sources (${stamp}).`);
+}
+
 function verifyVersions() {
   const scripts = fs.readFileSync(path.join(publicRoot, "assets/js/scripts.js"), "utf8");
   const sw = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
@@ -144,16 +158,14 @@ function verifyVersions() {
   let playerDocuments = 0;
   for (const filePath of htmlFiles) {
     const source = fs.readFileSync(filePath, "utf8");
-    if (!source.includes("assets/js/scripts.js?v=")) continue;
+    if (!source.includes("assets/js/app.js?v=")) continue;
     playerDocuments += 1;
-    if (!source.includes(`assets/js/scripts.js?v=${expected.build}`)) {
+    // Chantier JavaScript (INFRA, 10/11/2026) : une seule balise, le fichier construit par Vite.
+    if (!source.includes(`assets/js/app.js?v=${expected.build}`)) {
       fail(`stale runtime reference in ${path.relative(root, filePath)}`);
     }
-    const visualizerIndex = source.indexOf(`assets/js/audio-visualizer.js?v=${expected.build}`);
-    const transportIndex = source.indexOf(`assets/js/transport-ui.js?v=${expected.build}`);
-    if (visualizerIndex < 0 || transportIndex < 0 || visualizerIndex > transportIndex) {
-      fail(`desktop visualizer is not loaded before transport in ${path.relative(root, filePath)}`);
-    }
+    const legacyTag = source.match(/assets\/js\/(?!app\.js|bibliotheque\.js|sphragis\.js)[a-z-]+\.js\?v=/);
+    if (legacyTag) fail(`individual runtime script still loaded in ${path.relative(root, filePath)}: ${legacyTag[0]}`);
   }
   if (playerDocuments < expected.albums + 1) {
     fail(`only ${playerDocuments} player documents reference the current runtime`);
@@ -171,7 +183,7 @@ function verifyCriticalStartupPath() {
   let playerDocuments = 0;
   for (const filePath of htmlFiles) {
     const source = fs.readFileSync(filePath, "utf8");
-    if (!source.includes("assets/js/scripts.js?v=")) continue;
+    if (!source.includes("assets/js/app.js?v=")) continue;
     playerDocuments += 1;
     const blockingRuntimeScript = source.match(/<script\s+src="[^"]*assets\/js\/[^"]+"(?![^>]*\bdefer\b)[^>]*><\/script>/i);
     if (blockingRuntimeScript) {
@@ -395,6 +407,7 @@ function runRegressionSuite() {
 }
 
 function main() {
+  verifyBuiltApp();
   verifyVersions();
   verifyCriticalStartupPath();
   verifyCatalog();

@@ -88,3 +88,6 @@ DOCS/PLAN_*.md
 tools/visual/.resultats/
 playwright-report/
 package-lock.json
+
+# Construction du JavaScript avec Vite (10/11/2026) : la configuration est suivie
+!tools/build/

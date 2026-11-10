@@ -133,7 +133,7 @@ for (let playlistIndex = 0; playlistIndex < expected.length; playlistIndex += 1)
   if (JSON.stringify(renderedSources) !== JSON.stringify(expectedSources)) {
     fail(`${pageRelative} does not preserve playlist source order`);
   }
-  if (!page.includes("assets/js/audio-visualizer.js?v=") || !page.includes("assets/js/album-player-ui.js?v=")) {
+  if (!page.includes("assets/js/app.js?v=")) { // visualiseur et fiche sont dans app.js (Vite, 10/11/2026)
     fail(`${pageRelative} is missing the shared player runtime`);
   }
 }

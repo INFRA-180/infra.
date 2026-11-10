@@ -261,7 +261,7 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(installedAlbumPages.length, catalogAlbumCount, "all album documents must be installed with the PWA shell");
   assert(installedAlbumPages.includes("https://site.test/music/salam-infra.html"));
   assert(installedAlbumPages.includes("https://site.test/music/trou-noir-infra.html"));
-  assert(installedShellAssets.includes(`./assets/js/scripts.js?v=${runtimeRelease}`));
+  assert(installedShellAssets.includes(`./assets/js/app.js?v=${runtimeRelease}`)); // un seul fichier construit par Vite (10/11/2026)
   assert(
     installedOptionalShellAssets.includes("./assets/vendor/qr-creator.min.js?v=1.0.0"),
     "optional shell resources must still be attempted"

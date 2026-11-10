@@ -11,11 +11,13 @@
     "check:boundary": "node tools/verify-public-boundary.js",
     "bump": "node tools/bump-version.js",
     "visual": "playwright test --config tools/visual/playwright.config.js",
-    "visual:update": "playwright test --config tools/visual/playwright.config.js --update-snapshots"
+    "visual:update": "playwright test --config tools/visual/playwright.config.js --update-snapshots",
+    "build": "vite build --config tools/build/vite.config.mjs",
+    "pretest": "npm run build --silent"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
-    "esbuild": "0.28.2",
+    "vite": "8.3.5",
     "wrangler": "4.127.1"
   }
 }

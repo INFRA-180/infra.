@@ -2636,7 +2636,12 @@ async function testCacheTimeoutInspectsSerializedPutBeforeNetworkRetry() {
   let firstPut = true;
   let releaseMutationIdle = null;
   const mutationIdle = new Promise((resolve) => { releaseMutationIdle = resolve; });
+  const clock = createManualClock();
   const sandbox = createSandbox({
+    Date: clock.Date,
+    performance: clock.performance,
+    setTimeout: clock.setTimeout,
+    clearTimeout: clock.clearTimeout,
     fetch(request) {
       fetchUrls.push(request && request.url ? request.url : String(request || ""));
       return Promise.resolve(validSegmentResponse());
@@ -2690,7 +2695,7 @@ async function testCacheTimeoutInspectsSerializedPutBeforeNetworkRetry() {
       putSingle(src) {
         if (src === playlist[1].src && firstPut) {
           firstPut = false;
-          setTimeout(function () {
+          clock.setTimeout(function () {
             cacheReady = true;
             releaseMutationIdle(true);
           }, 45);
@@ -2712,14 +2717,13 @@ async function testCacheTimeoutInspectsSerializedPutBeforeNetworkRetry() {
   });
 
   radio.maybePrefetchNextTrack("cache_timeout_test");
-  await new Promise((resolve) => setTimeout(resolve, 30));
+  await clock.advance(30);
   assert.strictEqual(
     inspections.filter((src) => src === playlist[1].src).length,
     1,
     "The cache-timeout retry must wait for the still-running serialized mutation"
   );
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  await flushAsyncWork();
+  await clock.advance(50);
   assert.strictEqual(
     fetchUrls.filter((src) => src === playlist[1].src).length,
     1,
@@ -2732,12 +2736,73 @@ async function testCacheTimeoutInspectsSerializedPutBeforeNetworkRetry() {
   assert(state.nextPrefetchReadySrcs.has(playlist[1].src), "The completed serialized put must rehydrate N+1 readiness");
 }
 
+// Horloge contrôlée par le test (lot A, 10/11/2026) : le bac à sable ne voit plus le temps réel.
+// Le test avance le temps lui-même → même résultat sur un Mac rapide ou occupé.
+function createManualClock(start) {
+  let now = Number(start) || 1767225600000;
+  let nextId = 1;
+  const timers = new Map();
+  class ManualDate extends Date {
+    constructor(...args) {
+      if (args.length) super(...args);
+      else super(now);
+    }
+    static now() {
+      return now;
+    }
+  }
+  async function flushRealTasks() {
+    for (let round = 0; round < 5; round += 1) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+  return {
+    Date: ManualDate,
+    performance: { now: () => now },
+    setTimeout(callback, delay, ...args) {
+      const id = nextId;
+      nextId += 1;
+      timers.set(id, { at: now + Math.max(0, Number(delay) || 0), callback, args });
+      return id;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+    },
+    async advance(ms) {
+      const target = now + Math.max(0, Number(ms) || 0);
+      for (;;) {
+        await flushRealTasks();
+        let nextIdDue = 0;
+        let nextAt = Infinity;
+        for (const [id, timer] of timers) {
+          if (timer.at <= target && (timer.at < nextAt || (timer.at === nextAt && id < nextIdDue))) {
+            nextAt = timer.at;
+            nextIdDue = id;
+          }
+        }
+        if (!nextIdDue) break;
+        const timer = timers.get(nextIdDue);
+        timers.delete(nextIdDue);
+        now = Math.max(now, timer.at);
+        timer.callback(...timer.args);
+      }
+      now = target;
+      await flushRealTasks();
+    }
+  };
+}
+
 async function testPrefetchNPlusOneRetriesAfterTwoTransientFailures() {
   const fetchUrls = [];
   const runtimeEvents = [];
   let bufferedEnd = 30;
   let nPlusOneUrl = "";
+  const clock = createManualClock();
   const sandbox = createSandbox({
+    Date: clock.Date,
+    performance: clock.performance,
+    setTimeout: clock.setTimeout,
+    clearTimeout: clock.clearTimeout,
     fetch(request) {
       const url = request && request.url ? request.url : String(request || "");
       fetchUrls.push(url);
@@ -2809,7 +2874,7 @@ async function testPrefetchNPlusOneRetriesAfterTwoTransientFailures() {
   });
 
   radio.maybePrefetchNextTrack("timeout_test");
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await clock.advance(50);
   assert.strictEqual(
     fetchUrls.filter((url) => url === playlist[1].src).length,
     2,
@@ -2817,8 +2882,7 @@ async function testPrefetchNPlusOneRetriesAfterTwoTransientFailures() {
   );
   bufferedEnd = 30;
   radio.maybePrefetchNextTrack("buffer_recovered");
-  await new Promise((resolve) => setTimeout(resolve, 80));
-  await flushAsyncWork();
+  await clock.advance(80);
   assert.strictEqual(
     fetchUrls.filter((url) => url === playlist[1].src).length,
     3,

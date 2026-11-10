@@ -26,6 +26,7 @@ function isolateLegacyScripts() {
       // Lot C : audio-radio/ (modules importés par audio-radio.js) — pas d'enveloppe propre ;
       // audio-radio.js garde la sienne (bloc protégé, comme avant).
       if (id.startsWith(legacyDir + "audio-radio" + path.sep)) return null;
+      if (id.startsWith(legacyDir + "transport-ui" + path.sep)) return null; // lot D, même règle
       const name = path.basename(id);
       // Lot C : les import d'en-tête (audio-radio.js → audio-radio/) restent hors du bloc protégé.
       const imports = code.match(/^(?:import [^;]+;\s*)+/);

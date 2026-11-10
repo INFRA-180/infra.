@@ -1741,3 +1741,9 @@
 - `package-lock.json` suivi par Git (autorisé dans `verify-public-boundary.js`) ; `.github/workflows/deploy-pages.yml` : Node 24 + `npm ci --ignore-scripts` avant `node tools/release-audit.js`.
 - Raison : depuis le lot B, les tests construisent les scripts avec Vite. Le site publié n'en dépend pas (`app.js` construit et suivi).
 - Après chaque push : vérifier le déploiement (`gh run list`), pas seulement `npm test`.
+
+## 11/11/2026 — transport-ui.js découpé en 5 modules (lot D, Claude, `audiofix431`)
+- `transport-ui.js` (3 471 l.) → entrée de 230 l. (réglages, assemblage, `window.InfraTransportUi` inchangé) + `transport-ui/` : `mini-progress`, `picture-in-picture`, `desktop-layout`, `transport-builder`, `mini-player`.
+- Même méthode que le lot C : 110 fonctions identiques à l'original (comparaison par jetons), modules reliés par `link()`. Nouveau : les 6 variables d'état `mobilePlayerSpace…` ne servaient qu'au mini-lecteur → déplacées dans `mini-player.js` (l'outil refuse une variable modifiable partagée par plusieurs sujets).
+- Reste gros : `ensureGlobalTransportUi` (1 877 l., `transport-builder.js`) est une seule fonction ; la découper demande de toucher à son contenu (autre chantier).
+- Défaut **antérieur** repéré (non causé par le lot D, identique en `audiofix430`) : dans Safari iPhone (simulateur, pas l'app installée), la pochette du grand lecteur recouvre le titre.

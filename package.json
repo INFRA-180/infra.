@@ -13,6 +13,7 @@
     "visual": "playwright test --config tools/visual/playwright.config.js",
     "visual:update": "playwright test --config tools/visual/playwright.config.js --update-snapshots",
     "build": "vite build --config tools/build/vite.config.mjs",
+    "watch": "vite build --config tools/build/vite.config.mjs --watch",
     "pretest": "npm run lint --silent && npm run build --silent",
     "lint": "eslint --config tools/build/eslint.config.mjs \"public/assets/js/**/*.js\"",
     "format": "prettier --config tools/build/prettier.json --ignore-path tools/build/.prettierignore --write \"public/assets/js/**/*.js\" tools/build tools/lib"

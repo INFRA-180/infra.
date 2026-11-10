@@ -14,7 +14,7 @@ const expect = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const scripts = read("public/assets/js/scripts.js");
+const scripts = require("./build/app-sources.js").runtimeSource();
 const radio = read("public/assets/js/audio-radio.js");
 const core = read("public/assets/js/audio-core.js");
 const mediaSession = read("public/assets/js/media-session.js");

@@ -9,7 +9,7 @@ function read(relativePath) {
   return fs.readFileSync(path.resolve(__dirname, "..", relativePath), "utf8");
 }
 
-const scripts = read("public/assets/js/scripts.js");
+const scripts = require("./build/app-sources.js").runtimeSource();
 const worker = read("public/sw.js");
 const audioRadio = read("public/assets/js/audio-radio.js");
 const nowPlaying = read("public/assets/js/now-playing.js");

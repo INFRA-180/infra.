@@ -154,7 +154,7 @@ function testPlaybackAudioSessionConfiguration() {
 
 function testAudioSessionInterruptionResumeGate() {
   const radioSource = fs.readFileSync(RADIO_PATH, "utf8");
-  const scriptsSource = fs.readFileSync(path.join(ROOT, "public/assets/js/scripts.js"), "utf8");
+  const scriptsSource = require("./build/app-sources.js").runtimeSource();
   assert(
     !radioSource.includes("!audioState.audioSessionTelemetryBound &&"),
     "a directly sampled active state must remain valid when a statechange was missed"
@@ -2981,7 +2981,7 @@ function testPersistentAlbumAndFullscreenContracts() {
   assert(transportSource.includes('root.dataset.controlsBound === "1"'));
   assert(transportSource.includes('root.dataset.controlsBound = "1"'));
 
-  const scriptsSource = fs.readFileSync(path.join(ROOT, "public/assets/js/scripts.js"), "utf8");
+  const scriptsSource = require("./build/app-sources.js").runtimeSource();
   const srcMatchesBody = extractFunctionBody(scriptsSource, "srcMatches");
   assert(srcMatchesBody.includes("getAudioAssetPathKey"));
   assert(!srcMatchesBody.includes("endsWith("));

@@ -8,7 +8,7 @@ const vm = require("node:vm");
 
 const publicRoot = path.resolve(__dirname, "../public");
 const catalogAlbumCount = (JSON.parse(fs.readFileSync(path.join(publicRoot, "data/tracks.json"), "utf8")).albums || []).length;
-const runtimeSource = fs.readFileSync(path.join(publicRoot, "assets/js/scripts.js"), "utf8");
+const runtimeSource = require("./build/app-sources.js").runtimeSource();
 const runtimeRelease = (runtimeSource.match(/window\.INFRA_BUILD_TAG = "([^"]+)";/) || [])[1] || "";
 const serviceWorkerSource = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
 const shellRelease = (serviceWorkerSource.match(/const VERSION = "([^"]+)";/) || [])[1] || "";

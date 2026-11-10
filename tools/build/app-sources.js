@@ -10,9 +10,24 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "../..");
 const entryPath = path.join(__dirname, "app-entry.js");
 
+// Fichiers importés par app-entry.js ; scripts.js est suivi de ses modules runtime/ (même ordre).
 function sourceFiles() {
   const entry = fs.readFileSync(entryPath, "utf8");
-  return Array.from(entry.matchAll(/^import "(.+)";$/gm), (match) => path.resolve(__dirname, match[1]));
+  const files = Array.from(entry.matchAll(/^import "(.+)";$/gm), (match) => path.resolve(__dirname, match[1]));
+  return files.flatMap((file) => (path.basename(file) === "scripts.js" ? [...runtimeModules(file), file] : [file]));
+}
+
+function runtimeModules(scriptsFile) {
+  // Tout le dossier runtime/ (modules importés par scripts.js ou entre eux), dans un ordre stable.
+  const dir = path.join(path.dirname(scriptsFile), "runtime");
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((name) => name.endsWith(".js")).sort().map((name) => path.join(dir, name));
+}
+
+// Texte complet du lecteur (scripts.js puis ses modules), pour les contrôles qui lisent le code.
+function runtimeSource() {
+  const scriptsFile = path.join(root, "public/assets/js/scripts.js");
+  return [scriptsFile, ...runtimeModules(scriptsFile)].map((file) => fs.readFileSync(file, "utf8")).join("\n");
 }
 
 function sourcesDigest() {
@@ -30,4 +45,4 @@ function banner() {
   return `/*! INFRA. app.js — construit par Vite (npm run build), ne pas modifier à la main. sources:${sourcesDigest()} */`;
 }
 
-module.exports = { root, sourceFiles, sourcesDigest, banner };
+module.exports = { root, sourceFiles, runtimeModules, runtimeSource, sourcesDigest, banner };

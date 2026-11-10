@@ -15,7 +15,7 @@ const homeCatalog = read("public/assets/js/home-catalog.js");
 const spaRenderer = read("public/assets/js/spa-renderer.js");
 const audioTelemetry = read("public/assets/js/audio-telemetry.js");
 const transport = read("public/assets/js/transport-ui.js");
-const scripts = read("public/assets/js/scripts.js");
+const scripts = require("./build/app-sources.js").runtimeSource(); // scripts.js + modules runtime/
 const audioRadio = read("public/assets/js/audio-radio.js");
 const albumPlayerUi = read("public/assets/js/album-player-ui.js");
 

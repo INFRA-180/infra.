@@ -156,7 +156,7 @@ if (!/<section class="module one-col" data-module-id="playlists">\s*<details cla
   fail("Playlists is not open by default");
 }
 
-const runtime = read("public/assets/js/scripts.js");
+const runtime = require("./build/app-sources.js").runtimeSource();
 const orderFunctionStart = runtime.indexOf("function enforceHomeModuleOrder()");
 const orderFunctionEnd = runtime.indexOf("function enforceHomeAppsCollapsed", orderFunctionStart);
 if (orderFunctionStart < 0 || orderFunctionEnd < 0) {
@@ -248,7 +248,7 @@ for (const contract of expected) {
 const albumUi = read("public/assets/js/album-player-ui.js");
 const audioCore = read("public/assets/js/audio-core.js");
 const audioRadio = read("public/assets/js/audio-radio.js");
-const scripts = read("public/assets/js/scripts.js");
+const scripts = require("./build/app-sources.js").runtimeSource();
 if (!albumUi.includes('document.body.classList.contains("playlist-screen") ? "playlist" : "album"')) {
   fail("playlist pages do not declare their queue type");
 }

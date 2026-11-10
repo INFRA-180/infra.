@@ -21,6 +21,8 @@ function isolateLegacyScripts() {
     name: "infra-isolate-legacy-scripts",
     transform(code, id) {
       if (!id.startsWith(legacyDir) || !id.endsWith(".js")) return null;
+      // Modules ES (import/export) : scripts.js et runtime/ — pas d'enveloppe, comme l'ancien scripts.js d'un seul tenant.
+      if (id === legacyDir + "scripts.js" || id.startsWith(legacyDir + "runtime" + path.sep)) return null;
       const name = path.basename(id);
       return {
         code: `try {\n${code}\n} catch (error) {\n  console.error("[INFRA] ${name} :", error);\n}\n`,

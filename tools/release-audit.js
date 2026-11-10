@@ -7,7 +7,7 @@ const { spawnSync } = require("node:child_process");
 
 const root = path.resolve(__dirname, "..");
 const publicRoot = path.join(root, "public");
-const runtimeSource = fs.readFileSync(path.join(publicRoot, "assets/js/scripts.js"), "utf8");
+const runtimeSource = require("./build/app-sources.js").runtimeSource(); // scripts.js + modules runtime/
 const serviceWorkerSource = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
 const catalogBaseline = JSON.parse(fs.readFileSync(path.join(publicRoot, "data/catalog.json"), "utf8"));
 const tracksBaseline = JSON.parse(fs.readFileSync(path.join(publicRoot, "data/tracks.json"), "utf8"));
@@ -136,7 +136,7 @@ function verifyBuiltApp() {
 }
 
 function verifyVersions() {
-  const scripts = fs.readFileSync(path.join(publicRoot, "assets/js/scripts.js"), "utf8");
+  const scripts = require("./build/app-sources.js").runtimeSource();
   const sw = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
   if (!scripts.includes(`window.INFRA_BUILD_TAG = "${expected.build}"`)) {
     fail(`runtime build is not ${expected.build}`);
@@ -290,7 +290,7 @@ function verifyNoLegacyRuntimeCovers() {
   }
 
   const tracks = readJson("public/data/tracks.json");
-  const scripts = fs.readFileSync(path.join(publicRoot, "assets/js/scripts.js"), "utf8");
+  const scripts = require("./build/app-sources.js").runtimeSource();
   const home = fs.readFileSync(path.join(publicRoot, "index.html"), "utf8");
   const homeCatalog = fs.readFileSync(path.join(publicRoot, "assets/js/home-catalog.js"), "utf8");
   const sw = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");

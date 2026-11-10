@@ -13,7 +13,7 @@ const TRANSPORT_PATH = path.join(ROOT, "public/assets/js/transport-ui.js");
 const HOME_CATALOG_PATH = path.join(ROOT, "public/assets/js/home-catalog.js");
 const STYLES_PATH = path.join(ROOT, "public/assets/css/styles.css");
 const spaSource = fs.readFileSync(SPA_PATH, "utf8");
-const scriptsSource = fs.readFileSync(SCRIPTS_PATH, "utf8");
+const scriptsSource = require("./build/app-sources.js").runtimeSource();
 const transportSource = fs.readFileSync(TRANSPORT_PATH, "utf8");
 const homeCatalogSource = fs.readFileSync(HOME_CATALOG_PATH, "utf8");
 const stylesSource = fs.readFileSync(STYLES_PATH, "utf8");
@@ -227,7 +227,7 @@ function testWebKitHistoryQuotaGuard() {
     scriptsSource.includes("SPA_SCROLL_HISTORY_DEBOUNCE_MS"),
     "scroll history writes must be debounced"
   );
-  const scrollListenerStart = scriptsSource.indexOf('window.addEventListener(\n        "scroll"');
+  const scrollListenerStart = scriptsSource.search(/window\.addEventListener\(\n\s+"scroll"/); // indentation libre (modules, 10/11/2026)
   const scrollListenerEnd = scriptsSource.indexOf("spaState.scrollBound = true", scrollListenerStart);
   const scrollListener = scriptsSource.slice(scrollListenerStart, scrollListenerEnd);
   assert.ok(scrollListenerStart >= 0, "scroll history listener is missing");

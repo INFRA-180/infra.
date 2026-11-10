@@ -14,7 +14,7 @@ const scriptsPath = path.join(root, "public/assets/js/scripts.js");
 const favoritesPath = path.join(root, "public/assets/js/favorites-ui.js");
 const transportSource = fs.readFileSync(transportPath, "utf8");
 const stylesSource = fs.readFileSync(stylesPath, "utf8");
-const scriptsSource = fs.readFileSync(scriptsPath, "utf8");
+const scriptsSource = require("./build/app-sources.js").runtimeSource();
 const favoritesSource = fs.readFileSync(favoritesPath, "utf8");
 
 function createClassList() {

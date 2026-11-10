@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 "use strict";
+const { codeAssertMatch, codeHas } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 // Clips sur l'accueil (maquette V5 validée par INFRA le 09/11/2026) : vignettes locales,
 // rien de YouTube chargé avant un toucher, clip lu sur place, titre affiché une seule fois,
 // fermeture qui décharge le lecteur, musique mise en pause au lancement d'un clip.
@@ -116,16 +117,16 @@ const tile = (harness, index) => harness.grid.children[index].children[0];
   assert.equal(harness.iframe.src, "", "no YouTube player before a touch");
   assert.equal(harness.shell.hidden, true);
   const image = tile(harness, 0).children[0].children[0];
-  assert.match(image.getAttribute("src"), /clips\/firstVideo-480\.webp$/, "thumbnail must be the local WebP");
+  codeAssertMatch(image.getAttribute("src"), /clips\/firstVideo-480\.webp$/, "thumbnail must be the local WebP");
 })();
 
 (function testClipPlaysInPlaceAndPausesMusic() {
   const harness = createHarness({ musicPlaying: true });
   harness.catalog.renderClipsSection(CLIPS);
   tile(harness, 1).click();
-  assert.match(harness.iframe.src, /^https:\/\/www\.youtube-nocookie\.com\/embed\/secondVideo\?/);
-  assert.equal(harness.iframe.src.includes("autoplay=1"), true, "a touch starts the clip");
-  assert.equal(harness.iframe.src.includes("enablejsapi=1"), true, "the clip must accept a pause from the music");
+  codeAssertMatch(harness.iframe.src, /^https:\/\/www\.youtube-nocookie\.com\/embed\/secondVideo\?/);
+  assert.equal(codeHas(harness.iframe.src, "autoplay=1"), true, "a touch starts the clip");
+  assert.equal(codeHas(harness.iframe.src, "enablejsapi=1"), true, "the clip must accept a pause from the music");
   assert.equal(harness.shell.hidden, false);
   assert.equal(harness.title.textContent, "Second clip");
   assert.equal(harness.grid.children[1].hidden, true, "the playing clip's tile leaves the row (title shown once)");

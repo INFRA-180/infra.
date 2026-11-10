@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
+const { codeHas, codeIndexOf, codeMatch, codeTest } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
@@ -11,8 +12,8 @@ const runtimeSource = require("./build/app-sources.js").runtimeSource(); // scri
 const serviceWorkerSource = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
 const catalogBaseline = JSON.parse(fs.readFileSync(path.join(publicRoot, "data/catalog.json"), "utf8"));
 const tracksBaseline = JSON.parse(fs.readFileSync(path.join(publicRoot, "data/tracks.json"), "utf8"));
-const buildMatch = runtimeSource.match(/window\.INFRA_BUILD_TAG = "([^"]+)";/);
-const shellMatch = serviceWorkerSource.match(/const VERSION = "([^"]+)";/);
+const buildMatch = codeMatch(runtimeSource, /window\.INFRA_BUILD_TAG = "([^"]+)";/);
+const shellMatch = codeMatch(serviceWorkerSource, /const VERSION = "([^"]+)";/);
 const expected = Object.freeze({
   build: buildMatch ? buildMatch[1] : "",
   shell: shellMatch ? shellMatch[1] : "",
@@ -22,8 +23,8 @@ const expected = Object.freeze({
     : 0
 });
 
-if (!/^audiofix\d+-\d{8}$/.test(expected.build)) fail(`invalid runtime build: ${expected.build || "missing"}`);
-if (!/^infra-shell-\d{8}-audio\d+$/.test(expected.shell)) fail(`invalid shell build: ${expected.shell || "missing"}`);
+if (!codeTest(/^audiofix\d+-\d{8}$/, expected.build)) fail(`invalid runtime build: ${expected.build || "missing"}`);
+if (!codeTest(/^infra-shell-\d{8}-audio\d+$/, expected.shell)) fail(`invalid shell build: ${expected.shell || "missing"}`);
 if (expected.albums < 31 || expected.tracks < 284) fail("catalogue regressed below the published baseline");
 
 function fail(message) {
@@ -87,7 +88,7 @@ function verifyCatalog() {
     if (catalogAlbum.thumb !== album.cover) {
       fail(`cover mismatch for ${album.page}: ${catalogAlbum.thumb} != ${album.cover}`);
     }
-    if (!/\/[^/]+-cover-1200\.webp$/.test(album.cover || "")) {
+    if (!codeTest(/\/[^/]+-cover-1200\.webp$/, album.cover || "")) {
       fail(`album does not use a canonical 1200 WebP: ${album.page}`);
     }
     const coverPath = path.join(publicRoot, album.cover);
@@ -96,10 +97,10 @@ function verifyCatalog() {
     if (!fs.existsSync(pagePath)) fail(`missing album document: ${album.page}`);
     const pageSource = fs.readFileSync(pagePath, "utf8");
     const pageCoverSrc = `../${album.cover}`;
-    if (!pageSource.includes(`<link rel="preload" href="${pageCoverSrc}" as="image" type="image/webp" fetchpriority="high" />`)) {
+    if (!codeHas(pageSource, `<link rel="preload" href="${pageCoverSrc}" as="image" type="image/webp" fetchpriority="high" />`)) {
       fail(`album cover preload is missing from ${album.page}`);
     }
-    if (!pageSource.includes(`<img class="cover" width="1200" height="1200" src="${pageCoverSrc}" loading="eager" decoding="sync" fetchpriority="high"`)) {
+    if (!codeHas(pageSource, `<img class="cover" width="1200" height="1200" src="${pageCoverSrc}" loading="eager" decoding="sync" fetchpriority="high"`)) {
       fail(`album hero dimensions/decoding contract is missing from ${album.page}`);
     }
     pages.add(album.page);
@@ -125,11 +126,11 @@ function verifyBuiltApp() {
   // app.js doit correspondre à ses sources (sinon : npm run build) et garder l'ordre d'origine.
   const { sourceFiles, sourcesDigest } = require("./build/app-sources.js");
   const app = fs.readFileSync(path.join(publicRoot, "assets/js/app.js"), "utf8");
-  const stamp = (app.match(/^\/\*! INFRA\. app\.js [^\n]*sources:([0-9a-f]{16}) \*\//) || [])[1];
+  const stamp = (codeMatch(app, /^\/\*! INFRA\. app\.js [^\n]*sources:([0-9a-f]{16}) \*\//) || [])[1];
   if (stamp !== sourcesDigest()) fail("public/assets/js/app.js is not up to date with its sources: run npm run build");
   const order = sourceFiles().map((file) => path.basename(file));
-  const visualizer = order.indexOf("audio-visualizer.js");
-  const transport = order.indexOf("transport-ui.js");
+  const visualizer = codeIndexOf(order, "audio-visualizer.js");
+  const transport = codeIndexOf(order, "transport-ui.js");
   if (visualizer < 0 || transport < 0 || visualizer > transport) fail("desktop visualizer is not bundled before transport");
   if (order[order.length - 1] !== "scripts.js") fail("scripts.js must stay last in app.js");
   console.log(`Built app.js matches its ${order.length} sources (${stamp}).`);
@@ -138,19 +139,19 @@ function verifyBuiltApp() {
 function verifyVersions() {
   const scripts = require("./build/app-sources.js").runtimeSource();
   const sw = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
-  if (!scripts.includes(`window.INFRA_BUILD_TAG = "${expected.build}"`)) {
+  if (!codeHas(scripts, `window.INFRA_BUILD_TAG = "${expected.build}"`)) {
     fail(`runtime build is not ${expected.build}`);
   }
-  if (!sw.includes(`const VERSION = "${expected.shell}"`)) {
+  if (!codeHas(sw, `const VERSION = "${expected.shell}"`)) {
     fail(`Service Worker is not ${expected.shell}`);
   }
-  if (!scripts.includes(`const SPA_SHELL_VERSION = "${expected.shell}"`)) {
+  if (!codeHas(scripts, `const SPA_SHELL_VERSION = "${expected.shell}"`)) {
     fail(`runtime Service Worker contract is not ${expected.shell}`);
   }
-  if (!scripts.includes('const AUDIO_BASE = "https://infra180-api.pages.dev/audio"')) {
+  if (!codeHas(scripts, 'const AUDIO_BASE = "https://infra180-api.pages.dev/audio"')) {
     fail("runtime audio origin is not the Worker R2 proxy");
   }
-  if (scripts.includes(".r2.dev") || sw.includes(".r2.dev")) {
+  if (codeHas(scripts, ".r2.dev") || codeHas(sw, ".r2.dev")) {
     fail("non-production r2.dev audio endpoint remains in the active runtime");
   }
 
@@ -158,13 +159,13 @@ function verifyVersions() {
   let playerDocuments = 0;
   for (const filePath of htmlFiles) {
     const source = fs.readFileSync(filePath, "utf8");
-    if (!source.includes("assets/js/app.js?v=")) continue;
+    if (!codeHas(source, "assets/js/app.js?v=")) continue;
     playerDocuments += 1;
     // Chantier JavaScript (INFRA, 10/11/2026) : une seule balise, le fichier construit par Vite.
-    if (!source.includes(`assets/js/app.js?v=${expected.build}`)) {
+    if (!codeHas(source, `assets/js/app.js?v=${expected.build}`)) {
       fail(`stale runtime reference in ${path.relative(root, filePath)}`);
     }
-    const legacyTag = source.match(/assets\/js\/(?!app\.js|bibliotheque\.js|sphragis\.js)[a-z-]+\.js\?v=/);
+    const legacyTag = codeMatch(source, /assets\/js\/(?!app\.js|bibliotheque\.js|sphragis\.js)[a-z-]+\.js\?v=/);
     if (legacyTag) fail(`individual runtime script still loaded in ${path.relative(root, filePath)}: ${legacyTag[0]}`);
   }
   if (playerDocuments < expected.albums + 1) {
@@ -175,7 +176,7 @@ function verifyVersions() {
 
 function verifyCriticalStartupPath() {
   const styles = fs.readFileSync(path.join(publicRoot, "assets/css/styles.css"), "utf8");
-  if (/^\s*@import\s+/im.test(styles) || /fonts\.googleapis\.com/i.test(styles)) {
+  if (codeTest(/^\s*@import\s+/im, styles) || codeTest(/fonts\.googleapis\.com/i, styles)) {
     fail("critical stylesheet must not depend on a remote CSS import");
   }
 
@@ -183,16 +184,16 @@ function verifyCriticalStartupPath() {
   let playerDocuments = 0;
   for (const filePath of htmlFiles) {
     const source = fs.readFileSync(filePath, "utf8");
-    if (!source.includes("assets/js/app.js?v=")) continue;
+    if (!codeHas(source, "assets/js/app.js?v=")) continue;
     playerDocuments += 1;
-    const blockingRuntimeScript = source.match(/<script\s+src="[^"]*assets\/js\/[^"]+"(?![^>]*\bdefer\b)[^>]*><\/script>/i);
+    const blockingRuntimeScript = codeMatch(source, /<script\s+src="[^"]*assets\/js\/[^"]+"(?![^>]*\bdefer\b)[^>]*><\/script>/i);
     if (blockingRuntimeScript) {
       fail(`parser-blocking runtime script in ${path.relative(root, filePath)}: ${blockingRuntimeScript[0]}`);
     }
-    if (!source.includes('infra:launch-watchdog:v1') || !source.includes(`build:"${expected.build}"`)) {
+    if (!codeHas(source, 'infra:launch-watchdog:v1') || !codeHas(source, `build:"${expected.build}"`)) {
       fail(`startup watchdog is missing or stale in ${path.relative(root, filePath)}`);
     }
-    if (/maximum-scale\s*=|user-scalable\s*=\s*no/i.test(source)) {
+    if (codeTest(/maximum-scale\s*=|user-scalable\s*=\s*no/i, source)) {
       fail(`viewport zoom is disabled in ${path.relative(root, filePath)}`);
     }
   }
@@ -211,63 +212,63 @@ function verifyAudioVisuals() {
     fail("precomputed audio visual data is still shipped");
   }
   if (
-    !visualizerSource.includes("window.AudioContext || window.webkitAudioContext") ||
-    !visualizerSource.includes("createMediaElementSource(audio)") ||
-    !visualizerSource.includes("createAnalyser()") ||
-    !visualizerSource.includes("source.connect(context.destination)") ||
-    !visualizerSource.includes("source.connect(analyser)") ||
-    !visualizerSource.includes("getByteFrequencyData") ||
-    !visualizerSource.includes("getByteTimeDomainData") ||
-    !visualizerSource.includes('crossOrigin || "").toLowerCase() !== "anonymous"') ||
-    !visualizerSource.includes("(prefers-reduced-motion: reduce)") ||
-    !visualizerSource.includes("FRAME_INTERVAL_MS = 1000 / 30") ||
-    !visualizerSource.includes("ENERGY_ATTACK_SECONDS = 0.045") ||
-    !visualizerSource.includes("ENERGY_RELEASE_SECONDS = 0.26") ||
-    !visualizerSource.includes("SPECTRUM_SPATIAL_KERNEL = Object.freeze([1, 4, 6, 4, 1])") ||
-    !visualizerSource.includes("smoothSpectrumSpatially(points)") ||
-    !visualizerSource.includes("FFT_SIZE = 2048") ||
-    !visualizerSource.includes("MIN_FREQUENCY_HZ = 40") ||
-    !visualizerSource.includes("MAX_FREQUENCY_HZ = 16000") ||
-    !visualizerSource.includes("Math.pow(ratioRange") ||
-    !visualizerSource.includes("const centerY = size.height * 0.5") ||
-    !visualizerSource.includes("size.height * 0.25") ||
-    !visualizerSource.includes("const PURE_FFT_MODE = true") ||
-    !visualizerSource.includes("POWDER_EARTH_PARTICLE_COUNT = 250000") ||
-    !visualizerSource.includes("POWDER_MOON_PARTICLE_COUNT = 250000") ||
-    !visualizerSource.includes("POWDER_PARTICLE_COUNT = 500000") ||
-    !visualizerSource.includes("POWDER_HELIX_PARTICLE_COUNT = 60000") ||
-    !visualizerSource.includes("createPowderParticles(PURE_FFT_MODE ? 0 : POWDER_PARTICLE_COUNT)") ||
-    !visualizerSource.includes("height: new Float32Array(particleCount)") ||
-    !visualizerSource.includes("side: new Uint8Array(particleCount)") ||
-    !visualizerSource.includes("gravityClass: new Uint8Array(particleCount)") ||
-    !visualizerSource.includes("helixOffset: new Float32Array(particleCount)") ||
-    !visualizerSource.includes("helixBaseSin: new Float32Array(particleCount)") ||
-    !visualizerSource.includes("bandIndex: new Uint16Array(particleCount)") ||
-    !visualizerSource.includes("powderContext.createImageData(width, height)") ||
-    !visualizerSource.includes("EARTH_GRAVITY_METERS_PER_SECOND2 = 9.80665") ||
-    !visualizerSource.includes("MOON_GRAVITY_METERS_PER_SECOND2 = 1.62") ||
-    !visualizerSource.includes("updatePowderBandMap(values.length)") ||
-    !visualizerSource.includes("powderContainmentEnvelope[index] = Math.max(") ||
-    !visualizerSource.includes("Math.sqrt(") ||
-    !visualizerSource.includes("velocity -= gravity * step") ||
-    !visualizerSource.includes("(sides[index] ? 1 : -1)") ||
-    !visualizerSource.includes("powderHelixRotationPhase") ||
-    !visualizerSource.includes("HELIX_DRIVE_ATTACK_SECONDS = 0.09") ||
-    !visualizerSource.includes("frameHeight * (0.035 + (signal * 0.18))") ||
-    !visualizerSource.includes("targetOffset - helixOffset") ||
-    !visualizerSource.includes("const restingOpacity = moving ? 1 : 0.34") ||
-    !visualizerSource.includes("drawingContext.quadraticCurveTo(") ||
-    !visualizerSource.includes("powderContainmentRawEnvelope[index],") ||
-    !visualizerSource.includes("drawingContext.drawImage(") ||
-    !visualizerSource.includes("if (!PURE_FFT_MODE) {\n        updatePowderPhysics(") ||
-    !visualizerSource.includes("if (!PURE_FFT_MODE) drawPowder(size, centerY);") ||
-    visualizerSource.includes("drawingContext.clip()") ||
-    visualizerSource.includes('drawingContext.strokeStyle = "rgba(255,255,255,0.13)"') ||
-    !visualizerSource.includes("document.hidden")
+    !codeHas(visualizerSource, "window.AudioContext || window.webkitAudioContext") ||
+    !codeHas(visualizerSource, "createMediaElementSource(audio)") ||
+    !codeHas(visualizerSource, "createAnalyser()") ||
+    !codeHas(visualizerSource, "source.connect(context.destination)") ||
+    !codeHas(visualizerSource, "source.connect(analyser)") ||
+    !codeHas(visualizerSource, "getByteFrequencyData") ||
+    !codeHas(visualizerSource, "getByteTimeDomainData") ||
+    !codeHas(visualizerSource, 'crossOrigin || "").toLowerCase() !== "anonymous"') ||
+    !codeHas(visualizerSource, "(prefers-reduced-motion: reduce)") ||
+    !codeHas(visualizerSource, "FRAME_INTERVAL_MS = 1000 / 30") ||
+    !codeHas(visualizerSource, "ENERGY_ATTACK_SECONDS = 0.045") ||
+    !codeHas(visualizerSource, "ENERGY_RELEASE_SECONDS = 0.26") ||
+    !codeHas(visualizerSource, "SPECTRUM_SPATIAL_KERNEL = Object.freeze([1, 4, 6, 4, 1])") ||
+    !codeHas(visualizerSource, "smoothSpectrumSpatially(points)") ||
+    !codeHas(visualizerSource, "FFT_SIZE = 2048") ||
+    !codeHas(visualizerSource, "MIN_FREQUENCY_HZ = 40") ||
+    !codeHas(visualizerSource, "MAX_FREQUENCY_HZ = 16000") ||
+    !codeHas(visualizerSource, "Math.pow(ratioRange") ||
+    !codeHas(visualizerSource, "const centerY = size.height * 0.5") ||
+    !codeHas(visualizerSource, "size.height * 0.25") ||
+    !codeHas(visualizerSource, "const PURE_FFT_MODE = true") ||
+    !codeHas(visualizerSource, "POWDER_EARTH_PARTICLE_COUNT = 250000") ||
+    !codeHas(visualizerSource, "POWDER_MOON_PARTICLE_COUNT = 250000") ||
+    !codeHas(visualizerSource, "POWDER_PARTICLE_COUNT = 500000") ||
+    !codeHas(visualizerSource, "POWDER_HELIX_PARTICLE_COUNT = 60000") ||
+    !codeHas(visualizerSource, "createPowderParticles(PURE_FFT_MODE ? 0 : POWDER_PARTICLE_COUNT)") ||
+    !codeHas(visualizerSource, "height: new Float32Array(particleCount)") ||
+    !codeHas(visualizerSource, "side: new Uint8Array(particleCount)") ||
+    !codeHas(visualizerSource, "gravityClass: new Uint8Array(particleCount)") ||
+    !codeHas(visualizerSource, "helixOffset: new Float32Array(particleCount)") ||
+    !codeHas(visualizerSource, "helixBaseSin: new Float32Array(particleCount)") ||
+    !codeHas(visualizerSource, "bandIndex: new Uint16Array(particleCount)") ||
+    !codeHas(visualizerSource, "powderContext.createImageData(width, height)") ||
+    !codeHas(visualizerSource, "EARTH_GRAVITY_METERS_PER_SECOND2 = 9.80665") ||
+    !codeHas(visualizerSource, "MOON_GRAVITY_METERS_PER_SECOND2 = 1.62") ||
+    !codeHas(visualizerSource, "updatePowderBandMap(values.length)") ||
+    !codeHas(visualizerSource, "powderContainmentEnvelope[index] = Math.max(") ||
+    !codeHas(visualizerSource, "Math.sqrt(") ||
+    !codeHas(visualizerSource, "velocity -= gravity * step") ||
+    !codeHas(visualizerSource, "(sides[index] ? 1 : -1)") ||
+    !codeHas(visualizerSource, "powderHelixRotationPhase") ||
+    !codeHas(visualizerSource, "HELIX_DRIVE_ATTACK_SECONDS = 0.09") ||
+    !codeHas(visualizerSource, "frameHeight * (0.035 + (signal * 0.18))") ||
+    !codeHas(visualizerSource, "targetOffset - helixOffset") ||
+    !codeHas(visualizerSource, "const restingOpacity = moving ? 1 : 0.34") ||
+    !codeHas(visualizerSource, "drawingContext.quadraticCurveTo(") ||
+    !codeHas(visualizerSource, "powderContainmentRawEnvelope[index],") ||
+    !codeHas(visualizerSource, "drawingContext.drawImage(") ||
+    !codeHas(visualizerSource, "if (!PURE_FFT_MODE) {\n        updatePowderPhysics(") ||
+    !codeHas(visualizerSource, "if (!PURE_FFT_MODE) drawPowder(size, centerY);") ||
+    codeHas(visualizerSource, "drawingContext.clip()") ||
+    codeHas(visualizerSource, 'drawingContext.strokeStyle = "rgba(255,255,255,0.13)"') ||
+    !codeHas(visualizerSource, "document.hidden")
   ) {
     fail("desktop live visualizer is missing its audio graph or lifecycle guards");
   }
-  if (/analyser\.connect\s*\(\s*context\.destination/.test(visualizerSource)) {
+  if (codeTest(/analyser\.connect\s*\(\s*context\.destination/, visualizerSource)) {
     fail("desktop analyser creates a duplicate audible destination path");
   }
 
@@ -276,12 +277,12 @@ function verifyAudioVisuals() {
 
 function verifyNoLegacyRuntimeCovers() {
   const textFiles = walk(publicRoot, (filePath) =>
-    /\.(?:css|html|js|json|webmanifest)$/i.test(filePath)
+    codeTest(/\.(?:css|html|js|json|webmanifest)$/i, filePath)
   );
   const legacyReferences = [];
   for (const filePath of textFiles) {
     const source = fs.readFileSync(filePath, "utf8");
-    if (/cover-(?:480|900)\.webp/.test(source)) {
+    if (codeTest(/cover-(?:480|900)\.webp/, source)) {
       legacyReferences.push(path.relative(root, filePath));
     }
   }
@@ -302,7 +303,7 @@ function verifyNoLegacyRuntimeCovers() {
     walk(musicRoot, (filePath) => {
       const relativeMusicPath = path.relative(musicRoot, filePath);
       return !relativeMusicPath.startsWith(`sources${path.sep}`) &&
-        /cover.*\.(?:webp|jpe?g|png)$/i.test(path.basename(filePath));
+        codeTest(/cover.*\.(?:webp|jpe?g|png)$/i, path.basename(filePath));
     }).map((filePath) => path.relative(publicRoot, filePath).split(path.sep).join("/"))
   );
 
@@ -320,7 +321,7 @@ function verifyNoLegacyRuntimeCovers() {
       `extras=${extras.join(",") || "none"}, missing=${missing.join(",") || "none"})`
     );
   }
-  const allowlistMatch = sw.match(/const CANONICAL_COVER_PATHS = new Set\(\[([\s\S]*?)\]\);/);
+  const allowlistMatch = codeMatch(sw, /const CANONICAL_COVER_PATHS = new Set\(\[([\s\S]*?)\]\);/);
   if (!allowlistMatch) fail("Service Worker canonical cover allowlist is missing");
   const cachedCovers = new Set(JSON.parse(`[${allowlistMatch[1]}]`));
   const unexpectedCached = [...cachedCovers].filter((cover) => !expectedCovers.has(cover));
@@ -333,28 +334,28 @@ function verifyNoLegacyRuntimeCovers() {
     );
   }
   if (
-    !sw.includes(`const MAX_COVER_CACHE_ENTRIES = ${expected.albums}`) ||
-    !sw.includes("await reconcileCoverCache()") ||
-    !scripts.includes("const ALBUM_COVER_IMAGE_CACHE_LIMIT = 4") ||
-    !scripts.includes("const ALBUM_COVER_PREPARE_LIMIT = 2") ||
-    !scripts.includes("covers.slice(0, Math.min(ALBUM_COVER_PREPARE_LIMIT, covers.length))")
+    !codeHas(sw, `const MAX_COVER_CACHE_ENTRIES = ${expected.albums}`) ||
+    !codeHas(sw, "await reconcileCoverCache()") ||
+    !codeHas(scripts, "const ALBUM_COVER_IMAGE_CACHE_LIMIT = 4") ||
+    !codeHas(scripts, "const ALBUM_COVER_PREPARE_LIMIT = 2") ||
+    !codeHas(scripts, "covers.slice(0, Math.min(ALBUM_COVER_PREPARE_LIMIT, covers.length))")
   ) {
     fail("bounded cover cache/warmup policy is incomplete");
   }
   const homeAlbumImages = [...home.matchAll(/<img class="album-thumb album-cover"[^>]+>/g)].map((match) => match[0]);
-  const eagerHomeCovers = homeAlbumImages.filter((tag) => /\ssrc="/.test(tag));
-  const deferredHomeCovers = homeAlbumImages.filter((tag) => /\sdata-cover-src="/.test(tag));
+  const eagerHomeCovers = homeAlbumImages.filter((tag) => codeTest(/\ssrc="/, tag));
+  const deferredHomeCovers = homeAlbumImages.filter((tag) => codeTest(/\sdata-cover-src="/, tag));
   const deferredPlaylistTiles = [...home.matchAll(/<img class="playlist-cover-tile"[^>]+>/g)]
-    .filter((match) => /\sdata-cover-src="/.test(match[0]));
+    .filter((match) => codeTest(/\sdata-cover-src="/, match[0]));
   if (
     homeAlbumImages.length !== expected.albums ||
     eagerHomeCovers.length !== 2 ||
     deferredHomeCovers.length !== expected.albums - 2 ||
-    eagerHomeCovers.filter((tag) => /fetchpriority="high"/.test(tag)).length !== 1 ||
-    eagerHomeCovers.filter((tag) => /fetchpriority="auto"/.test(tag)).length !== 1 ||
+    eagerHomeCovers.filter((tag) => codeTest(/fetchpriority="high"/, tag)).length !== 1 ||
+    eagerHomeCovers.filter((tag) => codeTest(/fetchpriority="auto"/, tag)).length !== 1 ||
     deferredPlaylistTiles.length !== 16 ||
-    !homeCatalog.includes('querySelectorAll("img[data-cover-src]")') ||
-    !homeCatalog.includes('rootMargin: "320px 0px"')
+    !codeHas(homeCatalog, 'querySelectorAll("img[data-cover-src]")') ||
+    !codeHas(homeCatalog, 'rootMargin: "320px 0px"')
   ) {
     fail("home cover network deferral policy is incomplete");
   }
@@ -399,6 +400,7 @@ function runRegressionSuite() {
     "tools/test-audiofix402-fluidity.js",
     "tools/test-transport-pip.js",
     "tools/test-bump-version.js",
+    "tools/test-code-text.js",
     "tools/verify-audio-stability.js",
     "tools/verify-public-boundary.js"
   ];

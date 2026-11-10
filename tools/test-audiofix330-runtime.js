@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
+const { codeHas, codeIndexOf, codeMatch, codeTest } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -156,16 +157,16 @@ function testAudioSessionInterruptionResumeGate() {
   const radioSource = fs.readFileSync(RADIO_PATH, "utf8");
   const scriptsSource = require("./build/app-sources.js").runtimeSource();
   assert(
-    !radioSource.includes("!audioState.audioSessionTelemetryBound &&"),
+    !codeHas(radioSource, "!audioState.audioSessionTelemetryBound &&"),
     "a directly sampled active state must remain valid when a statechange was missed"
   );
-  assert(radioSource.includes("function scheduleSystemInterruptionResumeAfterActive(trigger)"));
-  assert(radioSource.includes("}, 500);"), "the guarded fallback must wait 500 ms for native Play");
-  assert(radioSource.includes("guard.resumeAttempted = true"), "the fallback needs a one-attempt latch");
-  assert(radioSource.includes("command.interruptionSrc = interruptionGuard.src"), "an external resume must retain the interrupted source locally");
-  assert(radioSource.includes('resume_gate_reason: "audio_play_event"'), "the native Play path must explain its interruption resume gate");
-  assert(radioSource.includes("native_play_observed: true"), "the interruption report must distinguish an observed native Play");
-  assert(scriptsSource.includes('callAudioRadio("scheduleSystemInterruptionResumeAfterActive", ["visibility_sample"])'));
+  assert(codeHas(radioSource, "function scheduleSystemInterruptionResumeAfterActive(trigger)"));
+  assert(codeHas(radioSource, "}, 500);"), "the guarded fallback must wait 500 ms for native Play");
+  assert(codeHas(radioSource, "guard.resumeAttempted = true"), "the fallback needs a one-attempt latch");
+  assert(codeHas(radioSource, "command.interruptionSrc = interruptionGuard.src"), "an external resume must retain the interrupted source locally");
+  assert(codeHas(radioSource, 'resume_gate_reason: "audio_play_event"'), "the native Play path must explain its interruption resume gate");
+  assert(codeHas(radioSource, "native_play_observed: true"), "the interruption report must distinguish an observed native Play");
+  assert(codeHas(scriptsSource, 'callAudioRadio("scheduleSystemInterruptionResumeAfterActive", ["visibility_sample"])'));
   const sandbox = createSandbox();
   loadScript(sandbox, RADIO_PATH);
   const canResume = sandbox.InfraAudioRadio.canAllowSystemInterruptionResume;
@@ -2835,16 +2836,16 @@ async function testPrefetchNPlusOneRetriesAfterTwoTransientFailures() {
     "The bounded N+1 recovery attempt must report its third timeout before the tail queue continues"
   );
   assert(
-    fetchUrls.includes(playlist[2].src) && fetchUrls.includes(playlist[3].src),
+    codeHas(fetchUrls, playlist[2].src) && codeHas(fetchUrls, playlist[3].src),
     "An exhausted N+1 must not starve N+2 through N+5"
   );
 }
 
 function extractFunctionBody(source, name) {
   const marker = `function ${name}(`;
-  const start = source.indexOf(marker);
+  const start = codeIndexOf(source, marker);
   assert(start >= 0, `Missing ${name}() implementation`);
-  const open = source.indexOf("{", start + marker.length);
+  const open = codeIndexOf(source, "{", start + marker.length);
   assert(open >= 0, `Missing ${name}() body`);
   let depth = 0;
   for (let index = open; index < source.length; index += 1) {
@@ -2860,8 +2861,8 @@ function extractFunctionBody(source, name) {
 function testNoGlobalPrefetchClear() {
   const radioSource = fs.readFileSync(RADIO_PATH, "utf8");
   const clearBody = extractFunctionBody(radioSource, "clearNextTrackPrefetch");
-  assert(!/caches\s*\.\s*(?:delete|keys)\s*\(/.test(clearBody));
-  assert(!/clearCache\s*\(/.test(clearBody));
+  assert(!codeTest(/caches\s*\.\s*(?:delete|keys)\s*\(/, clearBody));
+  assert(!codeTest(/clearCache\s*\(/, clearBody));
 
   const sandbox = createSandbox({
     caches: { open: () => Promise.resolve(null) }
@@ -2876,160 +2877,158 @@ function testNoGlobalPrefetchClear() {
 
 function testPersistentAlbumAndFullscreenContracts() {
   const albumUiSource = fs.readFileSync(ALBUM_UI_PATH, "utf8");
-  assert(!albumUiSource.includes("cleanupForeignAlbumAudioWhenIdle"));
-  assert(!albumUiSource.includes('className = "track-controls"'));
-  assert(!albumUiSource.includes("data-track-prev"));
-  assert(!albumUiSource.includes("data-track-next"));
-  assert(albumUiSource.includes('setAttribute("data-album-play", "")'));
-  assert(albumUiSource.includes('collectionButton("album-play-toggle"'));
-  assert(albumUiSource.includes("toggleCurrentPageCollection()"));
+  assert(!codeHas(albumUiSource, "cleanupForeignAlbumAudioWhenIdle"));
+  assert(!codeHas(albumUiSource, 'className = "track-controls"'));
+  assert(!codeHas(albumUiSource, "data-track-prev"));
+  assert(!codeHas(albumUiSource, "data-track-next"));
+  assert(codeHas(albumUiSource, 'setAttribute("data-album-play", "")'));
+  assert(codeHas(albumUiSource, 'collectionButton("album-play-toggle"'));
+  assert(codeHas(albumUiSource, "toggleCurrentPageCollection()"));
   assert(
-    albumUiSource.includes("audioState.playlistKind === ui.playlistKind"),
+    codeHas(albumUiSource, "audioState.playlistKind === ui.playlistKind"),
     "A collection page may rebind only its already-active album or playlist queue"
   );
   assert(
-    albumUiSource.includes("if (matchIndex >= 0)"),
+    codeHas(albumUiSource, "if (matchIndex >= 0)"),
     "An album route must preserve a foreign active queue instead of replacing it"
   );
 
   const radioSource = fs.readFileSync(RADIO_PATH, "utf8");
-  const globalTransportStart = radioSource.indexOf("function handleGlobalTransportToggle");
-  const globalTransportEnd = radioSource.indexOf("function ensureGlobalAudio", globalTransportStart);
+  const globalTransportStart = codeIndexOf(radioSource, "function handleGlobalTransportToggle");
+  const globalTransportEnd = codeIndexOf(radioSource, "function ensureGlobalAudio", globalTransportStart);
   const globalTransportBody = radioSource.slice(globalTransportStart, globalTransportEnd);
   assert(
-    globalTransportBody.indexOf("startGlobalRandomPlayback()") >= 0 &&
-      globalTransportBody.indexOf("startGlobalRandomPlayback()") < globalTransportBody.indexOf("startCurrentPageCollectionFromIdle(audio)"),
+    codeIndexOf(globalTransportBody, "startGlobalRandomPlayback()") >= 0 &&
+      codeIndexOf(globalTransportBody, "startGlobalRandomPlayback()") < codeIndexOf(globalTransportBody, "startCurrentPageCollectionFromIdle(audio)"),
     "The global transport must start cold Radio before adopting the current collection"
   );
   assert(
-    globalTransportBody.includes('surface: "global_cold_radio"'),
+    codeHas(globalTransportBody, 'surface: "global_cold_radio"'),
     "The cold global transport must keep a gesture-safe Radio fallback while metadata loads"
   );
-  const coldCapabilityStart = radioSource.indexOf("function canStartInitialGlobalRandomPlayback");
-  const coldCapabilityEnd = radioSource.indexOf("function startSelectedTrackInRadioFromCold", coldCapabilityStart);
-  assert(!/document\.body\.classList\.contains\("home-screen"\)/.test(
-    radioSource.slice(coldCapabilityStart, coldCapabilityEnd)
-  ), "Cold Radio must be available from album and playlist routes");
-  assert(albumUiSource.includes("startSelectedTrackInRadioFromCold"), "A selected cold track must enter the Radio queue first");
-  assert(radioSource.includes("ensureRadioPlaylistLoaded().then"), "A one-track cold Radio queue must be completed in the background");
+  const coldCapabilityStart = codeIndexOf(radioSource, "function canStartInitialGlobalRandomPlayback");
+  const coldCapabilityEnd = codeIndexOf(radioSource, "function startSelectedTrackInRadioFromCold", coldCapabilityStart);
+  assert(!codeTest(/document\.body\.classList\.contains\("home-screen"\)/, radioSource.slice(coldCapabilityStart, coldCapabilityEnd)), "Cold Radio must be available from album and playlist routes");
+  assert(codeHas(albumUiSource, "startSelectedTrackInRadioFromCold"), "A selected cold track must enter the Radio queue first");
+  assert(codeHas(radioSource, "ensureRadioPlaylistLoaded().then"), "A one-track cold Radio queue must be completed in the background");
 
   const modeStylesSource = fs.readFileSync(STYLES_PATH, "utf8");
   assert(
-    !modeStylesSource.includes(".play-btn.is-current:not(.is-playing) .track-eq span"),
+    !codeHas(modeStylesSource, ".play-btn.is-current:not(.is-playing) .track-eq span"),
     "The restored player must keep its historical equalizer animation"
   );
   assert(
-    !modeStylesSource.includes(".now-playing-mode-btn.is-on") &&
-      /\.global-transport-mode\.is-on,\s*\.global-transport-btn\[data-transport-shuffle\]\.is-on\s*\{[^}]*color:\s*var\(--ink\)/.test(modeStylesSource) &&
-      /\.now-playing-btn\.is-on\s*\{[^}]*color:\s*#fff/.test(modeStylesSource),
+    !codeHas(modeStylesSource, ".now-playing-mode-btn.is-on") &&
+      codeTest(/\.global-transport-mode\.is-on,\s*\.global-transport-btn\[data-transport-shuffle\]\.is-on\s*\{[^}]*color:\s*var\(--ink\)/, modeStylesSource) &&
+      codeTest(/\.now-playing-btn\.is-on\s*\{[^}]*color:\s*#fff/, modeStylesSource),
     "Radio and Shuffle must retain the pre-audio377 gray/white visual states"
   );
 
   const nowPlayingSource = fs.readFileSync(NOW_PLAYING_PATH, "utf8");
   assert(
-    nowPlayingSource.includes("animation.onfinish = finalize") &&
-      nowPlayingSource.includes("animation.oncancel = finalize"),
+    codeHas(nowPlayingSource, "animation.onfinish = finalize") &&
+      codeHas(nowPlayingSource, "animation.oncancel = finalize"),
     "Fullscreen completion and cancellation must share the mini-player restoration finalizer"
   );
   const fullscreenOpenBody = extractFunctionBody(nowPlayingSource, "openNowPlayingOverlay");
   assert(
-    fullscreenOpenBody.indexOf("syncTransportUi();") >
-      fullscreenOpenBody.indexOf("audioState.nowPlayingOpen = true"),
+    codeIndexOf(fullscreenOpenBody, "syncTransportUi();") >
+      codeIndexOf(fullscreenOpenBody, "audioState.nowPlayingOpen = true"),
     "The first cold fullscreen open must immediately synchronize the desktop visualizer"
   );
 
   const transportSource = fs.readFileSync(TRANSPORT_UI_PATH, "utf8");
   const transportSyncBody = extractFunctionBody(transportSource, "syncTransportUi");
   assert(
-    transportSyncBody.includes('const isAlbum = document.body.classList.contains("album-screen")') &&
-      transportSyncBody.includes("isHome || isAlbum || hasPlaybackSessionActive"),
+    codeHas(transportSyncBody, 'const isAlbum = document.body.classList.contains("album-screen")') &&
+      codeHas(transportSyncBody, "isHome || isAlbum || hasPlaybackSessionActive"),
     "The cold mini-player must remain visible on album routes"
   );
   assert(
-    transportSyncBody.includes("const canOpenNowPlaying = Boolean(hasPlaybackSessionActive)"),
+    codeHas(transportSyncBody, "const canOpenNowPlaying = Boolean(hasPlaybackSessionActive)"),
     "A cold album route must not make fullscreen available before a playback session exists"
   );
 
   const miniSyncBody = extractFunctionBody(transportSource, "syncTransportMiniUi");
   assert(
-    transportSource.includes("data-transport-mini-duration>0:00</span>") &&
-      !miniSyncBody.includes('"--:--"') &&
-      miniSyncBody.includes("audio.currentTime > 0"),
+    codeHas(transportSource, "data-transport-mini-duration>0:00</span>") &&
+      !codeHas(miniSyncBody, '"--:--"') &&
+      codeHas(miniSyncBody, "audio.currentTime > 0"),
     "The mini-player duration placeholder must be 0:00 while metadata is unavailable"
   );
-  assert(miniSyncBody.includes("audioState.sourceMetadataPending"));
+  assert(codeHas(miniSyncBody, "audioState.sourceMetadataPending"));
   const nowPlayingProgressBody = extractFunctionBody(nowPlayingSource, "syncNowPlayingOverlayProgress");
-  assert(nowPlayingProgressBody.includes("audioState.sourceMetadataPending"));
-  assert(nowPlayingProgressBody.includes("formatPlaybackTime"));
+  assert(codeHas(nowPlayingProgressBody, "audioState.sourceMetadataPending"));
+  assert(codeHas(nowPlayingProgressBody, "formatPlaybackTime"));
 
   const coreSource = fs.readFileSync(CORE_PATH, "utf8");
   const coreStartBody = extractFunctionBody(coreSource, "startTrack");
-  assert(coreStartBody.includes("bindMediaSessionActions({ force: true, quiet: true })"));
+  assert(codeHas(coreStartBody, "bindMediaSessionActions({ force: true, quiet: true })"));
   const playResolvedBody = extractFunctionBody(coreSource, "handlePlayResolved");
-  assert(!playResolvedBody.includes("clearTrackFailure("));
+  assert(!codeHas(playResolvedBody, "clearTrackFailure("));
   const ensureCurrentIndexBody = extractFunctionBody(coreSource, "ensureCurrentIndexFromAudio");
-  assert(!ensureCurrentIndexBody.includes("extractFilenameFromSrc"));
+  assert(!codeHas(ensureCurrentIndexBody, "extractFilenameFromSrc"));
   const queuePreviewBody = extractFunctionBody(coreSource, "getQueuePreviewIndices");
   const resolveIndexBody = extractFunctionBody(coreSource, "resolveIndex");
-  assert(queuePreviewBody.includes("extendAlbumPlaylistToNextAlbum"));
-  assert(resolveIndexBody.includes("extendAlbumPlaylistToNextAlbum"));
+  assert(codeHas(queuePreviewBody, "extendAlbumPlaylistToNextAlbum"));
+  assert(codeHas(resolveIndexBody, "extendAlbumPlaylistToNextAlbum"));
 
-  assert(albumUiSource.includes("immediatePlay: true"));
-  assert(albumUiSource.includes("userGesture: true"));
-  assert(!albumUiSource.includes("resetAudioElementForSource(audio, track.src)"));
+  assert(codeHas(albumUiSource, "immediatePlay: true"));
+  assert(codeHas(albumUiSource, "userGesture: true"));
+  assert(!codeHas(albumUiSource, "resetAudioElementForSource(audio, track.src)"));
 
-  assert(transportSource.includes('root.dataset.controlsBound === "1"'));
-  assert(transportSource.includes('root.dataset.controlsBound = "1"'));
+  assert(codeHas(transportSource, 'root.dataset.controlsBound === "1"'));
+  assert(codeHas(transportSource, 'root.dataset.controlsBound = "1"'));
 
   const scriptsSource = require("./build/app-sources.js").runtimeSource();
   const srcMatchesBody = extractFunctionBody(scriptsSource, "srcMatches");
-  assert(srcMatchesBody.includes("getAudioAssetPathKey"));
-  assert(!srcMatchesBody.includes("endsWith("));
-  assert(!srcMatchesBody.includes("extractFilenameFromSrc"));
+  assert(codeHas(srcMatchesBody, "getAudioAssetPathKey"));
+  assert(!codeHas(srcMatchesBody, "endsWith("));
+  assert(!codeHas(srcMatchesBody, "extractFilenameFromSrc"));
   const coverNormalizeBody = extractFunctionBody(scriptsSource, "normalizeCoverElementsForBase");
-  assert(coverNormalizeBody.includes('getAttribute("onerror")'));
-  assert(coverNormalizeBody.includes("normalizeUrlAgainstBase(fallbackMatch[2], baseUrl)"));
+  assert(codeHas(coverNormalizeBody, 'getAttribute("onerror")'));
+  assert(codeHas(coverNormalizeBody, "normalizeUrlAgainstBase(fallbackMatch[2], baseUrl)"));
   const nextAlbumBody = extractFunctionBody(scriptsSource, "findNextAlbumForContinuity");
   const previousAlbumBody = extractFunctionBody(scriptsSource, "findPreviousAlbumForContinuity");
-  assert(!nextAlbumBody.includes("% catalogAlbums.length"));
-  assert(!nextAlbumBody.includes("% tracksAlbums.length"));
-  assert(!previousAlbumBody.includes("% catalogAlbums.length"));
-  assert(!previousAlbumBody.includes("% tracksAlbums.length"));
+  assert(!codeHas(nextAlbumBody, "% catalogAlbums.length"));
+  assert(!codeHas(nextAlbumBody, "% tracksAlbums.length"));
+  assert(!codeHas(previousAlbumBody, "% catalogAlbums.length"));
+  assert(!codeHas(previousAlbumBody, "% tracksAlbums.length"));
   const stallRecoveryBody = extractFunctionBody(scriptsSource, "recoverPlaybackFromStall");
   assert(
-    stallRecoveryBody.indexOf('audio.addEventListener("canplay", resume') < stallRecoveryBody.indexOf("audio.load()"),
+    codeIndexOf(stallRecoveryBody, 'audio.addEventListener("canplay", resume') < codeIndexOf(stallRecoveryBody, "audio.load()"),
     "Stall recovery must bind its guarded listener before reloading the source"
   );
   const failureRecoveryBody = extractFunctionBody(scriptsSource, "failAudioRecovery");
-  assert(failureRecoveryBody.includes("clearWaitingRecovery()"));
+  assert(codeHas(failureRecoveryBody, "clearWaitingRecovery()"));
   const continuityRetryBody = extractFunctionBody(scriptsSource, "scheduleAlbumContinuityNavigationRetry");
-  assert(continuityRetryBody.includes("startRequestToken"));
-  assert(continuityRetryBody.includes("modeTransitionToken"));
-  assert(continuityRetryBody.includes("activeRequest.commands.length < 8"));
-  assert(continuityRetryBody.includes("request.commands.splice"));
-  assert(continuityRetryBody.includes("playNext(command.options)"));
+  assert(codeHas(continuityRetryBody, "startRequestToken"));
+  assert(codeHas(continuityRetryBody, "modeTransitionToken"));
+  assert(codeHas(continuityRetryBody, "activeRequest.commands.length < 8"));
+  assert(codeHas(continuityRetryBody, "request.commands.splice"));
+  assert(codeHas(continuityRetryBody, "playNext(command.options)"));
   const coverSessionWarmupBody = extractFunctionBody(scriptsSource, "prepareAlbumCoversForSession");
   const coverFallbackWarmupBody = extractFunctionBody(scriptsSource, "warmAlbumCoverCache");
   const coverScheduleBody = extractFunctionBody(scriptsSource, "scheduleAlbumCoverCacheWarmup");
   assert(
-    !coverSessionWarmupBody.includes("scheduleAlbumCoverCacheWarmup") &&
-      !coverFallbackWarmupBody.includes("scheduleAlbumCoverCacheWarmup") &&
-      !coverScheduleBody.includes("scheduleAlbumCoverCacheWarmup("),
+    !codeHas(coverSessionWarmupBody, "scheduleAlbumCoverCacheWarmup") &&
+      !codeHas(coverFallbackWarmupBody, "scheduleAlbumCoverCacheWarmup") &&
+      !codeHas(coverScheduleBody, "scheduleAlbumCoverCacheWarmup("),
     "A paused cover warmup must record pending work instead of recursively scheduling idle callbacks"
   );
-  assert(coverSessionWarmupBody.includes("albumCoverWarmupResumePending = true"));
-  assert(coverFallbackWarmupBody.includes("albumCoverWarmupResumePending = true"));
-  assert(coverScheduleBody.includes("albumCoverWarmupResumePending = false"));
+  assert(codeHas(coverSessionWarmupBody, "albumCoverWarmupResumePending = true"));
+  assert(codeHas(coverFallbackWarmupBody, "albumCoverWarmupResumePending = true"));
+  assert(codeHas(coverScheduleBody, "albumCoverWarmupResumePending = false"));
 
   const stylesSource = fs.readFileSync(STYLES_PATH, "utf8");
-  const coverWrapBlock = stylesSource.match(/\.now-playing-cover-wrap\s*\{([^}]*)\}/);
-  const coverBlock = stylesSource.match(/\.now-playing-cover\s*\{([^}]*)\}/);
-  assert(coverWrapBlock && /overflow:\s*hidden/.test(coverWrapBlock[1]));
-  assert(coverWrapBlock && /transform:\s*translateZ\(0\)/.test(coverWrapBlock[1]));
-  assert(coverWrapBlock && /backface-visibility:\s*hidden/.test(coverWrapBlock[1]));
-  assert(coverBlock && /border-radius:\s*0/.test(coverBlock[1]));
-  assert(coverBlock && /transform:\s*translateZ\(0\) scale\(1\.002\)/.test(coverBlock[1]));
-  assert(coverBlock && /backface-visibility:\s*hidden/.test(coverBlock[1]));
+  const coverWrapBlock = codeMatch(stylesSource, /\.now-playing-cover-wrap\s*\{([^}]*)\}/);
+  const coverBlock = codeMatch(stylesSource, /\.now-playing-cover\s*\{([^}]*)\}/);
+  assert(coverWrapBlock && codeTest(/overflow:\s*hidden/, coverWrapBlock[1]));
+  assert(coverWrapBlock && codeTest(/transform:\s*translateZ\(0\)/, coverWrapBlock[1]));
+  assert(coverWrapBlock && codeTest(/backface-visibility:\s*hidden/, coverWrapBlock[1]));
+  assert(coverBlock && codeTest(/border-radius:\s*0/, coverBlock[1]));
+  assert(coverBlock && codeTest(/transform:\s*translateZ\(0\) scale\(1\.002\)/, coverBlock[1]));
+  assert(coverBlock && codeTest(/backface-visibility:\s*hidden/, coverBlock[1]));
 }
 
 (async function run() {

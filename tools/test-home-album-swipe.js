@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
+const { codeAssertMatch, codeHas } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -37,11 +38,11 @@ function createHarness(options) {
     },
     contains(target) { return target === cover; },
     getAttribute(name) { return name === "aria-label" ? "Ouvrir l'album V-23PI56" : ""; },
-    closest(selector) { return selector.includes('data-catalog-grid="albums"') ? grid : null; }
+    closest(selector) { return codeHas(selector, 'data-catalog-grid="albums"') ? grid : null; }
   };
   const cover = {
     closest(selector) {
-      return selector.includes('[data-catalog-grid="albums"]') ? card : null;
+      return codeHas(selector, '[data-catalog-grid="albums"]') ? card : null;
     }
   };
   const document = {
@@ -113,7 +114,7 @@ function createHarness(options) {
   assert.equal(harness.opened.length, 1);
   assert.equal(harness.opened[0].target, harness.card);
   assert.equal(harness.opened[0].options.trigger, "swipe_right");
-  assert.match(harness.opened[0].options.gestureToken, /^swipe-/);
+  codeAssertMatch(harness.opened[0].options.gestureToken, /^swipe-/);
   assert.equal(harness.card.classList.contains("is-album-swipe-tracking"), false);
 
   const click = harness.dispatch("click");

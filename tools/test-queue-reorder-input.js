@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
+const { codeHas, codeIndexOf } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -12,7 +13,7 @@ const audioCore = fs.readFileSync(path.join(root, "public/assets/js/audio-core.j
 const styles = fs.readFileSync(path.join(root, "public/assets/css/styles.css"), "utf8");
 
 function includes(source, fragment, message) {
-  assert(source.includes(fragment), message);
+  assert(codeHas(source, fragment), message);
 }
 
 includes(transport, "const QUEUE_PRESS_HOLD_MS = 420", "touch reorder needs a bounded hold delay");
@@ -66,19 +67,19 @@ includes(styles, ".now-playing-up-next-item.is-dragging {\n  opacity: 0;", "the 
 includes(styles, ".now-playing-queue-drag-ghost {\n    animation: none;", "reduced-motion users cannot disable the pickup animation");
 includes(styles, "-webkit-touch-callout: none", "iOS callout can still steal the long press");
 
-const previewStart = transport.indexOf("function animateQueuePreview");
-const previewEnd = transport.indexOf("function animateQueueFinalFlip", previewStart);
+const previewStart = codeIndexOf(transport, "function animateQueuePreview");
+const previewEnd = codeIndexOf(transport, "function animateQueueFinalFlip", previewStart);
 const previewBody = transport.slice(previewStart, previewEnd);
-assert(!previewBody.includes("row.animate("), "preview rows must not restart WAAPI animations");
-assert(!previewBody.includes('fill: "both"'), "preview rows must not retain filled animation effects");
-assert(!previewBody.includes("previewAnimationRestartCount +="), "serialized previews must never count an animation restart");
+assert(!codeHas(previewBody, "row.animate("), "preview rows must not restart WAAPI animations");
+assert(!codeHas(previewBody, 'fill: "both"'), "preview rows must not retain filled animation effects");
+assert(!codeHas(previewBody, "previewAnimationRestartCount +="), "serialized previews must never count an animation restart");
 
-const touchCommitStart = transport.indexOf("function finishQueuePress");
-const touchCommitEnd = transport.indexOf("function findTouch", touchCommitStart);
+const touchCommitStart = codeIndexOf(transport, "function finishQueuePress");
+const touchCommitEnd = codeIndexOf(transport, "function findTouch", touchCommitStart);
 const touchCommitBody = transport.slice(touchCommitStart, touchCommitEnd);
 assert(
-  touchCommitBody.indexOf("animateQueueFinalFlip(gesture, beforeRects).then") <
-    touchCommitBody.indexOf("finishQueueReorderVisuals(gesture, { suppressClick: true })"),
+  codeIndexOf(touchCommitBody, "animateQueueFinalFlip(gesture, beforeRects).then") <
+    codeIndexOf(touchCommitBody, "finishQueueReorderVisuals(gesture, { suppressClick: true })"),
   "touch cleanup must wait for the final FLIP promise"
 );
 

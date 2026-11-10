@@ -2,6 +2,7 @@
 
 "use strict";
 
+const { codeAssertMatch, codeHas, codeMatch } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -61,7 +62,7 @@ function createSandbox(requestWindow) {
     innerHeight: 900,
     documentPictureInPicture: requestWindow ? { requestWindow } : undefined,
     matchMedia(query) {
-      return { matches: query.includes("min-width") };
+      return { matches: codeHas(query, "min-width") };
     },
     setTimeout,
     clearTimeout,
@@ -202,36 +203,34 @@ function testResponsivePictureInPictureLayouts() {
 }
 
 function testStaticContracts() {
-  const pipBodyRule = stylesSource.match(/body\.transport-pip-document\s*\{([^}]*)\}/);
-  const pipPlayerRule = stylesSource.match(
-    /body\.transport-pip-document \.transport-pip-player\.global-transport\s*\{([^}]*)\}/
-  );
+  const pipBodyRule = codeMatch(stylesSource, /body\.transport-pip-document\s*\{([^}]*)\}/);
+  const pipPlayerRule = codeMatch(stylesSource, /body\.transport-pip-document \.transport-pip-player\.global-transport\s*\{([^}]*)\}/);
   assert(pipBodyRule, "PiP document CSS rule is missing");
   assert(pipPlayerRule, "PiP player CSS rule is missing");
-  assert.match(pipBodyRule[1], /padding:\s*0\s*;/, "PiP document must be full bleed");
-  assert.match(pipPlayerRule[1], /padding:\s*14px\s*;/, "PiP content padding must remain internal");
-  assert.match(pipPlayerRule[1], /border:\s*0\s*;/, "PiP player must not keep the card border");
-  assert.match(pipPlayerRule[1], /border-radius:\s*0\s*;/, "PiP player must not keep rounded card corners");
-  assert.match(pipPlayerRule[1], /box-shadow:\s*none\s*;/, "PiP player must not keep the card shadow");
-  assert(transportSource.includes('window.addEventListener("pointerup", function (event) { finishRootGesture(event, false, true); })'));
-  assert(transportSource.includes('root.addEventListener("lostpointercapture", function (event) { finishRootGesture(event, false, false); })'));
-  assert(transportSource.includes("disallowReturnToOpener: true"));
-  assert(transportSource.includes("background:var(--bg-start,#f4f4f4)"));
-  assert(transportSource.includes('refs.root.classList.toggle("is-compact", compact)'));
-  assert(transportSource.includes('refs.root.classList.toggle("is-narrow", narrow)'));
-  assert(transportSource.includes('refs.root.classList.toggle("is-wide", wide)'));
-  assert(transportSource.includes('viewport.width >= DESKTOP_TRANSPORT_COVER_MIN_WIDTH'));
-  assert(transportSource.includes('viewport.height >= DESKTOP_TRANSPORT_COVER_MIN_HEIGHT'));
-  assert(transportSource.includes('!audioState.transportPipOpen'));
-  assert(transportSource.includes('pipWindow.addEventListener("pagehide"'));
-  assert(transportSource.includes('pipWindow.addEventListener("resize", syncTransportPictureInPictureUi'));
-  assert(transportSource.includes('getRuntimeAssetUrl("assets/css/styles.css" + query)'));
-  assert(scriptsSource.includes("new URL(String(path || \"\"), runtime.baseUrl).href"));
-  assert(stylesSource.includes("body.transport-pip-document .transport-pip-player.is-expanded"));
-  assert(stylesSource.includes(".global-transport.is-pip-detach-armed"));
-  assert(scriptsSource.includes("audioState.transportPipOpen ||"));
-  assert(scriptsSource.includes("audioState.transportPipOpening"));
-  assert(favoritesSource.includes("transport.pipFavorite"));
+  codeAssertMatch(pipBodyRule[1], /padding:\s*0\s*;/, "PiP document must be full bleed");
+  codeAssertMatch(pipPlayerRule[1], /padding:\s*14px\s*;/, "PiP content padding must remain internal");
+  codeAssertMatch(pipPlayerRule[1], /border:\s*0\s*;/, "PiP player must not keep the card border");
+  codeAssertMatch(pipPlayerRule[1], /border-radius:\s*0\s*;/, "PiP player must not keep rounded card corners");
+  codeAssertMatch(pipPlayerRule[1], /box-shadow:\s*none\s*;/, "PiP player must not keep the card shadow");
+  assert(codeHas(transportSource, 'window.addEventListener("pointerup", function (event) { finishRootGesture(event, false, true); })'));
+  assert(codeHas(transportSource, 'root.addEventListener("lostpointercapture", function (event) { finishRootGesture(event, false, false); })'));
+  assert(codeHas(transportSource, "disallowReturnToOpener: true"));
+  assert(codeHas(transportSource, "background:var(--bg-start,#f4f4f4)"));
+  assert(codeHas(transportSource, 'refs.root.classList.toggle("is-compact", compact)'));
+  assert(codeHas(transportSource, 'refs.root.classList.toggle("is-narrow", narrow)'));
+  assert(codeHas(transportSource, 'refs.root.classList.toggle("is-wide", wide)'));
+  assert(codeHas(transportSource, 'viewport.width >= DESKTOP_TRANSPORT_COVER_MIN_WIDTH'));
+  assert(codeHas(transportSource, 'viewport.height >= DESKTOP_TRANSPORT_COVER_MIN_HEIGHT'));
+  assert(codeHas(transportSource, '!audioState.transportPipOpen'));
+  assert(codeHas(transportSource, 'pipWindow.addEventListener("pagehide"'));
+  assert(codeHas(transportSource, 'pipWindow.addEventListener("resize", syncTransportPictureInPictureUi'));
+  assert(codeHas(transportSource, 'getRuntimeAssetUrl("assets/css/styles.css" + query)'));
+  assert(codeHas(scriptsSource, "new URL(String(path || \"\"), runtime.baseUrl).href"));
+  assert(codeHas(stylesSource, "body.transport-pip-document .transport-pip-player.is-expanded"));
+  assert(codeHas(stylesSource, ".global-transport.is-pip-detach-armed"));
+  assert(codeHas(scriptsSource, "audioState.transportPipOpen ||"));
+  assert(codeHas(scriptsSource, "audioState.transportPipOpening"));
+  assert(codeHas(favoritesSource, "transport.pipFavorite"));
 }
 
 async function main() {

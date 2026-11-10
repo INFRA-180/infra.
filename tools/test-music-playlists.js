@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
+const { codeHas, codeIndexOf, codeMatch, codeTest } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -38,7 +39,7 @@ if (playlistData.playlistCount !== 4 || playlists.length !== 4) {
 if (playlistData.trackOccurrences !== 234) {
   fail(`expected 234 playlist occurrences, found ${playlistData.trackOccurrences}`);
 }
-if (read("public/data/playlists.json").includes("musicPersistentID")) {
+if (codeHas(read("public/data/playlists.json"), "musicPersistentID")) {
   fail("public playlist data exposes Music persistent IDs");
 }
 
@@ -101,30 +102,30 @@ for (let playlistIndex = 0; playlistIndex < expected.length; playlistIndex += 1)
 
   const pageRelative = `public/playlists/${contract.slug}.html`;
   const page = read(pageRelative);
-  if (!page.includes('<body class="album-screen playlist-screen"')) {
+  if (!codeHas(page, '<body class="album-screen playlist-screen"')) {
     fail(`${pageRelative} is not initialized as a playlist screen`);
   }
-  if (!page.includes(`data-playlist-slug="${contract.slug}"`) || !page.includes(`<h1 class="playlist-visible-title" aria-label="${contract.name}">${contract.symbol}</h1>`)) {
+  if (!codeHas(page, `data-playlist-slug="${contract.slug}"`) || !codeHas(page, `<h1 class="playlist-visible-title" aria-label="${contract.name}">${contract.symbol}</h1>`)) {
     fail(`${pageRelative} has incorrect playlist metadata`);
   }
-  if (!page.includes("assets/css/playlists.css?v=playlist-collage-20260802")) {
+  if (!codeHas(page, "assets/css/playlists.css?v=playlist-collage-20260802")) {
     fail(`${pageRelative} does not load the playlist collage styles`);
   }
   const pageCovers = [...page.matchAll(/class="playlist-cover-tile" src="\.\.\/assets\/music\/responsive\/([^"]+)"/g)].map((match) => match[1]);
-  if (JSON.stringify(pageCovers) !== JSON.stringify(contract.covers) || page.includes("playlist-cover-image")) {
+  if (JSON.stringify(pageCovers) !== JSON.stringify(contract.covers) || codeHas(page, "playlist-cover-image")) {
     fail(`${pageRelative} does not render its four-album mosaic`);
   }
-  if ((page.match(/class="playlist-cover-tile"[^>]+loading="eager"/g) || []).length !== 4 || (page.match(/class="playlist-cover-tile"[^>]+fetchpriority="high"/g) || []).length !== 1) {
+  if ((codeMatch(page, /class="playlist-cover-tile"[^>]+loading="eager"/g) || []).length !== 4 || (codeMatch(page, /class="playlist-cover-tile"[^>]+fetchpriority="high"/g) || []).length !== 1) {
     fail(`${pageRelative} has incorrect hero mosaic loading priorities`);
   }
   const publicLogoUrl = "https://infra-180.github.io/infra./assets/pwa/icon-512-logo-white.png";
-  if (!page.includes(`<meta property="og:image" content="${publicLogoUrl}"`) || !page.includes(`<meta name="twitter:image" content="${publicLogoUrl}"`)) {
+  if (!codeHas(page, `<meta property="og:image" content="${publicLogoUrl}"`) || !codeHas(page, `<meta name="twitter:image" content="${publicLogoUrl}"`)) {
     fail(`${pageRelative} does not expose the generic INFRA image in social metadata`);
   }
-  if (page.includes(contract.archivedCover) || page.includes(`"image": "${publicLogoUrl}"`)) {
+  if (codeHas(page, contract.archivedCover) || codeHas(page, `"image": "${publicLogoUrl}"`)) {
     fail(`${pageRelative} still exposes a dedicated cover or schema image`);
   }
-  const rows = page.match(/class="track-player playlist-track"/g) || [];
+  const rows = codeMatch(page, /class="track-player playlist-track"/g) || [];
   if (rows.length !== contract.count) {
     fail(`${pageRelative} renders ${rows.length} rows instead of ${contract.count}`);
   }
@@ -133,7 +134,7 @@ for (let playlistIndex = 0; playlistIndex < expected.length; playlistIndex += 1)
   if (JSON.stringify(renderedSources) !== JSON.stringify(expectedSources)) {
     fail(`${pageRelative} does not preserve playlist source order`);
   }
-  if (!page.includes("assets/js/app.js?v=")) { // visualiseur et fiche sont dans app.js (Vite, 10/11/2026)
+  if (!codeHas(page, "assets/js/app.js?v=")) { // visualiseur et fiche sont dans app.js (Vite, 10/11/2026)
     fail(`${pageRelative} is missing the shared player runtime`);
   }
 }
@@ -143,22 +144,22 @@ if (seenSources.size !== 225) {
 }
 
 const index = read("public/index.html");
-const playlistsPosition = index.indexOf('data-module-id="playlists"');
-const albumsPosition = index.indexOf('data-module-id="albums"');
+const playlistsPosition = codeIndexOf(index, 'data-module-id="playlists"');
+const albumsPosition = codeIndexOf(index, 'data-module-id="albums"');
 if (playlistsPosition < 0 || albumsPosition < 0 || albumsPosition > playlistsPosition) {
   fail("Albums is not the first music section on the home page");
 }
-if (!/<section class="module one-col" data-module-id="albums">\s*<details class="albums-menu" open>/.test(index)) {
+if (!codeTest(/<section class="module one-col" data-module-id="albums">\s*<details class="albums-menu" open>/, index)) {
   fail("Albums is not open by default");
 }
 // Bibliothèque V3 (INFRA, 08/11/2026) : Playlists est visible sur l'accueil, au-dessus des albums (ordre visuel CSS).
-if (!/<section class="module one-col" data-module-id="playlists">\s*<details class="albums-menu playlists-menu" open>/.test(index)) {
+if (!codeTest(/<section class="module one-col" data-module-id="playlists">\s*<details class="albums-menu playlists-menu" open>/, index)) {
   fail("Playlists is not open by default");
 }
 
 const runtime = require("./build/app-sources.js").runtimeSource();
-const orderFunctionStart = runtime.indexOf("function enforceHomeModuleOrder()");
-const orderFunctionEnd = runtime.indexOf("function enforceHomeAppsCollapsed", orderFunctionStart);
+const orderFunctionStart = codeIndexOf(runtime, "function enforceHomeModuleOrder()");
+const orderFunctionEnd = codeIndexOf(runtime, "function enforceHomeAppsCollapsed", orderFunctionStart);
 if (orderFunctionStart < 0 || orderFunctionEnd < 0) {
   fail("home module order function is missing");
 }
@@ -167,11 +168,11 @@ const moduleNodes = ["albums", "playlists", "clips", "apps"].map((id) => ({ id }
 const container = {
   children: moduleNodes.slice(),
   querySelector(selector) {
-    const match = selector.match(/data-module-id="([^"]+)"/);
+    const match = codeMatch(selector, /data-module-id="([^"]+)"/);
     return match ? moduleNodes.find((node) => node.id === match[1]) || null : null;
   },
   appendChild(node) {
-    const currentIndex = this.children.indexOf(node);
+    const currentIndex = codeIndexOf(this.children, node);
     if (currentIndex >= 0) this.children.splice(currentIndex, 1);
     this.children.push(node);
   }
@@ -187,60 +188,60 @@ if (JSON.stringify(runtimeHomeOrder) !== JSON.stringify(["albums", "playlists", 
 }
 
 for (const contract of expected) {
-  if (!index.includes(`href="playlists/${contract.slug}.html"`) || !index.includes(contract.name)) {
+  if (!codeHas(index, `href="playlists/${contract.slug}.html"`) || !codeHas(index, contract.name)) {
     fail(`home page is missing ${contract.name}`);
   }
-  const cardStart = index.indexOf(`href="playlists/${contract.slug}.html"`);
-  const cardEnd = index.indexOf("</a>", cardStart);
+  const cardStart = codeIndexOf(index, `href="playlists/${contract.slug}.html"`);
+  const cardEnd = codeIndexOf(index, "</a>", cardStart);
   const card = index.slice(cardStart, cardEnd);
   const cardCovers = [...card.matchAll(/class="playlist-cover-tile" data-cover-src="assets\/music\/responsive\/([^"]+)"/g)].map((match) => match[1]);
-  if (JSON.stringify(cardCovers) !== JSON.stringify(contract.covers) || card.includes("playlist-cover-image") || card.includes(contract.archivedCover)) {
+  if (JSON.stringify(cardCovers) !== JSON.stringify(contract.covers) || codeHas(card, "playlist-cover-image") || codeHas(card, contract.archivedCover)) {
     fail(`home page mosaic is incorrect for ${contract.name}`);
   }
-  if ((card.match(/class="playlist-cover-tile"[^>]+loading="lazy"/g) || []).length !== 4 || (card.match(/class="playlist-cover-tile"[^>]+fetchpriority="low"/g) || []).length !== 4) {
+  if ((codeMatch(card, /class="playlist-cover-tile"[^>]+loading="lazy"/g) || []).length !== 4 || (codeMatch(card, /class="playlist-cover-tile"[^>]+fetchpriority="low"/g) || []).length !== 4) {
     fail(`home page mosaic loading is incorrect for collapsed ${contract.name}`);
   }
-  if (/class="playlist-cover-tile"\s+src=/.test(card)) {
+  if (codeTest(/class="playlist-cover-tile"\s+src=/, card)) {
     fail(`collapsed home mosaic eagerly downloads covers for ${contract.name}`);
   }
-  if (!card.includes(`<span class="playlist-card-title">${contract.symbol}</span>`) || card.includes(`<span class="playlist-card-title">${contract.name}</span>`)) {
+  if (!codeHas(card, `<span class="playlist-card-title">${contract.symbol}</span>`) || codeHas(card, `<span class="playlist-card-title">${contract.name}</span>`)) {
     fail(`home page does not show only the sign for ${contract.name}`);
   }
 }
 
-const homePlaylistSection = index.slice(index.indexOf("<!-- PLAYLIST_GRID_START -->"), index.indexOf("<!-- PLAYLIST_GRID_END -->"));
+const homePlaylistSection = index.slice(codeIndexOf(index, "<!-- PLAYLIST_GRID_START -->"), codeIndexOf(index, "<!-- PLAYLIST_GRID_END -->"));
 const homeOrder = [...homePlaylistSection.matchAll(/href="playlists\/(infra-[^"]+)\.html"/g)].map((match) => match[1]);
 if (JSON.stringify(homeOrder) !== JSON.stringify(expected.map((contract) => contract.slug))) {
   fail(`home playlist order is incorrect: ${homeOrder.join(" -> ")}`);
 }
-const seoPlaylistSection = index.slice(index.indexOf("<!-- PLAYLIST_SEO_LINKS_START -->"), index.indexOf("<!-- PLAYLIST_SEO_LINKS_END -->"));
+const seoPlaylistSection = index.slice(codeIndexOf(index, "<!-- PLAYLIST_SEO_LINKS_START -->"), codeIndexOf(index, "<!-- PLAYLIST_SEO_LINKS_END -->"));
 const seoOrder = [...seoPlaylistSection.matchAll(/href="playlists\/(infra-[^"]+)\.html"/g)].map((match) => match[1]);
 if (JSON.stringify(seoOrder) !== JSON.stringify(expected.map((contract) => contract.slug))) {
   fail(`SEO playlist order is incorrect: ${seoOrder.join(" -> ")}`);
 }
 
 const playlistStyles = read("public/assets/css/styles.css"); // playlists.css fusionné au lot 3
-if (!playlistStyles.includes(".playlist-cover-tile") || !playlistStyles.includes("grid-template-columns: repeat(2") || playlistStyles.includes(".playlist-cover-image")) {
+if (!codeHas(playlistStyles, ".playlist-cover-tile") || !codeHas(playlistStyles, "grid-template-columns: repeat(2") || codeHas(playlistStyles, ".playlist-cover-image")) {
   fail("playlist album mosaics are not styled correctly");
 }
 for (const contract of expected) {
-  if (!playlistStyles.includes(`background-image: url("../branding/${contract.asset}")`)) {
+  if (!codeHas(playlistStyles, `background-image: url("../branding/${contract.asset}")`)) {
     fail(`${contract.name} does not use its stable sign asset`);
   }
 }
-if (!playlistStyles.includes("@media (min-width: 981px)") || !playlistStyles.includes("--playlist-sign-size: 0.74rem") || !playlistStyles.includes("--playlist-sign-size: clamp(1.2rem, 3.8vw, 1.75rem)")) {
+if (!codeHas(playlistStyles, "@media (min-width: 981px)") || !codeHas(playlistStyles, "--playlist-sign-size: 0.74rem") || !codeHas(playlistStyles, "--playlist-sign-size: clamp(1.2rem, 3.8vw, 1.75rem)")) {
   fail("desktop playlist titles do not follow the album title sizing");
 }
 
 const serviceWorker = read("public/sw.js");
-if (!serviceWorker.includes("assets/css/playlists.css?v=playlist-collage-20260802") || !serviceWorker.includes("data/playlists.json?v=playlist-collage-20260802")) {
+if (!codeHas(serviceWorker, "assets/css/playlists.css?v=playlist-collage-20260802") || !codeHas(serviceWorker, "data/playlists.json?v=playlist-collage-20260802")) {
   fail("the PWA does not cache the current playlist stylesheet");
 }
 for (const contract of expected) {
-  if (!serviceWorker.includes(`assets/branding/${contract.asset}`)) {
+  if (!codeHas(serviceWorker, `assets/branding/${contract.asset}`)) {
     fail(`the PWA does not cache ${contract.asset}`);
   }
-  if (serviceWorker.includes(`assets/branding/${contract.archivedCover}`)) {
+  if (codeHas(serviceWorker, `assets/branding/${contract.archivedCover}`)) {
     fail(`the PWA still caches archived cover ${contract.archivedCover}`);
   }
 }
@@ -249,16 +250,16 @@ const albumUi = read("public/assets/js/album-player-ui.js");
 const audioCore = read("public/assets/js/audio-core.js");
 const audioRadio = read("public/assets/js/audio-radio.js");
 const scripts = require("./build/app-sources.js").runtimeSource();
-if (!albumUi.includes('document.body.classList.contains("playlist-screen") ? "playlist" : "album"')) {
+if (!codeHas(albumUi, 'document.body.classList.contains("playlist-screen") ? "playlist" : "album"')) {
   fail("playlist pages do not declare their queue type");
 }
-if (!audioCore.includes('audioState.playlistKind !== "playlist"')) {
+if (!codeHas(audioCore, 'audioState.playlistKind !== "playlist"')) {
   fail("track starts overwrite the playlist queue type");
 }
-if (!audioRadio.includes('["global", "favorites", "playlist"].includes(audioState.playlistKind)')) {
+if (!codeHas(audioRadio, '["global", "favorites", "playlist"].includes(audioState.playlistKind)')) {
   fail("playlist queues are not persisted across the session");
 }
-if ((scripts.match(/if \(audioState\.playlistKind !== "album"\) return -1;/g) || []).length < 2) {
+if ((codeMatch(scripts, /if \(audioState\.playlistKind !== "album"\) return -1;/g) || []).length < 2) {
   fail("album continuity can still escape a playlist queue");
 }
 

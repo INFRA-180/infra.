@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
+const { codeHas, codeMatch, codeTest } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -9,9 +10,9 @@ const vm = require("node:vm");
 const publicRoot = path.resolve(__dirname, "../public");
 const catalogAlbumCount = (JSON.parse(fs.readFileSync(path.join(publicRoot, "data/tracks.json"), "utf8")).albums || []).length;
 const runtimeSource = require("./build/app-sources.js").runtimeSource();
-const runtimeRelease = (runtimeSource.match(/window\.INFRA_BUILD_TAG = "([^"]+)";/) || [])[1] || "";
+const runtimeRelease = (codeMatch(runtimeSource, /window\.INFRA_BUILD_TAG = "([^"]+)";/) || [])[1] || "";
 const serviceWorkerSource = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
-const shellRelease = (serviceWorkerSource.match(/const VERSION = "([^"]+)";/) || [])[1] || "";
+const shellRelease = (codeMatch(serviceWorkerSource, /const VERSION = "([^"]+)";/) || [])[1] || "";
 
 let fetchHandler = null;
 let installHandler = null;
@@ -39,7 +40,7 @@ const shellCache = {
   },
   add: (asset) => {
     installedOptionalShellAssets.push(asset);
-    if (String(asset).includes("qr-creator.min.js")) {
+    if (codeHas(String(asset), "qr-creator.min.js")) {
       return Promise.reject(new Error("optional_asset_unavailable"));
     }
     return Promise.resolve();
@@ -257,13 +258,13 @@ async function dispatchSiteFetch(request) {
   installHandler({ waitUntil: (promise) => { installPromise = promise; } });
   await installPromise;
   assert.strictEqual(skipWaitingCalls, 0, "install must not replace the active controller during playback");
-  const installedAlbumPages = shellPutRequests.filter((asset) => /\/music\/[^/]+-infra\.html$/.test(asset));
+  const installedAlbumPages = shellPutRequests.filter((asset) => codeTest(/\/music\/[^/]+-infra\.html$/, asset));
   assert.strictEqual(installedAlbumPages.length, catalogAlbumCount, "all album documents must be installed with the PWA shell");
-  assert(installedAlbumPages.includes("https://site.test/music/salam-infra.html"));
-  assert(installedAlbumPages.includes("https://site.test/music/trou-noir-infra.html"));
-  assert(installedShellAssets.includes(`./assets/js/app.js?v=${runtimeRelease}`)); // un seul fichier construit par Vite (10/11/2026)
+  assert(codeHas(installedAlbumPages, "https://site.test/music/salam-infra.html"));
+  assert(codeHas(installedAlbumPages, "https://site.test/music/trou-noir-infra.html"));
+  assert(codeHas(installedShellAssets, `./assets/js/app.js?v=${runtimeRelease}`)); // un seul fichier construit par Vite (10/11/2026)
   assert(
-    installedOptionalShellAssets.includes("./assets/vendor/qr-creator.min.js?v=1.0.0"),
+    codeHas(installedOptionalShellAssets, "./assets/vendor/qr-creator.min.js?v=1.0.0"),
     "optional shell resources must still be attempted"
   );
 
@@ -337,10 +338,10 @@ async function dispatchSiteFetch(request) {
     "infra-shell-20260823-audio402-runtime",
     "infra-shell-20260823-audio402-shell"
   ]);
-  assert(!deletedCaches.includes("infra-next-track-segments-v9"));
-  assert(!deletedCaches.includes("infra-covers-v2"));
-  assert(!deletedCaches.includes(`${shellRelease}-shell`));
-  assert(!deletedCaches.includes(`${shellRelease}-runtime`));
+  assert(!codeHas(deletedCaches, "infra-next-track-segments-v9"));
+  assert(!codeHas(deletedCaches, "infra-covers-v2"));
+  assert(!codeHas(deletedCaches, `${shellRelease}-shell`));
+  assert(!codeHas(deletedCaches, `${shellRelease}-runtime`));
   assert.deepStrictEqual(deletedCoverEntries.sort(), [
     "https://other.test/assets/music/responsive/abricot-cover-1200.webp",
     "https://site.test/assets/music/responsive/obsolete-cover-1200.webp"

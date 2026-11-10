@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
+const { codeAssertMatch } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -75,7 +76,7 @@ async function testInstalledShellWinsWithoutNetwork() {
   assert.equal(result.cached, true);
   assert.equal(result.strategy, "window_shell_cache");
   assert.equal(result.workerVersion, "infra-shell-20260823-audio402");
-  assert.match(result.html, /Salam/);
+  codeAssertMatch(result.html, /Salam/);
   assert.equal(cacheMatchCalls, 1);
   assert.equal(fetchCalls, 0);
 
@@ -116,7 +117,7 @@ async function testIntentAndClickShareOneRequest() {
   }));
   const [prefetched, loaded] = await Promise.all([intent, click]);
   assert.equal(prefetched, true);
-  assert.match(loaded.html, /Ballades/);
+  codeAssertMatch(loaded.html, /Ballades/);
   assert.equal(fetchCalls, 1);
 }
 
@@ -176,7 +177,7 @@ async function testNavigationUpgradesCacheOnlyWarmup() {
   });
   const [warmed, loaded] = await Promise.all([cacheOnlyWarmup, userNavigation]);
   assert.equal(warmed, false, "a missing shell entry must stay cache-only during idle warmup");
-  assert.match(loaded.html, /Network fallback/, "a user navigation must upgrade a cache-only miss");
+  codeAssertMatch(loaded.html, /Network fallback/, "a user navigation must upgrade a cache-only miss");
   assert.equal(fetchCalls, 1, "the upgraded user navigation must make one bounded fallback request");
 }
 
@@ -199,7 +200,7 @@ async function testHungCacheLookupFallsBackBoundedly() {
     cacheLookupTimeoutMs: 50,
     timeoutMs: 1000
   });
-  assert.match(loaded.html, /Bounded fallback/);
+  codeAssertMatch(loaded.html, /Bounded fallback/);
   assert.equal(fetchCalls, 1);
   assert.ok(Date.now() - startedAt < 500, "a hung CacheStorage lookup must not freeze album navigation");
 }

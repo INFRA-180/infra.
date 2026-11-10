@@ -2,6 +2,7 @@
 
 "use strict";
 
+const { codeHas } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -243,7 +244,7 @@ const sandbox = {
       };
     },
     matchMedia(query) {
-      return query.includes("prefers-reduced-motion") ? motionQuery : desktopQuery;
+      return codeHas(query, "prefers-reduced-motion") ? motionQuery : desktopQuery;
     }
   }
 };

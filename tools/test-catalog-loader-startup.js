@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
+const { codeTest } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -199,7 +200,7 @@ async function flushTasks() {
     "The live refresh starts once in the background"
   );
   assert.strictEqual(
-    startup.fetchCalls.filter((url) => /\/data\/(?:catalog|tracks|track-durations)\.json/.test(url)).length,
+    startup.fetchCalls.filter((url) => codeTest(/\/data\/(?:catalog|tracks|track-durations)\.json/, url)).length,
     3,
     "The validated local bundle is the blocking startup dependency"
   );

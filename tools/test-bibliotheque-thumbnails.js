@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
+const { codeAssertMatch, codeHas, codeMatch, codeTest } = require("./lib/code-text.js"); // recherches insensibles au formatage (étape 4e)
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -29,7 +30,7 @@ function element(tagName) {
     children: [],
     dataset: {},
     complete: true,
-    classList: { contains(name) { return String(node.className || "").split(" ").includes(name); } },
+    classList: { contains(name) { return codeHas(String(node.className || "").split(" "), name); } },
     setAttribute(name, value) { attributes.set(name, String(value)); },
     getAttribute(name) { return attributes.get(name) || null; },
     removeAttribute(name) { attributes.delete(name); },
@@ -111,14 +112,14 @@ const html = fs.readFileSync(path.join(publicRoot, "index.html"), "utf8");
 const images = [...html.matchAll(/<img class="(album-thumb album-cover|playlist-cover-tile)"[^>]+>/g)];
 assert.ok(images.length > 16, "the Home contains album cards and mosaic tiles");
 for (const [tag] of images) {
-  const canonicalSource = tag.match(/\s(?:src|data-cover-src)="([^"]+)"/)?.[1];
-  assert.match(canonicalSource || "", /-cover-1200\.webp$/);
-  const responsive = tag.match(/\s((?:data-cover-)?srcset)="([^"]+)"/);
+  const canonicalSource = codeMatch(tag, /\s(?:src|data-cover-src)="([^"]+)"/)?.[1];
+  codeAssertMatch(canonicalSource || "", /-cover-1200\.webp$/);
+  const responsive = codeMatch(tag, /\s((?:data-cover-)?srcset)="([^"]+)"/);
   if (!responsive && !process.argv.includes("--strict-static")) continue;
   assert.ok(responsive, `missing responsive candidates for ${canonicalSource}`);
-  const deferred = /\sdata-cover-src="/.test(tag);
+  const deferred = codeTest(/\sdata-cover-src="/, tag);
   assert.equal(responsive[1], deferred ? "data-cover-srcset" : "srcset");
-  assert.ok(tag.includes(deferred ? ' data-cover-sizes="' : ' sizes="'));
+  assert.ok(codeHas(tag, deferred ? ' data-cover-sizes="' : ' sizes="'));
   const candidate = thumbnailPath(canonicalSource);
   assert.equal(responsive[2], `${candidate} 400w, ${canonicalSource} 1200w`);
   const buffer = fs.readFileSync(path.join(publicRoot, candidate));

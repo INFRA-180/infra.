@@ -213,16 +213,21 @@
 
     closeButton.addEventListener("click", closeFromPointer);
     closeButton.addEventListener("pointerup", closeFromPointer);
-    dialog.addEventListener("pointerdown", function (event) {
-      if (event.target !== dialog) return;
-      backdropPointer = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY
-      };
-    }, { passive: true });
+    dialog.addEventListener(
+      "pointerdown",
+      function (event) {
+        if (event.target !== dialog) return;
+        backdropPointer = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY
+        };
+      },
+      { passive: true }
+    );
     dialog.addEventListener("pointerup", function (event) {
-      if (!backdropPointer || event.pointerId !== backdropPointer.pointerId || event.target !== dialog) return;
+      if (!backdropPointer || event.pointerId !== backdropPointer.pointerId || event.target !== dialog)
+        return;
       const dx = event.clientX - backdropPointer.startX;
       const dy = event.clientY - backdropPointer.startY;
       backdropPointer = null;
@@ -270,16 +275,24 @@
       script.src = vendorUrl;
       script.async = true;
       script.dataset.infraQrVendor = "true";
-      script.addEventListener("load", function () {
-        if (window.QrCreator && typeof window.QrCreator.render === "function") {
-          resolve(window.QrCreator);
-          return;
-        }
-        reject(new Error("qr_creator_unavailable"));
-      }, { once: true });
-      script.addEventListener("error", function () {
-        reject(new Error("qr_creator_load_failed"));
-      }, { once: true });
+      script.addEventListener(
+        "load",
+        function () {
+          if (window.QrCreator && typeof window.QrCreator.render === "function") {
+            resolve(window.QrCreator);
+            return;
+          }
+          reject(new Error("qr_creator_unavailable"));
+        },
+        { once: true }
+      );
+      script.addEventListener(
+        "error",
+        function () {
+          reject(new Error("qr_creator_load_failed"));
+        },
+        { once: true }
+      );
       document.head.appendChild(script);
     });
 
@@ -296,15 +309,18 @@
       const QrCreator = await loadQrLibrary();
       if (token !== openToken || currentShareUrl !== url) return;
       parts.qr.replaceChildren();
-      QrCreator.render({
-        text: url,
-        radius: 0.5,
-        ecLevel: "H",
-        fill: QR_FILL,
-        background: SHARE_BRAND_RED,
-        quiet: 4,
-        size: 280
-      }, parts.qr);
+      QrCreator.render(
+        {
+          text: url,
+          radius: 0.5,
+          ecLevel: "H",
+          fill: QR_FILL,
+          background: SHARE_BRAND_RED,
+          quiet: 4,
+          size: 280
+        },
+        parts.qr
+      );
       const canvas = parts.qr.querySelector("canvas");
       if (canvas) {
         canvas.setAttribute("role", "img");
@@ -467,21 +483,36 @@
     const page = button && button.closest("main.page");
     const heading = page && page.querySelector("h1");
     if (!heading) return;
-    openShare({ element: button, title: heading.textContent.trim(), url: cleanUrl(window.location.href) }, button);
+    openShare(
+      { element: button, title: heading.textContent.trim(), url: cleanUrl(window.location.href) },
+      button
+    );
   });
-  document.addEventListener("contextmenu", function (event) {
-    if (resolveShareIntent(event.target, false)) event.preventDefault();
-  }, true);
-  document.addEventListener("keydown", function (event) {
-    if (event.key !== "Enter" || !event.shiftKey) return;
-    const intent = resolveShareIntent(event.target, true);
-    if (!intent) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    openShare(intent, intent.element);
-  }, true);
-  window.addEventListener("scroll", function () {
-    if (activeGesture && !activeGesture.activated) clearGesture();
-  }, { capture: true, passive: true });
+  document.addEventListener(
+    "contextmenu",
+    function (event) {
+      if (resolveShareIntent(event.target, false)) event.preventDefault();
+    },
+    true
+  );
+  document.addEventListener(
+    "keydown",
+    function (event) {
+      if (event.key !== "Enter" || !event.shiftKey) return;
+      const intent = resolveShareIntent(event.target, true);
+      if (!intent) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openShare(intent, intent.element);
+    },
+    true
+  );
+  window.addEventListener(
+    "scroll",
+    function () {
+      if (activeGesture && !activeGesture.activated) clearGesture();
+    },
+    { capture: true, passive: true }
+  );
   window.addEventListener("blur", clearGesture);
 })();

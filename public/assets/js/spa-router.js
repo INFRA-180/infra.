@@ -1,9 +1,7 @@
 (function () {
   "use strict";
 
-  const globalObject = typeof window !== "undefined"
-    ? window
-    : (typeof self !== "undefined" ? self : {});
+  const globalObject = typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : {};
 
   const constants = Object.freeze({
     HISTORY_MARKER: "__infraSpa",
@@ -17,7 +15,8 @@
     SCROLL_HISTORY_DEBOUNCE_MS: 240
   });
 
-  const staticAssetPattern = /\.(?:mp3|m4a|aac|wav|flac|ogg|png|jpe?g|webp|gif|svg|ico|pdf|zip|json|js|css|woff2?)$/i;
+  const staticAssetPattern =
+    /\.(?:mp3|m4a|aac|wav|flac|ogg|png|jpe?g|webp|gif|svg|ico|pdf|zip|json|js|css|woff2?)$/i;
 
   function isEnabled(locationLike) {
     const locationRef = locationLike || globalObject.location || {};
@@ -26,9 +25,8 @@
 
   function buildHistoryState(options) {
     const opts = options || {};
-    const base = opts.baseState && typeof opts.baseState === "object"
-      ? Object.assign({}, opts.baseState)
-      : {};
+    const base =
+      opts.baseState && typeof opts.baseState === "object" ? Object.assign({}, opts.baseState) : {};
     base[constants.HISTORY_MARKER] = 1;
     base[constants.HISTORY_URL] = String(opts.url || "");
     base[constants.HISTORY_SCROLL_X] = Math.max(0, Math.round(Number(opts.scrollX) || 0));
@@ -61,9 +59,7 @@
 
     const url = String(opts.url || (globalObject.location && globalObject.location.href) || "");
     const state = buildHistoryState({
-      baseState: Object.prototype.hasOwnProperty.call(opts, "baseState")
-        ? opts.baseState
-        : historyRef.state,
+      baseState: Object.prototype.hasOwnProperty.call(opts, "baseState") ? opts.baseState : historyRef.state,
       url,
       scrollX: opts.scrollX,
       scrollY: opts.scrollY
@@ -86,17 +82,19 @@
     const opts = options || {};
     let url = null;
     try {
-      url = urlLike instanceof URL
-        ? urlLike
-        : new URL(String(urlLike || ""), opts.currentHref || (globalObject.location && globalObject.location.href) || "");
+      url =
+        urlLike instanceof URL
+          ? urlLike
+          : new URL(
+              String(urlLike || ""),
+              opts.currentHref || (globalObject.location && globalObject.location.href) || ""
+            );
     } catch (_err) {
       return false;
     }
 
     const currentOrigin = String(
-      opts.currentOrigin ||
-      (globalObject.location && globalObject.location.origin) ||
-      ""
+      opts.currentOrigin || (globalObject.location && globalObject.location.origin) || ""
     );
     if (currentOrigin && currentOrigin !== "null" && url.origin !== currentOrigin) return false;
 
@@ -110,9 +108,13 @@
     const opts = options || {};
     let url = null;
     try {
-      url = urlLike instanceof URL
-        ? urlLike
-        : new URL(String(urlLike || ""), opts.currentHref || (globalObject.location && globalObject.location.href) || "");
+      url =
+        urlLike instanceof URL
+          ? urlLike
+          : new URL(
+              String(urlLike || ""),
+              opts.currentHref || (globalObject.location && globalObject.location.href) || ""
+            );
     } catch (_err) {
       return "";
     }
@@ -140,9 +142,12 @@
     const currentHref = opts.currentHref || (globalObject.location && globalObject.location.href) || "";
     const currentOrigin = opts.currentOrigin || (globalObject.location && globalObject.location.origin) || "";
     const cacheStorage = opts.cacheStorage || globalObject.caches || null;
-    const fetchPage = typeof opts.fetch === "function"
-      ? opts.fetch
-      : (typeof globalObject.fetch === "function" ? globalObject.fetch.bind(globalObject) : null);
+    const fetchPage =
+      typeof opts.fetch === "function"
+        ? opts.fetch
+        : typeof globalObject.fetch === "function"
+          ? globalObject.fetch.bind(globalObject)
+          : null;
 
     function getKey(urlLike) {
       return getPageCacheKey(urlLike, { currentHref });
@@ -229,7 +234,9 @@
           response = await Promise.race([
             matchPromise,
             new Promise(function (resolve) {
-              lookupTimeoutId = globalObject.setTimeout(function () { resolve(null); }, lookupTimeoutMs);
+              lookupTimeoutId = globalObject.setTimeout(function () {
+                resolve(null);
+              }, lookupTimeoutMs);
             })
           ]);
         } else {
@@ -320,7 +327,7 @@
             signal: controller ? controller.signal : undefined,
             cache: loadOptions.cacheMode || "default",
             headers: {
-              "Accept": "text/html",
+              Accept: "text/html",
               "X-Infra-Spa": "1"
             }
           });
@@ -348,9 +355,7 @@
           strategy: reportedStrategy || "network",
           cacheHint: reportedCacheHint || "miss",
           workerVersion: reportedWorkerVersion,
-          responseMs: Number.isFinite(reportedResponseMs)
-            ? reportedResponseMs
-            : Date.now() - startedAt
+          responseMs: Number.isFinite(reportedResponseMs) ? reportedResponseMs : Date.now() - startedAt
         });
       })().finally(function () {
         if (inflightPages.get(key) === promise) inflightPages.delete(key);
@@ -363,11 +368,13 @@
     }
 
     function prefetch(href, options) {
-      return load(href, options).then(function (result) {
-        return Boolean(result && result.html);
-      }).catch(function () {
-        return false;
-      });
+      return load(href, options)
+        .then(function (result) {
+          return Boolean(result && result.html);
+        })
+        .catch(function () {
+          return false;
+        });
     }
 
     async function warm(urls, options) {
@@ -382,7 +389,9 @@
         while (cursor < entries.length) {
           const href = entries[cursor];
           cursor += 1;
-          const result = await load(href, warmOptions).catch(function () { return null; });
+          const result = await load(href, warmOptions).catch(function () {
+            return null;
+          });
           if (result && result.html) warmed += 1;
         }
       }

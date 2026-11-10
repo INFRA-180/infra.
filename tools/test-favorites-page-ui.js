@@ -44,7 +44,7 @@ assert(codeHas(selection, "selecting ? DONE_MODE_ICON : SELECT_MODE_ICON"));
 assert(codeHas(selection, 'toggle.setAttribute("aria-label", selecting ? "Terminer la sélection" : "Sélectionner des titres")'));
 assert(codeHas(selection, "remove.innerHTML = FAVORITES_TRASH_ICON"));
 assert(codeHas(selection, "remove.disabled = selectedCount <= 0"));
-assert(codeHas(source, "<circle cx=\\\"12\\\" cy=\\\"12\\\""), "track selectors must remain circular");
+assert(codeTest(/<circle cx=\\?"12\\?" cy=\\?"12\\?"/, source), "track selectors must remain circular"); // guillemets échappés ou non (formatage)
 
 assert(codeTest(/\.album-selection-toggle\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/, styles));
 assert(codeTest(/\.favorites-selecting \.favorites-select-btn\s*\{[\s\S]*?display:\s*grid;/, styles));

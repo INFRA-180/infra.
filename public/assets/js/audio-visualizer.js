@@ -27,10 +27,8 @@
   const EARTH_GRAVITY_METERS_PER_SECOND2 = 9.80665;
   const MOON_GRAVITY_METERS_PER_SECOND2 = 1.62;
   const POWDER_PIXELS_PER_METER = 100;
-  const POWDER_EARTH_GRAVITY_PX_PER_SECOND2 =
-    EARTH_GRAVITY_METERS_PER_SECOND2 * POWDER_PIXELS_PER_METER;
-  const POWDER_MOON_GRAVITY_PX_PER_SECOND2 =
-    MOON_GRAVITY_METERS_PER_SECOND2 * POWDER_PIXELS_PER_METER;
+  const POWDER_EARTH_GRAVITY_PX_PER_SECOND2 = EARTH_GRAVITY_METERS_PER_SECOND2 * POWDER_PIXELS_PER_METER;
+  const POWDER_MOON_GRAVITY_PX_PER_SECOND2 = MOON_GRAVITY_METERS_PER_SECOND2 * POWDER_PIXELS_PER_METER;
   const POWDER_AIR_DRAG_PER_SECOND = 0.18;
   const POWDER_MAX_PHYSICS_STEP_SECONDS = 1 / 60;
 
@@ -46,7 +44,7 @@
 
   function setActivationStatus(result, error) {
     sharedActivationResult = String(result || "unknown").slice(0, 120);
-    sharedActivationError = String(error && error.name ? error.name : (error || "")).slice(0, 120);
+    sharedActivationError = String(error && error.name ? error.name : error || "").slice(0, 120);
   }
 
   function getMediaQuery(query) {
@@ -72,11 +70,13 @@
     if (context.state === "running") return Promise.resolve(true);
     if (typeof context.resume !== "function") return Promise.resolve(false);
     try {
-      return Promise.resolve(context.resume()).then(function () {
-        return context.state === "running";
-      }).catch(function () {
-        return false;
-      });
+      return Promise.resolve(context.resume())
+        .then(function () {
+          return context.state === "running";
+        })
+        .catch(function () {
+          return false;
+        });
     } catch (_err) {
       return Promise.resolve(false);
     }
@@ -157,53 +157,55 @@
       return Promise.resolve(null);
     }
 
-    sharedActivationPromise = resumeContext(context).then(function (running) {
-      if (!running) {
-        setActivationStatus("resume_failed");
-        if (typeof context.close === "function") {
-          try {
-            context.close();
-          } catch (_err) {
-            // The media element was never attached, so closing is safe here.
+    sharedActivationPromise = resumeContext(context)
+      .then(function (running) {
+        if (!running) {
+          setActivationStatus("resume_failed");
+          if (typeof context.close === "function") {
+            try {
+              context.close();
+            } catch (_err) {
+              // The media element was never attached, so closing is safe here.
+            }
           }
+          return null;
         }
-        return null;
-      }
 
-      let source = null;
-      try {
-        source = context.createMediaElementSource(audio);
-        // Keep the audible route direct. The analyser is a side branch and is
-        // deliberately not connected to the destination.
-        source.connect(context.destination);
-      } catch (error) {
-        setActivationStatus("source_failed", error);
-        // If the source was created, keep its direct destination route alive:
-        // closing this context would mute the already-routed media element.
-        if (!source && typeof context.close === "function") {
-          try {
-            context.close();
-          } catch (_closeErr) {
-            // Ignore cleanup failures before the source exists.
+        let source = null;
+        try {
+          source = context.createMediaElementSource(audio);
+          // Keep the audible route direct. The analyser is a side branch and is
+          // deliberately not connected to the destination.
+          source.connect(context.destination);
+        } catch (error) {
+          setActivationStatus("source_failed", error);
+          // If the source was created, keep its direct destination route alive:
+          // closing this context would mute the already-routed media element.
+          if (!source && typeof context.close === "function") {
+            try {
+              context.close();
+            } catch (_closeErr) {
+              // Ignore cleanup failures before the source exists.
+            }
           }
+          return null;
         }
-        return null;
-      }
 
-      sharedAudio = audio;
-      sharedContext = context;
-      sharedSource = source;
-      try {
-        attachAnalyser(context, source);
-      } catch (error) {
-        setActivationStatus("analyser_failed", error);
-        return null;
-      }
-      setActivationStatus("ready");
-      return getSharedGraph(audio);
-    }).finally(function () {
-      sharedActivationPromise = null;
-    });
+        sharedAudio = audio;
+        sharedContext = context;
+        sharedSource = source;
+        try {
+          attachAnalyser(context, source);
+        } catch (error) {
+          setActivationStatus("analyser_failed", error);
+          return null;
+        }
+        setActivationStatus("ready");
+        return getSharedGraph(audio);
+      })
+      .finally(function () {
+        sharedActivationPromise = null;
+      });
 
     return sharedActivationPromise;
   }
@@ -212,13 +214,10 @@
     if (!values || !values.length || !context || !analyser) return 0;
     const nyquist = Math.max(1, Number(context.sampleRate) / 2);
     const first = Math.max(0, Math.floor((lowHz / nyquist) * values.length));
-    const last = Math.min(
-      values.length - 1,
-      Math.max(first, Math.ceil((highHz / nyquist) * values.length))
-    );
+    const last = Math.min(values.length - 1, Math.max(first, Math.ceil((highHz / nyquist) * values.length)));
     let total = 0;
     for (let index = first; index <= last; index += 1) total += values[index];
-    return (total / Math.max(1, last - first + 1)) / 255;
+    return total / Math.max(1, last - first + 1) / 255;
   }
 
   function readLiveEnergy(graph) {
@@ -234,28 +233,10 @@
       squared += sample * sample;
     }
     const rms = Math.min(1, Math.sqrt(squared / Math.max(1, graph.timeData.length)) * 3.2);
-    const bass = averageFrequencyRange(
-      graph.frequencyData,
-      graph.context,
-      graph.analyser,
-      40,
-      250
-    );
-    const mid = averageFrequencyRange(
-      graph.frequencyData,
-      graph.context,
-      graph.analyser,
-      250,
-      2400
-    );
-    const treble = averageFrequencyRange(
-      graph.frequencyData,
-      graph.context,
-      graph.analyser,
-      2400,
-      10000
-    );
-    const spectral = (bass * 0.58) + (mid * 0.29) + (treble * 0.13);
+    const bass = averageFrequencyRange(graph.frequencyData, graph.context, graph.analyser, 40, 250);
+    const mid = averageFrequencyRange(graph.frequencyData, graph.context, graph.analyser, 250, 2400);
+    const treble = averageFrequencyRange(graph.frequencyData, graph.context, graph.analyser, 2400, 10000);
+    const spectral = bass * 0.58 + mid * 0.29 + treble * 0.13;
     return {
       bass,
       mid,
@@ -299,13 +280,10 @@
         peak = Math.max(peak, value);
       }
       const average = total / Math.max(1, lastBin - firstBin + 1);
-      const normalized = ((average * 0.68) + (peak * 0.32)) / 255;
-      const noiseFloor = 0.045 + (ratio * 0.012);
-      const frequencyGain = 1.38 + (ratio * 0.2);
-      points[index] = Math.pow(
-        Math.max(0, Math.min(1, (normalized - noiseFloor) * frequencyGain)),
-        0.72
-      );
+      const normalized = (average * 0.68 + peak * 0.32) / 255;
+      const noiseFloor = 0.045 + ratio * 0.012;
+      const frequencyGain = 1.38 + ratio * 0.2;
+      points[index] = Math.pow(Math.max(0, Math.min(1, (normalized - noiseFloor) * frequencyGain)), 0.72);
     }
     return smoothSpectrumSpatially(points);
   }
@@ -319,14 +297,9 @@
     for (let index = 0; index < count; index += 1) {
       let total = 0;
       for (let kernelIndex = 0; kernelIndex < SPECTRUM_SPATIAL_KERNEL.length; kernelIndex += 1) {
-        const sourceIndex = Math.max(
-          0,
-          Math.min(last, index + kernelIndex - 2)
-        );
-        total += (
-          Math.max(0, Math.min(1, Number(values[sourceIndex]) || 0)) *
-          SPECTRUM_SPATIAL_KERNEL[kernelIndex]
-        );
+        const sourceIndex = Math.max(0, Math.min(last, index + kernelIndex - 2));
+        total +=
+          Math.max(0, Math.min(1, Number(values[sourceIndex]) || 0)) * SPECTRUM_SPATIAL_KERNEL[kernelIndex];
       }
       smoothed[index] = total / SPECTRUM_SPATIAL_KERNEL_WEIGHT;
     }
@@ -361,7 +334,7 @@
     };
     let seed = 0x1f2e3d4c;
     function random() {
-      seed = ((seed * 1664525) + 1013904223) >>> 0;
+      seed = (seed * 1664525 + 1013904223) >>> 0;
       return seed / 4294967296;
     }
     for (let index = 0; index < particleCount; index += 1) {
@@ -371,25 +344,23 @@
       particles.helixClass[index] = index % 25 < 3 ? 1 : 0;
       particles.helixStrand[index] = (Math.floor(index / 25) + index) & 1;
       if (particles.helixClass[index]) {
-        const basePhase = (
-          particles.x[index] * POWDER_HELIX_TURNS * Math.PI * 2
-        ) + (particles.helixStrand[index] ? Math.PI : 0);
+        const basePhase =
+          particles.x[index] * POWDER_HELIX_TURNS * Math.PI * 2 +
+          (particles.helixStrand[index] ? Math.PI : 0);
         particles.helixBaseSin[index] = Math.sin(basePhase);
         particles.helixBaseCos[index] = Math.cos(basePhase);
-        particles.helixOffset[index] = (
-          particles.side[index] ? 1 : -1
-        ) * POWDER_HELIX_IDLE_RADIUS_PX;
+        particles.helixOffset[index] = (particles.side[index] ? 1 : -1) * POWDER_HELIX_IDLE_RADIUS_PX;
       }
       particles.restOffset[index] = particles.gravityClass[index]
-        ? 3.5 + (Math.pow(random(), 0.7) * 11)
-        : 2.2 + (Math.pow(random(), 0.8) * 8);
+        ? 3.5 + Math.pow(random(), 0.7) * 11
+        : 2.2 + Math.pow(random(), 0.8) * 8;
       particles.opacity[index] = 2 + Math.floor(random() * 7);
       particles.accent[index] = random() < 0.045 ? 1 : 0;
       particles.response[index] = particles.gravityClass[index]
-        ? 0.9 + (random() * 0.1)
-        : 0.68 + (random() * 0.3);
-      particles.launchThreshold[index] = 0.08 + (random() * 0.84);
-      particles.restitution[index] = 0.08 + (random() * 0.1);
+        ? 0.9 + random() * 0.1
+        : 0.68 + random() * 0.3;
+      particles.launchThreshold[index] = 0.08 + random() * 0.84;
+      particles.restitution[index] = 0.08 + random() * 0.1;
     }
     return particles;
   }
@@ -399,9 +370,7 @@
     const audio = config.audio || null;
     const canvas = config.canvas || null;
     const root = config.root || null;
-    const reportHealth = typeof config.reportHealth === "function"
-      ? config.reportHealth
-      : function () {};
+    const reportHealth = typeof config.reportHealth === "function" ? config.reportHealth : function () {};
     if (!audio || !canvas || !root) return null;
     if (canvas.__infraAudioVisualizer) return canvas.__infraAudioVisualizer;
 
@@ -474,7 +443,7 @@
 
     function smoothValue(current, target, elapsed, attack, release) {
       const response = target > current ? attack : release;
-      return current + ((target - current) * (1 - Math.exp(-elapsed / response)));
+      return current + (target - current) * (1 - Math.exp(-elapsed / response));
     }
 
     function updateEnergy(graph, timestamp, reduced) {
@@ -506,15 +475,16 @@
         spectrumEnvelope = targets.slice();
       } else {
         for (let index = 0; index < targets.length; index += 1) {
-          spectrumEnvelope[index] = reduced || !lastSpectrumAt
-            ? targets[index]
-            : smoothValue(
-              spectrumEnvelope[index],
-              targets[index],
-              elapsed,
-              SPECTRUM_ATTACK_SECONDS,
-              SPECTRUM_RELEASE_SECONDS
-            );
+          spectrumEnvelope[index] =
+            reduced || !lastSpectrumAt
+              ? targets[index]
+              : smoothValue(
+                  spectrumEnvelope[index],
+                  targets[index],
+                  elapsed,
+                  SPECTRUM_ATTACK_SECONDS,
+                  SPECTRUM_RELEASE_SECONDS
+                );
         }
       }
       lastSpectrumAt = spectrumTimestamp;
@@ -530,9 +500,7 @@
         const index = reverse ? values.length - 1 - point : point;
         return {
           x: (index / denominator) * size.width,
-          y: centerY + (
-            Math.max(0, Math.min(1, values[index])) * maximumHeight * verticalDirection
-          )
+          y: centerY + Math.max(0, Math.min(1, values[index])) * maximumHeight * verticalDirection
         };
       }
 
@@ -572,11 +540,7 @@
         }
       }
       if (!powderSurface || !powderContext) return false;
-      if (
-        powderImageData &&
-        powderSurfaceWidth === width &&
-        powderSurfaceHeight === height
-      ) {
+      if (powderImageData && powderSurfaceWidth === width && powderSurfaceHeight === height) {
         return true;
       }
       powderSurface.width = width;
@@ -613,9 +577,8 @@
       powderParticles.helixVelocity.fill(0);
       for (let index = 0; index < powderParticles.count; index += 1) {
         if (!powderParticles.helixClass[index]) continue;
-        powderParticles.helixOffset[index] = (
-          powderParticles.side[index] ? 1 : -1
-        ) * POWDER_HELIX_IDLE_RADIUS_PX;
+        powderParticles.helixOffset[index] =
+          (powderParticles.side[index] ? 1 : -1) * POWDER_HELIX_IDLE_RADIUS_PX;
       }
       powderAirborneCount = 0;
       powderHelixActiveCount = 0;
@@ -663,23 +626,20 @@
       const stepCount = Math.max(1, Math.ceil(elapsed / POWDER_MAX_PHYSICS_STEP_SECONDS));
       const step = elapsed / stepCount;
       const drag = Math.exp(-POWDER_AIR_DRAG_PER_SECOND * step);
-      const helixDriveTarget = allowLaunch && !reduced
-        ? Math.max(0, Math.min(1, (reactiveEnergy * 0.45) + (averageFlux * 1.5)))
-        : 0;
+      const helixDriveTarget =
+        allowLaunch && !reduced ? Math.max(0, Math.min(1, reactiveEnergy * 0.45 + averageFlux * 1.5)) : 0;
       powderHelixDrive = reduced
         ? 0
         : smoothValue(
-          powderHelixDrive,
-          helixDriveTarget,
-          elapsed,
-          HELIX_DRIVE_ATTACK_SECONDS,
-          HELIX_DRIVE_RELEASE_SECONDS
-        );
+            powderHelixDrive,
+            helixDriveTarget,
+            elapsed,
+            HELIX_DRIVE_ATTACK_SECONDS,
+            HELIX_DRIVE_RELEASE_SECONDS
+          );
       const helixDrive = powderHelixDrive;
-      const helixRotationSpeed = allowLaunch ? 0.42 + (helixDrive * 1.45) : 0;
-      powderHelixRotationPhase = (
-        powderHelixRotationPhase + (helixRotationSpeed * elapsed)
-      ) % (Math.PI * 2);
+      const helixRotationSpeed = allowLaunch ? 0.42 + helixDrive * 1.45 : 0;
+      powderHelixRotationPhase = (powderHelixRotationPhase + helixRotationSpeed * elapsed) % (Math.PI * 2);
       const helixRotationSin = Math.sin(powderHelixRotationPhase);
       const helixRotationCos = Math.cos(powderHelixRotationPhase);
       let airborne = 0;
@@ -707,14 +667,8 @@
         const first = bandIndices[index];
         const second = Math.min(lastBand, first + 1);
         const blend = bandBlends[index];
-        const localLevel = (
-          (values[first] * (1 - blend)) +
-          (values[second] * blend)
-        );
-        const localFlux = (
-          (powderSpectrumFlux[first] * (1 - blend)) +
-          (powderSpectrumFlux[second] * blend)
-        );
+        const localLevel = values[first] * (1 - blend) + values[second] * blend;
+        const localFlux = powderSpectrumFlux[first] * (1 - blend) + powderSpectrumFlux[second] * blend;
         let height = heights[index];
         let velocity = velocities[index];
         const gravity = gravityClasses[index]
@@ -722,33 +676,34 @@
           : POWDER_EARTH_GRAVITY_PX_PER_SECOND2;
         if (helixClasses[index]) {
           const direction = helixStrands[index] ? -1 : 1;
-          const wave = (
-            (helixBaseSines[index] * helixRotationCos) +
-            (direction * helixBaseCosines[index] * helixRotationSin)
-          );
-          const signal = Math.max(
-            0,
-            Math.min(1, (localLevel * 0.82) + (localFlux * 0.75) + (helixDrive * 0.06))
-          );
+          const wave =
+            helixBaseSines[index] * helixRotationCos + direction * helixBaseCosines[index] * helixRotationSin;
+          const signal = Math.max(0, Math.min(1, localLevel * 0.82 + localFlux * 0.75 + helixDrive * 0.06));
           const idleOffset = (sides[index] ? 1 : -1) * POWDER_HELIX_IDLE_RADIUS_PX;
-          const radius = allowLaunch && signal > 0.008
-            ? Math.min(
-              frameHeight - 1,
-              POWDER_HELIX_IDLE_RADIUS_PX +
-                (frameHeight * (0.035 + (signal * 0.18)) * responses[index])
-            )
-            : POWDER_HELIX_IDLE_RADIUS_PX;
-          const targetOffset = allowLaunch && signal > 0.008
-            ? wave * radius
-            : idleOffset;
+          const radius =
+            allowLaunch && signal > 0.008
+              ? Math.min(
+                  frameHeight - 1,
+                  POWDER_HELIX_IDLE_RADIUS_PX + frameHeight * (0.035 + signal * 0.18) * responses[index]
+                )
+              : POWDER_HELIX_IDLE_RADIUS_PX;
+          const targetOffset = allowLaunch && signal > 0.008 ? wave * radius : idleOffset;
           let helixOffset = helixOffsets[index];
           let helixVelocity = helixVelocities[index];
           const helixSpring = allowLaunch
-            ? (gravityClasses[index] ? 15 : 32)
-            : (gravityClasses[index] ? 24 : 36);
+            ? gravityClasses[index]
+              ? 15
+              : 32
+            : gravityClasses[index]
+              ? 24
+              : 36;
           const helixDampingRate = allowLaunch
-            ? (gravityClasses[index] ? 2.4 : 5.8)
-            : (gravityClasses[index] ? 4.8 : 7);
+            ? gravityClasses[index]
+              ? 2.4
+              : 5.8
+            : gravityClasses[index]
+              ? 4.8
+              : 7;
           const helixDamping = Math.exp(-helixDampingRate * step);
           for (let substep = 0; substep < stepCount; substep += 1) {
             helixVelocity += (targetOffset - helixOffset) * helixSpring * step;
@@ -757,11 +712,7 @@
           }
           const helixLimit = Math.max(POWDER_HELIX_IDLE_RADIUS_PX, frameHeight - 1);
           helixOffset = Math.max(-helixLimit, Math.min(helixLimit, helixOffset));
-          if (
-            !allowLaunch &&
-            Math.abs(targetOffset - helixOffset) < 0.4 &&
-            Math.abs(helixVelocity) < 1
-          ) {
+          if (!allowLaunch && Math.abs(targetOffset - helixOffset) < 0.4 && Math.abs(helixVelocity) < 1) {
             helixOffset = idleOffset;
             helixVelocity = 0;
           }
@@ -769,20 +720,14 @@
           helixVelocities[index] = helixVelocity;
           const helixMoving = allowLaunch
             ? signal > 0.008 || Math.abs(helixVelocity) > 0.04
-            : (
-              Math.abs(targetOffset - helixOffset) > 0.4 ||
-              Math.abs(helixVelocity) > 1
-            );
+            : Math.abs(targetOffset - helixOffset) > 0.4 || Math.abs(helixVelocity) > 1;
           if (helixMoving) {
             helixActive += 1;
             airborne += 1;
           }
           const absoluteHelixOffset = Math.abs(helixOffset);
           maximumPowderRisePx = Math.max(maximumPowderRisePx, absoluteHelixOffset);
-          maximumPowderHelixOffsetPx = Math.max(
-            maximumPowderHelixOffsetPx,
-            absoluteHelixOffset
-          );
+          maximumPowderHelixOffsetPx = Math.max(maximumPowderHelixOffsetPx, absoluteHelixOffset);
           const visibleHelixHeight = Math.min(frameHeight, absoluteHelixOffset + 1);
           if (visibleHelixHeight > powderBandMaxHeights[first]) {
             powderBandMaxHeights[first] = visibleHelixHeight;
@@ -793,43 +738,25 @@
           continue;
         }
         const grounded = height <= 0.01 && Math.abs(velocity) <= 0.01;
-        if (
-          !reduced &&
-          grounded &&
-          allowLaunch &&
-          physicsTimestamp >= nextLaunchTimes[index]
-        ) {
-          const drive = Math.min(1, (localFlux * 3.4) + (localLevel * 0.38));
+        if (!reduced && grounded && allowLaunch && physicsTimestamp >= nextLaunchTimes[index]) {
+          const drive = Math.min(1, localFlux * 3.4 + localLevel * 0.38);
           if (drive >= launchThresholds[index]) {
-            const localCeiling = Math.max(
-              0,
-              (localLevel * frameHeight) - restOffsets[index] - 1
-            );
+            const localCeiling = Math.max(0, localLevel * frameHeight - restOffsets[index] - 1);
             const launchRatio = gravityClasses[index]
-              ? Math.min(1, 0.78 + (localLevel * 0.16) + (localFlux * 0.8))
-              : Math.min(1, 0.5 + (localLevel * 0.34) + (localFlux * 1.2));
-            const targetHeight = Math.min(
-              localCeiling,
-              localCeiling * launchRatio * responses[index]
-            );
+              ? Math.min(1, 0.78 + localLevel * 0.16 + localFlux * 0.8)
+              : Math.min(1, 0.5 + localLevel * 0.34 + localFlux * 1.2);
+            const targetHeight = Math.min(localCeiling, localCeiling * launchRatio * responses[index]);
             if (targetHeight >= 1) {
               velocity = Math.sqrt(2 * gravity * targetHeight);
               height = 0.02;
-              nextLaunchTimes[index] =
-                physicsTimestamp + 120 + (launchThresholds[index] * 260);
-              launchThresholds[index] = 0.08 + (
-                ((launchThresholds[index] * 1.618) + 0.173) % 0.84
-              );
+              nextLaunchTimes[index] = physicsTimestamp + 120 + launchThresholds[index] * 260;
+              launchThresholds[index] = 0.08 + ((launchThresholds[index] * 1.618 + 0.173) % 0.84);
               powderKickCount += 1;
             }
           }
         }
 
-        for (
-          let substep = 0;
-          substep < stepCount && (height > 0 || velocity > 0);
-          substep += 1
-        ) {
+        for (let substep = 0; substep < stepCount && (height > 0 || velocity > 0); substep += 1) {
           velocity -= gravity * step;
           velocity *= drag;
           height += velocity * step;
@@ -844,10 +771,7 @@
             }
           }
         }
-        const maximumParticleHeight = Math.max(
-          0,
-          frameHeight - restOffsets[index] - 1
-        );
+        const maximumParticleHeight = Math.max(0, frameHeight - restOffsets[index] - 1);
         if (height > maximumParticleHeight) {
           height = maximumParticleHeight;
           if (velocity > 0) velocity = 0;
@@ -857,10 +781,7 @@
         if (height > 0 || Math.abs(velocity) > 0.01) airborne += 1;
         maximumPowderRisePx = Math.max(maximumPowderRisePx, height);
 
-        const visibleHeight = Math.min(
-          frameHeight,
-          height + restOffsets[index] + 1
-        );
+        const visibleHeight = Math.min(frameHeight, height + restOffsets[index] + 1);
         if (visibleHeight > powderBandMaxHeights[first]) powderBandMaxHeights[first] = visibleHeight;
         if (visibleHeight > powderBandMaxHeights[second]) powderBandMaxHeights[second] = visibleHeight;
       }
@@ -893,7 +814,7 @@
       if (!ensurePowderSurface(size)) return;
       powderPixels.fill(0);
       const energy = Math.max(0, Math.min(1, reactiveEnergy));
-      const brightness = 0.56 + (energy * 0.28);
+      const brightness = 0.56 + energy * 0.28;
       const xs = powderParticles.x;
       const opacities = powderParticles.opacity;
       const accents = powderParticles.accent;
@@ -909,29 +830,22 @@
         const edgeFade = Math.min(1, x / 0.035, (1 - x) / 0.035);
         const helix = helixClasses[index];
         const moving = helix
-          ? (
-            Math.abs(helixVelocities[index]) > 0.04 ||
+          ? Math.abs(helixVelocities[index]) > 0.04 ||
             Math.abs(helixOffsets[index]) > POWDER_HELIX_IDLE_RADIUS_PX + 0.4
-          )
           : heights[index] > 0.05;
         const restingOpacity = moving ? 1 : 0.34;
         const alphaByte = Math.max(
           0,
-          Math.min(
-            255,
-            Math.round(opacities[index] * brightness * edgeFade * restingOpacity)
-          )
+          Math.min(255, Math.round(opacities[index] * brightness * edgeFade * restingOpacity))
         );
         if (!alphaByte) continue;
         const pixelX = Math.round(x * maximumPixelX);
         const verticalOffset = helix
           ? helixOffsets[index]
           : (sides[index] ? 1 : -1) * (restOffsets[index] + heights[index]);
-        const pixelY = Math.round(
-          (centerY + verticalOffset) * size.ratio
-        );
+        const pixelY = Math.round((centerY + verticalOffset) * size.ratio);
         if (pixelY < 0 || pixelY >= powderSurfaceHeight) continue;
-        const offset = ((pixelY * powderSurfaceWidth) + pixelX) * 4;
+        const offset = (pixelY * powderSurfaceWidth + pixelX) * 4;
         const accent = accents[index];
         const pointAlpha = accent ? Math.round(alphaByte * 0.72) : alphaByte;
         const currentAlpha = powderPixels[offset + 3];
@@ -995,9 +909,12 @@
       const bounds = canvas.getBoundingClientRect();
       let opacity = 0;
       try {
-        opacity = typeof window.getComputedStyle === "function"
-          ? Number(window.getComputedStyle(root).opacity)
-          : (root.classList.contains("is-active") && root.classList.contains("is-ready") ? 1 : 0);
+        opacity =
+          typeof window.getComputedStyle === "function"
+            ? Number(window.getComputedStyle(root).opacity)
+            : root.classList.contains("is-active") && root.classList.contains("is-ready")
+              ? 1
+              : 0;
       } catch (_err) {
         opacity = 0;
       }
@@ -1049,13 +966,14 @@
         visualizer_context_supported: getAudioContextConstructor() ? 1 : 0,
         visualizer_context_running: sharedContext && sharedContext.state === "running" ? 1 : 0,
         visualizer_analyser_ready: graph ? 1 : 0,
-        visualizer_canvas_visible: (
+        visualizer_canvas_visible:
           bounds.width > 0 &&
           bounds.height > 0 &&
           opacity > 0 &&
           root.classList.contains("is-active") &&
           root.classList.contains("is-ready")
-        ) ? 1 : 0
+            ? 1
+            : 0
       };
     }
 
@@ -1095,7 +1013,7 @@
       const immediateSpectrum = updateSpectrum(graph, timestamp, pointCount, reduced);
       const centerY = size.height * 0.5;
       const maximumHeight = Math.min(size.height * 0.25, 64);
-      const dynamicHeight = maximumHeight * (0.96 + (reactiveEnergy * 0.04));
+      const dynamicHeight = maximumHeight * (0.96 + reactiveEnergy * 0.04);
       if (!PURE_FFT_MODE) {
         updatePowderPhysics(
           immediateSpectrum,
@@ -1107,11 +1025,9 @@
       }
       const visibleEnvelope = PURE_FFT_MODE
         ? spectrumEnvelope
-        : (
-          powderContainmentEnvelope.length === spectrumEnvelope.length
-            ? powderContainmentEnvelope
-            : spectrumEnvelope
-        );
+        : powderContainmentEnvelope.length === spectrumEnvelope.length
+          ? powderContainmentEnvelope
+          : spectrumEnvelope;
       const envelopePeak = visibleEnvelope.reduce(function (peak, value) {
         return Math.max(peak, Number(value) || 0);
       }, 0);
@@ -1235,10 +1151,14 @@
     ["play", "playing", "pause", "ended", "loadstart", "seeked"].forEach(function (eventName) {
       audio.addEventListener(eventName, refresh, { passive: true });
     });
-    document.addEventListener("visibilitychange", function () {
-      if (document.hidden) emitHealth("hidden");
-      refresh();
-    }, { passive: true });
+    document.addEventListener(
+      "visibilitychange",
+      function () {
+        if (document.hidden) emitHealth("hidden");
+        refresh();
+      },
+      { passive: true }
+    );
 
     const desktopQuery = getMediaQuery(DESKTOP_QUERY);
     const motionQuery = getMediaQuery(REDUCED_MOTION_QUERY);

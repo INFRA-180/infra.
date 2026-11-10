@@ -171,7 +171,8 @@ function codeTest(regex, source) {
 }
 
 function codeMatch(source, regex) {
-  if (typeof source !== "string" || !(regex instanceof RegExp) || regex.global || regex.sticky) return source.match(regex);
+  if (typeof source !== "string" || !(regex instanceof RegExp) || regex.global || regex.sticky)
+    return source.match(regex);
   return source.match(regex) || relaxedExec(regex, source);
 }
 

@@ -17,29 +17,55 @@
     const PREVIOUS_RESTART_THRESHOLD_SECONDS = 3;
 
     const savePlaybackQueueContext = method(ctx, "savePlaybackQueueContext");
-    const getCurrentLogicalAudioSrc = method(ctx, "getCurrentLogicalAudioSrc", function () { return ""; });
-    const srcMatches = method(ctx, "srcMatches", function () { return false; });
-    const hashString = method(ctx, "hashString", function () { return 0; });
-    const ensureRadioQueue = method(ctx, "ensureRadioQueue", function () { return false; });
-    const normalizeAudioSourceUrl = method(ctx, "normalizeAudioSourceUrl", function (value) { return String(value || ""); });
+    const getCurrentLogicalAudioSrc = method(ctx, "getCurrentLogicalAudioSrc", function () {
+      return "";
+    });
+    const srcMatches = method(ctx, "srcMatches", function () {
+      return false;
+    });
+    const hashString = method(ctx, "hashString", function () {
+      return 0;
+    });
+    const ensureRadioQueue = method(ctx, "ensureRadioQueue", function () {
+      return false;
+    });
+    const normalizeAudioSourceUrl = method(ctx, "normalizeAudioSourceUrl", function (value) {
+      return String(value || "");
+    });
     const revokeActiveBlobUrl = method(ctx, "revokeActiveBlobUrl");
     const loadMediaElementForPlayback = method(ctx, "loadMediaElementForPlayback");
-    const toAbsoluteUrlOrEmpty = method(ctx, "toAbsoluteUrlOrEmpty", function (value) { return String(value || ""); });
-    const getCurrentPlayableAudioSrc = method(ctx, "getCurrentPlayableAudioSrc", function () { return ""; });
-    const registerTrackFailure = method(ctx, "registerTrackFailure", function () { return 0; });
-    const getTrackByIndex = method(ctx, "getTrackByIndex", function () { return null; });
+    const toAbsoluteUrlOrEmpty = method(ctx, "toAbsoluteUrlOrEmpty", function (value) {
+      return String(value || "");
+    });
+    const getCurrentPlayableAudioSrc = method(ctx, "getCurrentPlayableAudioSrc", function () {
+      return "";
+    });
+    const registerTrackFailure = method(ctx, "registerTrackFailure", function () {
+      return 0;
+    });
+    const getTrackByIndex = method(ctx, "getTrackByIndex", function () {
+      return null;
+    });
     const setTrackStatus = method(ctx, "setTrackStatus");
     const clearFadeTimer = method(ctx, "clearFadeTimer");
     const syncAudioUi = method(ctx, "syncAudioUi");
     const clearWaitingRecovery = method(ctx, "clearWaitingRecovery");
     const clearOtherTrackStatuses = method(ctx, "clearOtherTrackStatuses");
     const clearTrackStatus = method(ctx, "clearTrackStatus");
-    const getAudioTelemetryNow = method(ctx, "getAudioTelemetryNow", function () { return Date.now(); });
-    const getAudioAssetPath = method(ctx, "getAudioAssetPath", function () { return ""; });
+    const getAudioTelemetryNow = method(ctx, "getAudioTelemetryNow", function () {
+      return Date.now();
+    });
+    const getAudioAssetPath = method(ctx, "getAudioAssetPath", function () {
+      return "";
+    });
     const trackAudioRuntimeEvent = method(ctx, "trackAudioRuntimeEvent");
-    const buildAudioMonitorPayload = method(ctx, "buildAudioMonitorPayload", function () { return {}; });
+    const buildAudioMonitorPayload = method(ctx, "buildAudioMonitorPayload", function () {
+      return {};
+    });
     const logAudioAuditEvent = method(ctx, "logAudioAuditEvent");
-    const getAudioSource = method(ctx, "getAudioSource", function () { return ""; });
+    const getAudioSource = method(ctx, "getAudioSource", function () {
+      return "";
+    });
     const clearNextTrackPrefetch = method(ctx, "clearNextTrackPrefetch");
     const resetPreparedInitialGlobalRandomPlayback = method(ctx, "resetPreparedInitialGlobalRandomPlayback");
     const fadeInAudio = method(ctx, "fadeInAudio");
@@ -48,21 +74,41 @@
     const syncMediaSessionMetadata = method(ctx, "syncMediaSessionMetadata");
     const scheduleMediaSessionResync = method(ctx, "scheduleMediaSessionResync");
     const startAudioRaf = method(ctx, "startAudioRaf");
-    const fadeOutAudio = method(ctx, "fadeOutAudio", function () { return Promise.resolve(); });
-    const isIosDevice = method(ctx, "isIosDevice", function () { return false; });
+    const fadeOutAudio = method(ctx, "fadeOutAudio", function () {
+      return Promise.resolve();
+    });
+    const isIosDevice = method(ctx, "isIosDevice", function () {
+      return false;
+    });
     const scheduleSilentCheck = method(ctx, "scheduleSilentCheck");
-    const getAutoPrefetchedNextIndex = method(ctx, "getAutoPrefetchedNextIndex", function () { return -1; });
-    const ensureRadioPlaylistForNavigation = method(ctx, "ensureRadioPlaylistForNavigation", function () { return true; });
+    const getAutoPrefetchedNextIndex = method(ctx, "getAutoPrefetchedNextIndex", function () {
+      return -1;
+    });
+    const ensureRadioPlaylistForNavigation = method(ctx, "ensureRadioPlaylistForNavigation", function () {
+      return true;
+    });
     const ensurePlayablePlaylistContext = method(ctx, "ensurePlayablePlaylistContext");
-    const canStartInitialGlobalRandomPlayback = method(ctx, "canStartInitialGlobalRandomPlayback", function () { return false; });
+    const canStartInitialGlobalRandomPlayback = method(
+      ctx,
+      "canStartInitialGlobalRandomPlayback",
+      function () {
+        return false;
+      }
+    );
     const startGlobalRandomPlayback = method(ctx, "startGlobalRandomPlayback");
-    const ensureRadioPlaylistLoaded = method(ctx, "ensureRadioPlaylistLoaded", function () { return Promise.resolve([]); });
+    const ensureRadioPlaylistLoaded = method(ctx, "ensureRadioPlaylistLoaded", function () {
+      return Promise.resolve([]);
+    });
     const syncRadioQueueToPlaylist = method(ctx, "syncRadioQueueToPlaylist");
     const updateProgressUi = method(ctx, "updateProgressUi");
     const saveResumeState = method(ctx, "saveResumeState");
     const markAudioPauseIntent = method(ctx, "markAudioPauseIntent");
-    const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () { return -1; });
-    const extendAlbumPlaylistToPreviousAlbum = method(ctx, "extendAlbumPlaylistToPreviousAlbum", function () { return -1; });
+    const extendAlbumPlaylistToNextAlbum = method(ctx, "extendAlbumPlaylistToNextAlbum", function () {
+      return -1;
+    });
+    const extendAlbumPlaylistToPreviousAlbum = method(ctx, "extendAlbumPlaylistToPreviousAlbum", function () {
+      return -1;
+    });
     const beginAudioRecovery = method(ctx, "beginAudioRecovery");
     const failAudioRecovery = method(ctx, "failAudioRecovery");
     const maybePrefetchNextTrack = method(ctx, "maybePrefetchNextTrack");
@@ -98,31 +144,36 @@
       const commandToken = String(opts.commandToken || createMediaCommandToken(action));
       const currentIndex = Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1;
       const currentTrack = currentIndex >= 0 ? audioState.playlist[currentIndex] : null;
-      trackAudioRuntimeEvent("media_command", Object.assign(
-        buildAudioMonitorPayload(
-          currentTrack,
-          currentIndex,
-          audioState.activeLogicalSrc || (audio && (audio.currentSrc || audio.src)) || ""
-        ),
-        {
-          command_token: commandToken,
-          command_sequence: Number.isFinite(opts.commandSequence)
-            ? opts.commandSequence
-            : (audioState.mediaCommandSequence || 0),
-          action: String(action || ""),
-          origin: getMediaCommandOrigin(opts),
-          surface: String(opts.surface || (opts.fromMediaSession ? "media_session" : "transport")),
-          surface_hint: getMediaCommandSurfaceHint(opts),
-          before_paused: Object.prototype.hasOwnProperty.call(opts, "commandBeforePaused")
-            ? Boolean(opts.commandBeforePaused)
-            : Boolean(audio && audio.paused),
-          before_current_time: Number.isFinite(opts.commandBeforeCurrentTime)
-            ? opts.commandBeforeCurrentTime
-            : (audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0),
-          from_index: currentIndex
-        },
-        details || {}
-      ));
+      trackAudioRuntimeEvent(
+        "media_command",
+        Object.assign(
+          buildAudioMonitorPayload(
+            currentTrack,
+            currentIndex,
+            audioState.activeLogicalSrc || (audio && (audio.currentSrc || audio.src)) || ""
+          ),
+          {
+            command_token: commandToken,
+            command_sequence: Number.isFinite(opts.commandSequence)
+              ? opts.commandSequence
+              : audioState.mediaCommandSequence || 0,
+            action: String(action || ""),
+            origin: getMediaCommandOrigin(opts),
+            surface: String(opts.surface || (opts.fromMediaSession ? "media_session" : "transport")),
+            surface_hint: getMediaCommandSurfaceHint(opts),
+            before_paused: Object.prototype.hasOwnProperty.call(opts, "commandBeforePaused")
+              ? Boolean(opts.commandBeforePaused)
+              : Boolean(audio && audio.paused),
+            before_current_time: Number.isFinite(opts.commandBeforeCurrentTime)
+              ? opts.commandBeforeCurrentTime
+              : audio && Number.isFinite(audio.currentTime)
+                ? audio.currentTime
+                : 0,
+            from_index: currentIndex
+          },
+          details || {}
+        )
+      );
       return commandToken;
     }
 
@@ -133,23 +184,37 @@
       try {
         audio.currentTime = 0;
       } catch (_err) {
-        emitMediaCommand("previous", options, Object.assign({
-          decision: "restart",
-          outcome: "rejected",
-          after_current_time: before,
-          after_paused: Boolean(audio.paused)
-        }, details || {}));
+        emitMediaCommand(
+          "previous",
+          options,
+          Object.assign(
+            {
+              decision: "restart",
+              outcome: "rejected",
+              after_current_time: before,
+              after_paused: Boolean(audio.paused)
+            },
+            details || {}
+          )
+        );
         return false;
       }
       updateProgressUi();
       saveResumeState();
       syncMediaSessionMetadata({ forcePosition: true });
-      emitMediaCommand("previous", options, Object.assign({
-        decision: "restart",
-        outcome: before > 0 ? "success" : "noop",
-        after_current_time: 0,
-        after_paused: Boolean(audio.paused)
-      }, details || {}));
+      emitMediaCommand(
+        "previous",
+        options,
+        Object.assign(
+          {
+            decision: "restart",
+            outcome: before > 0 ? "success" : "noop",
+            after_current_time: 0,
+            after_paused: Boolean(audio.paused)
+          },
+          details || {}
+        )
+      );
       return true;
     }
 
@@ -190,7 +255,10 @@
       if (existingAt >= 0) list.splice(existingAt, 1);
       list.push(index);
 
-      const dynamicLimit = Math.max(2, Math.min(audioState.playlist.length - 1, audioState.recentPlayedLimit));
+      const dynamicLimit = Math.max(
+        2,
+        Math.min(audioState.playlist.length - 1, audioState.recentPlayedLimit)
+      );
       while (list.length > dynamicLimit) {
         list.shift();
       }
@@ -207,7 +275,7 @@
         );
         return;
       }
-      const src = String(audioState.playlist[index] && audioState.playlist[index].src || "");
+      const src = String((audioState.playlist[index] && audioState.playlist[index].src) || "");
       if (!src) return;
       const currentHistorySrc = audioState.shuffleHistory[audioState.shuffleHistoryCursor] || "";
       if (currentHistorySrc && srcMatches(currentHistorySrc, src)) return;
@@ -258,14 +326,13 @@
         ensureRadioQueue(Math.max(audioState.radioQueueMinRemaining || 0, planDepth));
         list = audioState.playlist;
         const currentSrc = getCurrentLogicalAudioSrc();
-        const bySrc = currentSrc
-          ? list.findIndex((track) => track && srcMatches(track.src, currentSrc))
-          : -1;
-        const cursor = bySrc >= 0
-          ? bySrc
-          : (Number.isInteger(audioState.radioQueueCursor) && audioState.radioQueueCursor >= 0
-            ? audioState.radioQueueCursor
-            : currentIndex);
+        const bySrc = currentSrc ? list.findIndex((track) => track && srcMatches(track.src, currentSrc)) : -1;
+        const cursor =
+          bySrc >= 0
+            ? bySrc
+            : Number.isInteger(audioState.radioQueueCursor) && audioState.radioQueueCursor >= 0
+              ? audioState.radioQueueCursor
+              : currentIndex;
         const ordered = [];
         for (let index = cursor + 1; index < list.length && ordered.length < planDepth; index += 1) {
           ordered.push(index);
@@ -274,7 +341,10 @@
           mode: "radio",
           baseSrc: String(list[cursor] && list[cursor].src ? list[cursor].src : currentSrc || ""),
           baseIndex: cursor,
-          entries: ordered.map((index) => ({ index, src: String(list[index] && list[index].src ? list[index].src : "") }))
+          entries: ordered.map((index) => ({
+            index,
+            src: String(list[index] && list[index].src ? list[index].src : "")
+          }))
         };
         return ordered.slice(0, requested);
       }
@@ -302,50 +372,66 @@
           mode: "linear",
           baseSrc: String(list[currentIndex] && list[currentIndex].src ? list[currentIndex].src : ""),
           baseIndex: currentIndex,
-          entries: ordered.map((index) => ({ index, src: String(list[index] && list[index].src ? list[index].src : "") }))
+          entries: ordered.map((index) => ({
+            index,
+            src: String(list[index] && list[index].src ? list[index].src : "")
+          }))
         };
         return ordered.slice(0, requested);
       }
 
       const currentTrack = list[currentIndex];
       const currentSrc = String(currentTrack && currentTrack.src ? currentTrack.src : "");
-      const existing = audioState.upcomingTrackPlan && audioState.upcomingTrackPlan.mode === "shuffle"
-        ? audioState.upcomingTrackPlan
-        : null;
+      const existing =
+        audioState.upcomingTrackPlan && audioState.upcomingTrackPlan.mode === "shuffle"
+          ? audioState.upcomingTrackPlan
+          : null;
       let retained = [];
       if (
         Array.isArray(audioState.shuffleHistory) &&
         Number.isInteger(audioState.shuffleHistoryCursor) &&
         audioState.shuffleHistoryCursor >= 0
       ) {
-        retained = audioState.shuffleHistory.slice(audioState.shuffleHistoryCursor + 1).map((src) => ({ src }));
+        retained = audioState.shuffleHistory
+          .slice(audioState.shuffleHistoryCursor + 1)
+          .map((src) => ({ src }));
       }
       if (existing) {
         let existingRetained = [];
         if (srcMatches(existing.baseSrc, currentSrc)) {
           existingRetained = existing.entries.slice();
         } else {
-          const consumedAt = existing.entries.findIndex((entry) => entry && srcMatches(entry.src, currentSrc));
+          const consumedAt = existing.entries.findIndex(
+            (entry) => entry && srcMatches(entry.src, currentSrc)
+          );
           if (consumedAt >= 0) existingRetained = existing.entries.slice(consumedAt + 1);
         }
         retained = retained.concat(existingRetained);
       }
 
       const seen = new Set([currentSrc]);
-      retained = retained.map((entry) => {
-        const index = list.findIndex((track) => track && entry && srcMatches(track.src, entry.src));
-        return index >= 0 ? { index, src: String(list[index].src || "") } : null;
-      }).filter((entry) => {
-        if (!entry || !entry.src || seen.has(entry.src)) return false;
-        seen.add(entry.src);
-        return true;
-      });
+      retained = retained
+        .map((entry) => {
+          const index = list.findIndex((track) => track && entry && srcMatches(track.src, entry.src));
+          return index >= 0 ? { index, src: String(list[index].src || "") } : null;
+        })
+        .filter((entry) => {
+          if (!entry || !entry.src || seen.has(entry.src)) return false;
+          seen.add(entry.src);
+          return true;
+        });
 
-      const seed = hashString(`${currentSrc || currentIndex}|${audioState.playlistToken}|${audioState.shuffleSessionSeed || "shuffle-session"}|shuffle-materialized`);
-      const recentSet = new Set((audioState.recentPlayed || []).map((index) => {
-        const track = list[index];
-        return String(track && track.src ? track.src : "");
-      }).filter(Boolean));
+      const seed = hashString(
+        `${currentSrc || currentIndex}|${audioState.playlistToken}|${audioState.shuffleSessionSeed || "shuffle-session"}|shuffle-materialized`
+      );
+      const recentSet = new Set(
+        (audioState.recentPlayed || [])
+          .map((index) => {
+            const track = list[index];
+            return String(track && track.src ? track.src : "");
+          })
+          .filter(Boolean)
+      );
       const candidates = list
         .map((track, index) => ({
           index,
@@ -420,9 +506,12 @@
         }
 
         let settled = false;
-        const timeout = setTimeout(function () {
-          done(false);
-        }, Math.max(80, Number(timeoutMs) || 180));
+        const timeout = setTimeout(
+          function () {
+            done(false);
+          },
+          Math.max(80, Number(timeoutMs) || 180)
+        );
 
         function done(ready) {
           if (settled) return;
@@ -456,7 +545,10 @@
       if (!Number.isInteger(index) || index < 0) return;
       const audio = audioState.audio;
       if (!audio) return;
-      const src = toAbsoluteUrlOrEmpty(srcLike || "") || getCurrentLogicalAudioSrc() || getCurrentPlayableAudioSrc(audio);
+      const src =
+        toAbsoluteUrlOrEmpty(srcLike || "") ||
+        getCurrentLogicalAudioSrc() ||
+        getCurrentPlayableAudioSrc(audio);
       const recoveryKey = `${activeRequestToken}|${src}`;
       const activeRecovery = audioState.trackFailureRecovery;
       if (activeRecovery && activeRecovery.key === recoveryKey) return;
@@ -473,7 +565,9 @@
           reason: "retry_limit",
           strategy: "reset_source"
         });
-        setTrackStatus(track, "Chargement du fichier audio, réessaie dans quelques secondes.", { retry: true });
+        setTrackStatus(track, "Chargement du fichier audio, réessaie dans quelques secondes.", {
+          retry: true
+        });
         clearFadeTimer();
         syncAudioUi();
         return;
@@ -499,7 +593,9 @@
           status: Number.isFinite(Number(diagnostic.status)) ? Number(diagnostic.status) : null,
           result: diagnostic.result || ""
         });
-        setTrackStatus(track, "Chargement du fichier audio, réessaie dans quelques secondes.", { retry: true });
+        setTrackStatus(track, "Chargement du fichier audio, réessaie dans quelques secondes.", {
+          retry: true
+        });
         clearFadeTimer();
         syncAudioUi();
       }
@@ -521,66 +617,75 @@
           return;
         }
         recoveryRecord.timer = 0;
-        Promise.resolve(probeAudioSourceForRecovery(src, {
-          request_token: activeRequestToken,
-          reason: "playback_failure",
-          monitor_payload: buildAudioMonitorPayload(audioState.playlist[index], index, src)
-        })).then(function (probe) {
-          if (audioState.trackFailureRecovery !== recoveryRecord) return;
-          if (activeRequestToken !== audioState.startRequestToken) return;
-          if (audioState.currentIndex !== index || !audio.paused) {
-            clearRecoveryRecord();
-            return;
-          }
-          const diagnostic = probe && typeof probe === "object" ? probe : { ok: false, result: "probe_invalid" };
-          if (!diagnostic.ok) {
-            failRecovery(diagnostic.reason || diagnostic.result || "probe_failed", diagnostic);
-            return;
-          }
-          if (!resetAudioElementForSource(audio, src)) {
-            failRecovery("source_reset_failed", diagnostic);
-            return;
-          }
-          waitForAudioReadiness(audio, activeRequestToken, isIosDevice() ? 1200 : 900).then(function (ready) {
+        Promise.resolve(
+          probeAudioSourceForRecovery(src, {
+            request_token: activeRequestToken,
+            reason: "playback_failure",
+            monitor_payload: buildAudioMonitorPayload(audioState.playlist[index], index, src)
+          })
+        )
+          .then(function (probe) {
             if (audioState.trackFailureRecovery !== recoveryRecord) return;
             if (activeRequestToken !== audioState.startRequestToken) return;
             if (audioState.currentIndex !== index || !audio.paused) {
               clearRecoveryRecord();
               return;
             }
-            if (!ready) {
-              failRecovery("readiness_timeout", diagnostic);
+            const diagnostic =
+              probe && typeof probe === "object" ? probe : { ok: false, result: "probe_invalid" };
+            if (!diagnostic.ok) {
+              failRecovery(diagnostic.reason || diagnostic.result || "probe_failed", diagnostic);
               return;
             }
-            let playResult = null;
-            try {
-              playResult = audio.play();
-            } catch (playErr) {
-              failRecovery("reset_play_rejected", {
-                error_name: playErr && playErr.name ? playErr.name : "Error",
-                result: "play_threw"
-              });
+            if (!resetAudioElementForSource(audio, src)) {
+              failRecovery("source_reset_failed", diagnostic);
               return;
             }
-            Promise.resolve(playResult).then(function () {
-              if (audioState.trackFailureRecovery === recoveryRecord) {
-                audioState.trackFailureRecovery = null;
+            waitForAudioReadiness(audio, activeRequestToken, isIosDevice() ? 1200 : 900).then(
+              function (ready) {
+                if (audioState.trackFailureRecovery !== recoveryRecord) return;
+                if (activeRequestToken !== audioState.startRequestToken) return;
+                if (audioState.currentIndex !== index || !audio.paused) {
+                  clearRecoveryRecord();
+                  return;
+                }
+                if (!ready) {
+                  failRecovery("readiness_timeout", diagnostic);
+                  return;
+                }
+                let playResult = null;
+                try {
+                  playResult = audio.play();
+                } catch (playErr) {
+                  failRecovery("reset_play_rejected", {
+                    error_name: playErr && playErr.name ? playErr.name : "Error",
+                    result: "play_threw"
+                  });
+                  return;
+                }
+                Promise.resolve(playResult)
+                  .then(function () {
+                    if (audioState.trackFailureRecovery === recoveryRecord) {
+                      audioState.trackFailureRecovery = null;
+                    }
+                  })
+                  .catch(function (playErr) {
+                    if (activeRequestToken !== audioState.startRequestToken) return;
+                    failRecovery("reset_play_rejected", {
+                      error_name: playErr && playErr.name ? playErr.name : "Error",
+                      result: "play_rejected"
+                    });
+                  });
               }
-            }).catch(function (playErr) {
-              if (activeRequestToken !== audioState.startRequestToken) return;
-              failRecovery("reset_play_rejected", {
-                error_name: playErr && playErr.name ? playErr.name : "Error",
-                result: "play_rejected"
-              });
+            );
+          })
+          .catch(function (probeErr) {
+            if (activeRequestToken !== audioState.startRequestToken) return;
+            failRecovery("probe_rejected", {
+              error_name: probeErr && probeErr.name ? probeErr.name : "Error",
+              result: "network_error"
             });
           });
-        }).catch(function (probeErr) {
-          if (activeRequestToken !== audioState.startRequestToken) return;
-          failRecovery("probe_rejected", {
-            error_name: probeErr && probeErr.name ? probeErr.name : "Error",
-            result: "network_error"
-          });
-        });
       }, 800);
     }
 
@@ -603,7 +708,12 @@
       const isImmediateUserGesture = Boolean(opts.immediatePlay && opts.userGesture);
       const preparedNextIndex = getAutoPrefetchedNextIndex();
       const hasPreparedTransportTarget = isFromTransportControl && preparedNextIndex === index;
-      const isFastSkip = isAutoAdvance || isFromMediaSession || isFromTransportControl || hasPreparedTransportTarget || isImmediateUserGesture;
+      const isFastSkip =
+        isAutoAdvance ||
+        isFromMediaSession ||
+        isFromTransportControl ||
+        hasPreparedTransportTarget ||
+        isImmediateUserGesture;
       const isPreparedInitialRandom = Boolean(opts.initialRandom);
       const mediaCommandToken = String(opts.commandToken || "");
       const mediaCommandStartedAt = Number(opts.commandStartedAt) || Date.now();
@@ -651,28 +761,48 @@
       audioState.playRequestToken = requestToken;
       audioState.loggedCacheHitSrc = "";
       audioState.currentTrackPath = getAudioAssetPath(nextSrc || target.src, window.location.href);
-      trackAudioRuntimeEvent("startTrack_enter", Object.assign(
-        buildAudioMonitorPayload(target, index, nextSrc || target.src),
-        {
+      trackAudioRuntimeEvent(
+        "startTrack_enter",
+        Object.assign(buildAudioMonitorPayload(target, index, nextSrc || target.src), {
           request_token: requestToken,
-          trigger: opts.auto ? "auto" : isFromMediaSession ? "media_session" : isFromTransportControl ? "transport" : opts.resume ? "resume" : isImmediateUserGesture ? "cold_radio" : isPreparedInitialRandom ? "initial_random" : "user",
+          trigger: opts.auto
+            ? "auto"
+            : isFromMediaSession
+              ? "media_session"
+              : isFromTransportControl
+                ? "transport"
+                : opts.resume
+                  ? "resume"
+                  : isImmediateUserGesture
+                    ? "cold_radio"
+                    : isPreparedInitialRandom
+                      ? "initial_random"
+                      : "user",
           from_media_session: isFromMediaSession,
           from_transport_control: isFromTransportControl,
           surface: opts.surface || "",
           command_token: mediaCommandToken,
           action: String(opts.mediaAction || ""),
           decision: String(opts.mediaDecision || ""),
-          origin: isFromMediaSession ? "media_session" : (isFromTransportControl ? "transport" : ""),
+          origin: isFromMediaSession ? "media_session" : isFromTransportControl ? "transport" : "",
           surface_hint: mediaCommandToken ? getMediaCommandSurfaceHint(opts) : "",
           initial_random: isPreparedInitialRandom,
           immediate_play: isImmediateUserGesture,
           same_track: sameTrack
-        }
-      ));
+        })
+      );
       logAudioAuditEvent("click_track", target, index, nextSrc || target.src, {
         request_token: requestToken,
         same_track: sameTrack,
-        trigger: opts.auto ? "auto" : isFromMediaSession ? "media_session" : isFromTransportControl ? "transport" : opts.resume ? "resume" : "user",
+        trigger: opts.auto
+          ? "auto"
+          : isFromMediaSession
+            ? "media_session"
+            : isFromTransportControl
+              ? "transport"
+              : opts.resume
+                ? "resume"
+                : "user",
         click_perf_ms: audioState.audioClickPerfTs
       });
       logAudioAuditEvent("source_resolved", target, index, nextSrc || target.src, {
@@ -680,16 +810,17 @@
         branch: getAudioSource(nextSrc) === "r2dev" ? "r2" : "other",
         click_perf_ms: audioState.audioClickPerfTs
       });
-      trackAudioRuntimeEvent("play_request", Object.assign(
-        buildAudioMonitorPayload(target, index, nextSrc || target.src),
-        {
+      trackAudioRuntimeEvent(
+        "play_request",
+        Object.assign(buildAudioMonitorPayload(target, index, nextSrc || target.src), {
           request_token: requestToken,
           same_track: sameTrack,
           click_perf_ms: audioState.audioClickPerfTs
-        }
-      ));
+        })
+      );
       const shouldFastSourceSwitch = isFastSkip;
-      const shouldFadeSwitch = !shouldFastSourceSwitch && !sameTrack && !audio.paused && Boolean(getCurrentPlayableAudioSrc(audio));
+      const shouldFadeSwitch =
+        !shouldFastSourceSwitch && !sameTrack && !audio.paused && Boolean(getCurrentPlayableAudioSrc(audio));
 
       if (sameTrack && !opts.resume) {
         try {
@@ -771,16 +902,20 @@
         syncAudioUi();
         startAudioRaf();
         if (mediaCommandToken) {
-          emitMediaCommand(opts.mediaAction || "play", Object.assign({}, opts, {
-            commandToken: mediaCommandToken
-          }), {
-            decision: String(opts.mediaDecision || ""),
-            outcome: "success",
-            command_latency_ms: Math.max(0, Date.now() - mediaCommandStartedAt),
-            to_index: index,
-            after_paused: Boolean(audio.paused),
-            after_current_time: Number.isFinite(audio.currentTime) ? audio.currentTime : 0
-          });
+          emitMediaCommand(
+            opts.mediaAction || "play",
+            Object.assign({}, opts, {
+              commandToken: mediaCommandToken
+            }),
+            {
+              decision: String(opts.mediaDecision || ""),
+              outcome: "success",
+              command_latency_ms: Math.max(0, Date.now() - mediaCommandStartedAt),
+              to_index: index,
+              after_paused: Boolean(audio.paused),
+              after_current_time: Number.isFinite(audio.currentTime) ? audio.currentTime : 0
+            }
+          );
         }
       }
 
@@ -800,21 +935,31 @@
           network_state: audio.networkState,
           click_perf_ms: audioState.audioClickPerfTs,
           immediate_play: isImmediateUserGesture,
-          user_activation_active: Boolean(typeof navigator !== "undefined" && navigator.userActivation && navigator.userActivation.isActive),
-          user_activation_seen: Boolean(typeof navigator !== "undefined" && navigator.userActivation && navigator.userActivation.hasBeenActive)
+          user_activation_active: Boolean(
+            typeof navigator !== "undefined" && navigator.userActivation && navigator.userActivation.isActive
+          ),
+          user_activation_seen: Boolean(
+            typeof navigator !== "undefined" &&
+            navigator.userActivation &&
+            navigator.userActivation.hasBeenActive
+          )
         });
         if (mediaCommandToken) {
-          emitMediaCommand(opts.mediaAction || "play", Object.assign({}, opts, {
-            commandToken: mediaCommandToken
-          }), {
-            decision: String(opts.mediaDecision || ""),
-            outcome: "rejected",
-            reason: playErr && playErr.name ? playErr.name : "unknown",
-            command_latency_ms: Math.max(0, Date.now() - mediaCommandStartedAt),
-            to_index: index,
-            after_paused: Boolean(audio.paused),
-            after_current_time: Number.isFinite(audio.currentTime) ? audio.currentTime : 0
-          });
+          emitMediaCommand(
+            opts.mediaAction || "play",
+            Object.assign({}, opts, {
+              commandToken: mediaCommandToken
+            }),
+            {
+              decision: String(opts.mediaDecision || ""),
+              outcome: "rejected",
+              reason: playErr && playErr.name ? playErr.name : "unknown",
+              command_latency_ms: Math.max(0, Date.now() - mediaCommandStartedAt),
+              to_index: index,
+              after_paused: Boolean(audio.paused),
+              after_current_time: Number.isFinite(audio.currentTime) ? audio.currentTime : 0
+            }
+          );
         }
         if (playErr && playErr.name === "AbortError" && !isRetry) {
           audioState.playAbortRetryToken = requestToken;
@@ -884,13 +1029,24 @@
           network_state: audio.networkState,
           click_perf_ms: audioState.audioClickPerfTs,
           immediate_play: isImmediateUserGesture,
-          user_activation_active: Boolean(typeof navigator !== "undefined" && navigator.userActivation && navigator.userActivation.isActive),
-          user_activation_seen: Boolean(typeof navigator !== "undefined" && navigator.userActivation && navigator.userActivation.hasBeenActive)
+          user_activation_active: Boolean(
+            typeof navigator !== "undefined" && navigator.userActivation && navigator.userActivation.isActive
+          ),
+          user_activation_seen: Boolean(
+            typeof navigator !== "undefined" &&
+            navigator.userActivation &&
+            navigator.userActivation.hasBeenActive
+          )
         });
         if (isAutoAdvance) scheduleSilentCheck(target, index, nextSrc || target.src, requestToken);
-        audio.play()
-          .then(function () { handlePlayResolved(meta); })
-          .catch(function (playErr) { handlePlayRejected(playErr, meta); });
+        audio
+          .play()
+          .then(function () {
+            handlePlayResolved(meta);
+          })
+          .catch(function (playErr) {
+            handlePlayRejected(playErr, meta);
+          });
       }
 
       function beginPlayback() {
@@ -991,11 +1147,14 @@
         const bySrc = currentSrc
           ? audioState.radioQueue.findIndex((track) => track && srcMatches(track.src, currentSrc))
           : -1;
-        audioState.radioQueueCursor = bySrc >= 0 ? bySrc : (direction > 0 ? -1 : 0);
+        audioState.radioQueueCursor = bySrc >= 0 ? bySrc : direction > 0 ? -1 : 0;
       }
 
       if (direction > 0) {
-        if (audioState.radioQueue.length - audioState.radioQueueCursor - 1 < audioState.radioQueueMinRemaining) {
+        if (
+          audioState.radioQueue.length - audioState.radioQueueCursor - 1 <
+          audioState.radioQueueMinRemaining
+        ) {
           ensureRadioQueue(audioState.radioQueueMinRemaining);
         }
         if (audioState.radioQueueCursor < audioState.radioQueue.length - 1) {
@@ -1076,9 +1235,8 @@
         const commandStartedAt = Date.now();
         const commandAudio = audioState.audio;
         const commandBeforePaused = Boolean(commandAudio && commandAudio.paused);
-        const commandBeforeCurrentTime = commandAudio && Number.isFinite(commandAudio.currentTime)
-          ? commandAudio.currentTime
-          : 0;
+        const commandBeforeCurrentTime =
+          commandAudio && Number.isFinite(commandAudio.currentTime) ? commandAudio.currentTime : 0;
         const commandToken = emitMediaCommand("next", opts, {
           decision: "next",
           outcome: "dispatched",
@@ -1101,42 +1259,57 @@
         }
         if (opts.auto) {
           const nextTrack = audioState.playlist[nextIndex];
-          trackAudioRuntimeEvent("auto_advance_attempt", Object.assign(
-            buildAudioMonitorPayload(nextTrack, nextIndex, nextTrack && nextTrack.src ? nextTrack.src : ""),
-            {
-              from_index: audioState.currentIndex,
-              to_index: nextIndex,
-              prefetched: prefetchedNextIndex >= 0,
-              previous_track_path: audioState.currentTrackPath || getAudioAssetPath(audioState.activeLogicalSrc || "", window.location.href),
-              trigger: "auto"
-            }
-          ));
+          trackAudioRuntimeEvent(
+            "auto_advance_attempt",
+            Object.assign(
+              buildAudioMonitorPayload(nextTrack, nextIndex, nextTrack && nextTrack.src ? nextTrack.src : ""),
+              {
+                from_index: audioState.currentIndex,
+                to_index: nextIndex,
+                prefetched: prefetchedNextIndex >= 0,
+                previous_track_path:
+                  audioState.currentTrackPath ||
+                  getAudioAssetPath(audioState.activeLogicalSrc || "", window.location.href),
+                trigger: "auto"
+              }
+            )
+          );
         } else if (fromMediaSession) {
           const nextTrack = audioState.playlist[nextIndex];
-          trackAudioRuntimeEvent("media_session_nexttrack", Object.assign(
-            buildAudioMonitorPayload(nextTrack, nextIndex, nextTrack && nextTrack.src ? nextTrack.src : ""),
-            {
-              from_index: audioState.currentIndex,
-              to_index: nextIndex,
-              prefetched: prefetchedNextIndex >= 0,
-              previous_track_path: audioState.currentTrackPath || getAudioAssetPath(audioState.activeLogicalSrc || "", window.location.href),
-              trigger: "media_session"
-            }
-          ));
+          trackAudioRuntimeEvent(
+            "media_session_nexttrack",
+            Object.assign(
+              buildAudioMonitorPayload(nextTrack, nextIndex, nextTrack && nextTrack.src ? nextTrack.src : ""),
+              {
+                from_index: audioState.currentIndex,
+                to_index: nextIndex,
+                prefetched: prefetchedNextIndex >= 0,
+                previous_track_path:
+                  audioState.currentTrackPath ||
+                  getAudioAssetPath(audioState.activeLogicalSrc || "", window.location.href),
+                trigger: "media_session"
+              }
+            )
+          );
         } else if (fromTransportControl) {
           const nextTrack = audioState.playlist[nextIndex];
-          trackAudioRuntimeEvent("transport_nexttrack", Object.assign(
-            buildAudioMonitorPayload(nextTrack, nextIndex, nextTrack && nextTrack.src ? nextTrack.src : ""),
-            {
-              from_index: audioState.currentIndex,
-              to_index: nextIndex,
-              prefetched: prefetchedNextIndex >= 0,
-              previous_track_path: audioState.currentTrackPath || getAudioAssetPath(audioState.activeLogicalSrc || "", window.location.href),
-              trigger: "transport",
-              from_transport_control: true,
-              surface: opts.surface || ""
-            }
-          ));
+          trackAudioRuntimeEvent(
+            "transport_nexttrack",
+            Object.assign(
+              buildAudioMonitorPayload(nextTrack, nextIndex, nextTrack && nextTrack.src ? nextTrack.src : ""),
+              {
+                from_index: audioState.currentIndex,
+                to_index: nextIndex,
+                prefetched: prefetchedNextIndex >= 0,
+                previous_track_path:
+                  audioState.currentTrackPath ||
+                  getAudioAssetPath(audioState.activeLogicalSrc || "", window.location.href),
+                trigger: "transport",
+                from_transport_control: true,
+                surface: opts.surface || ""
+              }
+            )
+          );
         }
         startTrack(nextIndex, {
           seamless: useSeamless,
@@ -1184,9 +1357,8 @@
         }
       }
       const currentAudio = audioState.audio;
-      const currentTime = currentAudio && Number.isFinite(currentAudio.currentTime)
-        ? currentAudio.currentTime
-        : 0;
+      const currentTime =
+        currentAudio && Number.isFinite(currentAudio.currentTime) ? currentAudio.currentTime : 0;
       if (currentTime > PREVIOUS_RESTART_THRESHOLD_SECONDS) {
         restartCurrentTrackFromBeginning(opts, {
           reason: "restart_threshold",
@@ -1236,9 +1408,8 @@
         const commandStartedAt = Date.now();
         const commandAudio = audioState.audio;
         const commandBeforePaused = Boolean(commandAudio && commandAudio.paused);
-        const commandBeforeCurrentTime = commandAudio && Number.isFinite(commandAudio.currentTime)
-          ? commandAudio.currentTime
-          : 0;
+        const commandBeforeCurrentTime =
+          commandAudio && Number.isFinite(commandAudio.currentTime) ? commandAudio.currentTime : 0;
         const commandToken = emitMediaCommand("previous", opts, {
           decision: "previous",
           outcome: "dispatched",
@@ -1247,30 +1418,40 @@
         const commandSequence = Number(audioState.mediaCommandSequence || 0);
         if (opts.fromMediaSession) {
           const prevTrack = audioState.playlist[prevIndex];
-          trackAudioRuntimeEvent("media_session_previoustrack", Object.assign(
-            buildAudioMonitorPayload(prevTrack, prevIndex, prevTrack && prevTrack.src ? prevTrack.src : ""),
-            {
-              from_index: audioState.currentIndex,
-              to_index: prevIndex,
-              prefetched: false,
-              previous_track_path: audioState.currentTrackPath || getAudioAssetPath(audioState.activeLogicalSrc || "", window.location.href),
-              trigger: "media_session"
-            }
-          ));
+          trackAudioRuntimeEvent(
+            "media_session_previoustrack",
+            Object.assign(
+              buildAudioMonitorPayload(prevTrack, prevIndex, prevTrack && prevTrack.src ? prevTrack.src : ""),
+              {
+                from_index: audioState.currentIndex,
+                to_index: prevIndex,
+                prefetched: false,
+                previous_track_path:
+                  audioState.currentTrackPath ||
+                  getAudioAssetPath(audioState.activeLogicalSrc || "", window.location.href),
+                trigger: "media_session"
+              }
+            )
+          );
         } else if (opts.fromTransportControl) {
           const prevTrack = audioState.playlist[prevIndex];
-          trackAudioRuntimeEvent("transport_previoustrack", Object.assign(
-            buildAudioMonitorPayload(prevTrack, prevIndex, prevTrack && prevTrack.src ? prevTrack.src : ""),
-            {
-              from_index: audioState.currentIndex,
-              to_index: prevIndex,
-              prefetched: false,
-              previous_track_path: audioState.currentTrackPath || getAudioAssetPath(audioState.activeLogicalSrc || "", window.location.href),
-              trigger: "transport",
-              from_transport_control: true,
-              surface: opts.surface || ""
-            }
-          ));
+          trackAudioRuntimeEvent(
+            "transport_previoustrack",
+            Object.assign(
+              buildAudioMonitorPayload(prevTrack, prevIndex, prevTrack && prevTrack.src ? prevTrack.src : ""),
+              {
+                from_index: audioState.currentIndex,
+                to_index: prevIndex,
+                prefetched: false,
+                previous_track_path:
+                  audioState.currentTrackPath ||
+                  getAudioAssetPath(audioState.activeLogicalSrc || "", window.location.href),
+                trigger: "transport",
+                from_transport_control: true,
+                surface: opts.surface || ""
+              }
+            )
+          );
         }
         startTrack(prevIndex, {
           seamless: useSeamless,
@@ -1432,7 +1613,6 @@
       markAudioPauseIntent("ui", "toggle");
       audio.pause();
     }
-
 
     return {
       seekCurrentAudioToRatio,

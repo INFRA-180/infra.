@@ -28,10 +28,10 @@
       body: JSON.stringify({ answer })
     });
 
-    const payload = await response.json().catch(function () { return null; });
-    return payload && payload.ok === true && typeof payload.html === "string"
-      ? payload.html
-      : "";
+    const payload = await response.json().catch(function () {
+      return null;
+    });
+    return payload && payload.ok === true && typeof payload.html === "string" ? payload.html : "";
   }
 
   function reveal(html) {

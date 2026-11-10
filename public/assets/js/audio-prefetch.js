@@ -1,9 +1,7 @@
 (function () {
   "use strict";
 
-  const globalObject = typeof window !== "undefined"
-    ? window
-    : (typeof self !== "undefined" ? self : {});
+  const globalObject = typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : {};
 
   const constants = Object.freeze({
     ENABLED: true,
@@ -102,7 +100,9 @@
       return Promise.reject(new Error("prefetch_segment_too_large"));
     }
 
-    const declaredLength = Number(response.headers.get("Content-Length") || response.headers.get("content-length") || 0);
+    const declaredLength = Number(
+      response.headers.get("Content-Length") || response.headers.get("content-length") || 0
+    );
     if (declaredLength && declaredLength !== range.length) {
       cancelResponseBody(response);
       return Promise.reject(new Error("prefetch_content_length_mismatch"));
@@ -197,55 +197,57 @@
         reason: "invalid_source"
       });
     }
-    return openCache().then(function (cache) {
-      if (!cache || typeof cache.match !== "function") {
-        return {
-          src: normalizedSrc,
-          found: false,
-          valid: false,
-          reason: "cache_unavailable"
-        };
-      }
-      const request = createStorageRequest(normalizedSrc);
-      return cache.match(request, { ignoreVary: true }).then(function (response) {
-        if (!response) {
+    return openCache()
+      .then(function (cache) {
+        if (!cache || typeof cache.match !== "function") {
           return {
             src: normalizedSrc,
             found: false,
             valid: false,
-            reason: "cache_miss"
+            reason: "cache_unavailable"
           };
         }
-        const metadata = getStoredSegmentMetadata(response);
-        if (!metadata) {
+        const request = createStorageRequest(normalizedSrc);
+        return cache.match(request, { ignoreVary: true }).then(function (response) {
+          if (!response) {
+            return {
+              src: normalizedSrc,
+              found: false,
+              valid: false,
+              reason: "cache_miss"
+            };
+          }
+          const metadata = getStoredSegmentMetadata(response);
+          if (!metadata) {
+            return {
+              src: normalizedSrc,
+              found: true,
+              valid: false,
+              reason: "cache_corrupt"
+            };
+          }
           return {
             src: normalizedSrc,
             found: true,
-            valid: false,
-            reason: "cache_corrupt"
+            valid: true,
+            reason: "cache_hit",
+            bytes: metadata.bytes,
+            rangeStart: metadata.rangeStart,
+            rangeEnd: metadata.rangeEnd,
+            totalLength: metadata.totalLength,
+            bodyValidated: metadata.bodyValidated,
+            probeReady: Boolean(metadata.firstTwoBytes)
           };
-        }
+        });
+      })
+      .catch(function () {
         return {
           src: normalizedSrc,
-          found: true,
-          valid: true,
-          reason: "cache_hit",
-          bytes: metadata.bytes,
-          rangeStart: metadata.rangeStart,
-          rangeEnd: metadata.rangeEnd,
-          totalLength: metadata.totalLength,
-          bodyValidated: metadata.bodyValidated,
-          probeReady: Boolean(metadata.firstTwoBytes)
+          found: false,
+          valid: false,
+          reason: "cache_error"
         };
       });
-    }).catch(function () {
-      return {
-        src: normalizedSrc,
-        found: false,
-        valid: false,
-        reason: "cache_error"
-      };
-    });
   }
 
   function findFirstValidCachedSegment(sources) {
@@ -261,9 +263,7 @@
     function inspectAt(index) {
       if (index >= candidates.length) return Promise.resolve(null);
       return inspectCachedSegment(candidates[index]).then(function (result) {
-        return result && result.valid && result.probeReady !== false
-          ? result
-          : inspectAt(index + 1);
+        return result && result.valid && result.probeReady !== false ? result : inspectAt(index + 1);
       });
     }
 
@@ -279,10 +279,9 @@
       seen.add(normalizedSrc);
       candidates.push(normalizedSrc);
     });
-    const limit = Math.floor(Math.max(
-      1,
-      Math.min(constants.MAX_ENTRIES, Number(maxResults) || constants.MAX_ENTRIES)
-    ));
+    const limit = Math.floor(
+      Math.max(1, Math.min(constants.MAX_ENTRIES, Number(maxResults) || constants.MAX_ENTRIES))
+    );
     if (!candidates.length) return Promise.resolve([]);
 
     function fallbackToFirst() {
@@ -291,26 +290,34 @@
       });
     }
 
-    return openCache().then(function (cache) {
-      if (!cache || typeof cache.keys !== "function") return fallbackToFirst();
-      return cache.keys().then(function (keys) {
-        const storedUrls = new Set((keys || []).map(function (key) {
-          return sourceUrl(key && key.url ? key.url : key);
-        }).filter(Boolean));
-        const storedCandidates = candidates.filter(function (src) {
-          return storedUrls.has(src);
+    return openCache()
+      .then(function (cache) {
+        if (!cache || typeof cache.keys !== "function") return fallbackToFirst();
+        return cache.keys().then(function (keys) {
+          const storedUrls = new Set(
+            (keys || [])
+              .map(function (key) {
+                return sourceUrl(key && key.url ? key.url : key);
+              })
+              .filter(Boolean)
+          );
+          const storedCandidates = candidates.filter(function (src) {
+            return storedUrls.has(src);
+          });
+          return Promise.all(storedCandidates.map(inspectCachedSegment)).then(function (results) {
+            return results
+              .filter(function (result) {
+                return result && result.valid && result.probeReady !== false;
+              })
+              .slice(0, limit);
+          });
         });
-        return Promise.all(storedCandidates.map(inspectCachedSegment)).then(function (results) {
-          return results.filter(function (result) {
-            return result && result.valid && result.probeReady !== false;
-          }).slice(0, limit);
-        });
+      })
+      .catch(function () {
+        // Cache.keys() is an optimization. Keep the previously validated
+        // single-entry path as a safe fallback for older WebKit builds.
+        return fallbackToFirst();
       });
-    }).catch(function () {
-      // Cache.keys() is an optimization. Keep the previously validated
-      // single-entry path as a safe fallback for older WebKit builds.
-      return fallbackToFirst();
-    });
   }
 
   function enqueueMutation(operation) {
@@ -323,7 +330,9 @@
     // Snapshot the serialized queue. In particular, a caller timeout from
     // putSingle() must not cause a duplicate network fetch while its original
     // CacheStorage write is still the queue owner.
-    return mutationQueue.then(function () { return true; });
+    return mutationQueue.then(function () {
+      return true;
+    });
   }
 
   function mutationAllowed(options) {
@@ -373,7 +382,9 @@
         remaining -= 1;
         deletions.push(cache.delete(key));
       }
-      return Promise.all(deletions).then(function () { return true; });
+      return Promise.all(deletions).then(function () {
+        return true;
+      });
     });
   }
 
@@ -411,20 +422,24 @@
           if (!mutationAllowed(opts)) return false;
           // Cache.put replaces the matching entry atomically; avoid a delete gap
           // during which WebKit could miss a segment that is being refreshed.
-          return cache.put(request, cacheResponse)
+          return cache
+            .put(request, cacheResponse)
             .then(function () {
               if (!mutationAllowed(opts)) {
-                return cache.delete(request).then(function () { return false; });
+                return cache.delete(request).then(function () {
+                  return false;
+                });
               }
-              const keepSources = typeof opts.getKeepSources === "function"
-                ? opts.getKeepSources()
-                : (opts.keepSources || []);
+              const keepSources =
+                typeof opts.getKeepSources === "function" ? opts.getKeepSources() : opts.keepSources || [];
               return pruneCacheEntries(cache, {
                 maxEntries: opts.maxEntries || constants.MAX_ENTRIES,
                 keepSources
               });
             })
-            .then(function (stored) { return stored !== false; });
+            .then(function (stored) {
+              return stored !== false;
+            });
         });
       });
       // The caller gets a bounded result, but the underlying CacheStorage

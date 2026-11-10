@@ -118,126 +118,417 @@
   const SLOW_SPA_NAVIGATION_MS = 700;
   const LOCAL_CORRELATION_CAP = 32;
   const TELEMETRY_STRING_FIELDS = new Set([
-    "event", "trace_id", "build", "track", "album", "source", "ua_class",
-    "effective_type", "visibility_state", "trigger", "surface", "branch",
-    "reason", "error_name", "action", "strategy", "cache_hint", "state",
-    "swap_mode", "swap_policy", "handoff_strategy",
-    "phase", "mode", "playlist_kind", "audio_session_state", "audio_session_type",
-    "from_album", "to_album", "result", "recovery_reason", "intent_reason",
-    "route_kind", "display_mode", "orientation", "command_token", "origin",
-    "surface_hint", "decision", "outcome", "probe_stage", "supported_actions",
-    "unsupported_actions", "cleared_actions", "registration_result", "interruption_token",
-    "interruption_kind", "before_media_session_state", "after_media_session_state",
-    "direction", "axis", "input_type", "gesture_token", "queue_token", "lifecycle_reason",
-    "navigation_method", "navigation_result", "cancel_reason", "handler_state",
-    "catalog_source", "service_worker_state", "cover_first_frame_state",
-    "cover_second_frame_state", "cover_object_fit", "resume_gate_reason",
-    "home_restore_mode", "previous_launch_build", "previous_launch_route_kind"
+    "event",
+    "trace_id",
+    "build",
+    "track",
+    "album",
+    "source",
+    "ua_class",
+    "effective_type",
+    "visibility_state",
+    "trigger",
+    "surface",
+    "branch",
+    "reason",
+    "error_name",
+    "action",
+    "strategy",
+    "cache_hint",
+    "state",
+    "swap_mode",
+    "swap_policy",
+    "handoff_strategy",
+    "phase",
+    "mode",
+    "playlist_kind",
+    "audio_session_state",
+    "audio_session_type",
+    "from_album",
+    "to_album",
+    "result",
+    "recovery_reason",
+    "intent_reason",
+    "route_kind",
+    "display_mode",
+    "orientation",
+    "command_token",
+    "origin",
+    "surface_hint",
+    "decision",
+    "outcome",
+    "probe_stage",
+    "supported_actions",
+    "unsupported_actions",
+    "cleared_actions",
+    "registration_result",
+    "interruption_token",
+    "interruption_kind",
+    "before_media_session_state",
+    "after_media_session_state",
+    "direction",
+    "axis",
+    "input_type",
+    "gesture_token",
+    "queue_token",
+    "lifecycle_reason",
+    "navigation_method",
+    "navigation_result",
+    "cancel_reason",
+    "handler_state",
+    "catalog_source",
+    "service_worker_state",
+    "cover_first_frame_state",
+    "cover_second_frame_state",
+    "cover_object_fit",
+    "resume_gate_reason",
+    "home_restore_mode",
+    "previous_launch_build",
+    "previous_launch_route_kind"
   ]);
   const TELEMETRY_NUMBER_FIELDS = new Set([
-    "timestamp_ms", "delta_ms", "duration_before_play_ms", "duration_ms", "delay_ms",
-    "ms", "request_token", "ready_state", "network_state", "current_time",
-    "buffered_end", "duration", "bytes", "segment_bytes", "transfer_size",
-    "encoded_body_size", "decoded_body_size", "rank", "attempt", "ready_count",
-    "inflight_count", "from_index", "next_index", "generation", "depth", "status", "restored_count",
-    "response_ms", "body_ms", "queue_ms", "cache_ms", "range_start", "range_end",
-    "error_code", "timeout_ms", "recovery_ms", "advanced_ms", "buffer_ahead",
-    "cancelled_count", "health_session_age_ms", "volume", "click_perf_ms",
-    "guard_age_ms", "guard_current_time", "progressed_seconds", "playback_rate",
-    "play_call_ms", "loadstart_ms", "canplay_ms", "play_resolved_ms", "playing_ms",
-    "waiting_count", "stalled_count", "prefetch_age_ms", "render_ms", "swap_ms", "hydration_ms",
-    "screen_width", "screen_height", "inner_width", "inner_height",
-    "root_client_width", "root_client_height",
-    "visual_viewport_width", "visual_viewport_height",
-    "visual_viewport_offset_top", "visual_viewport_offset_left", "visual_viewport_scale",
-    "device_pixel_ratio", "safe_area_top", "safe_area_right", "safe_area_bottom", "safe_area_left",
-    "css_vh_height", "css_dvh_height",
-    "overlay_top", "overlay_bottom", "overlay_width", "overlay_height",
-    "overlay_visual_top_gap", "overlay_visual_bottom_gap",
-    "panel_top", "panel_bottom", "panel_height",
-    "cover_wait_ms", "track_transition_count", "track_playing_count",
-    "track_rejected_count", "track_error_count", "prepared_count", "unprepared_count",
-    "served_from_prefetch_count", "slow_transition_count", "max_play_to_playing_ms",
-    "total_play_to_playing_ms", "prefetch_start_count", "prefetch_done_count",
-    "prefetch_error_count", "prefetch_cache_ready_count", "spa_navigation_count",
-    "spa_abort_count", "spa_slow_count", "max_spa_navigation_ms",
-    "mini_visibility_change_count", "mini_hidden_count", "mini_unexpected_hidden_count",
-    "navigation_token", "cover_natural_width", "cover_display_px",
-    "cover_render_width_px", "cover_render_height_px", "cover_aspect_ratio_milli",
-    "position_delta_ms", "flip_animation_count", "handoff_stage_ms",
-    "preview_target_change_count", "preview_animation_restart_count",
-    "max_concurrent_animation_count", "spa_navigation_compacted_count",
-    "track_superseded_count", "scroll_restore_requested_x", "scroll_restore_requested_y",
-    "scroll_restore_applied_x", "scroll_restore_applied_y", "scroll_restore_delta_y",
-    "scroll_restore_anchor_correction", "route_layers_at_promote", "route_layers_after_detach",
-    "route_layers_before_commit", "route_layers_after_commit",
-    "first_paint_ms", "visible_cover_count", "visible_cover_ready_count",
-    "second_paint_ms", "second_visible_cover_count", "second_visible_cover_ready_count",
-    "spa_cover_not_ready_count", "spa_second_cover_not_ready_count",
-    "max_first_paint_ms", "max_second_paint_ms",
-    "html_cache_hit_count", "html_cache_miss_count",
-    "cover_cache_hit_count", "cover_cache_miss_count",
-    "storage_probe_count", "storage_persisted_state",
-    "storage_persist_request_count", "storage_persist_granted_count",
-    "storage_usage_mb", "storage_quota_mb", "storage_shell_present",
-    "storage_sw_controlled", "storage_cover_entries", "storage_audio_entries",
+    "timestamp_ms",
+    "delta_ms",
+    "duration_before_play_ms",
+    "duration_ms",
+    "delay_ms",
+    "ms",
+    "request_token",
+    "ready_state",
+    "network_state",
+    "current_time",
+    "buffered_end",
+    "duration",
+    "bytes",
+    "segment_bytes",
+    "transfer_size",
+    "encoded_body_size",
+    "decoded_body_size",
+    "rank",
+    "attempt",
+    "ready_count",
+    "inflight_count",
+    "from_index",
+    "next_index",
+    "generation",
+    "depth",
+    "status",
+    "restored_count",
+    "response_ms",
+    "body_ms",
+    "queue_ms",
+    "cache_ms",
+    "range_start",
+    "range_end",
+    "error_code",
+    "timeout_ms",
+    "recovery_ms",
+    "advanced_ms",
+    "buffer_ahead",
+    "cancelled_count",
+    "health_session_age_ms",
+    "volume",
+    "click_perf_ms",
+    "guard_age_ms",
+    "guard_current_time",
+    "progressed_seconds",
+    "playback_rate",
+    "play_call_ms",
+    "loadstart_ms",
+    "canplay_ms",
+    "play_resolved_ms",
+    "playing_ms",
+    "waiting_count",
+    "stalled_count",
+    "prefetch_age_ms",
+    "render_ms",
+    "swap_ms",
+    "hydration_ms",
+    "screen_width",
+    "screen_height",
+    "inner_width",
+    "inner_height",
+    "root_client_width",
+    "root_client_height",
+    "visual_viewport_width",
+    "visual_viewport_height",
+    "visual_viewport_offset_top",
+    "visual_viewport_offset_left",
+    "visual_viewport_scale",
+    "device_pixel_ratio",
+    "safe_area_top",
+    "safe_area_right",
+    "safe_area_bottom",
+    "safe_area_left",
+    "css_vh_height",
+    "css_dvh_height",
+    "overlay_top",
+    "overlay_bottom",
+    "overlay_width",
+    "overlay_height",
+    "overlay_visual_top_gap",
+    "overlay_visual_bottom_gap",
+    "panel_top",
+    "panel_bottom",
+    "panel_height",
+    "cover_wait_ms",
+    "track_transition_count",
+    "track_playing_count",
+    "track_rejected_count",
+    "track_error_count",
+    "prepared_count",
+    "unprepared_count",
+    "served_from_prefetch_count",
+    "slow_transition_count",
+    "max_play_to_playing_ms",
+    "total_play_to_playing_ms",
+    "prefetch_start_count",
+    "prefetch_done_count",
+    "prefetch_error_count",
+    "prefetch_cache_ready_count",
+    "spa_navigation_count",
+    "spa_abort_count",
+    "spa_slow_count",
+    "max_spa_navigation_ms",
+    "mini_visibility_change_count",
+    "mini_hidden_count",
+    "mini_unexpected_hidden_count",
+    "navigation_token",
+    "cover_natural_width",
+    "cover_display_px",
+    "cover_render_width_px",
+    "cover_render_height_px",
+    "cover_aspect_ratio_milli",
+    "position_delta_ms",
+    "flip_animation_count",
+    "handoff_stage_ms",
+    "preview_target_change_count",
+    "preview_animation_restart_count",
+    "max_concurrent_animation_count",
+    "spa_navigation_compacted_count",
+    "track_superseded_count",
+    "scroll_restore_requested_x",
+    "scroll_restore_requested_y",
+    "scroll_restore_applied_x",
+    "scroll_restore_applied_y",
+    "scroll_restore_delta_y",
+    "scroll_restore_anchor_correction",
+    "route_layers_at_promote",
+    "route_layers_after_detach",
+    "route_layers_before_commit",
+    "route_layers_after_commit",
+    "first_paint_ms",
+    "visible_cover_count",
+    "visible_cover_ready_count",
+    "second_paint_ms",
+    "second_visible_cover_count",
+    "second_visible_cover_ready_count",
+    "spa_cover_not_ready_count",
+    "spa_second_cover_not_ready_count",
+    "max_first_paint_ms",
+    "max_second_paint_ms",
+    "html_cache_hit_count",
+    "html_cache_miss_count",
+    "cover_cache_hit_count",
+    "cover_cache_miss_count",
+    "storage_probe_count",
+    "storage_persisted_state",
+    "storage_persist_request_count",
+    "storage_persist_granted_count",
+    "storage_usage_mb",
+    "storage_quota_mb",
+    "storage_shell_present",
+    "storage_sw_controlled",
+    "storage_cover_entries",
+    "storage_audio_entries",
     "storage_catalog_entries",
-    "visualizer_open_count", "visualizer_activation_count",
-    "visualizer_activation_success_count", "visualizer_activation_error_count",
-    "visualizer_frame_count", "visualizer_nonzero_frame_count", "visualizer_zero_frame_count",
-    "visualizer_max_rms_milli", "visualizer_max_bass_milli",
-    "visualizer_max_mid_milli", "visualizer_max_treble_milli",
-    "visualizer_energy_range_milli", "visualizer_max_amplitude_px",
-    "visualizer_canvas_width", "visualizer_canvas_height",
-    "visualizer_canvas_opacity_milli", "visualizer_audio_advanced_ms",
-    "visualizer_context_supported", "visualizer_context_running",
-    "visualizer_analyser_ready", "visualizer_canvas_visible",
-    "command_sequence", "event_sequence", "before_current_time", "after_current_time",
-    "probe_600_ms", "probe_1500_ms", "probe_3000_ms", "command_latency_ms",
-    "from_ms", "to_ms", "media_command_count", "media_command_success_count",
-    "media_command_noop_count", "media_command_dedup_count", "media_command_rejected_count",
-    "media_command_no_progress_count", "media_command_recovered_count",
-    "media_command_recovery_failed_count", "media_command_incomplete_count",
-    "media_play_count", "media_pause_count", "media_previous_count", "media_next_count",
-    "media_seek_count", "media_restart_count", "audio_interruption_count",
-    "launch_head_ms", "dom_ready_ms", "first_contentful_paint_ms", "first_app_frame_ms",
-    "app_ready_frame_ms", "init_done_ms", "catalog_ready_ms",
-    "document_ttfb_ms", "document_download_ms", "dom_parse_ms",
-    "critical_css_ready_ms", "runtime_scripts_ready_ms", "largest_contentful_paint_ms",
-    "cumulative_layout_shift_milli", "interaction_to_next_paint_ms",
-    "previous_incomplete_launch_age_ms", "service_worker_activity_count",
-    "background_window_count", "background_sequence", "hidden_started_at_ms",
-    "visible_return_at_ms", "hidden_duration_ms", "start_current_time", "end_current_time",
-    "sample_count", "track_change_count", "error_count", "interruption_count",
-    "resume_count", "dx", "dy", "abs_dx", "abs_dy", "threshold_px", "card_rank",
-    "gesture_duration_ms", "early_buffer_delay_ms", "source_index", "target_index",
-    "shifted_row_count", "ghost_created_ms", "lift_started_ms", "lift_finished_ms",
-    "flip_started_ms", "flip_finished_ms", "album_swipe_count", "album_swipe_success_count",
-    "album_swipe_cancel_count", "queue_reorder_count", "queue_reorder_success_count",
-    "queue_reorder_cancel_count", "launch_summary_count"
+    "visualizer_open_count",
+    "visualizer_activation_count",
+    "visualizer_activation_success_count",
+    "visualizer_activation_error_count",
+    "visualizer_frame_count",
+    "visualizer_nonzero_frame_count",
+    "visualizer_zero_frame_count",
+    "visualizer_max_rms_milli",
+    "visualizer_max_bass_milli",
+    "visualizer_max_mid_milli",
+    "visualizer_max_treble_milli",
+    "visualizer_energy_range_milli",
+    "visualizer_max_amplitude_px",
+    "visualizer_canvas_width",
+    "visualizer_canvas_height",
+    "visualizer_canvas_opacity_milli",
+    "visualizer_audio_advanced_ms",
+    "visualizer_context_supported",
+    "visualizer_context_running",
+    "visualizer_analyser_ready",
+    "visualizer_canvas_visible",
+    "command_sequence",
+    "event_sequence",
+    "before_current_time",
+    "after_current_time",
+    "probe_600_ms",
+    "probe_1500_ms",
+    "probe_3000_ms",
+    "command_latency_ms",
+    "from_ms",
+    "to_ms",
+    "media_command_count",
+    "media_command_success_count",
+    "media_command_noop_count",
+    "media_command_dedup_count",
+    "media_command_rejected_count",
+    "media_command_no_progress_count",
+    "media_command_recovered_count",
+    "media_command_recovery_failed_count",
+    "media_command_incomplete_count",
+    "media_play_count",
+    "media_pause_count",
+    "media_previous_count",
+    "media_next_count",
+    "media_seek_count",
+    "media_restart_count",
+    "audio_interruption_count",
+    "launch_head_ms",
+    "dom_ready_ms",
+    "first_contentful_paint_ms",
+    "first_app_frame_ms",
+    "app_ready_frame_ms",
+    "init_done_ms",
+    "catalog_ready_ms",
+    "document_ttfb_ms",
+    "document_download_ms",
+    "dom_parse_ms",
+    "critical_css_ready_ms",
+    "runtime_scripts_ready_ms",
+    "largest_contentful_paint_ms",
+    "cumulative_layout_shift_milli",
+    "interaction_to_next_paint_ms",
+    "previous_incomplete_launch_age_ms",
+    "service_worker_activity_count",
+    "background_window_count",
+    "background_sequence",
+    "hidden_started_at_ms",
+    "visible_return_at_ms",
+    "hidden_duration_ms",
+    "start_current_time",
+    "end_current_time",
+    "sample_count",
+    "track_change_count",
+    "error_count",
+    "interruption_count",
+    "resume_count",
+    "dx",
+    "dy",
+    "abs_dx",
+    "abs_dy",
+    "threshold_px",
+    "card_rank",
+    "gesture_duration_ms",
+    "early_buffer_delay_ms",
+    "source_index",
+    "target_index",
+    "shifted_row_count",
+    "ghost_created_ms",
+    "lift_started_ms",
+    "lift_finished_ms",
+    "flip_started_ms",
+    "flip_finished_ms",
+    "album_swipe_count",
+    "album_swipe_success_count",
+    "album_swipe_cancel_count",
+    "queue_reorder_count",
+    "queue_reorder_success_count",
+    "queue_reorder_cancel_count",
+    "launch_summary_count"
   ]);
   const TELEMETRY_BOOLEAN_FIELDS = new Set([
-    "fine_event", "navigator_on_line", "auto", "error", "health_session_active",
-    "cached", "range", "paused", "muted", "sync", "retry", "ready", "same_track",
-    "immediate_play", "from_media_session", "from_transport_control", "initial_random",
-    "reused_current_source", "user_activation_active", "user_activation_seen",
-    "controllerchange", "sw_reload_between", "reload_executed", "audio_fetch",
-    "served_from_prefetch", "is_ios", "is_standalone", "prepared", "prefetch_ready",
-    "cover_timed_out", "visible", "unexpected", "navigation_active", "fullscreen_open",
-    "has_playback_session", "has_source", "is_home", "is_album",
-    "cover_ready_at_first_paint", "cover_ready_at_second_paint",
-    "before_paused", "after_paused", "confirmed", "recovery_attempted",
-    "handler_play", "handler_pause", "handler_previous", "handler_next", "handler_seekto",
-    "audio_was_playing", "audio_is_playing", "progress_observed", "return_observed",
-    "catalog_ready", "service_worker_controlled", "document_was_discarded", "app_frame_ready",
-    "fcp_available", "lcp_available", "cls_available", "inp_available", "previous_incomplete_launch",
-    "handler_ready", "navigation_started", "navigation_completed", "lower_half",
-    "scroll_restored", "dom_reused", "html_cache_hit", "cover_cache_hit",
-    "ghost_created", "lift_animated", "flip_started", "flip_finished", "reduced_motion",
-    "lift_finished", "cover_geometry_ok", "native_play_observed", "bfcache",
-    "source_retained_until_promote", "source_detached_after_promote",
-    "layout_hit_test", "source_hidden_while_ghost", "theme_tokens_frozen",
-    "route_host_has_current", "single_route_invariant"
+    "fine_event",
+    "navigator_on_line",
+    "auto",
+    "error",
+    "health_session_active",
+    "cached",
+    "range",
+    "paused",
+    "muted",
+    "sync",
+    "retry",
+    "ready",
+    "same_track",
+    "immediate_play",
+    "from_media_session",
+    "from_transport_control",
+    "initial_random",
+    "reused_current_source",
+    "user_activation_active",
+    "user_activation_seen",
+    "controllerchange",
+    "sw_reload_between",
+    "reload_executed",
+    "audio_fetch",
+    "served_from_prefetch",
+    "is_ios",
+    "is_standalone",
+    "prepared",
+    "prefetch_ready",
+    "cover_timed_out",
+    "visible",
+    "unexpected",
+    "navigation_active",
+    "fullscreen_open",
+    "has_playback_session",
+    "has_source",
+    "is_home",
+    "is_album",
+    "cover_ready_at_first_paint",
+    "cover_ready_at_second_paint",
+    "before_paused",
+    "after_paused",
+    "confirmed",
+    "recovery_attempted",
+    "handler_play",
+    "handler_pause",
+    "handler_previous",
+    "handler_next",
+    "handler_seekto",
+    "audio_was_playing",
+    "audio_is_playing",
+    "progress_observed",
+    "return_observed",
+    "catalog_ready",
+    "service_worker_controlled",
+    "document_was_discarded",
+    "app_frame_ready",
+    "fcp_available",
+    "lcp_available",
+    "cls_available",
+    "inp_available",
+    "previous_incomplete_launch",
+    "handler_ready",
+    "navigation_started",
+    "navigation_completed",
+    "lower_half",
+    "scroll_restored",
+    "dom_reused",
+    "html_cache_hit",
+    "cover_cache_hit",
+    "ghost_created",
+    "lift_animated",
+    "flip_started",
+    "flip_finished",
+    "reduced_motion",
+    "lift_finished",
+    "cover_geometry_ok",
+    "native_play_observed",
+    "bfcache",
+    "source_retained_until_promote",
+    "source_detached_after_promote",
+    "layout_hit_test",
+    "source_hidden_while_ghost",
+    "theme_tokens_frozen",
+    "route_host_has_current",
+    "single_route_invariant"
   ]);
 
   function now() {
@@ -372,7 +663,9 @@
 
   function createSessionSummary() {
     const summary = {};
-    SESSION_SUMMARY_FIELDS.forEach(function (field) { summary[field] = 0; });
+    SESSION_SUMMARY_FIELDS.forEach(function (field) {
+      summary[field] = 0;
+    });
     return summary;
   }
 
@@ -391,10 +684,18 @@
     if (events.length <= SESSION_EVENT_CAP) return events;
     const mandatoryIndexes = new Set();
     [
-      "session_summary", "launch_summary", "background_window",
-      "spa_navigation", "album_swipe", "queue_reorder"
+      "session_summary",
+      "launch_summary",
+      "background_window",
+      "spa_navigation",
+      "album_swipe",
+      "queue_reorder"
     ].forEach(function (eventName) {
-      const index = events.map(function (event) { return event && event.event; }).lastIndexOf(eventName);
+      const index = events
+        .map(function (event) {
+          return event && event.event;
+        })
+        .lastIndexOf(eventName);
       if (index >= 0) mandatoryIndexes.add(index);
     });
     const keep = new Set(Array.from(mandatoryIndexes));
@@ -405,7 +706,9 @@
     for (let index = events.length - 1; index >= 0 && keep.size < SESSION_EVENT_CAP; index -= 1) {
       keep.add(index);
     }
-    return events.filter(function (_event, index) { return keep.has(index); });
+    return events.filter(function (_event, index) {
+      return keep.has(index);
+    });
   }
 
   function sanitizeTelemetryEvent(input) {
@@ -430,7 +733,9 @@
 
   function sanitizeStoredSession(input) {
     if (!input || typeof input !== "object") return null;
-    const sessionId = String(input.session_id || "").trim().slice(0, 96);
+    const sessionId = String(input.session_id || "")
+      .trim()
+      .slice(0, 96);
     const startedAt = Number(input.started_at_ms);
     if (!/^s-[a-z0-9-]{12,94}$/.test(sessionId) || !Number.isFinite(startedAt) || startedAt <= 0) {
       return null;
@@ -439,22 +744,30 @@
     const storedSchemaVersion = [2, 3, 4].includes(Number(input.schema_version))
       ? Number(input.schema_version)
       : SESSION_SCHEMA_VERSION;
-    const events = capSessionEvents((Array.isArray(input.events) ? input.events : [])
-      .map(sanitizeTelemetryEvent)
-      .filter(Boolean));
+    const events = capSessionEvents(
+      (Array.isArray(input.events) ? input.events : []).map(sanitizeTelemetryEvent).filter(Boolean)
+    );
     const lastAt = Number(input.last_at_ms);
     const endedAt = Number(input.ended_at_ms);
     return {
       schema_version: storedSchemaVersion,
       session_id: sessionId,
       status,
-      build: String(input.build || "").trim().slice(0, 120),
-      ua_class: String(input.ua_class || "").trim().slice(0, 32),
-      effective_type: String(input.effective_type || "").trim().slice(0, 32),
+      build: String(input.build || "")
+        .trim()
+        .slice(0, 120),
+      ua_class: String(input.ua_class || "")
+        .trim()
+        .slice(0, 32),
+      effective_type: String(input.effective_type || "")
+        .trim()
+        .slice(0, 32),
       started_at_ms: startedAt,
       last_at_ms: Number.isFinite(lastAt) && lastAt >= startedAt ? lastAt : startedAt,
       ended_at_ms: status === "sealed" && Number.isFinite(endedAt) && endedAt >= startedAt ? endedAt : 0,
-      close_reason: String(input.close_reason || "").trim().slice(0, 40),
+      close_reason: String(input.close_reason || "")
+        .trim()
+        .slice(0, 40),
       dropped_events: Math.max(0, Math.floor(Number(input.dropped_events) || 0)),
       summary: sanitizeSessionSummary(input.summary),
       events
@@ -476,7 +789,9 @@
       duration_ms: Math.max(0, endedAt - session.started_at_ms),
       close_reason: session.close_reason || "unknown",
       dropped_events: session.dropped_events,
-      events: session.events.map(function (event) { return Object.assign({}, event); })
+      events: session.events.map(function (event) {
+        return Object.assign({}, event);
+      })
     };
   }
 
@@ -486,7 +801,9 @@
       ? Number(candidates[0].schema_version)
       : SESSION_SCHEMA_VERSION;
     const reports = candidates
-      .filter(function (report) { return Number(report && report.schema_version) === schemaVersion; })
+      .filter(function (report) {
+        return Number(report && report.schema_version) === schemaVersion;
+      })
       .map(toSessionReport)
       .filter(Boolean)
       .slice(0, SESSION_STORE_CAP);
@@ -502,25 +819,42 @@
       if (largest && largest.events.length > 1) {
         const protectedIndexes = new Set();
         [
-          "session_summary", "launch_summary", "background_window",
-          "spa_navigation", "album_swipe", "queue_reorder"
+          "session_summary",
+          "launch_summary",
+          "background_window",
+          "spa_navigation",
+          "album_swipe",
+          "queue_reorder"
         ].forEach(function (eventName) {
-          const index = largest.events.map(function (event) { return event && event.event; }).lastIndexOf(eventName);
+          const index = largest.events
+            .map(function (event) {
+              return event && event.event;
+            })
+            .lastIndexOf(eventName);
           if (index >= 0) protectedIndexes.add(index);
         });
         largest.events.forEach(function (event, index) {
           if (event && ["audio_interruption", "error"].includes(event.event)) protectedIndexes.add(index);
         });
-        const ranked = largest.events.map(function (event, index) {
-          const eventName = String(event && event.event || "");
-          const result = String(event && event.result || "");
-          let priority = 4;
-          if (/prefetch|cache/.test(eventName) && !event.error) priority = 0;
-          else if (["album_swipe", "queue_reorder"].includes(eventName) && result === "cancelled") priority = 1;
-          else if (["media_command", "spa_navigation", "album_swipe", "queue_reorder"].includes(eventName) && !event.error) priority = 2;
-          else if (!event.error) priority = 3;
-          return { index, priority };
-        }).filter(function (candidate) { return !protectedIndexes.has(candidate.index); });
+        const ranked = largest.events
+          .map(function (event, index) {
+            const eventName = String((event && event.event) || "");
+            const result = String((event && event.result) || "");
+            let priority = 4;
+            if (/prefetch|cache/.test(eventName) && !event.error) priority = 0;
+            else if (["album_swipe", "queue_reorder"].includes(eventName) && result === "cancelled")
+              priority = 1;
+            else if (
+              ["media_command", "spa_navigation", "album_swipe", "queue_reorder"].includes(eventName) &&
+              !event.error
+            )
+              priority = 2;
+            else if (!event.error) priority = 3;
+            return { index, priority };
+          })
+          .filter(function (candidate) {
+            return !protectedIndexes.has(candidate.index);
+          });
         ranked.sort(function (left, right) {
           return left.priority - right.priority || left.index - right.index;
         });
@@ -536,9 +870,7 @@
       envelope = { schema_version: schemaVersion, reports };
       serialized = JSON.stringify(envelope);
     }
-    return byteLength(serialized) <= SESSION_ENVELOPE_MAX_BYTES
-      ? { envelope, serialized }
-      : null;
+    return byteLength(serialized) <= SESSION_ENVELOPE_MAX_BYTES ? { envelope, serialized } : null;
   }
 
   function call(ctx, name) {
@@ -652,7 +984,8 @@
     function getAutoFlag(type, data, requestToken) {
       if (data && data.trigger === "auto") return true;
       if (data && data.auto === true) return true;
-      if (Number.isFinite(requestToken) && fineAuto.has(requestToken)) return Boolean(fineAuto.get(requestToken));
+      if (Number.isFinite(requestToken) && fineAuto.has(requestToken))
+        return Boolean(fineAuto.get(requestToken));
       return false;
     }
 
@@ -678,7 +1011,8 @@
     function getRuntimeProbeState() {
       const audio = getAudio();
       return {
-        current_time: audio && Number.isFinite(audio.currentTime) ? Math.round(audio.currentTime * 1000) / 1000 : null,
+        current_time:
+          audio && Number.isFinite(audio.currentTime) ? Math.round(audio.currentTime * 1000) / 1000 : null,
         buffered_end: getBufferedEnd(),
         duration: audio && Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) / 1000 : null,
         ready_state: audio ? audio.readyState : null,
@@ -700,9 +1034,8 @@
     function getHealthSessionState() {
       return {
         health_session_active: Boolean(healthSessionActive),
-        health_session_age_ms: healthSessionActive && healthSessionStartedAt
-          ? Math.max(0, Date.now() - healthSessionStartedAt)
-          : 0
+        health_session_age_ms:
+          healthSessionActive && healthSessionStartedAt ? Math.max(0, Date.now() - healthSessionStartedAt) : 0
       };
     }
 
@@ -719,11 +1052,18 @@
         }
         request.onupgradeneeded = function () {
           const db = request.result;
-          if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, { keyPath: "session_id" });
+          if (!db.objectStoreNames.contains(DB_STORE))
+            db.createObjectStore(DB_STORE, { keyPath: "session_id" });
         };
-        request.onsuccess = function () { resolve(request.result); };
-        request.onerror = function () { resolve(null); };
-        request.onblocked = function () { resolve(null); };
+        request.onsuccess = function () {
+          resolve(request.result);
+        };
+        request.onerror = function () {
+          resolve(null);
+        };
+        request.onblocked = function () {
+          resolve(null);
+        };
       });
       return dbPromise;
     }
@@ -738,10 +1078,16 @@
             const store = transaction.objectStore(DB_STORE);
             const result = callback(store);
             transaction.oncomplete = function () {
-              resolve(result && Object.prototype.hasOwnProperty.call(result, "result") ? result.result : result);
+              resolve(
+                result && Object.prototype.hasOwnProperty.call(result, "result") ? result.result : result
+              );
             };
-            transaction.onerror = function () { resolve(null); };
-            transaction.onabort = function () { resolve(null); };
+            transaction.onerror = function () {
+              resolve(null);
+            };
+            transaction.onabort = function () {
+              resolve(null);
+            };
           } catch (_err) {
             resolve(null);
           }
@@ -752,7 +1098,9 @@
     function deleteStoredSessions(ids) {
       if (!Array.isArray(ids) || !ids.length) return;
       withStore("readwrite", function (store) {
-        ids.forEach(function (id) { store.delete(id); });
+        ids.forEach(function (id) {
+          store.delete(id);
+        });
         return true;
       }).catch(function () {});
     }
@@ -760,7 +1108,9 @@
     function persistSession(session) {
       const sanitized = sanitizeStoredSession(session);
       if (!sanitized) return;
-      withStore("readwrite", function (store) { return store.put(sanitized); }).catch(function () {});
+      withStore("readwrite", function (store) {
+        return store.put(sanitized);
+      }).catch(function () {});
     }
 
     function pruneLocalMap(map, limit) {
@@ -774,7 +1124,11 @@
         const parsed = new URL(raw, window.location.href);
         return `${parsed.origin.toLowerCase()}${parsed.pathname.replace(/\/{2,}/g, "/").toLowerCase()}`;
       } catch (_err) {
-        return raw.split(/[?#]/, 1)[0].replace(/\\/g, "/").replace(/\/{2,}/g, "/").toLowerCase();
+        return raw
+          .split(/[?#]/, 1)[0]
+          .replace(/\\/g, "/")
+          .replace(/\/{2,}/g, "/")
+          .toLowerCase();
       }
     }
 
@@ -806,18 +1160,32 @@
     function updateSummaryMax(field, value, session) {
       const summary = getSessionSummary(session);
       const number = Number(value);
-      if (!summary || !Object.prototype.hasOwnProperty.call(summary, field) || !Number.isFinite(number)) return;
+      if (!summary || !Object.prototype.hasOwnProperty.call(summary, field) || !Number.isFinite(number))
+        return;
       summary[field] = Math.max(Number(summary[field] || 0), Math.max(0, Math.round(number)));
     }
 
     function recordCacheObservation(kind, outcome, amount) {
-      const cacheKind = String(kind || "").trim().toLowerCase();
-      const cacheOutcome = String(outcome || "").trim().toLowerCase();
-      const field = cacheKind === "html"
-        ? (cacheOutcome === "hit" ? "html_cache_hit_count" : (cacheOutcome === "miss" ? "html_cache_miss_count" : ""))
-        : (cacheKind === "cover"
-            ? (cacheOutcome === "hit" ? "cover_cache_hit_count" : (cacheOutcome === "miss" ? "cover_cache_miss_count" : ""))
-            : "");
+      const cacheKind = String(kind || "")
+        .trim()
+        .toLowerCase();
+      const cacheOutcome = String(outcome || "")
+        .trim()
+        .toLowerCase();
+      const field =
+        cacheKind === "html"
+          ? cacheOutcome === "hit"
+            ? "html_cache_hit_count"
+            : cacheOutcome === "miss"
+              ? "html_cache_miss_count"
+              : ""
+          : cacheKind === "cover"
+            ? cacheOutcome === "hit"
+              ? "cover_cache_hit_count"
+              : cacheOutcome === "miss"
+                ? "cover_cache_miss_count"
+                : ""
+            : "";
       if (!field) return;
       const session = ensureActiveSession();
       if (!session) return;
@@ -855,7 +1223,8 @@
       if (!session) return;
       const retained = new Set(session.events || []);
       compactEvents.forEach(function (record, key) {
-        if (record.session_id === session.session_id && !retained.has(record.event)) compactEvents.delete(key);
+        if (record.session_id === session.session_id && !retained.has(record.event))
+          compactEvents.delete(key);
       });
       pruneLocalMap(compactEvents, SESSION_EVENT_CAP * SESSION_STORE_CAP);
     }
@@ -879,7 +1248,9 @@
       const mapKey = `${session.session_id}|${String(key || event.event || "event")}`;
       const existing = compactEvents.get(mapKey);
       if (existing && existing.event && session.events.includes(existing.event)) {
-        Object.keys(existing.event).forEach(function (field) { delete existing.event[field]; });
+        Object.keys(existing.event).forEach(function (field) {
+          delete existing.event[field];
+        });
         Object.assign(existing.event, event);
         session.last_at_ms = Math.max(session.last_at_ms || 0, event.timestamp_ms);
         persistSession(session);
@@ -893,22 +1264,35 @@
     function upsertSessionSummaryEvent(session, timestampMs) {
       if (!session) return null;
       const summary = getSessionSummary(session);
-      return upsertCompactEvent("session-summary", Object.assign({
-        event: "session_summary",
-        fine_event: true,
-        build: session.build || getRuntimeVersion(),
-        timestamp_ms: Number(timestampMs) || Date.now(),
-        track: "session",
-        album: "session",
-        source: "summary",
-        ua_class: session.ua_class || getUaClass()
-      }, summary || {}), session);
+      return upsertCompactEvent(
+        "session-summary",
+        Object.assign(
+          {
+            event: "session_summary",
+            fine_event: true,
+            build: session.build || getRuntimeVersion(),
+            timestamp_ms: Number(timestampMs) || Date.now(),
+            track: "session",
+            album: "session",
+            source: "summary",
+            ua_class: session.ua_class || getUaClass()
+          },
+          summary || {}
+        ),
+        session
+      );
     }
 
     function isTerminalMediaCommandOutcome(value) {
       return [
-        "success", "noop", "dedup", "rejected", "no_progress",
-        "recovered", "recovery_failed", "incomplete"
+        "success",
+        "noop",
+        "dedup",
+        "rejected",
+        "no_progress",
+        "recovered",
+        "recovery_failed",
+        "incomplete"
       ].includes(String(value || ""));
     }
 
@@ -936,9 +1320,13 @@
     }
 
     function processMediaCommand(payload, source, timestampMs) {
-      const commandToken = String(source && source.command_token || payload.command_token || "").trim().slice(0, 120);
+      const commandToken = String((source && source.command_token) || payload.command_token || "")
+        .trim()
+        .slice(0, 120);
       if (!commandToken) return false;
-      const action = String(source && source.action || payload.action || "").trim().toLowerCase();
+      const action = String((source && source.action) || payload.action || "")
+        .trim()
+        .toLowerCase();
       const session = ensureActiveSession({ allowHidden: action === "play" || action === "pause" });
       if (!session) return true;
       let record = mediaCommands.get(commandToken);
@@ -960,7 +1348,12 @@
       const incomingOutcome = String(update.outcome || "");
       if (isTerminalMediaCommandOutcome(previousOutcome)) {
         const previousIsFinal = [
-          "success", "noop", "dedup", "rejected", "recovered", "recovery_failed"
+          "success",
+          "noop",
+          "dedup",
+          "rejected",
+          "recovered",
+          "recovery_failed"
         ].includes(previousOutcome);
         const incomingIsTerminal = isTerminalMediaCommandOutcome(incomingOutcome);
         const incomingWouldDowngrade = previousOutcome === "no_progress" && incomingOutcome === "incomplete";
@@ -1016,12 +1409,16 @@
     function processMediaCapabilities(payload, source, timestampMs) {
       const session = ensureActiveSession();
       if (!session) return true;
-      upsertCompactEvent("media-capabilities", Object.assign({}, payload, {
-        event: "media_capabilities",
-        event_sequence: ++mediaEventSequence,
-        timestamp_ms: Number(timestampMs) || Date.now(),
-        result: String(source && source.registration_result || payload.registration_result || "unknown")
-      }), session);
+      upsertCompactEvent(
+        "media-capabilities",
+        Object.assign({}, payload, {
+          event: "media_capabilities",
+          event_sequence: ++mediaEventSequence,
+          timestamp_ms: Number(timestampMs) || Date.now(),
+          result: String((source && source.registration_result) || payload.registration_result || "unknown")
+        }),
+        session
+      );
       return true;
     }
 
@@ -1032,14 +1429,18 @@
         launchSummaryRecorded = true;
         incrementSummary("launch_summary_count", 1, session);
       }
-      upsertCompactEvent("launch-summary", Object.assign({}, payload, source || {}, {
-        event: "launch_summary",
-        timestamp_ms: Number(timestampMs) || Date.now(),
-        track: "launch",
-        album: "session",
-        source: "startup",
-        error: false
-      }), session);
+      upsertCompactEvent(
+        "launch-summary",
+        Object.assign({}, payload, source || {}, {
+          event: "launch_summary",
+          timestamp_ms: Number(timestampMs) || Date.now(),
+          track: "launch",
+          album: "session",
+          source: "startup",
+          error: false
+        }),
+        session
+      );
       return true;
     }
 
@@ -1049,7 +1450,9 @@
       const compactKey = `${session.session_id}|${mapKey}:${token}`;
       const compact = compactEvents.get(compactKey);
       if (compact && compact.event) {
-        session.events = session.events.filter(function (event) { return event !== compact.event; });
+        session.events = session.events.filter(function (event) {
+          return event !== compact.event;
+        });
       }
       compactEvents.delete(compactKey);
     }
@@ -1062,23 +1465,30 @@
         for (let index = entries.length - 1; index >= 0; index -= 1) {
           const token = entries[index][0];
           const record = entries[index][1] || {};
-          const direction = String(record.direction || "").toLowerCase() ||
+          const direction =
+            String(record.direction || "").toLowerCase() ||
             (String(record.trigger || "").includes("left") ? "left" : "right");
-          const matches = kind === "opened"
-            ? String(record.result || "") === "opened"
-            : String(record.result || "") === "cancelled" && direction === kind.split(":")[1];
+          const matches =
+            kind === "opened"
+              ? String(record.result || "") === "opened"
+              : String(record.result || "") === "cancelled" && direction === kind.split(":")[1];
           if (matches) {
             protectedTokens.add(token);
             break;
           }
         }
       });
-      const removable = entries.find(function (entry) { return !protectedTokens.has(entry[0]); }) || entries[0];
+      const removable =
+        entries.find(function (entry) {
+          return !protectedTokens.has(entry[0]);
+        }) || entries[0];
       if (removable) removeCompactCorrelation(session, "album-swipe", albumSwipes, removable[0]);
     }
 
     function processAlbumSwipe(payload, source, timestampMs) {
-      const token = String(source && source.gesture_token || payload.gesture_token || "").trim().slice(0, 120);
+      const token = String((source && source.gesture_token) || payload.gesture_token || "")
+        .trim()
+        .slice(0, 120);
       if (!token) return false;
       const session = ensureActiveSession();
       if (!session) return true;
@@ -1117,7 +1527,9 @@
     }
 
     function processQueueReorder(payload, source, timestampMs) {
-      const token = String(source && source.queue_token || payload.queue_token || "").trim().slice(0, 120);
+      const token = String((source && source.queue_token) || payload.queue_token || "")
+        .trim()
+        .slice(0, 120);
       if (!token) return false;
       const session = ensureActiveSession();
       if (!session) return true;
@@ -1158,23 +1570,21 @@
 
     function processAudioInterruption(payload, source, timestampMs) {
       const interruptionToken = String(
-        source && source.interruption_token || payload.interruption_token || "interruption"
-      ).trim().slice(0, 120);
+        (source && source.interruption_token) || payload.interruption_token || "interruption"
+      )
+        .trim()
+        .slice(0, 120);
       const session = ensureActiveSession({ allowHidden: true });
       if (!session) return true;
       const firstObservation = !audioInterruptions.has(interruptionToken);
-      const record = Object.assign(
-        audioInterruptions.get(interruptionToken) || {},
-        payload,
-        {
-          event: "audio_interruption",
-          interruption_token: interruptionToken,
-          event_sequence: audioInterruptions.has(interruptionToken)
-            ? audioInterruptions.get(interruptionToken).event_sequence
-            : ++mediaEventSequence,
-          timestamp_ms: Number(timestampMs) || Date.now()
-        }
-      );
+      const record = Object.assign(audioInterruptions.get(interruptionToken) || {}, payload, {
+        event: "audio_interruption",
+        interruption_token: interruptionToken,
+        event_sequence: audioInterruptions.has(interruptionToken)
+          ? audioInterruptions.get(interruptionToken).event_sequence
+          : ++mediaEventSequence,
+        timestamp_ms: Number(timestampMs) || Date.now()
+      });
       audioInterruptions.set(interruptionToken, record);
       if (firstObservation) incrementSummary("audio_interruption_count", 1, session);
       upsertCompactEvent(`audio-interruption:${interruptionToken}`, record, session);
@@ -1184,7 +1594,9 @@
 
     function clearLegacyDb() {
       if (!("indexedDB" in window) || typeof indexedDB.deleteDatabase !== "function") return;
-      try { indexedDB.deleteDatabase(LEGACY_DB_NAME); } catch (_err) {}
+      try {
+        indexedDB.deleteDatabase(LEGACY_DB_NAME);
+      } catch (_err) {}
     }
 
     function pruneSessions() {
@@ -1198,10 +1610,14 @@
         }
       });
       const ordered = Array.from(sessions.values()).sort(function (left, right) {
-        return Number(left.last_at_ms || left.started_at_ms) - Number(right.last_at_ms || right.started_at_ms);
+        return (
+          Number(left.last_at_ms || left.started_at_ms) - Number(right.last_at_ms || right.started_at_ms)
+        );
       });
       while (ordered.length > SESSION_STORE_CAP) {
-        let index = ordered.findIndex(function (session) { return session.session_id !== currentSessionId; });
+        let index = ordered.findIndex(function (session) {
+          return session.session_id !== currentSessionId;
+        });
         if (index < 0) index = 0;
         const removed = ordered.splice(index, 1)[0];
         if (removed) {
@@ -1215,7 +1631,9 @@
     function loadSessions() {
       if (sessionsLoaded) return Promise.resolve(Array.from(sessions.values()));
       if (sessionsLoadingPromise) return sessionsLoadingPromise;
-      sessionsLoadingPromise = withStore("readonly", function (store) { return store.getAll(); })
+      sessionsLoadingPromise = withStore("readonly", function (store) {
+        return store.getAll();
+      })
         .then(function (stored) {
           (Array.isArray(stored) ? stored : []).forEach(function (candidate) {
             const session = sanitizeStoredSession(candidate);
@@ -1225,7 +1643,9 @@
           pruneSessions();
           return Array.from(sessions.values());
         })
-        .finally(function () { sessionsLoadingPromise = null; });
+        .finally(function () {
+          sessionsLoadingPromise = null;
+        });
       return sessionsLoadingPromise;
     }
 
@@ -1265,34 +1685,30 @@
 
     function currentAudioPosition() {
       const audio = getAudio();
-      return audio && Number.isFinite(audio.currentTime)
-        ? Math.round(audio.currentTime * 1000) / 1000
-        : 0;
+      return audio && Number.isFinite(audio.currentTime) ? Math.round(audio.currentTime * 1000) / 1000 : 0;
     }
 
     function currentBackgroundLabels() {
       const state = getAudioState();
-      const track = state.playlist && Number.isInteger(state.currentIndex)
-        ? state.playlist[state.currentIndex]
-        : null;
+      const track =
+        state.playlist && Number.isInteger(state.currentIndex) ? state.playlist[state.currentIndex] : null;
       const audio = getAudio();
       const sourceIdentity = localSourceIdentity(
-        state.activeLogicalSrc ||
-        (audio && (audio.currentSrc || audio.src)) ||
-        (track && track.src) ||
-        ""
+        state.activeLogicalSrc || (audio && (audio.currentSrc || audio.src)) || (track && track.src) || ""
       );
       const trackLabel = String((track && (track.title || track.name)) || "background");
       const albumLabel = String((track && track.album) || state.currentAlbum || "session").toLowerCase();
       return {
         track: trackLabel,
         album: albumLabel,
-        identity: sourceIdentity || [
-          String(state.playlistKind || "playlist"),
-          Number.isInteger(state.currentIndex) ? state.currentIndex : -1,
-          albumLabel,
-          trackLabel
-        ].join("|")
+        identity:
+          sourceIdentity ||
+          [
+            String(state.playlistKind || "playlist"),
+            Number.isInteger(state.currentIndex) ? state.currentIndex : -1,
+            albumLabel,
+            trackLabel
+          ].join("|")
       };
     }
 
@@ -1304,10 +1720,13 @@
       const endPosition = Number.isFinite(windowRecord.end_current_time)
         ? windowRecord.end_current_time
         : position;
-      const advancedMs = Math.max(0, Math.round(
-        Number(windowRecord.accumulated_advanced_ms || 0) +
-        Math.max(0, endPosition - Number(windowRecord.segment_start_position || 0)) * 1000
-      ));
+      const advancedMs = Math.max(
+        0,
+        Math.round(
+          Number(windowRecord.accumulated_advanced_ms || 0) +
+            Math.max(0, endPosition - Number(windowRecord.segment_start_position || 0)) * 1000
+        )
+      );
       return {
         event: "background_window",
         fine_event: true,
@@ -1404,7 +1823,9 @@
       activeBackgroundWindow.visible_return_at_ms = returnObserved ? Date.now() : 0;
       activeBackgroundWindow.bfcache = Boolean(activeBackgroundWindow.bfcache || opts.bfcache);
       const advanced = Math.max(0, currentAudioPosition() - activeBackgroundWindow.start_current_time);
-      activeBackgroundWindow.result = String(reason || (advanced > 0.25 ? "visible_progressed" : "visible_no_progress"));
+      activeBackgroundWindow.result = String(
+        reason || (advanced > 0.25 ? "visible_progressed" : "visible_no_progress")
+      );
       const persisted = persistBackgroundWindow();
       activeBackgroundWindow = null;
       return persisted;
@@ -1420,7 +1841,12 @@
         record.track_identity = identity;
         record.track = labels.track;
         record.album = labels.album;
-      } else if (identity && record.track_identity && identity !== record.track_identity && labels.track !== "background") {
+      } else if (
+        identity &&
+        record.track_identity &&
+        identity !== record.track_identity &&
+        labels.track !== "background"
+      ) {
         record.accumulated_advanced_ms += Math.max(
           0,
           Math.round((record.last_observed_position - record.segment_start_position) * 1000)
@@ -1436,14 +1862,17 @@
       if (eventType === "stalled") record.stalled_count += 1;
       if (eventType === "error" || /_failed$/.test(eventType)) record.error_count += 1;
       if (eventType === "audio_interruption") {
-        const token = String(source && source.interruption_token || payload.interruption_token || "interruption");
+        const token = String(
+          (source && source.interruption_token) || payload.interruption_token || "interruption"
+        );
         record.interruption_tokens.add(token);
       }
       if (eventType === "media_command") {
-        const token = String(source && source.command_token || payload.command_token || "command");
+        const token = String((source && source.command_token) || payload.command_token || "command");
         record.command_tokens.add(token);
       }
-      if (eventType === "playing" && record.interruption_tokens.size) record.resume_count = Math.max(1, record.resume_count);
+      if (eventType === "playing" && record.interruption_tokens.size)
+        record.resume_count = Math.max(1, record.resume_count);
       if (eventType !== "background_progress") return;
       record.end_current_time = position;
       const advancedMs = Number(backgroundEventPayload(record, timestampMs).advanced_ms) || 0;
@@ -1454,7 +1883,10 @@
     }
 
     function isSourcePrepared(sourceKey, source) {
-      if (source && (source.prepared === true || source.prefetched === true || source.prefetch_ready === true)) {
+      if (
+        source &&
+        (source.prepared === true || source.prefetched === true || source.prefetch_ready === true)
+      ) {
         return true;
       }
       const prefetch = sourceKey ? prefetchBySource.get(sourceKey) : null;
@@ -1507,13 +1939,16 @@
     }
 
     function processPrefetchRuntimeEvent(eventType, source, timestampMs) {
-      if (![
-        "prefetch_start",
-        "prefetch_done",
-        "prefetch_error",
-        "prefetch_cache_timeout_recovered",
-        "prefetch_cache_rehydrated"
-      ].includes(eventType)) return;
+      if (
+        ![
+          "prefetch_start",
+          "prefetch_done",
+          "prefetch_error",
+          "prefetch_cache_timeout_recovered",
+          "prefetch_cache_rehydrated"
+        ].includes(eventType)
+      )
+        return;
       const session = ensureActiveSession();
       const sourceKey = getLocalSourceIdentity(source);
       let changed = false;
@@ -1549,7 +1984,10 @@
       } else if (eventType === "prefetch_cache_rehydrated") {
         changed = true;
         const sources = Array.isArray(source && source.sources) ? source.sources : [];
-        const restoredCount = Math.max(sources.length, Math.floor(Number(source && source.restored_count) || 0));
+        const restoredCount = Math.max(
+          sources.length,
+          Math.floor(Number(source && source.restored_count) || 0)
+        );
         incrementSummary("prefetch_cache_ready_count", restoredCount, session);
         sources.forEach(function (candidate) {
           const candidateKey = localSourceIdentity(candidate);
@@ -1568,12 +2006,7 @@
       if (!Number.isFinite(token) || token <= 0) return null;
       let transition = trackTransitions.get(token);
       const sourceKey = getLocalSourceIdentity(source);
-      if (
-        transition &&
-        sourceKey &&
-        transition.source_key &&
-        transition.source_key !== sourceKey
-      ) {
+      if (transition && sourceKey && transition.source_key && transition.source_key !== sourceKey) {
         return null;
       }
       if (!transition) {
@@ -1586,13 +2019,13 @@
           request_token: token,
           started_at_ms: timestampMs,
           source_key: sourceKey,
-          track: String(payload && payload.track || "unknown"),
-          album: String(payload && payload.album || "").toLowerCase(),
-          source: String(payload && payload.source || ""),
-          trigger: String(payload && payload.trigger || ""),
-          surface: String(payload && payload.surface || ""),
-          mode: String(payload && payload.mode || getPlaybackMode()),
-          playlist_kind: String(payload && payload.playlist_kind || getAudioState().playlistKind || ""),
+          track: String((payload && payload.track) || "unknown"),
+          album: String((payload && payload.album) || "").toLowerCase(),
+          source: String((payload && payload.source) || ""),
+          trigger: String((payload && payload.trigger) || ""),
+          surface: String((payload && payload.surface) || ""),
+          mode: String((payload && payload.mode) || getPlaybackMode()),
+          playlist_kind: String((payload && payload.playlist_kind) || getAudioState().playlistKind || ""),
           prepared: isSourcePrepared(sourceKey, source),
           served_from_prefetch: false,
           waiting_count: 0,
@@ -1623,7 +2056,10 @@
       if (payload && payload.source) transition.source = String(payload.source);
       if (payload && payload.trigger) transition.trigger = String(payload.trigger);
       if (payload && payload.surface) transition.surface = String(payload.surface);
-      if (source && (source.prepared === true || source.prefetched === true || source.prefetch_ready === true)) {
+      if (
+        source &&
+        (source.prepared === true || source.prefetched === true || source.prefetch_ready === true)
+      ) {
         transition.prepared = true;
       } else if (!transition.prepared) {
         transition.prepared = isSourcePrepared(transition.source_key, source);
@@ -1743,12 +2179,7 @@
       const prefetch = getOrCreatePrefetchRecord(sourceKey, source, timestampMs);
       if (prefetch) prefetch.served = true;
       let transition = token ? trackTransitions.get(token) : null;
-      if (
-        transition &&
-        sourceKey &&
-        transition.source_key &&
-        transition.source_key !== sourceKey
-      ) {
+      if (transition && sourceKey && transition.source_key && transition.source_key !== sourceKey) {
         transition = null;
       }
       if (!transition && sourceKey) {
@@ -1782,10 +2213,24 @@
         return;
       }
       const stageEvents = new Set([
-        "startTrack_enter", "click_track", "source_resolved", "source_assigned",
-        "play_request", "load_called", "ready_wait_start", "ready_wait_end",
-        "play_call", "first_byte", "canplay", "playable", "play_resolved",
-        "play_rejected", "playing", "error", "audio_network_result", "recovery_failed"
+        "startTrack_enter",
+        "click_track",
+        "source_resolved",
+        "source_assigned",
+        "play_request",
+        "load_called",
+        "ready_wait_start",
+        "ready_wait_end",
+        "play_call",
+        "first_byte",
+        "canplay",
+        "playable",
+        "play_resolved",
+        "play_rejected",
+        "playing",
+        "error",
+        "audio_network_result",
+        "recovery_failed"
       ]);
       if (!stageEvents.has(eventType) || !token) return false;
       const transition = getOrCreateTrackTransition(token, payload, source);
@@ -1797,14 +2242,21 @@
       if ((eventType === "canplay" || eventType === "playable") && !transition.canplay_at_ms) {
         transition.canplay_at_ms = at;
       }
-      if (eventType === "play_resolved" && !transition.play_resolved_at_ms) transition.play_resolved_at_ms = at;
+      if (eventType === "play_resolved" && !transition.play_resolved_at_ms)
+        transition.play_resolved_at_ms = at;
       if (eventType === "audio_network_result") {
         transition.delivery_observed = true;
         transition.delivery_branch = String(source.branch || source.result || "unknown");
         transition.delivery_status = Number.isFinite(Number(source.status)) ? Number(source.status) : null;
-        transition.delivery_response_ms = Number.isFinite(Number(source.response_ms)) ? Number(source.response_ms) : null;
-        transition.delivery_range_start = Number.isFinite(Number(source.range_start)) ? Number(source.range_start) : null;
-        transition.delivery_range_end = Number.isFinite(Number(source.range_end)) ? Number(source.range_end) : null;
+        transition.delivery_response_ms = Number.isFinite(Number(source.response_ms))
+          ? Number(source.response_ms)
+          : null;
+        transition.delivery_range_start = Number.isFinite(Number(source.range_start))
+          ? Number(source.range_start)
+          : null;
+        transition.delivery_range_end = Number.isFinite(Number(source.range_end))
+          ? Number(source.range_end)
+          : null;
         transition.delivery_bytes = Number.isFinite(Number(source.bytes)) ? Number(source.bytes) : null;
         transition.delivery_cached = Boolean(source.cached);
         transition.delivery_range = Boolean(source.range);
@@ -1827,14 +2279,22 @@
         finalizeTrackTransition(transition, "playing", at);
       } else if (eventType === "play_rejected") {
         if (wasFinalized) return false;
-        transition.error_name = String(source.reason || source.error_name || source.error_message || "play_rejected");
+        transition.error_name = String(
+          source.reason || source.error_name || source.error_message || "play_rejected"
+        );
         finalizeTrackTransition(transition, "rejected", at);
       } else if (eventType === "error") {
-        const mediaErrorName = String(source.reason || source.error_name || source.error_message || "media_error");
+        const mediaErrorName = String(
+          source.reason || source.error_name || source.error_message || "media_error"
+        );
         if (!wasFinalized || !transition.error_name) transition.error_name = mediaErrorName;
         transition.error_code = Number.isFinite(Number(source.error_code)) ? Number(source.error_code) : null;
-        transition.ready_state = Number.isFinite(Number(source.ready_state)) ? Number(source.ready_state) : null;
-        transition.network_state = Number.isFinite(Number(source.network_state)) ? Number(source.network_state) : null;
+        transition.ready_state = Number.isFinite(Number(source.ready_state))
+          ? Number(source.ready_state)
+          : null;
+        transition.network_state = Number.isFinite(Number(source.network_state))
+          ? Number(source.network_state)
+          : null;
         if (!wasFinalized) finalizeTrackTransition(transition, "error", at);
         if (wasFinalized && transition.result === "rejected") {
           transition.media_error_recorded = true;
@@ -1857,12 +2317,17 @@
       const fromUrl = source.to_url || source.url || "";
       const urlIdentity = localSourceIdentity(fromUrl);
       if (urlIdentity) return urlIdentity;
-      return String(source.to_album || source.album || "unknown").trim().toLowerCase();
+      return String(source.to_album || source.album || "unknown")
+        .trim()
+        .toLowerCase();
     }
 
     function getOrCreateSpaTransition(eventType, payload, source, timestampMs) {
       const targetIdentity = getSpaTargetIdentity(source);
-      const navigationToken = Math.max(0, Math.round(Number(source.navigation_token || payload.navigation_token) || 0));
+      const navigationToken = Math.max(
+        0,
+        Math.round(Number(source.navigation_token || payload.navigation_token) || 0)
+      );
       if (eventType === "nav:album_start") {
         const key = navigationToken
           ? `${targetIdentity || "nav"}|nav:${navigationToken}`
@@ -1898,7 +2363,8 @@
         pruneLocalMap(spaKeyByNavigation, LOCAL_CORRELATION_CAP);
         return transition;
       }
-      const knownKey = (navigationToken ? spaKeyByNavigation.get(navigationToken) : "") ||
+      const knownKey =
+        (navigationToken ? spaKeyByNavigation.get(navigationToken) : "") ||
         (targetIdentity ? spaKeyByTarget.get(targetIdentity) : "");
       let transition = spaTransitions.get(knownKey || activeSpaKey);
       if (!transition && ["album_open_tap", "spa_render_start", "spa_swap_start"].includes(eventType)) {
@@ -2087,19 +2553,29 @@
 
     function processSpaRuntimeEvent(eventType, payload, source, timestampMs) {
       const spaEvents = new Set([
-        "album_open_tap", "album_open_done", "album_open_fail", "nav:album_start",
-        "nav:album_done", "nav:album_abort", "spa_render_start", "spa_render_done", "spa_hydration_done",
-        "spa_swap_start", "spa_swap_done", "spa_scroll_restore", "cover_decode_duration", "spa_html_response"
+        "album_open_tap",
+        "album_open_done",
+        "album_open_fail",
+        "nav:album_start",
+        "nav:album_done",
+        "nav:album_abort",
+        "spa_render_start",
+        "spa_render_done",
+        "spa_hydration_done",
+        "spa_swap_start",
+        "spa_swap_done",
+        "spa_scroll_restore",
+        "cover_decode_duration",
+        "spa_html_response"
       ]);
       if (!spaEvents.has(eventType)) return;
       const transition = getOrCreateSpaTransition(eventType, payload, source, timestampMs);
       if (!transition) return;
-      if (
-        eventType === "cover_decode_duration" &&
-        source &&
-        (source.album_cover_only || source.blocking)
-      ) {
-        transition.cover_wait_ms = Math.max(transition.cover_wait_ms, Math.round(Number(source.duration_ms) || 0));
+      if (eventType === "cover_decode_duration" && source && (source.album_cover_only || source.blocking)) {
+        transition.cover_wait_ms = Math.max(
+          transition.cover_wait_ms,
+          Math.round(Number(source.duration_ms) || 0)
+        );
         transition.cover_timed_out = Boolean(transition.cover_timed_out || source.timed_out);
         transition.cover_natural_width = Math.max(
           Number(transition.cover_natural_width) || 0,
@@ -2111,7 +2587,8 @@
         );
       }
       if (eventType === "spa_render_done") transition.render_ms = Math.round(Number(source.duration_ms) || 0);
-      if (eventType === "spa_hydration_done") transition.hydration_ms = Math.round(Number(source.duration_ms) || 0);
+      if (eventType === "spa_hydration_done")
+        transition.hydration_ms = Math.round(Number(source.duration_ms) || 0);
       if (eventType === "spa_swap_done") {
         transition.swap_ms = Math.round(Number(source.duration_ms) || 0);
         transition.swap_mode = String(source.swap_mode || "");
@@ -2121,17 +2598,32 @@
         transition.source_retained_until_promote = source.source_retained_until_promote === true;
         transition.source_detached_after_promote = source.source_detached_after_promote === true;
         transition.theme_tokens_frozen = source.theme_tokens_frozen === true;
-        transition.route_layers_at_promote = Math.max(0, Math.round(Number(source.route_layers_at_promote) || 0));
-        transition.route_layers_after_detach = Math.max(0, Math.round(Number(source.route_layers_after_detach) || 0));
-        transition.route_layers_before_commit = Math.max(0, Math.round(Number(source.route_layers_before_commit) || 0));
-        transition.route_layers_after_commit = Math.max(0, Math.round(Number(source.route_layers_after_commit) || 0));
+        transition.route_layers_at_promote = Math.max(
+          0,
+          Math.round(Number(source.route_layers_at_promote) || 0)
+        );
+        transition.route_layers_after_detach = Math.max(
+          0,
+          Math.round(Number(source.route_layers_after_detach) || 0)
+        );
+        transition.route_layers_before_commit = Math.max(
+          0,
+          Math.round(Number(source.route_layers_before_commit) || 0)
+        );
+        transition.route_layers_after_commit = Math.max(
+          0,
+          Math.round(Number(source.route_layers_after_commit) || 0)
+        );
         transition.single_route_invariant = source.single_route_invariant === true;
         transition.route_host_has_current = source.route_host_has_current === true;
         transition.home_restore_mode = String(source.home_restore_mode || "");
         [
-          "scroll_restore_requested_x", "scroll_restore_requested_y",
-          "scroll_restore_applied_x", "scroll_restore_applied_y",
-          "scroll_restore_delta_y", "scroll_restore_anchor_correction"
+          "scroll_restore_requested_x",
+          "scroll_restore_requested_y",
+          "scroll_restore_applied_x",
+          "scroll_restore_applied_y",
+          "scroll_restore_delta_y",
+          "scroll_restore_anchor_correction"
         ].forEach(function (field) {
           if (source[field] === null || source[field] === undefined || source[field] === "") return;
           const value = Number(source[field]);
@@ -2148,26 +2640,50 @@
         if (typeof source.home_dom_reused === "boolean") transition.dom_reused = source.home_dom_reused;
         transition.route_kind = String(source.route_kind || "");
         transition.first_paint_ms = Math.max(0, Math.round(Number(source.first_paint_wait_ms) || 0));
-        transition.visible_cover_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_count) || 0));
-        transition.visible_cover_ready_count = Math.max(0, Math.round(Number(source.paint_relevant_cover_ready_count) || 0));
+        transition.visible_cover_count = Math.max(
+          0,
+          Math.round(Number(source.paint_relevant_cover_count) || 0)
+        );
+        transition.visible_cover_ready_count = Math.max(
+          0,
+          Math.round(Number(source.paint_relevant_cover_ready_count) || 0)
+        );
         transition.cover_ready_at_first_paint = source.paint_relevant_cover_ready !== false;
-        transition.cover_first_frame_state = transition.visible_cover_count <= 0
-          ? "none"
-          : (transition.cover_ready_at_first_paint
+        transition.cover_first_frame_state =
+          transition.visible_cover_count <= 0
+            ? "none"
+            : transition.cover_ready_at_first_paint
               ? "ready"
-              : (transition.visible_cover_ready_count > 0 ? "partial" : "empty"));
+              : transition.visible_cover_ready_count > 0
+                ? "partial"
+                : "empty";
         transition.second_paint_ms = Math.max(0, Math.round(Number(source.second_paint_wait_ms) || 0));
-        transition.second_visible_cover_count = Math.max(0, Math.round(Number(source.second_paint_relevant_cover_count) || 0));
-        transition.second_visible_cover_ready_count = Math.max(0, Math.round(Number(source.second_paint_relevant_cover_ready_count) || 0));
+        transition.second_visible_cover_count = Math.max(
+          0,
+          Math.round(Number(source.second_paint_relevant_cover_count) || 0)
+        );
+        transition.second_visible_cover_ready_count = Math.max(
+          0,
+          Math.round(Number(source.second_paint_relevant_cover_ready_count) || 0)
+        );
         transition.cover_ready_at_second_paint = source.second_paint_relevant_cover_ready !== false;
-        transition.cover_second_frame_state = transition.second_visible_cover_count <= 0
-          ? "none"
-          : (transition.cover_ready_at_second_paint
+        transition.cover_second_frame_state =
+          transition.second_visible_cover_count <= 0
+            ? "none"
+            : transition.cover_ready_at_second_paint
               ? "ready"
-              : (transition.second_visible_cover_ready_count > 0 ? "partial" : "empty"));
+              : transition.second_visible_cover_ready_count > 0
+                ? "partial"
+                : "empty";
         transition.cover_render_width_px = Math.max(0, Math.round(Number(source.cover_render_width_px) || 0));
-        transition.cover_render_height_px = Math.max(0, Math.round(Number(source.cover_render_height_px) || 0));
-        transition.cover_aspect_ratio_milli = Math.max(0, Math.round(Number(source.cover_aspect_ratio_milli) || 0));
+        transition.cover_render_height_px = Math.max(
+          0,
+          Math.round(Number(source.cover_render_height_px) || 0)
+        );
+        transition.cover_aspect_ratio_milli = Math.max(
+          0,
+          Math.round(Number(source.cover_aspect_ratio_milli) || 0)
+        );
         transition.cover_geometry_ok = source.cover_geometry_ok !== false;
         transition.cover_object_fit = String(source.cover_object_fit || "");
         if (typeof source.cover_cache_hit === "boolean") transition.cover_cache_hit = source.cover_cache_hit;
@@ -2178,9 +2694,12 @@
         if (typeof source.home_dom_reused === "boolean") transition.dom_reused = source.home_dom_reused;
         transition.home_restore_mode = String(source.home_restore_mode || transition.home_restore_mode || "");
         [
-          "scroll_restore_requested_x", "scroll_restore_requested_y",
-          "scroll_restore_applied_x", "scroll_restore_applied_y",
-          "scroll_restore_delta_y", "scroll_restore_anchor_correction"
+          "scroll_restore_requested_x",
+          "scroll_restore_requested_y",
+          "scroll_restore_applied_x",
+          "scroll_restore_applied_y",
+          "scroll_restore_delta_y",
+          "scroll_restore_anchor_correction"
         ].forEach(function (field) {
           if (source[field] === null || source[field] === undefined || source[field] === "") return;
           const value = Number(source[field]);
@@ -2194,7 +2713,8 @@
       }
       if (source.reason) transition.reason = String(source.reason);
       if (typeof source.controllerchange === "boolean") transition.controllerchange = source.controllerchange;
-      if (typeof source.sw_reload_between === "boolean") transition.sw_reload_between = source.sw_reload_between;
+      if (typeof source.sw_reload_between === "boolean")
+        transition.sw_reload_between = source.sw_reload_between;
       if (transition.finalized) return;
       if (eventType === "album_open_done" || eventType === "nav:album_done") {
         finalizeSpaTransition(transition, "done", timestampMs);
@@ -2206,7 +2726,9 @@
     }
 
     function processMiniPlayerVisibility(payload, source, timestampMs) {
-      let state = String(source && source.state || payload.state || "").trim().toLowerCase();
+      let state = String((source && source.state) || payload.state || "")
+        .trim()
+        .toLowerCase();
       if (state !== "visible" && state !== "hidden") {
         if (typeof source.visible !== "boolean") return false;
         state = source.visible ? "visible" : "hidden";
@@ -2215,23 +2737,28 @@
       miniVisibilityState = state;
       miniVisibilitySequence += 1;
       const reason = String(source.reason || payload.reason || "state_change");
-      const unexpected = typeof source.unexpected === "boolean"
-        ? source.unexpected
-        : (state === "hidden" && !/fullscreen|overlay|now_playing/i.test(reason));
+      const unexpected =
+        typeof source.unexpected === "boolean"
+          ? source.unexpected
+          : state === "hidden" && !/fullscreen|overlay|now_playing/i.test(reason);
       const session = ensureActiveSession();
       if (!session) return true;
       incrementSummary("mini_visibility_change_count", 1, session);
       if (state === "hidden") incrementSummary("mini_hidden_count", 1, session);
       if (unexpected) incrementSummary("mini_unexpected_hidden_count", 1, session);
-      upsertCompactEvent(`mini:${miniVisibilitySequence}`, Object.assign({}, payload, {
-        event: "mini_player_visibility",
-        timestamp_ms: Number(timestampMs) || Date.now(),
-        state,
-        visible: state === "visible",
-        reason,
-        unexpected,
-        error: false
-      }), session);
+      upsertCompactEvent(
+        `mini:${miniVisibilitySequence}`,
+        Object.assign({}, payload, {
+          event: "mini_player_visibility",
+          timestamp_ms: Number(timestampMs) || Date.now(),
+          state,
+          visible: state === "visible",
+          reason,
+          unexpected,
+          error: false
+        }),
+        session
+      );
       return true;
     }
 
@@ -2284,15 +2811,19 @@
         if (!Number.isFinite(value) || value < 0) return;
         summary[field] = Math.max(Number(summary[field]) || 0, Math.round(value));
       });
-      upsertCompactEvent("visualizer_health", Object.assign({}, payload, {
-        event: "visualizer_health",
-        timestamp_ms: Number(timestampMs) || Date.now(),
-        result: String(source && source.result || ""),
-        state: String(source && source.state || ""),
-        reason: String(source && source.reason || "probe"),
-        error: Boolean(source && source.error_name),
-        error_name: String(source && source.error_name || "")
-      }), session);
+      upsertCompactEvent(
+        "visualizer_health",
+        Object.assign({}, payload, {
+          event: "visualizer_health",
+          timestamp_ms: Number(timestampMs) || Date.now(),
+          result: String((source && source.result) || ""),
+          state: String((source && source.state) || ""),
+          reason: String((source && source.reason) || "probe"),
+          error: Boolean(source && source.error_name),
+          error_name: String((source && source.error_name) || "")
+        }),
+        session
+      );
       return true;
     }
 
@@ -2302,10 +2833,14 @@
       });
       mediaCommands.forEach(function (command) {
         if (isTerminalMediaCommandOutcome(command.outcome)) return;
-        processMediaCommand(Object.assign({}, command, {
-          outcome: "incomplete",
-          reason: String(reason || "sealed")
-        }), command, timestampMs);
+        processMediaCommand(
+          Object.assign({}, command, {
+            outcome: "incomplete",
+            reason: String(reason || "sealed")
+          }),
+          command,
+          timestampMs
+        );
       });
       spaTransitions.forEach(function (transition) {
         if (!transition.finalized) {
@@ -2317,9 +2852,12 @@
 
     function sessionSummaryHasActivity(session) {
       const summary = getSessionSummary(session);
-      return Boolean(summary && SESSION_SUMMARY_FIELDS.some(function (field) {
-        return Number(summary[field]) > 0;
-      }));
+      return Boolean(
+        summary &&
+        SESSION_SUMMARY_FIELDS.some(function (field) {
+          return Number(summary[field]) > 0;
+        })
+      );
     }
 
     function sealCurrentSession(reason) {
@@ -2374,8 +2912,14 @@
     }
 
     function removeReports(reports) {
-      const ids = reports.map(function (report) { return report.session_id; }).filter(Boolean);
-      ids.forEach(function (id) { sessions.delete(id); });
+      const ids = reports
+        .map(function (report) {
+          return report.session_id;
+        })
+        .filter(Boolean);
+      ids.forEach(function (id) {
+        sessions.delete(id);
+      });
       deleteStoredSessions(ids);
     }
 
@@ -2384,34 +2928,48 @@
       const workerUrl = getWorkerUrl();
       if (typeof fetch !== "function" || !workerUrl) return Promise.resolve(false);
       const sealed = Array.from(sessions.values())
-        .filter(function (session) { return session.status === "sealed" && session.events.length; })
-        .sort(function (left, right) { return left.started_at_ms - right.started_at_ms; })
+        .filter(function (session) {
+          return session.status === "sealed" && session.events.length;
+        })
+        .sort(function (left, right) {
+          return left.started_at_ms - right.started_at_ms;
+        })
         .slice(0, SESSION_STORE_CAP);
       const grouped = [];
       [2, 3, 4].forEach(function (schemaVersion) {
-        const group = sealed.filter(function (session) { return Number(session.schema_version) === schemaVersion; });
+        const group = sealed.filter(function (session) {
+          return Number(session.schema_version) === schemaVersion;
+        });
         if (group.length) grouped.push(group);
       });
       let sentAny = false;
-      return grouped.reduce(function (pending, group) {
-        return pending.then(function () {
-          const built = buildSessionEnvelope(group);
-          if (!built) return false;
-          const sentReports = built.envelope.reports;
-          return fetch(`${workerUrl.replace(/\/+$/, "")}/log`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: built.serialized,
-            credentials: "omit",
-            keepalive: Boolean(opts.keepalive)
-          }).then(function (response) {
-            if (!response || !response.ok) return false;
-            removeReports(sentReports);
-            sentAny = true;
-            return true;
-          }).catch(function () { return false; });
+      return grouped
+        .reduce(function (pending, group) {
+          return pending.then(function () {
+            const built = buildSessionEnvelope(group);
+            if (!built) return false;
+            const sentReports = built.envelope.reports;
+            return fetch(`${workerUrl.replace(/\/+$/, "")}/log`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: built.serialized,
+              credentials: "omit",
+              keepalive: Boolean(opts.keepalive)
+            })
+              .then(function (response) {
+                if (!response || !response.ok) return false;
+                removeReports(sentReports);
+                sentAny = true;
+                return true;
+              })
+              .catch(function () {
+                return false;
+              });
+          });
+        }, Promise.resolve(false))
+        .then(function () {
+          return sentAny;
         });
-      }, Promise.resolve(false)).then(function () { return sentAny; });
     }
 
     function flushQueue(options) {
@@ -2465,9 +3023,10 @@
       const audioState = getAudioState();
       const explicitRequestToken = Number(source.request_token);
       const activeRequestToken = Number(audioState.playRequestToken || audioState.startRequestToken);
-      const requestToken = Number.isFinite(explicitRequestToken) && explicitRequestToken > 0
-        ? explicitRequestToken
-        : activeRequestToken;
+      const requestToken =
+        Number.isFinite(explicitRequestToken) && explicitRequestToken > 0
+          ? explicitRequestToken
+          : activeRequestToken;
       const eventNow = now();
 
       if (eventType === "playing" || eventType === "play_resolved") markHealthSessionActive();
@@ -2477,19 +3036,27 @@
         pruneFineMaps();
       }
 
-      const startedAt = Number.isFinite(requestToken) && fineStarts.has(requestToken)
-        ? fineStarts.get(requestToken)
-        : audioState.audioClickPerfTs;
-      const deltaMs = Number.isFinite(startedAt) && startedAt > 0 ? Math.max(0, Math.round(eventNow - startedAt)) : null;
+      const startedAt =
+        Number.isFinite(requestToken) && fineStarts.has(requestToken)
+          ? fineStarts.get(requestToken)
+          : audioState.audioClickPerfTs;
+      const deltaMs =
+        Number.isFinite(startedAt) && startedAt > 0 ? Math.max(0, Math.round(eventNow - startedAt)) : null;
       const providedDeltaMs = Number(source.delta_ms);
       const normalizedDeltaMs = Number.isFinite(providedDeltaMs)
         ? Math.max(0, Math.round(providedDeltaMs))
-        : (eventType === "click_track" ? 0 : deltaMs);
+        : eventType === "click_track"
+          ? 0
+          : deltaMs;
       const timestampMs = Date.now();
-      const errorEvent = eventType === "play_rejected" ||
+      const errorEvent =
+        eventType === "play_rejected" ||
         eventType === "error" ||
         eventType === "prefetch_error" ||
-        (eventType === "media_command" && ["rejected", "no_progress", "recovery_failed", "incomplete"].includes(String(source.outcome || ""))) ||
+        (eventType === "media_command" &&
+          ["rejected", "no_progress", "recovery_failed", "incomplete"].includes(
+            String(source.outcome || "")
+          )) ||
         /_failed$/.test(eventType);
       const payload = Object.assign({}, source, getEnvironment(), getHealthSessionState(), {
         event: eventType,
@@ -2507,20 +3074,23 @@
         playlist_kind: source.playlist_kind || audioState.playlistKind || "",
         auto: getAutoFlag(eventType, source, requestToken),
         error: errorEvent,
-        error_name: eventType === "visualizer_health"
-          ? (source.error_name || "")
-          : (errorEvent ? (source.error_name || source.error_message || source.reason || "") : "")
+        error_name:
+          eventType === "visualizer_health"
+            ? source.error_name || ""
+            : errorEvent
+              ? source.error_name || source.error_message || source.reason || ""
+              : ""
       });
 
       if (
         isDocumentHidden() &&
         !activeBackgroundWindow &&
-        (
-          eventType === "audio_interruption" ||
-          (eventType === "audio_session_state" && String(source.audio_session_state || "") === "interrupted") ||
+        (eventType === "audio_interruption" ||
+          (eventType === "audio_session_state" &&
+            String(source.audio_session_state || "") === "interrupted") ||
           (eventType === "media_command" && String(source.action || "") === "play") ||
-          (["background_progress", "playing", "waiting", "stalled"].includes(eventType) && hasHiddenAudioActivity())
-        )
+          (["background_progress", "playing", "waiting", "stalled"].includes(eventType) &&
+            hasHiddenAudioActivity()))
       ) {
         beginBackgroundWindow(`${eventType}_hidden`, { bfcache: false });
       }
@@ -2585,11 +3155,12 @@
       if (!data || data.error !== true) markHealthSessionActive();
       const monitorError = Boolean(data && data.error === true);
       if (!monitorError) return;
-      trackRuntimeEvent("error", Object.assign(
-        buildMonitorPayload(track, index, src),
-        data || {},
-        { request_token: Number(getAudioState().playRequestToken || getAudioState().startRequestToken) }
-      ));
+      trackRuntimeEvent(
+        "error",
+        Object.assign(buildMonitorPayload(track, index, src), data || {}, {
+          request_token: Number(getAudioState().playRequestToken || getAudioState().startRequestToken)
+        })
+      );
     }
 
     function logAuditEvent(type, track, index, src, data) {
@@ -2605,7 +3176,9 @@
     }
 
     function hasPendingEvents() {
-      return Array.from(sessions.values()).some(function (session) { return session.events.length > 0; });
+      return Array.from(sessions.values()).some(function (session) {
+        return session.events.length > 0;
+      });
     }
 
     function attemptLifecycleDelivery(reason) {
@@ -2630,14 +3203,18 @@
       if (lifecycleInitialized) return;
       lifecycleInitialized = true;
       clearLegacyDb();
-      loadSessions().then(function () {
-        sealInterruptedSessions();
-        pruneSessions();
-        ensureActiveSession();
-        // A previous iOS force-quit cannot send on exit. Retry only those sealed
-        // sessions once on the next launch; the current session remains local.
-        flushQueue();
-      }).catch(function () { ensureActiveSession(); });
+      loadSessions()
+        .then(function () {
+          sealInterruptedSessions();
+          pruneSessions();
+          ensureActiveSession();
+          // A previous iOS force-quit cannot send on exit. Retry only those sealed
+          // sessions once on the next launch; the current session remains local.
+          flushQueue();
+        })
+        .catch(function () {
+          ensureActiveSession();
+        });
 
       document.addEventListener("visibilitychange", function () {
         if (document.visibilityState === "hidden") {

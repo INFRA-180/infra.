@@ -1,9 +1,7 @@
 (function () {
   "use strict";
 
-  const globalObject = typeof window !== "undefined"
-    ? window
-    : (typeof self !== "undefined" ? self : {});
+  const globalObject = typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : {};
 
   const FAVORITES_DB_NAME = "infra_favorites_v1";
   const FAVORITES_DB_STORE = "infra_favorites";
@@ -26,9 +24,12 @@
   function createFavoritesStorage(options) {
     const settings = options || {};
     const state = settings.state || {};
-    const normalizeEntries = typeof settings.normalizeEntries === "function"
-      ? settings.normalizeEntries
-      : function (entries) { return Array.isArray(entries) ? entries : []; };
+    const normalizeEntries =
+      typeof settings.normalizeEntries === "function"
+        ? settings.normalizeEntries
+        : function (entries) {
+            return Array.isArray(entries) ? entries : [];
+          };
     let dbPromise = null;
 
     function setDbSupported(value) {
@@ -162,8 +163,12 @@
           resolve(false);
           return;
         }
-        request.onsuccess = function () { resolve(true); };
-        request.onerror = function () { resolve(false); };
+        request.onsuccess = function () {
+          resolve(true);
+        };
+        request.onerror = function () {
+          resolve(false);
+        };
       });
     }
 
@@ -198,7 +203,9 @@
           resolve(false);
           return;
         }
-        clearRequest.onerror = function () { resolve(false); };
+        clearRequest.onerror = function () {
+          resolve(false);
+        };
         clearRequest.onsuccess = function () {
           let markerRequest;
           try {
@@ -211,8 +218,12 @@
             resolve(false);
             return;
           }
-          markerRequest.onsuccess = function () { resolve(true); };
-          markerRequest.onerror = function () { resolve(false); };
+          markerRequest.onsuccess = function () {
+            resolve(true);
+          };
+          markerRequest.onerror = function () {
+            resolve(false);
+          };
         };
       });
     }

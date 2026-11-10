@@ -1,9 +1,7 @@
 (function () {
   "use strict";
 
-  const globalObject = typeof window !== "undefined"
-    ? window
-    : (typeof self !== "undefined" ? self : {});
+  const globalObject = typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : {};
 
   const constants = Object.freeze({
     CACHE_NAME: "infra-covers-v2",
@@ -15,20 +13,12 @@
 
   function getLocationHref(options) {
     const opts = options || {};
-    return String(
-      opts.currentHref ||
-      (globalObject.location && globalObject.location.href) ||
-      ""
-    );
+    return String(opts.currentHref || (globalObject.location && globalObject.location.href) || "");
   }
 
   function getLocationOrigin(options) {
     const opts = options || {};
-    return String(
-      opts.currentOrigin ||
-      (globalObject.location && globalObject.location.origin) ||
-      ""
-    );
+    return String(opts.currentOrigin || (globalObject.location && globalObject.location.origin) || "");
   }
 
   function getBaseUrl(options) {
@@ -199,11 +189,7 @@
     if (!normalized) return "";
 
     const fallback = getFallbackArtwork(opts);
-    if (
-      fallback &&
-      typeof opts.srcMatches === "function" &&
-      opts.srcMatches(normalized, fallback)
-    ) {
+    if (fallback && typeof opts.srcMatches === "function" && opts.srcMatches(normalized, fallback)) {
       return normalized;
     }
     if (opts.responsive === false) return normalized;

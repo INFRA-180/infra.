@@ -1720,3 +1720,9 @@
 - Les contrôles qui lisent le code utilisent `require("./build/app-sources.js").runtimeSource()` (scripts.js + modules).
 - **Étape 4d** : `npm run lint` (ESLint 10.13.0, `tools/build/eslint.config.mjs`) — 0 problème sur tout le JavaScript du site ; lancé avant chaque `npm test`. `npm run format` (Prettier 3.9.10, `tools/build/prettier.json`) sur `scripts.js`, `runtime/` et `tools/build/`.
 - **Limite** : les 20 anciens fichiers ne sont pas reformatés : 7 fichiers de test vérifient leur code au caractère près (retours à la ligne compris). Les reformater demande d'abord de transformer ces tests de texte en tests de comportement (étape 4e).
+
+## 2026-11-10 — Tests insensibles au formatage, tout le JavaScript formaté (Claude, étape 4e)
+
+- `tools/lib/code-text.js` : `codeHas`, `codeIndexOf`, `codeMatch`, `codeTest`, `codeAssertMatch`… cherchent d'abord le texte exact, puis le texte normalisé (blancs retirés, sauf un espace entre deux mots ; un blanc au bord d'une recherche reste une limite, ex. `/\ssrc="/` ne trouve pas `data-cover-src="`). **Toujours les utiliser** pour vérifier du code dans un test. Testé par `tools/test-code-text.js`.
+- 923 vérifications converties dans 20 fichiers de test ; 3 mises à jour à la main (parenthèses inutiles retirées, guillemets réécrits par Prettier). Contrôlé : des défauts introduits exprès restent détectés.
+- **Tout le JavaScript du site est formaté** (`npm run format`, Prettier) : 38 fichiers, un seul style. Le générateur de Codex réécrit `catalog-fallback.js` en JSON (repères `  const fallbackCatalog = {` / `  const globalObject =` conservés) : pas de contrôle de formatage dans `npm test` pour ne pas bloquer la synchro du catalogue.

@@ -1,12 +1,14 @@
 (function () {
   "use strict";
 
-  const CLIP_SCRIPT_URL = typeof document !== "undefined" && document.currentScript && document.currentScript.src
-    ? document.currentScript.src
-    : "";
+  const CLIP_SCRIPT_URL =
+    typeof document !== "undefined" && document.currentScript && document.currentScript.src
+      ? document.currentScript.src
+      : "";
 
   // BEGIN GENERATED HOME THUMBNAILS (tools/generate-bibliotheque-thumbnails.js)
-  const HOME_ALBUM_COVER_SIZES = "(max-width: 639px) calc(50vw - 23px), (max-width: 959px) calc(33.33vw - 24px), (max-width: 1080px) calc(20vw - 24px), 192px";
+  const HOME_ALBUM_COVER_SIZES =
+    "(max-width: 639px) calc(50vw - 23px), (max-width: 959px) calc(33.33vw - 24px), (max-width: 1080px) calc(20vw - 24px), 192px";
   const HOME_MOSAIC_COVER_SIZES = "(max-width: 639px) 25vw, 130px";
   const HOME_THUMBNAILS = new Set([
     "abricot",
@@ -65,12 +67,14 @@
     };
     const albumGridInitialBatch = Math.max(1, Number(ctx.albumGridInitialBatch) || 8);
     const albumGridNextBatch = Math.max(1, Number(ctx.albumGridNextBatch) || 6);
-    const openAlbumCard = typeof ctx.openAlbumCard === "function"
-      ? ctx.openAlbumCard
-      : function () { return false; };
-    const trackAudioRuntimeEvent = typeof ctx.trackAudioRuntimeEvent === "function"
-      ? ctx.trackAudioRuntimeEvent
-      : function () {};
+    const openAlbumCard =
+      typeof ctx.openAlbumCard === "function"
+        ? ctx.openAlbumCard
+        : function () {
+            return false;
+          };
+    const trackAudioRuntimeEvent =
+      typeof ctx.trackAudioRuntimeEvent === "function" ? ctx.trackAudioRuntimeEvent : function () {};
     const ALBUM_SWIPE_AXIS_LOCK_PX = 10;
     const ALBUM_SWIPE_OPEN_PX = 58;
     const ALBUM_SWIPE_MAX_VISUAL_PX = 88;
@@ -105,11 +109,14 @@
     function setHomeCoverCandidates(image, source, deferred) {
       const match = source.match(/\/assets\/music\/responsive\/([a-z0-9-]+)-cover-1200\.webp(?:[?#].*)?$/);
       const stem = match && match[1];
-      const small = HOME_THUMBNAILS.has(stem) && source.startsWith(resolveRuntimeAssetUrl("assets/music/responsive/"))
-        ? resolveRuntimeAssetUrl(`assets/thumbnails/music/${stem}-400.webp`)
-        : "";
+      const small =
+        HOME_THUMBNAILS.has(stem) && source.startsWith(resolveRuntimeAssetUrl("assets/music/responsive/"))
+          ? resolveRuntimeAssetUrl(`assets/thumbnails/music/${stem}-400.webp`)
+          : "";
       const srcset = small ? `${small} 400w, ${source} 1200w` : "";
-      const sizes = image.classList.contains("playlist-cover-tile") ? HOME_MOSAIC_COVER_SIZES : HOME_ALBUM_COVER_SIZES;
+      const sizes = image.classList.contains("playlist-cover-tile")
+        ? HOME_MOSAIC_COVER_SIZES
+        : HOME_ALBUM_COVER_SIZES;
 
       if (deferred) {
         image.removeAttribute("srcset");
@@ -121,7 +128,8 @@
         }
       } else if (srcset) {
         if (image.getAttribute("sizes") !== sizes) image.setAttribute("sizes", sizes);
-        if (resolveRuntimeSrcset(image.getAttribute("srcset")) !== srcset) image.setAttribute("srcset", srcset);
+        if (resolveRuntimeSrcset(image.getAttribute("srcset")) !== srcset)
+          image.setAttribute("srcset", srcset);
       } else {
         image.removeAttribute("srcset");
         image.removeAttribute("sizes");
@@ -133,7 +141,9 @@
     function displayAlbumCardTitle(title) {
       const formatted = call(ctx, "displayAlbumCardTitle", title);
       if (typeof formatted === "string") return formatted;
-      const cleaned = String(title || "").replace(/\s+/g, " ").trim();
+      const cleaned = String(title || "")
+        .replace(/\s+/g, " ")
+        .trim();
       if (!cleaned) return "";
       if (/[\u0370-\u03ff]/u.test(cleaned) || /\b[A-Z][a-z]\b/.test(cleaned)) return cleaned;
       return cleaned.toLocaleUpperCase();
@@ -176,7 +186,12 @@
       const grid = card && card.closest ? card.closest('[data-catalog-grid="albums"]') : null;
       const cards = grid ? Array.from(grid.querySelectorAll("a.album-card[href]:not(.playlist-card)")) : [];
       const rank = Math.max(0, cards.indexOf(card) + 1);
-      const label = String(card && ((typeof card.getAttribute === "function" && card.getAttribute("aria-label")) || card.textContent) || "album")
+      const label = String(
+        (card &&
+          ((typeof card.getAttribute === "function" && card.getAttribute("aria-label")) ||
+            card.textContent)) ||
+          "album"
+      )
         .replace(/^Ouvrir l'album\s*/i, "")
         .replace(/\s+/g, " ")
         .trim();
@@ -194,25 +209,28 @@
       gesture.telemetryStarted = true;
       const deltaX = Number(gesture.lastX) - Number(gesture.startX);
       const deltaY = Number(gesture.lastY) - Number(gesture.startY);
-      trackAudioRuntimeEvent("album_swipe", Object.assign(
-        {
-          track: "gesture",
-          gesture_token: gesture.token,
-          input_type: gesture.inputType || "touch",
-          direction: deltaX < 0 ? "left" : (deltaX > 0 ? "right" : "none"),
-          axis: gesture.axis === "x" ? "horizontal" : (gesture.axis === "y" ? "vertical" : "pending"),
-          dx: Math.round(deltaX || 0),
-          dy: Math.round(deltaY || 0),
-          abs_dx: Math.round(Math.abs(deltaX || 0)),
-          abs_dy: Math.round(Math.abs(deltaY || 0)),
-          threshold_px: ALBUM_SWIPE_OPEN_PX,
-          gesture_duration_ms: Math.max(0, Date.now() - Number(gesture.startedAt || Date.now())),
-          handler_ready: true,
-          surface: "home_album_grid"
-        },
-        albumCardMetadata(gesture.card),
-        detailRecord
-      ));
+      trackAudioRuntimeEvent(
+        "album_swipe",
+        Object.assign(
+          {
+            track: "gesture",
+            gesture_token: gesture.token,
+            input_type: gesture.inputType || "touch",
+            direction: deltaX < 0 ? "left" : deltaX > 0 ? "right" : "none",
+            axis: gesture.axis === "x" ? "horizontal" : gesture.axis === "y" ? "vertical" : "pending",
+            dx: Math.round(deltaX || 0),
+            dy: Math.round(deltaY || 0),
+            abs_dx: Math.round(Math.abs(deltaX || 0)),
+            abs_dy: Math.round(Math.abs(deltaY || 0)),
+            threshold_px: ALBUM_SWIPE_OPEN_PX,
+            gesture_duration_ms: Math.max(0, Date.now() - Number(gesture.startedAt || Date.now())),
+            handler_ready: true,
+            surface: "home_album_grid"
+          },
+          albumCardMetadata(gesture.card),
+          detailRecord
+        )
+      );
     }
 
     function cancelAlbumSwipe(reason) {
@@ -234,30 +252,36 @@
       else if (typeof probe.stop === "function") probe.stop();
       const records = Array.isArray(probe.records) ? probe.records.slice(0, 6) : [];
       records.forEach(function (record) {
-        trackAudioRuntimeEvent("album_swipe", Object.assign({
-          track: "gesture",
-          album: String(record.album || "album"),
-          gesture_token: String(record.gesture_token || albumSwipeToken()),
-          input_type: String(record.input_type || "touch"),
-          direction: String(record.direction || "none"),
-          axis: String(record.axis || "pending"),
-          dx: Math.round(Number(record.dx) || 0),
-          dy: Math.round(Number(record.dy) || 0),
-          abs_dx: Math.round(Math.abs(Number(record.dx) || 0)),
-          abs_dy: Math.round(Math.abs(Number(record.dy) || 0)),
-          threshold_px: ALBUM_SWIPE_OPEN_PX,
-          card_rank: Math.max(0, Math.round(Number(record.card_rank) || 0)),
-          lower_half: Boolean(record.lower_half),
-          gesture_duration_ms: Math.max(0, Math.round(Number(record.gesture_duration_ms) || 0)),
-          early_buffer_delay_ms: Math.max(0, Date.now() - Number(record.finished_at_ms || Date.now())),
-          handler_ready: false,
-          handler_state: "not_ready",
-          navigation_started: false,
-          navigation_completed: false,
-          surface: "home_album_grid",
-          result: "cancelled",
-          cancel_reason: "handler_not_ready"
-        }, record));
+        trackAudioRuntimeEvent(
+          "album_swipe",
+          Object.assign(
+            {
+              track: "gesture",
+              album: String(record.album || "album"),
+              gesture_token: String(record.gesture_token || albumSwipeToken()),
+              input_type: String(record.input_type || "touch"),
+              direction: String(record.direction || "none"),
+              axis: String(record.axis || "pending"),
+              dx: Math.round(Number(record.dx) || 0),
+              dy: Math.round(Number(record.dy) || 0),
+              abs_dx: Math.round(Math.abs(Number(record.dx) || 0)),
+              abs_dy: Math.round(Math.abs(Number(record.dy) || 0)),
+              threshold_px: ALBUM_SWIPE_OPEN_PX,
+              card_rank: Math.max(0, Math.round(Number(record.card_rank) || 0)),
+              lower_half: Boolean(record.lower_half),
+              gesture_duration_ms: Math.max(0, Math.round(Number(record.gesture_duration_ms) || 0)),
+              early_buffer_delay_ms: Math.max(0, Date.now() - Number(record.finished_at_ms || Date.now())),
+              handler_ready: false,
+              handler_state: "not_ready",
+              navigation_started: false,
+              navigation_completed: false,
+              surface: "home_album_grid",
+              result: "cancelled",
+              cancel_reason: "handler_not_ready"
+            },
+            record
+          )
+        );
       });
       probe.records = [];
     }
@@ -267,57 +291,65 @@
       catalogState.albumSwipeBound = true;
       consumeEarlyAlbumSwipeProbe();
 
-      document.addEventListener("pointerdown", function (event) {
-        if (event.isPrimary === false) return;
-        if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
-        if (event.button !== undefined && event.button !== 0) return;
-        const card = findSwipeAlbumCard(event.target);
-        if (!card) return;
+      document.addEventListener(
+        "pointerdown",
+        function (event) {
+          if (event.isPrimary === false) return;
+          if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+          if (event.button !== undefined && event.button !== 0) return;
+          const card = findSwipeAlbumCard(event.target);
+          if (!card) return;
 
-        cancelAlbumSwipe("superseded");
-        albumSwipeGesture = {
-          card,
-          token: albumSwipeToken(),
-          inputType: event.pointerType,
-          startedAt: Date.now(),
-          pointerId: event.pointerId,
-          startX: Number(event.clientX) || 0,
-          startY: Number(event.clientY) || 0,
-          lastX: Number(event.clientX) || 0,
-          lastY: Number(event.clientY) || 0,
-          axis: "",
-          telemetryStarted: false
-        };
-      }, { capture: true, passive: true });
+          cancelAlbumSwipe("superseded");
+          albumSwipeGesture = {
+            card,
+            token: albumSwipeToken(),
+            inputType: event.pointerType,
+            startedAt: Date.now(),
+            pointerId: event.pointerId,
+            startX: Number(event.clientX) || 0,
+            startY: Number(event.clientY) || 0,
+            lastX: Number(event.clientX) || 0,
+            lastY: Number(event.clientY) || 0,
+            axis: "",
+            telemetryStarted: false
+          };
+        },
+        { capture: true, passive: true }
+      );
 
-      document.addEventListener("pointermove", function (event) {
-        const gesture = albumSwipeGesture;
-        if (!gesture || event.pointerId !== gesture.pointerId) return;
-        gesture.lastX = Number(event.clientX) || 0;
-        gesture.lastY = Number(event.clientY) || 0;
-        const deltaX = gesture.lastX - gesture.startX;
-        const deltaY = gesture.lastY - gesture.startY;
-        const absX = Math.abs(deltaX);
-        const absY = Math.abs(deltaY);
+      document.addEventListener(
+        "pointermove",
+        function (event) {
+          const gesture = albumSwipeGesture;
+          if (!gesture || event.pointerId !== gesture.pointerId) return;
+          gesture.lastX = Number(event.clientX) || 0;
+          gesture.lastY = Number(event.clientY) || 0;
+          const deltaX = gesture.lastX - gesture.startX;
+          const deltaY = gesture.lastY - gesture.startY;
+          const absX = Math.abs(deltaX);
+          const absY = Math.abs(deltaY);
 
-        if (!gesture.axis && (absX > ALBUM_SWIPE_AXIS_LOCK_PX || absY > ALBUM_SWIPE_AXIS_LOCK_PX)) {
-          gesture.axis = absX > absY * ALBUM_SWIPE_DOMINANCE ? "x" : "y";
-          emitAlbumSwipe(gesture, {
-            result: "tracking",
-            handler_state: "ready",
-            navigation_started: false,
-            navigation_completed: false
-          });
-        }
-        if (gesture.axis === "y") {
-          cancelAlbumSwipe("vertical_scroll");
-          return;
-        }
-        if (gesture.axis !== "x") return;
+          if (!gesture.axis && (absX > ALBUM_SWIPE_AXIS_LOCK_PX || absY > ALBUM_SWIPE_AXIS_LOCK_PX)) {
+            gesture.axis = absX > absY * ALBUM_SWIPE_DOMINANCE ? "x" : "y";
+            emitAlbumSwipe(gesture, {
+              result: "tracking",
+              handler_state: "ready",
+              navigation_started: false,
+              navigation_completed: false
+            });
+          }
+          if (gesture.axis === "y") {
+            cancelAlbumSwipe("vertical_scroll");
+            return;
+          }
+          if (gesture.axis !== "x") return;
 
-        if (event.cancelable) event.preventDefault();
-        setAlbumSwipeVisual(gesture.card, deltaX, absX >= ALBUM_SWIPE_OPEN_PX);
-      }, { capture: true, passive: false });
+          if (event.cancelable) event.preventDefault();
+          setAlbumSwipeVisual(gesture.card, deltaX, absX >= ALBUM_SWIPE_OPEN_PX);
+        },
+        { capture: true, passive: false }
+      );
 
       function finishAlbumSwipe(event, cancelled) {
         const gesture = albumSwipeGesture;
@@ -326,7 +358,8 @@
         const endY = Number(event.clientY);
         const deltaX = (Number.isFinite(endX) ? endX : gesture.lastX) - gesture.startX;
         const deltaY = (Number.isFinite(endY) ? endY : gesture.lastY) - gesture.startY;
-        const shouldOpen = !cancelled &&
+        const shouldOpen =
+          !cancelled &&
           gesture.axis === "x" &&
           Math.abs(deltaX) >= ALBUM_SWIPE_OPEN_PX &&
           Math.abs(deltaX) > Math.abs(deltaY) * ALBUM_SWIPE_DOMINANCE;
@@ -350,10 +383,11 @@
           navigation_completed: false,
           navigation_method: "spa"
         });
-        const opened = openAlbumCard(card, {
-          trigger: deltaX < 0 ? "swipe_left" : "swipe_right",
-          gestureToken: gesture.token
-        }) !== false;
+        const opened =
+          openAlbumCard(card, {
+            trigger: deltaX < 0 ? "swipe_left" : "swipe_right",
+            gestureToken: gesture.token
+          }) !== false;
         if (opened) {
           suppressedAlbumSwipeClick = {
             card,
@@ -369,25 +403,38 @@
         }
       }
 
-      document.addEventListener("pointerup", function (event) {
-        finishAlbumSwipe(event, false);
-      }, { capture: true, passive: false });
-      document.addEventListener("pointercancel", function (event) {
-        finishAlbumSwipe(event, true);
-      }, { capture: true, passive: true });
-      document.addEventListener("click", function (event) {
-        const suppressed = suppressedAlbumSwipeClick;
-        if (!suppressed) return;
-        if (Date.now() > suppressed.until) {
+      document.addEventListener(
+        "pointerup",
+        function (event) {
+          finishAlbumSwipe(event, false);
+        },
+        { capture: true, passive: false }
+      );
+      document.addEventListener(
+        "pointercancel",
+        function (event) {
+          finishAlbumSwipe(event, true);
+        },
+        { capture: true, passive: true }
+      );
+      document.addEventListener(
+        "click",
+        function (event) {
+          const suppressed = suppressedAlbumSwipeClick;
+          if (!suppressed) return;
+          if (Date.now() > suppressed.until) {
+            suppressedAlbumSwipeClick = null;
+            return;
+          }
+          const target = event.target;
+          if (target !== suppressed.card && !(suppressed.card.contains && suppressed.card.contains(target)))
+            return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
           suppressedAlbumSwipeClick = null;
-          return;
-        }
-        const target = event.target;
-        if (target !== suppressed.card && !(suppressed.card.contains && suppressed.card.contains(target))) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        suppressedAlbumSwipeClick = null;
-      }, true);
+        },
+        true
+      );
     }
 
     function sanitizeCatalog(payload) {
@@ -433,7 +480,7 @@
       else if (isApp) image.dataset.appCoverSrc = thumb;
       else image.dataset.coverSrc = thumb;
       image.loading = shouldEager ? "eager" : "lazy";
-      image.setAttribute("fetchpriority", index === 0 && !isApp ? "high" : (shouldEager ? "auto" : "low"));
+      image.setAttribute("fetchpriority", index === 0 && !isApp ? "high" : shouldEager ? "auto" : "low");
       if (isApp && item.thumbSrcset) image.dataset.appCoverSrcset = resolveRuntimeSrcset(item.thumbSrcset);
       if (isApp && item.thumbSizes) image.dataset.appCoverSizes = item.thumbSizes;
 
@@ -505,16 +552,21 @@
       image.setAttribute("src", source);
       delete image.dataset[sourceAttribute];
 
-      const reveal = function () { revealDeferredImage(image); };
+      const reveal = function () {
+        revealDeferredImage(image);
+      };
       if (typeof image.decode === "function") {
-        image.decode().then(reveal).catch(function () {
-          if (image.complete) {
-            reveal();
-            return;
-          }
-          image.addEventListener("load", reveal, { once: true });
-          image.addEventListener("error", reveal, { once: true });
-        });
+        image
+          .decode()
+          .then(reveal)
+          .catch(function () {
+            if (image.complete) {
+              reveal();
+              return;
+            }
+            image.addEventListener("load", reveal, { once: true });
+            image.addEventListener("error", reveal, { once: true });
+          });
         return;
       }
       if (image.complete) reveal();
@@ -530,7 +582,11 @@
       if (!images.length) return;
       const load = function (image) {
         if (image.classList.contains("album-cover") || image.classList.contains("playlist-cover-tile")) {
-          setHomeCoverCandidates(image, resolveRuntimeAssetUrl(image.dataset.coverSrc), !image.getAttribute("src"));
+          setHomeCoverCandidates(
+            image,
+            resolveRuntimeAssetUrl(image.dataset.coverSrc),
+            !image.getAttribute("src")
+          );
         }
         loadDeferredImage(image, "coverSrc", "coverSrcset", "coverSizes");
       };
@@ -539,13 +595,16 @@
         return;
       }
       if (!catalogState.albumCoverObserver) {
-        catalogState.albumCoverObserver = new IntersectionObserver(function (entries, observer) {
-          entries.forEach(function (entry) {
-            if (!entry.isIntersecting) return;
-            observer.unobserve(entry.target);
-            load(entry.target);
-          });
-        }, { rootMargin: "320px 0px" });
+        catalogState.albumCoverObserver = new IntersectionObserver(
+          function (entries, observer) {
+            entries.forEach(function (entry) {
+              if (!entry.isIntersecting) return;
+              observer.unobserve(entry.target);
+              load(entry.target);
+            });
+          },
+          { rootMargin: "320px 0px" }
+        );
       }
       images.forEach(function (image) {
         catalogState.albumCoverObserver.observe(image);
@@ -554,9 +613,10 @@
 
     function bindDeferredAppCovers(root) {
       const scope = root || document;
-      const menu = scope.closest && scope.closest(".apps-menu")
-        ? scope.closest(".apps-menu")
-        : document.querySelector(".apps-menu");
+      const menu =
+        scope.closest && scope.closest(".apps-menu")
+          ? scope.closest(".apps-menu")
+          : document.querySelector(".apps-menu");
       if (!menu) return;
 
       const loadApps = function () {
@@ -643,11 +703,19 @@
       window.addEventListener("resize", catalogState.albumGridScrollHandler, { passive: true });
 
       if ("IntersectionObserver" in window) {
-        catalogState.albumGridObserver = new IntersectionObserver(function (entries) {
-          if (entries.some(function (entry) { return entry.isIntersecting; }) && shouldLoadMore()) {
-            loadMore();
-          }
-        }, { rootMargin: "320px 0px" });
+        catalogState.albumGridObserver = new IntersectionObserver(
+          function (entries) {
+            if (
+              entries.some(function (entry) {
+                return entry.isIntersecting;
+              }) &&
+              shouldLoadMore()
+            ) {
+              loadMore();
+            }
+          },
+          { rootMargin: "320px 0px" }
+        );
         catalogState.albumGridObserver.observe(sentinel);
       }
 
@@ -663,7 +731,9 @@
     }
 
     function getAssetFileName(value) {
-      const clean = String(value || "").trim().split("?")[0];
+      const clean = String(value || "")
+        .trim()
+        .split("?")[0];
       if (!clean) return "";
       return clean.slice(clean.lastIndexOf("/") + 1);
     }
@@ -684,8 +754,7 @@
       const expectedThumb = resolveRuntimeAssetUrl(item.thumb);
       const currentThumb = String(image.getAttribute("src") || image.dataset.coverSrc || "").trim();
       const sameCover = Boolean(
-        expectedThumb &&
-        getAssetFileName(currentThumb) === getAssetFileName(expectedThumb)
+        expectedThumb && getAssetFileName(currentThumb) === getAssetFileName(expectedThumb)
       );
 
       card.setAttribute("href", String(item.page || ""));
@@ -707,7 +776,7 @@
       image.setAttribute("alt", String(item.thumbAlt || item.title || ""));
       image.setAttribute("decoding", "async");
       image.setAttribute("loading", index < 2 ? "eager" : "lazy");
-      image.setAttribute("fetchpriority", index === 0 ? "high" : (index === 1 ? "auto" : "low"));
+      image.setAttribute("fetchpriority", index === 0 ? "high" : index === 1 ? "auto" : "low");
       if (item.editKey) label.setAttribute("data-edit-key", item.editKey);
       else label.removeAttribute("data-edit-key");
       label.textContent = displayTitle;
@@ -765,12 +834,13 @@
 
         const displayTitle = displayAlbumCardTitle(item.title);
         const shouldEager = index < 2;
-        const expectedPriority = index === 0 ? "high" : (index === 1 ? "auto" : "low");
+        const expectedPriority = index === 0 ? "high" : index === 1 ? "auto" : "low";
         const lockedCover = lockedCoverMatchesCatalog(image, item.thumb);
 
         if (getCardAttribute(card, "href") !== String(item.page || "").trim()) return false;
         const currentCover = getCardAttribute(image, "src") || getCardAttribute(image, "data-cover-src");
-        if (!lockedCover && resolveRuntimeAssetUrl(currentCover) !== resolveRuntimeAssetUrl(item.thumb)) return false;
+        if (!lockedCover && resolveRuntimeAssetUrl(currentCover) !== resolveRuntimeAssetUrl(item.thumb))
+          return false;
         if (shouldEager && !getCardAttribute(image, "src")) return false;
         if (getCardAttribute(image, "alt") !== String(item.thumbAlt || item.title || "").trim()) return false;
         if (getCardAttribute(image, "width") !== String(item.width || "")) return false;
@@ -814,7 +884,9 @@
     function getClipThumbUrl(videoId) {
       const name = `../clips/${encodeURIComponent(videoId)}-480.webp`;
       try {
-        return CLIP_SCRIPT_URL ? new URL(name, CLIP_SCRIPT_URL).href : `assets/clips/${encodeURIComponent(videoId)}-480.webp`;
+        return CLIP_SCRIPT_URL
+          ? new URL(name, CLIP_SCRIPT_URL).href
+          : `assets/clips/${encodeURIComponent(videoId)}-480.webp`;
       } catch (_err) {
         return `assets/clips/${encodeURIComponent(videoId)}-480.webp`;
       }
@@ -849,17 +921,30 @@
     }
 
     function revealClipPlayer(shell) {
-      if (!shell || typeof shell.getBoundingClientRect !== "function" || typeof window.scrollBy !== "function") return;
+      if (
+        !shell ||
+        typeof shell.getBoundingClientRect !== "function" ||
+        typeof window.scrollBy !== "function"
+      )
+        return;
       const rect = shell.getBoundingClientRect();
       const bar = document.querySelector(".bib-tabs");
       const transport = document.querySelector(".global-transport");
       const top = (bar ? bar.getBoundingClientRect().bottom : 0) + 8;
-      const bottom = (transport && transport.getBoundingClientRect().top > 0
-        ? transport.getBoundingClientRect().top
-        : window.innerHeight) - 8;
-      const delta = rect.top < top ? rect.top - top : (rect.bottom > bottom ? Math.min(rect.bottom - bottom, rect.top - top) : 0);
+      const bottom =
+        (transport && transport.getBoundingClientRect().top > 0
+          ? transport.getBoundingClientRect().top
+          : window.innerHeight) - 8;
+      const delta =
+        rect.top < top
+          ? rect.top - top
+          : rect.bottom > bottom
+            ? Math.min(rect.bottom - bottom, rect.top - top)
+            : 0;
       if (!delta) return;
-      const reduce = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const reduce =
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       window.scrollBy({ top: delta, behavior: reduce ? "auto" : "smooth" });
     }
 
@@ -888,9 +973,14 @@
         if (parts.module.classList) parts.module.classList.add("is-playing");
       }
 
-      const items = parts.grid && Array.isArray(parts.grid.children) ? parts.grid.children : (parts.grid ? Array.from(parts.grid.children || []) : []);
+      const items =
+        parts.grid && Array.isArray(parts.grid.children)
+          ? parts.grid.children
+          : parts.grid
+            ? Array.from(parts.grid.children || [])
+            : [];
       items.forEach(function (li) {
-        const button = li && li.firstChild ? li.firstChild : (li && li.children ? li.children[0] : null);
+        const button = li && li.firstChild ? li.firstChild : li && li.children ? li.children[0] : null;
         const isActive = Boolean(button && button.dataset && button.dataset.clipId === clipState.activeId);
         li.hidden = isActive;
       });
@@ -921,7 +1011,8 @@
       image.setAttribute("decoding", "async");
       const play = document.createElement("span");
       play.className = "bib-vidplay";
-      play.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>';
+      play.innerHTML =
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>';
       frame.appendChild(image);
       frame.appendChild(play);
 
@@ -947,9 +1038,16 @@
 
       // Ordre voulu par INFRA (09/11/2026, VOLDEMORT d'abord) = ordre du catalogue du site ; le
       // catalogue en ligne garde l'ancien ordre jusqu'à sa prochaine synchronisation.
-      const clipKey = (entry) => String((entry && (entry.youtubeId || ((String(entry.youtubeUrl || "").match(/[?&]v=([\w-]+)/) || [])[1]))) || "");
+      const clipKey = (entry) =>
+        String(
+          (entry && (entry.youtubeId || (String(entry.youtubeUrl || "").match(/[?&]v=([\w-]+)/) || [])[1])) ||
+            ""
+        );
       const siteOrder = (sanitizeCatalog(fallbackCatalog).clips || []).map(clipKey);
-      const rank = (entry) => { const i = siteOrder.indexOf(clipKey(entry)); return i < 0 ? siteOrder.length : i; };
+      const rank = (entry) => {
+        const i = siteOrder.indexOf(clipKey(entry));
+        return i < 0 ? siteOrder.length : i;
+      };
       const safe = (Array.isArray(clips) ? clips.filter((entry) => entry && entry.id && entry.youtubeId) : [])
         .map((entry, index) => ({ entry, index }))
         .sort((a, b) => rank(a.entry) - rank(b.entry) || a.index - b.index)
@@ -976,7 +1074,8 @@
       // Le catalogue peut être redessiné (catalogue en direct) : un clip en cours continue.
       // Un accueil reconstruit (iframe vide) repart sans clip ouvert.
       const playing = Boolean(parts.iframe.getAttribute("src"));
-      if (playing && previousActive && safe.some((clip) => clip.id === previousActive)) setActiveClip(previousActive, {});
+      if (playing && previousActive && safe.some((clip) => clip.id === previousActive))
+        setActiveClip(previousActive, {});
       else closeActiveClip();
 
       const closeButton = parts.module.querySelector("[data-clip-close]");
@@ -986,17 +1085,22 @@
       }
       if (!clipState.musicListenerBound && typeof document.addEventListener === "function") {
         clipState.musicListenerBound = true;
-        document.addEventListener("play", function (event) {
-          const target = event && event.target;
-          if (target && String(target.tagName || "").toUpperCase() === "AUDIO") pauseActiveClip();
-        }, true);
+        document.addEventListener(
+          "play",
+          function (event) {
+            const target = event && event.target;
+            if (target && String(target.tagName || "").toUpperCase() === "AUDIO") pauseActiveClip();
+          },
+          true
+        );
       }
     }
 
     async function waitCatalogWithTimeout(promise, timeoutMs) {
-      const safePromise = promise && typeof promise.then === "function"
-        ? promise
-        : Promise.resolve(sanitizeCatalog(fallbackCatalog));
+      const safePromise =
+        promise && typeof promise.then === "function"
+          ? promise
+          : Promise.resolve(sanitizeCatalog(fallbackCatalog));
       const waitMs = Math.max(0, Number(timeoutMs) || 0);
       if (!waitMs) {
         return {
@@ -1093,7 +1197,7 @@
   "use strict";
   if (typeof document === "undefined" || typeof window === "undefined") return;
   if (typeof document.createElement !== "function" || !document.head) return;
-  var VERSION = "bibliotheque-v17-20261110";
+  var VERSION = "bibliotheque-v18-20261110";
   try {
     var script = document.currentScript;
     if (!script || !script.src) return;

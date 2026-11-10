@@ -20,11 +20,22 @@
     const LOCAL_CATALOG_VERSION = String(ctx.LOCAL_CATALOG_VERSION || "");
 
     function normalizeAlbumTitle(value) {
-      return call(ctx, "normalizeAlbumTitle", value) || String(value || "").replace(/\s+/g, " ").trim().toLocaleUpperCase();
+      return (
+        call(ctx, "normalizeAlbumTitle", value) ||
+        String(value || "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .toLocaleUpperCase()
+      );
     }
 
     function normalizeTrackTitle(value) {
-      return call(ctx, "normalizeTrackTitle", value) || String(value || "").trim().toLocaleUpperCase();
+      return (
+        call(ctx, "normalizeTrackTitle", value) ||
+        String(value || "")
+          .trim()
+          .toLocaleUpperCase()
+      );
     }
 
     function toRuntimeAbsoluteUrl(value) {
@@ -58,9 +69,8 @@
     function normalizeCatalogCard(raw, type) {
       const fallbackSize = type === "app" ? 500 : 800;
       const rawThumb = String(raw && raw.thumb ? raw.thumb : "").trim();
-      const canonicalThumb = type === "album"
-        ? (call(ctx, "normalizeCoverUrl", rawThumb, { width: 1200 }) || rawThumb)
-        : rawThumb;
+      const canonicalThumb =
+        type === "album" ? call(ctx, "normalizeCoverUrl", rawThumb, { width: 1200 }) || rawThumb : rawThumb;
       const card = {
         id: String(raw && raw.id ? raw.id : "").trim(),
         title: String(raw && raw.title ? raw.title : "").trim(),
@@ -78,9 +88,12 @@
       };
 
       if (raw && raw.download && typeof raw.download === "object") {
-        const typeName = String(raw.download.type || "").trim().toLowerCase() === "app_download"
-          ? "app_download"
-          : "download";
+        const typeName =
+          String(raw.download.type || "")
+            .trim()
+            .toLowerCase() === "app_download"
+            ? "app_download"
+            : "download";
         const url = String(raw.download.url || "").trim();
         if (url) {
           card.download = {
@@ -123,9 +136,10 @@
         const small = `assets/music/responsive/${base}-480.webp`;
         const large = `assets/music/responsive/${base}-900.webp`;
         responsive.srcset = `${small} 480w, ${large} 900w, ${cleanThumb} 3333w`;
-        responsive.sizes = type === "album"
-          ? "(max-width: 980px) calc(50vw - 28px), 250px"
-          : "(max-width: 980px) min(76vw, 290px), min(34vw, 430px)";
+        responsive.sizes =
+          type === "album"
+            ? "(max-width: 980px) calc(50vw - 28px), 250px"
+            : "(max-width: 980px) min(76vw, 290px), min(34vw, 430px)";
         return responsive;
       }
 
@@ -169,13 +183,9 @@
       const title = String(raw && raw.title ? raw.title : "").trim();
       const editKey = String(raw && raw.editKey ? raw.editKey : "").trim();
       const youtubeUrl = String(
-        raw && raw.youtubeUrl ? raw.youtubeUrl
-          : raw && raw.url ? raw.url
-          : ""
+        raw && raw.youtubeUrl ? raw.youtubeUrl : raw && raw.url ? raw.url : ""
       ).trim();
-      const youtubeId = extractYouTubeVideoId(
-        raw && raw.youtubeId ? raw.youtubeId : youtubeUrl
-      );
+      const youtubeId = extractYouTubeVideoId(raw && raw.youtubeId ? raw.youtubeId : youtubeUrl);
 
       return {
         id: String(raw && raw.id ? raw.id : "").trim() || youtubeId,
@@ -248,15 +258,30 @@
     }
 
     function isTracksDocument(payload) {
-      return Boolean(payload && Array.isArray(payload.albums) && payload.albums.length && payload.albums.every(function (album) {
-        return album && album.slug && album.page && Array.isArray(album.tracks) && album.tracks.every(function (track) {
-          return track && track.title && /^assets\/music\/streams\/.+\.m4a$/i.test(String(track.src || ""));
-        });
-      }));
+      return Boolean(
+        payload &&
+        Array.isArray(payload.albums) &&
+        payload.albums.length &&
+        payload.albums.every(function (album) {
+          return (
+            album &&
+            album.slug &&
+            album.page &&
+            Array.isArray(album.tracks) &&
+            album.tracks.every(function (track) {
+              return (
+                track && track.title && /^assets\/music\/streams\/.+\.m4a$/i.test(String(track.src || ""))
+              );
+            })
+          );
+        })
+      );
     }
 
     function isDurationsDocument(payload) {
-      return Boolean(payload && Array.isArray(payload.tracks) && Number(payload.trackCount) === payload.tracks.length);
+      return Boolean(
+        payload && Array.isArray(payload.tracks) && Number(payload.trackCount) === payload.tracks.length
+      );
     }
 
     function isCatalogLatestDocument(payload) {
@@ -291,9 +316,12 @@
       if (!("caches" in window)) return;
       try {
         const cache = await caches.open(LIVE_CATALOG_CACHE_NAME);
-        await cache.put(url, new Response(JSON.stringify(payload), {
-          headers: { "Content-Type": "application/json; charset=utf-8" }
-        }));
+        await cache.put(
+          url,
+          new Response(JSON.stringify(payload), {
+            headers: { "Content-Type": "application/json; charset=utf-8" }
+          })
+        );
       } catch (_err) {
         // Cache Storage is an optimization; local JSON remains the final fallback.
       }
@@ -330,13 +358,17 @@
 
       const url = getLiveCatalogLatestUrl();
       const controller = typeof AbortController === "function" ? new AbortController() : null;
-      const timeout = controller ? setTimeout(function () { controller.abort(); }, LIVE_CATALOG_TIMEOUT_MS) : 0;
+      const timeout = controller
+        ? setTimeout(function () {
+            controller.abort();
+          }, LIVE_CATALOG_TIMEOUT_MS)
+        : 0;
       catalogState.latestCatalogPromise = (async function () {
         try {
           const response = await fetch(url, {
             cache: "no-store",
             signal: controller ? controller.signal : undefined,
-            headers: { "Accept": "application/json" }
+            headers: { Accept: "application/json" }
           });
           if (!response.ok) throw new Error(`live catalog latest fetch failed: ${response.status}`);
           const payload = await response.json();
@@ -366,7 +398,7 @@
       if (fileName !== "catalog.json") url.searchParams.set("v", LOCAL_CATALOG_VERSION);
       const response = await fetch(url.href, {
         cache: "default",
-        headers: { "Accept": "application/json" }
+        headers: { Accept: "application/json" }
       });
       if (!response.ok) throw new Error(`local catalog fetch failed: ${response.status}`);
       return response.json();
@@ -380,22 +412,24 @@
         fetchLocalCatalogDocument("catalog.json"),
         fetchLocalCatalogDocument("tracks.json"),
         fetchLocalCatalogDocument("track-durations.json")
-      ]).then(function (results) {
-        const payload = {
-          schemaVersion: 1,
-          releaseId: `local-${LOCAL_CATALOG_VERSION || "catalog"}`,
-          documents: {
-            catalog: results[0],
-            tracks: results[1],
-            durations: results[2]
-          }
-        };
-        if (!isCatalogLatestDocument(payload)) throw new Error("local catalog bundle validation failed");
-        catalogState.localCatalogPayload = payload;
-        return payload;
-      }).finally(function () {
-        catalogState.localCatalogPromise = null;
-      });
+      ])
+        .then(function (results) {
+          const payload = {
+            schemaVersion: 1,
+            releaseId: `local-${LOCAL_CATALOG_VERSION || "catalog"}`,
+            documents: {
+              catalog: results[0],
+              tracks: results[1],
+              durations: results[2]
+            }
+          };
+          if (!isCatalogLatestDocument(payload)) throw new Error("local catalog bundle validation failed");
+          catalogState.localCatalogPayload = payload;
+          return payload;
+        })
+        .finally(function () {
+          catalogState.localCatalogPromise = null;
+        });
 
       return catalogState.localCatalogPromise;
     }
@@ -406,8 +440,12 @@
 
       catalogState.catalogBundlePromise = (async function () {
         const results = await Promise.all([
-          fetchLocalCatalogBundle().catch(function () { return null; }),
-          readCachedLiveCatalogLatest().catch(function () { return null; })
+          fetchLocalCatalogBundle().catch(function () {
+            return null;
+          }),
+          readCachedLiveCatalogLatest().catch(function () {
+            return null;
+          })
         ]);
         const local = results[0];
         const cachedLive = results[1];
@@ -482,13 +520,15 @@
         audioState.tracksData = payload || {};
         indexTrackMetadata(audioState.tracksData);
         return audioState.tracksData;
-      })().catch(function () {
-        audioState.tracksData = {};
-        indexTrackMetadata(audioState.tracksData);
-        return audioState.tracksData;
-      }).finally(function () {
-        audioState.tracksLoadingPromise = null;
-      });
+      })()
+        .catch(function () {
+          audioState.tracksData = {};
+          indexTrackMetadata(audioState.tracksData);
+          return audioState.tracksData;
+        })
+        .finally(function () {
+          audioState.tracksLoadingPromise = null;
+        });
 
       return audioState.tracksLoadingPromise;
     }
@@ -533,9 +573,11 @@
     function getTrackMetaByAssetPath(srcLike, baseUrl) {
       const assetKey = getAudioAssetPathKey(srcLike || "", baseUrl || window.location.href);
       const favoriteKey = canonicalFavoritePath(srcLike || "", baseUrl || window.location.href);
-      return (favoriteKey && audioState.trackMetaByAssetPath.get(favoriteKey)) ||
+      return (
+        (favoriteKey && audioState.trackMetaByAssetPath.get(favoriteKey)) ||
         (assetKey && audioState.trackMetaByAssetPath.get(assetKey)) ||
-        null;
+        null
+      );
     }
 
     function mergeTrackMetadata(track) {
@@ -549,8 +591,6 @@
         artwork: source.artwork || meta.artwork || ""
       });
     }
-
-
 
     return {
       normalizeCatalogCard,

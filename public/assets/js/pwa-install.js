@@ -8,7 +8,10 @@
 
   function createPwaInstall(context) {
     const ctx = context || {};
-    const pwaState = ctx.pwaState || { choiceStorageKey: "infra_pwa_install_choice_v1", sessionDismissed: false };
+    const pwaState = ctx.pwaState || {
+      choiceStorageKey: "infra_pwa_install_choice_v1",
+      sessionDismissed: false
+    };
 
     function isIosDevice() {
       return Boolean(call(ctx, "isIosDevice"));
@@ -181,7 +184,9 @@
 
     function readPwaChoice() {
       try {
-        return String(localStorage.getItem(pwaState.choiceStorageKey) || "").trim().toLowerCase();
+        return String(localStorage.getItem(pwaState.choiceStorageKey) || "")
+          .trim()
+          .toLowerCase();
       } catch (_err) {
         return "";
       }
@@ -189,7 +194,12 @@
 
     function persistPwaChoice(choice) {
       try {
-        localStorage.setItem(pwaState.choiceStorageKey, String(choice || "").trim().toLowerCase());
+        localStorage.setItem(
+          pwaState.choiceStorageKey,
+          String(choice || "")
+            .trim()
+            .toLowerCase()
+        );
       } catch (_err) {
         // Ignore storage errors.
       }
@@ -197,22 +207,38 @@
 
     // Fenêtre d'installation (INFRA, 08/11/2026) : montrée une seule fois, jamais quand le site est
     // déjà installé, sans cadre ; une ligne et les étapes en pictogrammes, une croix pour fermer.
-    const ICON_SHARE = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m-4 4 4-4 4 4M8 11H5v10h14V11h-3"/></svg>';
-    const ICON_ADD = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/></svg>';
-    const ICON_MENU = '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><circle cx="12" cy="5.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="18.5" r="1.7"/></g></svg>';
-    const ICON_CLOSE = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+    const ICON_SHARE =
+      '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3m-4 4 4-4 4 4M8 11H5v10h14V11h-3"/></svg>';
+    const ICON_ADD =
+      '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/></svg>';
+    const ICON_MENU =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><circle cx="12" cy="5.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="18.5" r="1.7"/></g></svg>';
+    const ICON_CLOSE =
+      '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 
     function getInstallSteps(browserKind) {
       if (browserKind === "ios-safari") {
-        return [[ICON_SHARE, "Partager"], [ICON_ADD, "Sur l’écran d’accueil"]];
+        return [
+          [ICON_SHARE, "Partager"],
+          [ICON_ADD, "Sur l’écran d’accueil"]
+        ];
       }
       if (browserKind === "ios-chrome" || browserKind === "ios-brave") {
-        return [[ICON_SHARE, "Partager"], [ICON_ADD, "Ajouter à l’écran d’accueil"]];
+        return [
+          [ICON_SHARE, "Partager"],
+          [ICON_ADD, "Ajouter à l’écran d’accueil"]
+        ];
       }
       if (String(browserKind).indexOf("android-") === 0) {
-        return [[ICON_MENU, "Menu"], [ICON_ADD, "Installer l’application"]];
+        return [
+          [ICON_MENU, "Menu"],
+          [ICON_ADD, "Installer l’application"]
+        ];
       }
-      return [[ICON_SHARE, "Partager"], [ICON_ADD, "Sur l’écran d’accueil"]];
+      return [
+        [ICON_SHARE, "Partager"],
+        [ICON_ADD, "Sur l’écran d’accueil"]
+      ];
     }
 
     function ensurePwaInstallPromptUi() {
@@ -226,12 +252,14 @@
       root.setAttribute("aria-label", "Ajouter INFRA. à l’écran d’accueil");
       root.setAttribute("aria-hidden", "true");
       root.innerHTML = [
-        "<div class=\"bib-install-in\">",
-        "  <div class=\"bib-install-tx\">",
+        '<div class="bib-install-in">',
+        '  <div class="bib-install-tx">',
         "    <strong>Ajouter INFRA. à l’écran d’accueil</strong>",
-        "    <span class=\"bib-install-steps\" data-pwa-steps></span>",
+        '    <span class="bib-install-steps" data-pwa-steps></span>',
         "  </div>",
-        "  <button class=\"bib-install-close\" type=\"button\" data-pwa-browser aria-label=\"Fermer\" title=\"Fermer\">" + ICON_CLOSE + "</button>",
+        '  <button class="bib-install-close" type="button" data-pwa-browser aria-label="Fermer" title="Fermer">' +
+          ICON_CLOSE +
+          "</button>",
         "</div>"
       ].join("");
 
@@ -253,7 +281,8 @@
       const existing = document.getElementById("infraPwaInstallModal");
       const browserKind = getInstallBrowserKind();
       const savedChoice = readPwaChoice();
-      const canShow = !adminMode &&
+      const canShow =
+        !adminMode &&
         document.body.classList.contains("home-screen") &&
         (isIosDevice() || isAndroidDevice()) &&
         !isStandaloneDisplayMode() &&
@@ -271,9 +300,11 @@
       const root = ensurePwaInstallPromptUi();
       const steps = root.querySelector("[data-pwa-steps]");
       if (steps) {
-        steps.innerHTML = getInstallSteps(browserKind).map(function (step) {
-          return "<span class=\"bib-install-step\">" + step[0] + "<span>" + step[1] + "</span></span>";
-        }).join("<span class=\"bib-install-sep\" aria-hidden=\"true\">›</span>");
+        steps.innerHTML = getInstallSteps(browserKind)
+          .map(function (step) {
+            return '<span class="bib-install-step">' + step[0] + "<span>" + step[1] + "</span></span>";
+          })
+          .join('<span class="bib-install-sep" aria-hidden="true">›</span>');
       }
       root.classList.add("is-open");
       root.setAttribute("aria-hidden", "false");
@@ -281,7 +312,6 @@
       pwaState.shownThisSession = true;
       persistPwaChoice("seen");
     }
-
 
     return {
       getIosBrowserKind,

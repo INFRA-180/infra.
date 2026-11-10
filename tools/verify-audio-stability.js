@@ -112,7 +112,7 @@ expect(codeHas(visualizer, "velocity -= gravity * step"), "desktop powder has no
 expect(codeHas(visualizer, "(sides[index] ? 1 : -1)"), "desktop powder is not rendered above and below the axis");
 expect(codeHas(visualizer, "powderHelixRotationPhase"), "desktop powder has no rotating helix phase");
 expect(codeHas(visualizer, "HELIX_DRIVE_ATTACK_SECONDS = 0.09"), "desktop helix drive has no temporal smoothing");
-expect(codeHas(visualizer, "frameHeight * (0.035 + (signal * 0.18))"), "desktop helix radius is not reduced");
+expect(codeHas(visualizer, "frameHeight * (0.035 + signal * 0.18)"), "desktop helix radius is not reduced");
 expect(codeHas(visualizer, "targetOffset - helixOffset"), "desktop powder helix has no physical spring");
 expect(codeHas(visualizer, "const restingOpacity = moving ? 1 : 0.34"), "desktop powder does not reduce its static central density");
 expect(codeHas(visualizer, "drawingContext.quadraticCurveTo("), "desktop frequency spectrum is still drawn as angular segments");

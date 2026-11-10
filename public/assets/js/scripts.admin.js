@@ -3,12 +3,12 @@
   const legacyStorageKey = "infra_home_editor_v1";
   const fontChoices = {
     default: "",
-    antique: "\"Antique Olive Nord Bold\", \"Avenir Next\", \"Helvetica Neue\", sans-serif",
-    space: "\"Space Grotesk\", \"Avenir Next\", \"Helvetica Neue\", sans-serif",
-    plex: "\"IBM Plex Sans\", \"Avenir Next\", \"Helvetica Neue\", sans-serif",
-    lora: "\"Lora\", \"Times New Roman\", serif",
-    sans: "\"Avenir Next\", \"Avenir\", \"Helvetica Neue\", Helvetica, Arial, sans-serif",
-    serif: "\"Times New Roman\", \"Times\", serif"
+    antique: '"Antique Olive Nord Bold", "Avenir Next", "Helvetica Neue", sans-serif',
+    space: '"Space Grotesk", "Avenir Next", "Helvetica Neue", sans-serif',
+    plex: '"IBM Plex Sans", "Avenir Next", "Helvetica Neue", sans-serif',
+    lora: '"Lora", "Times New Roman", serif',
+    sans: '"Avenir Next", "Avenir", "Helvetica Neue", Helvetica, Arial, sans-serif',
+    serif: '"Times New Roman", "Times", serif'
   };
 
   const adminState = {
@@ -75,10 +75,16 @@
     }
 
     function render(query) {
-      const q = String(query || "").trim().toLowerCase();
+      const q = String(query || "")
+        .trim()
+        .toLowerCase();
       const actions = getActions();
       const filtered = q
-        ? actions.filter((entry) => String(entry.label || "").toLowerCase().includes(q))
+        ? actions.filter((entry) =>
+            String(entry.label || "")
+              .toLowerCase()
+              .includes(q)
+          )
         : actions;
 
       results.replaceChildren();
@@ -256,12 +262,14 @@
     if (container.dataset.adminEditorBound === "1") return;
     container.dataset.adminEditorBound = "1";
 
-    const getCurrentTheme = typeof options.getCurrentTheme === "function"
-      ? options.getCurrentTheme
-      : function () { return "blanc"; };
-    const applyThemePreset = typeof options.applyThemePreset === "function"
-      ? options.applyThemePreset
-      : function () {};
+    const getCurrentTheme =
+      typeof options.getCurrentTheme === "function"
+        ? options.getCurrentTheme
+        : function () {
+            return "blanc";
+          };
+    const applyThemePreset =
+      typeof options.applyThemePreset === "function" ? options.applyThemePreset : function () {};
 
     let editing = false;
     let dragged = null;

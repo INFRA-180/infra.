@@ -1,9 +1,7 @@
 (function () {
   "use strict";
 
-  const globalObject = typeof window !== "undefined"
-    ? window
-    : (typeof self !== "undefined" ? self : {});
+  const globalObject = typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : {};
 
   function getNavigator() {
     return globalObject.navigator || {};
@@ -39,11 +37,11 @@
     const ua = String(nav.userAgent || "");
     const platform = String(nav.platform || "");
     const isIOS =
-      /iPad|iPhone|iPod/i.test(ua) ||
-      (platform === "MacIntel" && Number(nav.maxTouchPoints || 0) > 1);
-    const standaloneDisplay = typeof globalObject.matchMedia === "function"
-      ? globalObject.matchMedia("(display-mode: standalone)").matches
-      : false;
+      /iPad|iPhone|iPod/i.test(ua) || (platform === "MacIntel" && Number(nav.maxTouchPoints || 0) > 1);
+    const standaloneDisplay =
+      typeof globalObject.matchMedia === "function"
+        ? globalObject.matchMedia("(display-mode: standalone)").matches
+        : false;
     const legacyStandalone = nav.standalone === true;
     return Boolean(isIOS && (legacyStandalone || standaloneDisplay));
   }

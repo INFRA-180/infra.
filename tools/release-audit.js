@@ -254,7 +254,7 @@ function verifyAudioVisuals() {
     !codeHas(visualizerSource, "(sides[index] ? 1 : -1)") ||
     !codeHas(visualizerSource, "powderHelixRotationPhase") ||
     !codeHas(visualizerSource, "HELIX_DRIVE_ATTACK_SECONDS = 0.09") ||
-    !codeHas(visualizerSource, "frameHeight * (0.035 + (signal * 0.18))") ||
+    !codeHas(visualizerSource, "frameHeight * (0.035 + signal * 0.18)") ||
     !codeHas(visualizerSource, "targetOffset - helixOffset") ||
     !codeHas(visualizerSource, "const restingOpacity = moving ? 1 : 0.34") ||
     !codeHas(visualizerSource, "drawingContext.quadraticCurveTo(") ||

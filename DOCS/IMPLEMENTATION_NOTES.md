@@ -1736,3 +1736,8 @@
 - Corps des 115 fonctions **inchangés** (comparaison par jetons avec l'original) : chaque module est une fonction `createX(R)` qui reçoit les réglages (`R`) et renvoie ses fonctions ; les fonctions des autres modules sont reliées par `link()` avant tout appel (mêmes fonctions, pas d'enveloppes : comparaisons et `removeEventListener` intacts).
 - Découpage fait par un outil d'analyse (espree + eslint-scope) qui refuse s'il trouve une variable modifiable partagée ou une instruction hors fonction ; ESLint a attrapé un nom de la portée englobante (`canAllowSystemInterruptionResume`) → transmis aussi.
 - Build : les `import` d'en-tête restent hors du bloc protégé `try` de `audio-radio.js`. ESLint : `audio-radio.js` et `audio-radio/` en modules ES. `app.js` 553 → 565 Ko (liaisons).
+
+## 11/11/2026 — Déploiement : outils installés avant l'audit (choix d'INFRA)
+- `package-lock.json` suivi par Git (autorisé dans `verify-public-boundary.js`) ; `.github/workflows/deploy-pages.yml` : Node 24 + `npm ci --ignore-scripts` avant `node tools/release-audit.js`.
+- Raison : depuis le lot B, les tests construisent les scripts avec Vite. Le site publié n'en dépend pas (`app.js` construit et suivi).
+- Après chaque push : vérifier le déploiement (`gh run list`), pas seulement `npm test`.

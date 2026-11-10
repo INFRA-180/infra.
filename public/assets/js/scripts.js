@@ -1,15 +1,47 @@
 // Lecteur et pages du site INFRA. — état partagé, réglages et séquence de démarrage (dans l'ordre d'origine).
 // Les fonctions sont rangées par sujet dans runtime/ (chantier JavaScript d'INFRA, 10/11/2026).
-import { callAudioRadio, createAlbumPlayerUiApi, createAudioCoreApi, createAudioRadioApi, createAudioTelemetryApi, createHomeCatalogApi, createNowPlayingApi, createPwaInstallApi, createSpaRendererApi, createTransportUiApi, normalizePwaHeadAssetLinks } from "./runtime/module-bridges.js";
+import {
+  callAudioRadio,
+  createAlbumPlayerUiApi,
+  createAudioCoreApi,
+  createAudioRadioApi,
+  createAudioTelemetryApi,
+  createHomeCatalogApi,
+  createNowPlayingApi,
+  createPwaInstallApi,
+  createSpaRendererApi,
+  createTransportUiApi,
+  normalizePwaHeadAssetLinks
+} from "./runtime/module-bridges.js";
 import { createFavoritesUiApi } from "./runtime/favorites-bridge.js";
-import { consumePendingEarlyAlbumSwipeNavigation, createCatalogLoaderApi, initAlbumSwipeNavigation } from "./runtime/catalog-playback.js";
-import { applyWaitingServiceWorkerWhenIdle, beginPwaStorageObservation, isBusyForServiceWorkerUpdate, isIosDevice, isStandaloneDisplayMode, registerServiceWorker, rememberServiceWorkerReportedVersion, requestServiceWorkerUpdateCheck, serviceWorkerIdleUpdateRequested } from "./runtime/theme-admin-pwa.js";
+import {
+  consumePendingEarlyAlbumSwipeNavigation,
+  createCatalogLoaderApi,
+  initAlbumSwipeNavigation
+} from "./runtime/catalog-playback.js";
+import {
+  applyWaitingServiceWorkerWhenIdle,
+  beginPwaStorageObservation,
+  isBusyForServiceWorkerUpdate,
+  isIosDevice,
+  isStandaloneDisplayMode,
+  registerServiceWorker,
+  rememberServiceWorkerReportedVersion,
+  requestServiceWorkerUpdateCheck,
+  serviceWorkerIdleUpdateRequested
+} from "./runtime/theme-admin-pwa.js";
 import { getCurrentPlaylistTrack, normalizeAudioSourceUrl } from "./runtime/audio-sources.js";
 import { buildAudioMonitorPayload } from "./runtime/audio-monitor.js";
 import { trackAudioRuntimeEvent } from "./runtime/playback.js";
-import { disconnectLaunchPerformanceObservers, initPage, initSpaNavigation, markLaunchWatchdogComplete, reportLaunchSummary } from "./runtime/page-init.js";
+import {
+  disconnectLaunchPerformanceObservers,
+  initPage,
+  initSpaNavigation,
+  markLaunchWatchdogComplete,
+  reportLaunchSummary
+} from "./runtime/page-init.js";
 
-window.INFRA_BUILD_TAG = "audiofix427-20261110";
+window.INFRA_BUILD_TAG = "audiofix428-20261110";
 
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
@@ -23,9 +55,10 @@ try {
 }
 
 (function observeLaunchPerformance() {
-  const probe = window.__infraLaunchProbe && typeof window.__infraLaunchProbe === "object"
-    ? window.__infraLaunchProbe
-    : null;
+  const probe =
+    window.__infraLaunchProbe && typeof window.__infraLaunchProbe === "object"
+      ? window.__infraLaunchProbe
+      : null;
   if (!probe || typeof PerformanceObserver !== "function" || probe.performance_observers_started) return;
   probe.performance_observers_started = true;
   probe.performance_observers = [];
@@ -78,21 +111,9 @@ const infraDownloadsApi = window.InfraDownloads || {};
 function normalizeDownloadUrl(rawUrl) {
   return typeof infraDownloadsApi.normalizeDownloadUrl === "function"
     ? infraDownloadsApi.normalizeDownloadUrl(rawUrl)
-    : String(rawUrl || "").replace(/&amp;/g, "&").trim();
-}
-
-function downloadNow(url) {
-  if (typeof infraDownloadsApi.downloadNow === "function") {
-    infraDownloadsApi.downloadNow(url);
-  }
-}
-
-function openAppDownloadGatekeeper(appName, url) {
-  if (typeof infraDownloadsApi.openAppDownloadGatekeeper === "function") {
-    infraDownloadsApi.openAppDownloadGatekeeper(appName, url);
-  } else {
-    downloadNow(url);
-  }
+    : String(rawUrl || "")
+        .replace(/&amp;/g, "&")
+        .trim();
 }
 
 const themeStorageKey = "infra_theme_preset_v2";
@@ -214,17 +235,13 @@ const themePresets = {
 
 const spaRouterApi = window.InfraSpaRouter || null;
 
-const spaRouterConstants = spaRouterApi && spaRouterApi.constants
-  ? spaRouterApi.constants
-  : {};
+const spaRouterConstants = spaRouterApi && spaRouterApi.constants ? spaRouterApi.constants : {};
 
 const spaState = {
-  enabled: spaRouterApi && typeof spaRouterApi.isEnabled === "function"
-    ? spaRouterApi.isEnabled(window.location)
-    : (
-        window.location.protocol === "http:" ||
-        window.location.protocol === "https:"
-      ),
+  enabled:
+    spaRouterApi && typeof spaRouterApi.isEnabled === "function"
+      ? spaRouterApi.isEnabled(window.location)
+      : window.location.protocol === "http:" || window.location.protocol === "https:",
   bound: false,
   controller: null,
   currentUrl: window.location.href,
@@ -431,27 +448,38 @@ const pwaInstallApi = createPwaInstallApi();
 
 const NOW_PLAYING_OVERLAY_ENABLED = true;
 
-const PLAYER_ICON_PLAY = "<svg class=\"player-glyph player-glyph-play\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M8 5v14l11-7z\"/></svg>";
+const PLAYER_ICON_PLAY =
+  '<svg class="player-glyph player-glyph-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>';
 
-const PLAYER_ICON_STOP = "<svg class=\"player-glyph player-glyph-stop\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"7\" y=\"7\" width=\"10\" height=\"10\" rx=\"1.5\" fill=\"currentColor\"/></svg>";
+const PLAYER_ICON_STOP =
+  '<svg class="player-glyph player-glyph-stop" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"/></svg>';
 
-const PLAYER_ICON_PREVIOUS = "<svg class=\"player-glyph player-glyph-prev\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M6 6h3v12H6zM10 12l10-6v12z\"/></svg>";
+const PLAYER_ICON_PREVIOUS =
+  '<svg class="player-glyph player-glyph-prev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6 6h3v12H6zM10 12l10-6v12z"/></svg>';
 
-const PLAYER_ICON_NEXT = "<svg class=\"player-glyph player-glyph-next\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M14 12L4 6v12zM18 6h3v12h-3z\"/></svg>";
+const PLAYER_ICON_NEXT =
+  '<svg class="player-glyph player-glyph-next" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M14 12L4 6v12zM18 6h3v12h-3z"/></svg>';
 
-const RADIO_ICON = "<svg class=\"radio-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"2.25\" fill=\"currentColor\"/><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-width=\"2\" d=\"M8.4 15.6a5.1 5.1 0 0 1 0-7.2M15.6 8.4a5.1 5.1 0 0 1 0 7.2M5.2 18.8a9.6 9.6 0 0 1 0-13.6M18.8 5.2a9.6 9.6 0 0 1 0 13.6\"/></svg>";
+const RADIO_ICON =
+  '<svg class="radio-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="2.25" fill="currentColor"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M8.4 15.6a5.1 5.1 0 0 1 0-7.2M15.6 8.4a5.1 5.1 0 0 1 0 7.2M5.2 18.8a9.6 9.6 0 0 1 0-13.6M18.8 5.2a9.6 9.6 0 0 1 0 13.6"/></svg>';
 
-const SHUFFLE_ICON = "<svg class=\"shuffle-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.15\" d=\"M3 6h2.7c2.25 0 3.75 1 5.15 3.15l2.3 3.7C14.55 15 16.05 16 18.3 16H21\"/><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.15\" d=\"M3 18h2.7c1.8 0 3.1-.65 4.25-2.05\"/><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.15\" d=\"M14.05 8.05C15.2 6.65 16.5 6 18.3 6H21\"/><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.15\" d=\"m18 3 3 3-3 3\"/><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.15\" d=\"m18 13 3 3-3 3\"/></svg>";
+const SHUFFLE_ICON =
+  '<svg class="shuffle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15" d="M3 6h2.7c2.25 0 3.75 1 5.15 3.15l2.3 3.7C14.55 15 16.05 16 18.3 16H21"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15" d="M3 18h2.7c1.8 0 3.1-.65 4.25-2.05"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15" d="M14.05 8.05C15.2 6.65 16.5 6 18.3 6H21"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15" d="m18 3 3 3-3 3"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.15" d="m18 13 3 3-3 3"/></svg>';
 
-const HEART_ICON_OUTLINE = "<svg class=\"heart-icon heart-icon-outline\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.9\" d=\"M19.5 12.572 12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.566Z\"/></svg>";
+const HEART_ICON_OUTLINE =
+  '<svg class="heart-icon heart-icon-outline" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M19.5 12.572 12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.566Z"/></svg>';
 
-const HEART_ICON_FILLED = "<svg class=\"heart-icon heart-icon-filled\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"currentColor\" d=\"M6.98 3.07a6 6 0 0 1 4.99 1.43l.03.03.04-.03a6 6 0 0 1 8.34 8.61l-.18.18-.05.04-7.45 7.38a1 1 0 0 1-1.31.08l-.09-.08-7.5-7.42A6 6 0 0 1 6.98 3.07Z\"/></svg>";
+const HEART_ICON_FILLED =
+  '<svg class="heart-icon heart-icon-filled" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6.98 3.07a6 6 0 0 1 4.99 1.43l.03.03.04-.03a6 6 0 0 1 8.34 8.61l-.18.18-.05.04-7.45 7.38a1 1 0 0 1-1.31.08l-.09-.08-7.5-7.42A6 6 0 0 1 6.98 3.07Z"/></svg>';
 
-const DOWNLOAD_ICON = "<svg class=\"album-action-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 4v10m0 0 4-4m-4 4-4-4M5 19h14\"/></svg>";
+const DOWNLOAD_ICON =
+  '<svg class="album-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg>';
 
-const SELECT_MODE_ICON = "<svg class=\"album-action-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"m8.8 12.2 2.15 2.15 4.7-4.7\"/><circle cx=\"12\" cy=\"12\" r=\"8.25\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\"/></svg>";
+const SELECT_MODE_ICON =
+  '<svg class="album-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m8.8 12.2 2.15 2.15 4.7-4.7"/><circle cx="12" cy="12" r="8.25" fill="none" stroke="currentColor" stroke-width="1.9"/></svg>';
 
-const DONE_MODE_ICON = "<svg class=\"album-action-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2.1\" d=\"M6 6l12 12M18 6 6 18\"/></svg>";
+const DONE_MODE_ICON =
+  '<svg class="album-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1" d="M6 6l12 12M18 6 6 18"/></svg>';
 
 const TRACK_CLICK_COOLDOWN_MS = 180;
 
@@ -471,18 +499,21 @@ const PREFETCH_NEXT_CACHE_NAME = prefetchConstants.CACHE_NAME || "infra-next-tra
 
 const coverApi = window.InfraCovers || null;
 
-const coverConstants = coverApi && coverApi.constants
-  ? coverApi.constants
-  : {};
+const coverConstants = coverApi && coverApi.constants ? coverApi.constants : {};
 
 const COVERS_CACHE_NAME = coverConstants.CACHE_NAME || "infra-covers";
 
-const COVER_SESSION_PREPARE_ENABLED = Object.prototype.hasOwnProperty.call(coverConstants, "SESSION_PREPARE_ENABLED")
+const COVER_SESSION_PREPARE_ENABLED = Object.prototype.hasOwnProperty.call(
+  coverConstants,
+  "SESSION_PREPARE_ENABLED"
+)
   ? Boolean(coverConstants.SESSION_PREPARE_ENABLED)
   : true;
 
 // ROLLBACK: passer a false pour revenir au warmup cache-only audiofix200.
-const CONFIGURED_COVER_SESSION_PREPARE_CONCURRENCY = Number.isFinite(Number(coverConstants.SESSION_PREPARE_CONCURRENCY))
+const CONFIGURED_COVER_SESSION_PREPARE_CONCURRENCY = Number.isFinite(
+  Number(coverConstants.SESSION_PREPARE_CONCURRENCY)
+)
   ? Math.max(1, Number(coverConstants.SESSION_PREPARE_CONCURRENCY))
   : 3;
 
@@ -490,7 +521,10 @@ const COVER_SESSION_PREPARE_CONCURRENCY = isStandaloneDisplayMode()
   ? 1
   : CONFIGURED_COVER_SESSION_PREPARE_CONCURRENCY;
 
-const COVER_SESSION_NAVIGATION_GATE_ENABLED = Object.prototype.hasOwnProperty.call(coverConstants, "SESSION_NAVIGATION_GATE_ENABLED")
+const COVER_SESSION_NAVIGATION_GATE_ENABLED = Object.prototype.hasOwnProperty.call(
+  coverConstants,
+  "SESSION_NAVIGATION_GATE_ENABLED"
+)
   ? Boolean(coverConstants.SESSION_NAVIGATION_GATE_ENABLED)
   : true;
 
@@ -533,7 +567,7 @@ const PREFETCH_MAX_ATTEMPTS = 2;
 
 const WORKER_URL = "https://infra180-api.pages.dev";
 
-const SPA_SHELL_VERSION = "infra-shell-20261110-audio427";
+const SPA_SHELL_VERSION = "infra-shell-20261110-audio428";
 
 const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
 
@@ -550,17 +584,17 @@ const LIVE_CATALOG_CACHE_NAME = `${SPA_SHELL_VERSION}-catalog`;
 
 const LIVE_CATALOG_TIMEOUT_MS = 3500;
 
-const LOCAL_CATALOG_VERSION = "audiofix427-20261110";
+const LOCAL_CATALOG_VERSION = "audiofix428-20261110";
 
 const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
 const mediaSessionApi = window.InfraMediaSession || null;
 
-const favoritesConstants = window.InfraFavorites && window.InfraFavorites.constants
-  ? window.InfraFavorites.constants
-  : {};
+const favoritesConstants =
+  window.InfraFavorites && window.InfraFavorites.constants ? window.InfraFavorites.constants : {};
 
-const FAVORITES_RESET_DB_MARKER = favoritesConstants.RESET_DB_MARKER || "__infra_favorites_reset_audiofix212__";
+const FAVORITES_RESET_DB_MARKER =
+  favoritesConstants.RESET_DB_MARKER || "__infra_favorites_reset_audiofix212__";
 
 const DESKTOP_TRANSPORT_STORAGE_KEY = "infra_desktop_transport_layout_v2";
 
@@ -578,7 +612,7 @@ const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
 
 const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
 
-const runtimeVersion = "audiofix427-20261110";
+const runtimeVersion = "audiofix428-20261110";
 
 const runtime = (function () {
   const scriptEl =
@@ -588,9 +622,7 @@ const runtime = (function () {
     );
   let scriptUrl;
   try {
-    scriptUrl = scriptEl && scriptEl.src
-      ? new URL(scriptEl.src, window.location.href)
-      : null;
+    scriptUrl = scriptEl && scriptEl.src ? new URL(scriptEl.src, window.location.href) : null;
   } catch (_err) {
     scriptUrl = null;
   }
@@ -613,9 +645,10 @@ normalizePwaHeadAssetLinks();
 
 const audioTelemetryApi = createAudioTelemetryApi();
 
-const fallbackCatalog = window.InfraFallbackCatalog && typeof window.InfraFallbackCatalog === "object"
-  ? window.InfraFallbackCatalog
-  : { apps: [], albums: [], clips: [] };
+const fallbackCatalog =
+  window.InfraFallbackCatalog && typeof window.InfraFallbackCatalog === "object"
+    ? window.InfraFallbackCatalog
+    : { apps: [], albums: [], clips: [] };
 
 const catalogState = {
   data: null,
@@ -675,9 +708,14 @@ if ("serviceWorker" in navigator) {
     if (isBusyForServiceWorkerUpdate()) return;
     window.location.reload();
   });
-  document.addEventListener("pause", function (event) {
-    if (event.target && event.target.tagName === "AUDIO") window.setTimeout(applyWaitingServiceWorkerWhenIdle, 1500);
-  }, true);
+  document.addEventListener(
+    "pause",
+    function (event) {
+      if (event.target && event.target.tagName === "AUDIO")
+        window.setTimeout(applyWaitingServiceWorkerWhenIdle, 1500);
+    },
+    true
+  );
 }
 
 if ("serviceWorker" in navigator) {
@@ -691,9 +729,9 @@ if ("serviceWorker" in navigator) {
     if (data.type === "INFRA_AUDIO_NETWORK") {
       const src = normalizeAudioSourceUrl(data.url || "");
       if (!src) return;
-      trackAudioRuntimeEvent("audio_network_result", Object.assign(
-        buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, src),
-        {
+      trackAudioRuntimeEvent(
+        "audio_network_result",
+        Object.assign(buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, src), {
           request_token: audioState.startRequestToken,
           reason: data.reason || "service_worker_network",
           strategy: data.strategy || "network_fallback",
@@ -709,17 +747,17 @@ if ("serviceWorker" in navigator) {
           cached: false,
           cache_hint: "network",
           audio_fetch: true
-        }
-      ));
+        })
+      );
       return;
     }
     if (data.type !== "INFRA_PREFETCH_HIT") return;
     const src = normalizeAudioSourceUrl(data.url || "");
     if (!src) return;
     audioState.nextPrefetchServedSrc = src;
-    trackAudioRuntimeEvent("served_from_prefetch", Object.assign(
-      buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, src),
-      {
+    trackAudioRuntimeEvent(
+      "served_from_prefetch",
+      Object.assign(buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, src), {
         range: Boolean(data.range),
         range_header: data.range_header || "",
         range_start: Number.isFinite(Number(data.range_start)) ? Number(data.range_start) : null,
@@ -728,50 +766,138 @@ if ("serviceWorker" in navigator) {
         status: Number.isFinite(Number(data.status)) ? Number(data.status) : 200,
         strategy: data.strategy || "segment_v9",
         client_id: data.client_id || ""
-      }
-    ));
+      })
+    );
   });
 }
 
 audioTelemetryApi.initLifecycle();
 
 document.addEventListener("DOMContentLoaded", function () {
-  const initStartedAt = typeof performance !== "undefined" && typeof performance.now === "function"
-    ? performance.now()
-    : 0;
+  const initStartedAt =
+    typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : 0;
   initAlbumSwipeNavigation();
   consumePendingEarlyAlbumSwipeNavigation();
   initSpaNavigation();
   registerServiceWorker();
-  void initPage().then(function () {
-    return reportLaunchSummary(initStartedAt);
-  }).catch(function () {
-    const probe = window.__infraLaunchProbe && typeof window.__infraLaunchProbe === "object"
-      ? window.__infraLaunchProbe
-      : {};
-    trackAudioRuntimeEvent("launch_summary", {
-      launch_head_ms: Math.max(0, Math.round(Number(probe.head_ms) || 0)),
-      dom_ready_ms: Math.max(0, Math.round(initStartedAt)),
-      init_done_ms: 0,
-      first_app_frame_ms: 0,
-      app_ready_frame_ms: 0,
-      previous_incomplete_launch_age_ms: Math.max(0, Math.round(Number(probe.previous_incomplete_launch_age_ms) || 0)),
-      catalog_ready: false,
-      service_worker_controlled: Boolean(navigator.serviceWorker && navigator.serviceWorker.controller),
-      document_was_discarded: Boolean(document.wasDiscarded),
-      app_frame_ready: false,
-      fcp_available: false,
-      lcp_available: probe.lcp_available === true,
-      cls_available: probe.cls_available === true,
-      inp_available: probe.inp_available === true,
-      previous_incomplete_launch: probe.previous_incomplete_launch === true,
-      previous_launch_build: String(probe.previous_launch_build || ""),
-      previous_launch_route_kind: String(probe.previous_launch_route_kind || ""),
-      reason: "init_failed"
+  void initPage()
+    .then(function () {
+      return reportLaunchSummary(initStartedAt);
+    })
+    .catch(function () {
+      const probe =
+        window.__infraLaunchProbe && typeof window.__infraLaunchProbe === "object"
+          ? window.__infraLaunchProbe
+          : {};
+      trackAudioRuntimeEvent("launch_summary", {
+        launch_head_ms: Math.max(0, Math.round(Number(probe.head_ms) || 0)),
+        dom_ready_ms: Math.max(0, Math.round(initStartedAt)),
+        init_done_ms: 0,
+        first_app_frame_ms: 0,
+        app_ready_frame_ms: 0,
+        previous_incomplete_launch_age_ms: Math.max(
+          0,
+          Math.round(Number(probe.previous_incomplete_launch_age_ms) || 0)
+        ),
+        catalog_ready: false,
+        service_worker_controlled: Boolean(navigator.serviceWorker && navigator.serviceWorker.controller),
+        document_was_discarded: Boolean(document.wasDiscarded),
+        app_frame_ready: false,
+        fcp_available: false,
+        lcp_available: probe.lcp_available === true,
+        cls_available: probe.cls_available === true,
+        inp_available: probe.inp_available === true,
+        previous_incomplete_launch: probe.previous_incomplete_launch === true,
+        previous_launch_build: String(probe.previous_launch_build || ""),
+        previous_launch_route_kind: String(probe.previous_launch_route_kind || ""),
+        reason: "init_failed"
+      });
+      markLaunchWatchdogComplete(probe);
+      disconnectLaunchPerformanceObservers(probe);
     });
-    markLaunchWatchdogComplete(probe);
-    disconnectLaunchPerformanceObservers(probe);
-  });
 });
 
-export { infraDownloadsApi, normalizeDownloadUrl, themeStorageKey, legacyThemeStorageKey, legacyThemeMap, themePresets, spaRouterApi, spaState, audioState, pwaState, STORAGE_PERSIST_REQUEST_KEY, pwaInstallApi, NOW_PLAYING_OVERLAY_ENABLED, PLAYER_ICON_PLAY, PLAYER_ICON_STOP, PLAYER_ICON_PREVIOUS, PLAYER_ICON_NEXT, RADIO_ICON, SHUFFLE_ICON, HEART_ICON_OUTLINE, HEART_ICON_FILLED, DOWNLOAD_ICON, SELECT_MODE_ICON, DONE_MODE_ICON, TRACK_CLICK_COOLDOWN_MS, AUDIO_BASE, prefetchApi, PREFETCH_NEXT_ENABLED, PREFETCH_NEXT_CACHE_NAME, coverApi, COVERS_CACHE_NAME, COVER_SESSION_PREPARE_ENABLED, COVER_SESSION_PREPARE_CONCURRENCY, COVER_SESSION_NAVIGATION_GATE_ENABLED, ALBUM_COVER_IMAGE_CACHE_LIMIT, ALBUM_COVER_PREPARE_LIMIT, PREFETCH_NEXT_MAX_BYTES, PREFETCH_NEXT_THRESHOLD_SECONDS, PREFETCH_NEXT_SEGMENT_BYTES, PREFETCH_NEXT_QUEUE_DEPTH, PREFETCH_NEXT_CONCURRENCY, PREFETCH_NEXT_MAX_ENTRIES, PREFETCH_BUFFER_STABLE_SECONDS, PREFETCH_BUFFER_ABORT_SECONDS, PREFETCH_REQUEST_TIMEOUT_MS, PREFETCH_MAX_ATTEMPTS, WORKER_URL, SPA_SHELL_CACHE_NAME, SPA_PAGE_FETCH_TIMEOUT_MS, SPA_SCROLL_HISTORY_DEBOUNCE_MS, LIVE_CATALOG_CACHE_NAME, LIVE_CATALOG_TIMEOUT_MS, LOCAL_CATALOG_VERSION, audioTelemetryModule, mediaSessionApi, FAVORITES_RESET_DB_MARKER, DESKTOP_TRANSPORT_STORAGE_KEY, DESKTOP_TRANSPORT_LEGACY_STORAGE_KEY, DESKTOP_TRANSPORT_MIN_WIDTH, DESKTOP_TRANSPORT_MIN_HEIGHT, DESKTOP_TRANSPORT_MARGIN, DESKTOP_TRANSPORT_DRAG_THRESHOLD, DESKTOP_TRANSPORT_COVER_MIN_WIDTH, DESKTOP_TRANSPORT_COVER_MIN_HEIGHT, runtimeVersion, runtime, audioTelemetryApi, fallbackCatalog, catalogState, ALBUM_GRID_INITIAL_BATCH, ALBUM_GRID_NEXT_BATCH, clipState, homeCatalogApi, audioRadioApi, audioCoreApi, spaRendererApi, albumPlayerUiApi, nowPlayingApi, transportUiApi, SERVICE_WORKER_UPDATE_CHECK_MIN_MS, favoritesUiApi, catalogLoaderApi };
+export {
+  infraDownloadsApi,
+  normalizeDownloadUrl,
+  themeStorageKey,
+  legacyThemeStorageKey,
+  legacyThemeMap,
+  themePresets,
+  spaRouterApi,
+  spaState,
+  audioState,
+  pwaState,
+  STORAGE_PERSIST_REQUEST_KEY,
+  pwaInstallApi,
+  NOW_PLAYING_OVERLAY_ENABLED,
+  PLAYER_ICON_PLAY,
+  PLAYER_ICON_STOP,
+  PLAYER_ICON_PREVIOUS,
+  PLAYER_ICON_NEXT,
+  RADIO_ICON,
+  SHUFFLE_ICON,
+  HEART_ICON_OUTLINE,
+  HEART_ICON_FILLED,
+  DOWNLOAD_ICON,
+  SELECT_MODE_ICON,
+  DONE_MODE_ICON,
+  TRACK_CLICK_COOLDOWN_MS,
+  AUDIO_BASE,
+  prefetchApi,
+  PREFETCH_NEXT_ENABLED,
+  PREFETCH_NEXT_CACHE_NAME,
+  coverApi,
+  COVERS_CACHE_NAME,
+  COVER_SESSION_PREPARE_ENABLED,
+  COVER_SESSION_PREPARE_CONCURRENCY,
+  COVER_SESSION_NAVIGATION_GATE_ENABLED,
+  ALBUM_COVER_IMAGE_CACHE_LIMIT,
+  ALBUM_COVER_PREPARE_LIMIT,
+  PREFETCH_NEXT_MAX_BYTES,
+  PREFETCH_NEXT_THRESHOLD_SECONDS,
+  PREFETCH_NEXT_SEGMENT_BYTES,
+  PREFETCH_NEXT_QUEUE_DEPTH,
+  PREFETCH_NEXT_CONCURRENCY,
+  PREFETCH_NEXT_MAX_ENTRIES,
+  PREFETCH_BUFFER_STABLE_SECONDS,
+  PREFETCH_BUFFER_ABORT_SECONDS,
+  PREFETCH_REQUEST_TIMEOUT_MS,
+  PREFETCH_MAX_ATTEMPTS,
+  WORKER_URL,
+  SPA_SHELL_CACHE_NAME,
+  SPA_PAGE_FETCH_TIMEOUT_MS,
+  SPA_SCROLL_HISTORY_DEBOUNCE_MS,
+  LIVE_CATALOG_CACHE_NAME,
+  LIVE_CATALOG_TIMEOUT_MS,
+  LOCAL_CATALOG_VERSION,
+  audioTelemetryModule,
+  mediaSessionApi,
+  FAVORITES_RESET_DB_MARKER,
+  DESKTOP_TRANSPORT_STORAGE_KEY,
+  DESKTOP_TRANSPORT_LEGACY_STORAGE_KEY,
+  DESKTOP_TRANSPORT_MIN_WIDTH,
+  DESKTOP_TRANSPORT_MIN_HEIGHT,
+  DESKTOP_TRANSPORT_MARGIN,
+  DESKTOP_TRANSPORT_DRAG_THRESHOLD,
+  DESKTOP_TRANSPORT_COVER_MIN_WIDTH,
+  DESKTOP_TRANSPORT_COVER_MIN_HEIGHT,
+  runtimeVersion,
+  runtime,
+  audioTelemetryApi,
+  fallbackCatalog,
+  catalogState,
+  ALBUM_GRID_INITIAL_BATCH,
+  ALBUM_GRID_NEXT_BATCH,
+  clipState,
+  homeCatalogApi,
+  audioRadioApi,
+  audioCoreApi,
+  spaRendererApi,
+  albumPlayerUiApi,
+  nowPlayingApi,
+  transportUiApi,
+  SERVICE_WORKER_UPDATE_CHECK_MIN_MS,
+  favoritesUiApi,
+  catalogLoaderApi
+};

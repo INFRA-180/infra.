@@ -1713,3 +1713,10 @@
 - Pages (index, 31 albums, 4 playlists, 3 apps) et Service Worker chargent `app.js?v=…` au lieu des 21 balises. Les fichiers sources restent dans `public/assets/js/` pour l'instant (étape 4b : modules rangés par sujet).
 - **Pour Codex (outil privé)** : `_private/tools/sync-itunes-r2-catalog.js` → `RUNTIME_SCRIPT_FILES = ["app.js"]` (copie d'avant : `sync-itunes-r2-catalog.js.avant-vite-20261110`). L'outil réécrit toujours `scripts.js` et `catalog-fallback.js` ; l'automatisation lance `npm test`, donc `pretest` reconstruit `app.js` avant le commit `public/`.
 - Vérifié : 24 écrans identiques au pixel, aucune erreur console (accueil, album, playlist, app × 3 appareils), lecture réelle dans Safari iPhone (simulateur).
+
+## 2026-11-10 — Code rangé : modules, formatage, vérification (Claude)
+
+- **Étape 4b** : `scripts.js` (6 459 lignes, un seul bloc) → état partagé, réglages et séquence de démarrage dans `scripts.js` (~780 lignes, ordre d'exécution d'origine) + **13 modules** `public/assets/js/runtime/` qui ne contiennent que des fonctions (ponts, favoris, catalogue, pochettes, thème/Service Worker, navigation, sources audio, continuité d'album, Media Session, surveillance audio, lecture, démarrage). Règle : **un module ne doit rien exécuter au chargement** (les imports changent l'ordre d'exécution) ; tout ce qui s'exécute reste dans `scripts.js`. Les versions que l'outil de Codex réécrit restent dans `scripts.js`.
+- Les contrôles qui lisent le code utilisent `require("./build/app-sources.js").runtimeSource()` (scripts.js + modules).
+- **Étape 4d** : `npm run lint` (ESLint 10.13.0, `tools/build/eslint.config.mjs`) — 0 problème sur tout le JavaScript du site ; lancé avant chaque `npm test`. `npm run format` (Prettier 3.9.10, `tools/build/prettier.json`) sur `scripts.js`, `runtime/` et `tools/build/`.
+- **Limite** : les 20 anciens fichiers ne sont pas reformatés : 7 fichiers de test vérifient leur code au caractère près (retours à la ligne compris). Les reformater demande d'abord de transformer ces tests de texte en tests de comportement (étape 4e).

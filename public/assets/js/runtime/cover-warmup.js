@@ -1,12 +1,26 @@
 // Préparation et cache des pochettes.
 // Extrait de l'ancien scripts.js (chantier JavaScript d'INFRA, 10/11/2026). Uniquement des fonctions
 // et leurs variables : l'état partagé et l'ordre de démarrage restent dans scripts.js.
-import { ALBUM_COVER_IMAGE_CACHE_LIMIT, ALBUM_COVER_PREPARE_LIMIT, COVERS_CACHE_NAME, COVER_SESSION_PREPARE_CONCURRENCY, COVER_SESSION_PREPARE_ENABLED, audioState, spaState } from "../scripts.js";
+import {
+  ALBUM_COVER_IMAGE_CACHE_LIMIT,
+  ALBUM_COVER_PREPARE_LIMIT,
+  COVERS_CACHE_NAME,
+  COVER_SESSION_PREPARE_CONCURRENCY,
+  COVER_SESSION_PREPARE_ENABLED,
+  audioState,
+  spaState
+} from "../scripts.js";
 import { getAudioTelemetryNow } from "./config.js";
 import { getImagePreferredSrc } from "./module-bridges.js";
 import { loadTracksData } from "./catalog-playback.js";
 import { isMobilePwaCoverNavigation } from "./theme-admin-pwa.js";
-import { getCurrentAlbumTitle, normalizeAlbumTitle, preloadImage, toAbsoluteUrlOrEmpty, toRuntimeAbsoluteUrl } from "./audio-sources.js";
+import {
+  getCurrentAlbumTitle,
+  normalizeAlbumTitle,
+  preloadImage,
+  toAbsoluteUrlOrEmpty,
+  toRuntimeAbsoluteUrl
+} from "./audio-sources.js";
 import { choosePreferredSrcsetSource, normalizeCoverUrl } from "./media-artwork.js";
 import { getAlbumNameFromUrlLike, trackAudioRuntimeEvent } from "./playback.js";
 import { isAlbumOpenUrl } from "./page-init.js";
@@ -113,7 +127,8 @@ function getVisibleHomeCoverUrls() {
       const rect = img.getBoundingClientRect();
       const viewportWidth = Math.max(0, window.innerWidth || document.documentElement.clientWidth || 0);
       const viewportHeight = Math.max(0, window.innerHeight || document.documentElement.clientHeight || 0);
-      if (rect.bottom <= 0 || rect.top >= viewportHeight || rect.right <= 0 || rect.left >= viewportWidth) return;
+      if (rect.bottom <= 0 || rect.top >= viewportHeight || rect.right <= 0 || rect.left >= viewportWidth)
+        return;
     }
     const url = getImagePreferredSrc(img, window.location.href, { preferredWidth });
     if (!url || seen.has(url)) return;
@@ -127,30 +142,33 @@ function primeLinkedAlbumCoverForPwa(link, targetUrl) {
   if (!isMobilePwaCoverNavigation()) return "";
   if (!link || !targetUrl || !isAlbumOpenUrl(targetUrl)) return "";
 
-  const img = typeof link.querySelector === "function"
-    ? link.querySelector("img.album-cover, img.cover")
-    : null;
+  const img =
+    typeof link.querySelector === "function" ? link.querySelector("img.album-cover, img.cover") : null;
   if (!img) return "";
 
   const srcset = img.getAttribute("srcset") || "";
-  const preferred = choosePreferredSrcsetSource(srcset, 1200)
-    || img.currentSrc
-    || String(img.getAttribute("src") || "").trim();
+  const preferred =
+    choosePreferredSrcsetSource(srcset, 1200) ||
+    img.currentSrc ||
+    String(img.getAttribute("src") || "").trim();
   const url = preferred ? normalizeCoverUrl(preferred, { width: 1200 }) : "";
   if (!url) return "";
 
   if (audioState.albumCoverReadyUrls.has(url) || audioState.albumCoverPrimeUrls.has(url)) return url;
 
   audioState.albumCoverPrimeUrls.add(url);
-  preloadImage(url, { highPriority: true }).then(function (result) {
-    if (result && result.ok) {
-      audioState.albumCoverReadyUrls.add(url);
-    }
-  }).catch(function () {}).finally(function () {
-    // Only block duplicate requests while the current decode is running.
-    // A transient mobile/network failure must remain retryable on the next tap.
-    audioState.albumCoverPrimeUrls.delete(url);
-  });
+  preloadImage(url, { highPriority: true })
+    .then(function (result) {
+      if (result && result.ok) {
+        audioState.albumCoverReadyUrls.add(url);
+      }
+    })
+    .catch(function () {})
+    .finally(function () {
+      // Only block duplicate requests while the current decode is running.
+      // A transient mobile/network failure must remain retryable on the next tap.
+      audioState.albumCoverPrimeUrls.delete(url);
+    });
   return url;
 }
 
@@ -167,12 +185,15 @@ function releasePwaCoverHold(reason) {
   const minVisibleUntil = Number(hold.minVisibleUntil) || 0;
   if (!forceRelease && minVisibleUntil > now) {
     if (!hold.releaseTimer) {
-      hold.releaseTimer = window.setTimeout(function () {
-        if (spaState.pwaCoverHold === hold) {
-          hold.releaseTimer = 0;
-          releasePwaCoverHold(reasonText);
-        }
-      }, Math.max(0, Math.round(minVisibleUntil - now)));
+      hold.releaseTimer = window.setTimeout(
+        function () {
+          if (spaState.pwaCoverHold === hold) {
+            hold.releaseTimer = 0;
+            releasePwaCoverHold(reasonText);
+          }
+        },
+        Math.max(0, Math.round(minVisibleUntil - now))
+      );
     }
     return;
   }
@@ -214,8 +235,8 @@ function limitAlbumCoverWarmupUrls(covers) {
 
 function shouldPauseAlbumCoverWarmup() {
   const audio = audioState.audio;
-  const recentPlayRequest = Number(audioState.playRequestTs || 0) > 0 &&
-    Date.now() - Number(audioState.playRequestTs || 0) < 3000;
+  const recentPlayRequest =
+    Number(audioState.playRequestTs || 0) > 0 && Date.now() - Number(audioState.playRequestTs || 0) < 3000;
   const audioBusy = Boolean(
     audioState.trackStartInFlight ||
     audioState.sourceMetadataPending ||
@@ -277,10 +298,7 @@ function decodeCoverForSession(url, signal) {
     }
     image.onload = function () {
       if (typeof image.decode === "function") {
-        image.decode().then(
-          remember,
-          remember
-        );
+        image.decode().then(remember, remember);
         return;
       }
       remember();
@@ -306,56 +324,72 @@ function prepareAlbumCoverEntry(cache, entry, reason, signal) {
     cache: "default"
   });
 
-  return cache.match(request).then(function (cached) {
-    if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
-      return { aborted: true, cacheHint: cached ? "cache" : "unknown" };
-    }
-    if (cached) return { response: cached, cacheHint: "cache" };
-    logCoverRuntimeEvent("cover_request", {
-      album: entry.album,
-      source: "session_prepare",
-      cover_url: entry.url,
-      reason: reason || "session"
-    }, { dedupeMs: 30000 });
-    return fetch(request, signal ? { signal } : {}).then(function (response) {
-      if (response && response.ok) {
-        cache.put(request, response.clone()).catch(function () {});
-        return { response, cacheHint: "network" };
+  return cache
+    .match(request)
+    .then(function (cached) {
+      if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
+        return { aborted: true, cacheHint: cached ? "cache" : "unknown" };
       }
-      throw new Error("cover_prepare_http");
-    });
-  }).then(function (result) {
-    if (!result || result.aborted || (signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
-      return false;
-    }
-    return decodeCoverForSession(entry.url, signal).then(function (decoded) {
-      if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) return false;
-      if (decoded) audioState.albumCoverReadyUrls.add(entry.url);
-      trackAudioRuntimeEvent("cover_prepare_item", Object.assign({
+      if (cached) return { response: cached, cacheHint: "cache" };
+      logCoverRuntimeEvent(
+        "cover_request",
+        {
+          album: entry.album,
+          source: "session_prepare",
+          cover_url: entry.url,
+          reason: reason || "session"
+        },
+        { dedupeMs: 30000 }
+      );
+      return fetch(request, signal ? { signal } : {}).then(function (response) {
+        if (response && response.ok) {
+          cache.put(request, response.clone()).catch(function () {});
+          return { response, cacheHint: "network" };
+        }
+        throw new Error("cover_prepare_http");
+      });
+    })
+    .then(function (result) {
+      if (!result || result.aborted || (signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
+        return false;
+      }
+      return decodeCoverForSession(entry.url, signal).then(function (decoded) {
+        if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) return false;
+        if (decoded) audioState.albumCoverReadyUrls.add(entry.url);
+        trackAudioRuntimeEvent(
+          "cover_prepare_item",
+          Object.assign(
+            {
+              album: entry.album,
+              cover_url: entry.url,
+              width: entry.width || 0,
+              cache_hint: result && result.cacheHint ? result.cacheHint : "unknown",
+              decoded: Boolean(decoded),
+              ready: audioState.albumCoverReadyUrls.has(entry.url),
+              memory: Boolean(
+                audioState.albumCoverImageCache && audioState.albumCoverImageCache.has(entry.url)
+              ),
+              duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
+              reason: reason || "session"
+            },
+            getResourceTimingHint(entry.url, startedAt)
+          )
+        );
+        return Boolean(decoded);
+      });
+    })
+    .catch(function (err) {
+      if ((signal && signal.aborted) || (err && err.name === "AbortError")) return false;
+      trackAudioRuntimeEvent("cover_prepare_error", {
         album: entry.album,
         cover_url: entry.url,
         width: entry.width || 0,
-        cache_hint: result && result.cacheHint ? result.cacheHint : "unknown",
-        decoded: Boolean(decoded),
-        ready: audioState.albumCoverReadyUrls.has(entry.url),
-        memory: Boolean(audioState.albumCoverImageCache && audioState.albumCoverImageCache.has(entry.url)),
-        duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
-        reason: reason || "session"
-      }, getResourceTimingHint(entry.url, startedAt)));
-      return Boolean(decoded);
+        reason: reason || "session",
+        error_name: err && err.name ? err.name : "Error",
+        error_message: err && err.message ? err.message : "cover_prepare_failed"
+      });
+      return false;
     });
-  }).catch(function (err) {
-    if ((signal && signal.aborted) || (err && err.name === "AbortError")) return false;
-    trackAudioRuntimeEvent("cover_prepare_error", {
-      album: entry.album,
-      cover_url: entry.url,
-      width: entry.width || 0,
-      reason: reason || "session",
-      error_name: err && err.name ? err.name : "Error",
-      error_message: err && err.message ? err.message : "cover_prepare_failed"
-    });
-    return false;
-  });
 }
 
 function rememberAlbumCoverImage(url, image) {
@@ -363,7 +397,8 @@ function rememberAlbumCoverImage(url, image) {
   if (audioState.albumCoverReadyUrls && typeof audioState.albumCoverReadyUrls.add === "function") {
     audioState.albumCoverReadyUrls.add(url);
   }
-  if (!image || !audioState.albumCoverImageCache || typeof audioState.albumCoverImageCache.set !== "function") return;
+  if (!image || !audioState.albumCoverImageCache || typeof audioState.albumCoverImageCache.set !== "function")
+    return;
   if (audioState.albumCoverImageCache.has(url)) {
     audioState.albumCoverImageCache.delete(url);
   }
@@ -401,71 +436,76 @@ function prepareAlbumCoversForSession(reason) {
     warmupAudio.addEventListener("play", pauseForAudio);
     warmupAudio.addEventListener("playing", pauseForAudio);
   }
-  audioState.albumCoverPreparePromise = loadTracksData().then(function (tracksData) {
-    if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
-      pausedForActivity = true;
-      return;
-    }
-    const covers = limitAlbumCoverWarmupUrls(orderAlbumCoverWarmupUrls(getAlbumCoverWarmupUrls(tracksData)));
-    if (!covers.length) {
-      audioState.albumCoverCacheWarmupDone = true;
-      return;
-    }
-    trackAudioRuntimeEvent("cover_prepare_start", {
-      count: covers.length,
-      reason: reason || "session"
-    });
-    return caches.open(COVERS_CACHE_NAME).then(function (cache) {
-      let cursor = 0;
-      let decodedCount = 0;
-      const workerCount = Math.min(COVER_SESSION_PREPARE_CONCURRENCY, covers.length);
-      const workers = Array.from({ length: workerCount }, function () {
-        return Promise.resolve().then(function runNext() {
-          if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
-            pausedForActivity = true;
-            if (abortController && !abortController.signal.aborted) abortController.abort();
-            return;
-          }
-          const entry = covers[cursor];
-          cursor += 1;
-          if (!entry) return;
-          return prepareAlbumCoverEntry(cache, entry, reason, signal).then(function (decoded) {
-            if (decoded) decodedCount += 1;
-            return runNext();
+  audioState.albumCoverPreparePromise = loadTracksData()
+    .then(function (tracksData) {
+      if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
+        pausedForActivity = true;
+        return;
+      }
+      const covers = limitAlbumCoverWarmupUrls(
+        orderAlbumCoverWarmupUrls(getAlbumCoverWarmupUrls(tracksData))
+      );
+      if (!covers.length) {
+        audioState.albumCoverCacheWarmupDone = true;
+        return;
+      }
+      trackAudioRuntimeEvent("cover_prepare_start", {
+        count: covers.length,
+        reason: reason || "session"
+      });
+      return caches.open(COVERS_CACHE_NAME).then(function (cache) {
+        let cursor = 0;
+        let decodedCount = 0;
+        const workerCount = Math.min(COVER_SESSION_PREPARE_CONCURRENCY, covers.length);
+        const workers = Array.from({ length: workerCount }, function () {
+          return Promise.resolve().then(function runNext() {
+            if ((signal && signal.aborted) || shouldPauseAlbumCoverWarmup()) {
+              pausedForActivity = true;
+              if (abortController && !abortController.signal.aborted) abortController.abort();
+              return;
+            }
+            const entry = covers[cursor];
+            cursor += 1;
+            if (!entry) return;
+            return prepareAlbumCoverEntry(cache, entry, reason, signal).then(function (decoded) {
+              if (decoded) decodedCount += 1;
+              return runNext();
+            });
+          });
+        });
+        return Promise.all(workers).then(function () {
+          audioState.albumCoverCacheWarmupDone = audioState.albumCoverReadyUrls.size >= covers.length;
+          trackAudioRuntimeEvent("cover_prepare_done", {
+            count: covers.length,
+            decoded_count: decodedCount,
+            ready_count: audioState.albumCoverReadyUrls.size,
+            memory_count: audioState.albumCoverImageCache ? audioState.albumCoverImageCache.size : 0,
+            complete: Boolean(audioState.albumCoverCacheWarmupDone),
+            duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
+            reason: reason || "session"
           });
         });
       });
-      return Promise.all(workers).then(function () {
-        audioState.albumCoverCacheWarmupDone = audioState.albumCoverReadyUrls.size >= covers.length;
-        trackAudioRuntimeEvent("cover_prepare_done", {
-          count: covers.length,
-          decoded_count: decodedCount,
-          ready_count: audioState.albumCoverReadyUrls.size,
-          memory_count: audioState.albumCoverImageCache ? audioState.albumCoverImageCache.size : 0,
-          complete: Boolean(audioState.albumCoverCacheWarmupDone),
-          duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
-          reason: reason || "session"
-        });
+    })
+    .catch(function (err) {
+      trackAudioRuntimeEvent("cover_prepare_error", {
+        reason: reason || "session",
+        error_name: err && err.name ? err.name : "Error",
+        error_message: err && err.message ? err.message : "cover_prepare_failed"
       });
+    })
+    .finally(function () {
+      if (warmupAudio && typeof warmupAudio.removeEventListener === "function") {
+        warmupAudio.removeEventListener("loadstart", pauseForAudio);
+        warmupAudio.removeEventListener("play", pauseForAudio);
+        warmupAudio.removeEventListener("playing", pauseForAudio);
+      }
+      audioState.albumCoverCacheWarmupScheduled = false;
+      audioState.albumCoverPreparePromise = null;
+      if ((pausedForActivity || shouldPauseAlbumCoverWarmup()) && !audioState.albumCoverCacheWarmupDone) {
+        audioState.albumCoverWarmupResumePending = true;
+      }
     });
-  }).catch(function (err) {
-    trackAudioRuntimeEvent("cover_prepare_error", {
-      reason: reason || "session",
-      error_name: err && err.name ? err.name : "Error",
-      error_message: err && err.message ? err.message : "cover_prepare_failed"
-    });
-  }).finally(function () {
-    if (warmupAudio && typeof warmupAudio.removeEventListener === "function") {
-      warmupAudio.removeEventListener("loadstart", pauseForAudio);
-      warmupAudio.removeEventListener("play", pauseForAudio);
-      warmupAudio.removeEventListener("playing", pauseForAudio);
-    }
-    audioState.albumCoverCacheWarmupScheduled = false;
-    audioState.albumCoverPreparePromise = null;
-    if ((pausedForActivity || shouldPauseAlbumCoverWarmup()) && !audioState.albumCoverCacheWarmupDone) {
-      audioState.albumCoverWarmupResumePending = true;
-    }
-  });
 
   return audioState.albumCoverPreparePromise;
 }
@@ -479,76 +519,93 @@ function warmAlbumCoverCache(reason) {
     audioState.albumCoverWarmupResumePending = true;
     return Promise.resolve();
   }
-  return loadTracksData().then(function (tracksData) {
-    const covers = limitAlbumCoverWarmupUrls(orderAlbumCoverWarmupUrls(getAlbumCoverWarmupUrls(tracksData)));
-    if (!covers.length) {
-      audioState.albumCoverCacheWarmupDone = true;
-      return;
-    }
-    return caches.open(COVERS_CACHE_NAME).then(function (cache) {
-      let chain = Promise.resolve();
-      covers.forEach(function (entry, index) {
-        chain = chain.then(function () {
-          if (shouldPauseAlbumCoverWarmup()) {
-            audioState.albumCoverCacheWarmupScheduled = false;
-            audioState.albumCoverWarmupResumePending = true;
-            throw new Error("cover_warmup_paused_for_activity");
-          }
-          return new Promise(function (resolve) {
-            setTimeout(resolve, index === 0 ? 0 : 45);
-          }).then(function () {
-            const request = new Request(entry.url, {
-              method: "GET",
-              credentials: "same-origin",
-              cache: "default"
-            });
-            const startedAt = getAudioTelemetryNow();
-            return cache.match(request).then(function (cached) {
-              if (cached) {
-                logCoverRuntimeEvent("cover_loaded", {
-                  album: entry.album,
-                  source: "idle_prefetch",
-                  cover_url: entry.url,
-                  cache_hint: "cache",
-                  duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
-                  reason: reason || "idle"
-                });
-                return;
-              }
-              logCoverRuntimeEvent("cover_request", {
-                album: entry.album,
-                source: "idle_prefetch",
-                cover_url: entry.url,
-                reason: reason || "idle"
-              }, { dedupeMs: 30000 });
-              return fetch(request).then(function (response) {
-                if (response && response.ok) {
-                  cache.put(request, response.clone()).catch(function () {});
-                  logCoverRuntimeEvent("cover_loaded", Object.assign({
+  return loadTracksData()
+    .then(function (tracksData) {
+      const covers = limitAlbumCoverWarmupUrls(
+        orderAlbumCoverWarmupUrls(getAlbumCoverWarmupUrls(tracksData))
+      );
+      if (!covers.length) {
+        audioState.albumCoverCacheWarmupDone = true;
+        return;
+      }
+      return caches.open(COVERS_CACHE_NAME).then(function (cache) {
+        let chain = Promise.resolve();
+        covers.forEach(function (entry, index) {
+          chain = chain.then(function () {
+            if (shouldPauseAlbumCoverWarmup()) {
+              audioState.albumCoverCacheWarmupScheduled = false;
+              audioState.albumCoverWarmupResumePending = true;
+              throw new Error("cover_warmup_paused_for_activity");
+            }
+            return new Promise(function (resolve) {
+              setTimeout(resolve, index === 0 ? 0 : 45);
+            }).then(function () {
+              const request = new Request(entry.url, {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "default"
+              });
+              const startedAt = getAudioTelemetryNow();
+              return cache
+                .match(request)
+                .then(function (cached) {
+                  if (cached) {
+                    logCoverRuntimeEvent("cover_loaded", {
+                      album: entry.album,
+                      source: "idle_prefetch",
+                      cover_url: entry.url,
+                      cache_hint: "cache",
+                      duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
+                      reason: reason || "idle"
+                    });
+                    return;
+                  }
+                  logCoverRuntimeEvent(
+                    "cover_request",
+                    {
+                      album: entry.album,
+                      source: "idle_prefetch",
+                      cover_url: entry.url,
+                      reason: reason || "idle"
+                    },
+                    { dedupeMs: 30000 }
+                  );
+                  return fetch(request).then(function (response) {
+                    if (response && response.ok) {
+                      cache.put(request, response.clone()).catch(function () {});
+                      logCoverRuntimeEvent(
+                        "cover_loaded",
+                        Object.assign(
+                          {
+                            album: entry.album,
+                            source: "idle_prefetch",
+                            cover_url: entry.url,
+                            duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
+                            reason: reason || "idle"
+                          },
+                          getResourceTimingHint(entry.url, startedAt)
+                        )
+                      );
+                    }
+                  });
+                })
+                .catch(function () {
+                  trackAudioRuntimeEvent("cover_error", {
                     album: entry.album,
                     source: "idle_prefetch",
                     cover_url: entry.url,
-                    duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - startedAt)),
                     reason: reason || "idle"
-                  }, getResourceTimingHint(entry.url, startedAt)));
-                }
-              });
-            }).catch(function () {
-              trackAudioRuntimeEvent("cover_error", {
-                album: entry.album,
-                source: "idle_prefetch",
-                cover_url: entry.url,
-                reason: reason || "idle"
-              });
+                  });
+                });
             });
           });
         });
+        return chain.then(function () {
+          audioState.albumCoverCacheWarmupDone = true;
+        });
       });
-      return chain.then(function () {
-        audioState.albumCoverCacheWarmupDone = true;
-      });
-    });
-  }).catch(function () {});
+    })
+    .catch(function () {});
 }
 
 function scheduleAlbumCoverCacheWarmup(reason) {
@@ -582,22 +639,36 @@ function optimizeAlbumCoverImage() {
   });
 
   function logCoverDone(type) {
-    trackAudioRuntimeEvent(type, Object.assign({
-      album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(window.location.href),
-      source: "DOM",
-      cover_url: cover.currentSrc || cover.src || rawSrc,
-      duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - coverStartedAt))
-    }, getResourceTimingHint(cover.currentSrc || cover.src || rawSrc, coverStartedAt)));
+    trackAudioRuntimeEvent(
+      type,
+      Object.assign(
+        {
+          album: getCurrentAlbumTitle() || getAlbumNameFromUrlLike(window.location.href),
+          source: "DOM",
+          cover_url: cover.currentSrc || cover.src || rawSrc,
+          duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - coverStartedAt))
+        },
+        getResourceTimingHint(cover.currentSrc || cover.src || rawSrc, coverStartedAt)
+      )
+    );
   }
 
   if (!cover.dataset.audiofix113CoverTelemetry) {
     cover.dataset.audiofix113CoverTelemetry = "1";
-    cover.addEventListener("load", function () {
-      logCoverDone("cover_loaded");
-    }, { once: true });
-    cover.addEventListener("error", function () {
-      logCoverDone("cover_error");
-    }, { once: true });
+    cover.addEventListener(
+      "load",
+      function () {
+        logCoverDone("cover_loaded");
+      },
+      { once: true }
+    );
+    cover.addEventListener(
+      "error",
+      function () {
+        logCoverDone("cover_error");
+      },
+      { once: true }
+    );
   }
 
   cover.setAttribute("src", canonical);
@@ -610,4 +681,22 @@ function optimizeAlbumCoverImage() {
   cover.setAttribute("loading", "eager");
 }
 
-export { shouldInitAudioFeatures, getResourceTimingHint, logCoverRuntimeEvent, getAlbumCoverWarmupUrls, getVisibleHomeCoverUrls, primeLinkedAlbumCoverForPwa, releasePwaCoverHold, orderAlbumCoverWarmupUrls, limitAlbumCoverWarmupUrls, shouldPauseAlbumCoverWarmup, decodeCoverForSession, prepareAlbumCoverEntry, rememberAlbumCoverImage, prepareAlbumCoversForSession, warmAlbumCoverCache, scheduleAlbumCoverCacheWarmup, optimizeAlbumCoverImage };
+export {
+  shouldInitAudioFeatures,
+  getResourceTimingHint,
+  logCoverRuntimeEvent,
+  getAlbumCoverWarmupUrls,
+  getVisibleHomeCoverUrls,
+  primeLinkedAlbumCoverForPwa,
+  releasePwaCoverHold,
+  orderAlbumCoverWarmupUrls,
+  limitAlbumCoverWarmupUrls,
+  shouldPauseAlbumCoverWarmup,
+  decodeCoverForSession,
+  prepareAlbumCoverEntry,
+  rememberAlbumCoverImage,
+  prepareAlbumCoversForSession,
+  warmAlbumCoverCache,
+  scheduleAlbumCoverCacheWarmup,
+  optimizeAlbumCoverImage
+};

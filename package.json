@@ -13,10 +13,16 @@
     "visual": "playwright test --config tools/visual/playwright.config.js",
     "visual:update": "playwright test --config tools/visual/playwright.config.js --update-snapshots",
     "build": "vite build --config tools/build/vite.config.mjs",
-    "pretest": "npm run build --silent"
+    "pretest": "npm run lint --silent && npm run build --silent",
+    "lint": "eslint --config tools/build/eslint.config.mjs \"public/assets/js/**/*.js\"",
+    "format": "prettier --config tools/build/prettier.json --write public/assets/js/scripts.js \"public/assets/js/runtime/*.js\" tools/build"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.64.1",
+    "eslint": "10.13.0",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
     "vite": "8.3.5",
     "wrangler": "4.127.1"
   }

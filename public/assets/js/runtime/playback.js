@@ -4,8 +4,20 @@
 import { audioCoreApi, audioState, audioTelemetryApi } from "../scripts.js";
 import { callAudioRadio, syncTransportMiniUi } from "./module-bridges.js";
 import { isIosDevice } from "./theme-admin-pwa.js";
-import { getCurrentAlbumTitle, getCurrentLogicalAudioSrc, getCurrentPlaylistTrack, resolveCatalogAlbumArtwork, resolveTracksAlbumArtwork, srcMatches, toAbsoluteUrlOrEmpty } from "./audio-sources.js";
-import { getAlbumCoverFromDoc, getMediaSessionFallbackArtwork, normalizeArtworkUrl } from "./media-artwork.js";
+import {
+  getCurrentAlbumTitle,
+  getCurrentLogicalAudioSrc,
+  getCurrentPlaylistTrack,
+  resolveCatalogAlbumArtwork,
+  resolveTracksAlbumArtwork,
+  srcMatches,
+  toAbsoluteUrlOrEmpty
+} from "./audio-sources.js";
+import {
+  getAlbumCoverFromDoc,
+  getMediaSessionFallbackArtwork,
+  normalizeArtworkUrl
+} from "./media-artwork.js";
 import { buildAudioMonitorPayload } from "./audio-monitor.js";
 
 function trackAudioRuntimeEvent(type, data) {
@@ -49,17 +61,17 @@ function getAlbumNameFromUrlLike(urlLike) {
 function logAudioRuntimeAlbumSwitch(context, cached) {
   if (!context || !context.startedAt) return;
   const track = getCurrentPlaylistTrack();
-  trackAudioRuntimeEvent("album_switch", Object.assign(
-    buildAudioMonitorPayload(track, audioState.currentIndex, getCurrentLogicalAudioSrc()),
-    {
+  trackAudioRuntimeEvent(
+    "album_switch",
+    Object.assign(buildAudioMonitorPayload(track, audioState.currentIndex, getCurrentLogicalAudioSrc()), {
       from_album: context.fromAlbum || "",
       to_album: getCurrentAlbumTitle() || document.title || "",
       from_url: context.fromUrl || "",
       to_url: context.toUrl || "",
       delay_ms: Date.now() - context.startedAt,
       cached: Boolean(cached)
-    }
-  ));
+    })
+  );
 }
 
 function clearFadeTimer() {
@@ -174,7 +186,7 @@ function fadeOutAudio(audio, durationMs, requestToken) {
       }
 
       step += 1;
-      const nextVolume = Math.max(0, startVolume * (1 - (step / steps)));
+      const nextVolume = Math.max(0, startVolume * (1 - step / steps));
       try {
         audio.volume = nextVolume;
       } catch (_err) {
@@ -313,4 +325,41 @@ function toggleCurrentPageCollection() {
   return callAudioRadio("toggleCurrentPageCollection", arguments);
 }
 
-export { trackAudioRuntimeEvent, sendAudioMonitoringLog, logAudioAuditEvent, getCoverTelemetrySource, getAlbumNameFromUrlLike, logAudioRuntimeAlbumSwitch, clearFadeTimer, fadeInAudio, forceAudioFullVolume, fadeOutAudio, ensureGlobalAudio, stopAudioRaf, startAudioRaf, updateProgressUi, saveResumeState, restoreResumeState, ensurePlayablePlaylistContext, markAudioPauseIntent, cancelSystemInterruptionResume, cancelExternalResumeCommand, syncPlaylistContext, ensureCurrentIndexFromAudio, getCurrentPlaylistIndexSafe, getQueuePreviewIndices, resetAudioElementForSource, recoverFromTrackFailure, getRandomIndex, startTrack, playNext, playPrevious, movePlaylistItem, startRadioPlaybackFromIdle, togglePlayPause, playFromExternalControl, handleGlobalTransportToggle, toggleCurrentPageCollection };
+export {
+  trackAudioRuntimeEvent,
+  sendAudioMonitoringLog,
+  logAudioAuditEvent,
+  getCoverTelemetrySource,
+  getAlbumNameFromUrlLike,
+  logAudioRuntimeAlbumSwitch,
+  clearFadeTimer,
+  fadeInAudio,
+  forceAudioFullVolume,
+  fadeOutAudio,
+  ensureGlobalAudio,
+  stopAudioRaf,
+  startAudioRaf,
+  updateProgressUi,
+  saveResumeState,
+  restoreResumeState,
+  ensurePlayablePlaylistContext,
+  markAudioPauseIntent,
+  cancelSystemInterruptionResume,
+  cancelExternalResumeCommand,
+  syncPlaylistContext,
+  ensureCurrentIndexFromAudio,
+  getCurrentPlaylistIndexSafe,
+  getQueuePreviewIndices,
+  resetAudioElementForSource,
+  recoverFromTrackFailure,
+  getRandomIndex,
+  startTrack,
+  playNext,
+  playPrevious,
+  movePlaylistItem,
+  startRadioPlaybackFromIdle,
+  togglePlayPause,
+  playFromExternalControl,
+  handleGlobalTransportToggle,
+  toggleCurrentPageCollection
+};

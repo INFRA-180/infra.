@@ -1,7 +1,14 @@
 // Adresses audio, état des titres, titres et pochettes courantes.
 // Extrait de l'ancien scripts.js (chantier JavaScript d'INFRA, 10/11/2026). Uniquement des fonctions
 // et leurs variables : l'état partagé et l'ordre de démarrage restent dans scripts.js.
-import { AUDIO_BASE, audioState, catalogState, fallbackCatalog, normalizeDownloadUrl, runtime } from "../scripts.js";
+import {
+  AUDIO_BASE,
+  audioState,
+  catalogState,
+  fallbackCatalog,
+  normalizeDownloadUrl,
+  runtime
+} from "../scripts.js";
 import { getAudioTelemetryNow } from "./config.js";
 import { getTrackMetaByAssetPath, mergeTrackMetadata } from "./catalog-playback.js";
 import { getResourceTimingHint, logCoverRuntimeEvent } from "./cover-warmup.js";
@@ -201,11 +208,7 @@ function normalizeAudioSourceUrl(rawUrl) {
   }
 
   const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
-  if (
-    host === "drive.google.com" ||
-    host === "docs.google.com" ||
-    host === "drive.usercontent.google.com"
-  ) {
+  if (host === "drive.google.com" || host === "docs.google.com" || host === "drive.usercontent.google.com") {
     return normalizeDownloadUrl(parsed.href);
   }
 
@@ -218,7 +221,7 @@ function isBlobObjectUrl(value) {
 
 function getCurrentPlayableAudioSrc(audio) {
   const currentAudio = audio || audioState.audio;
-  return currentAudio ? (currentAudio.currentSrc || currentAudio.src || "") : "";
+  return currentAudio ? currentAudio.currentSrc || currentAudio.src || "" : "";
 }
 
 function getCurrentLogicalAudioSrc() {
@@ -290,11 +293,16 @@ function normalizeTrackTitle(title) {
 }
 
 function normalizeAlbumTitle(title) {
-  return String(title || "").replace(/\s+/g, " ").trim().toLocaleUpperCase();
+  return String(title || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleUpperCase();
 }
 
 function displayAlbumCardTitle(title) {
-  const cleaned = String(title || "").replace(/\s+/g, " ").trim();
+  const cleaned = String(title || "")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!cleaned) return "";
   if (/[\u0370-\u03ff]/u.test(cleaned) || /\b[A-Z][a-z]\b/.test(cleaned)) return cleaned;
   return cleaned.toLocaleUpperCase();
@@ -303,9 +311,10 @@ function displayAlbumCardTitle(title) {
 function getCurrentAlbumTitle() {
   if (!document.body.classList.contains("album-screen")) return "";
   const routeHost = document.getElementById("infraSpaRouteHost");
-  const routeRoot = document.querySelector(
-    "#infraSpaRouteHost .spa-route-layer.album-screen[data-spa-route-state='current']"
-  ) || (!routeHost ? document : null);
+  const routeRoot =
+    document.querySelector(
+      "#infraSpaRouteHost .spa-route-layer.album-screen[data-spa-route-state='current']"
+    ) || (!routeHost ? document : null);
   if (!routeRoot) return "";
   const heading =
     routeRoot.querySelector("main.page > h1") ||
@@ -352,12 +361,14 @@ function preloadImage(src, options) {
     return Promise.resolve({ ok: false, src: url });
   }
 
-  const resultCache = audioState.coverLoadResults instanceof Map
-    ? audioState.coverLoadResults
-    : (audioState.coverLoadResults = new Map());
-  const promiseCache = audioState.coverLoadPromises instanceof Map
-    ? audioState.coverLoadPromises
-    : (audioState.coverLoadPromises = new Map());
+  const resultCache =
+    audioState.coverLoadResults instanceof Map
+      ? audioState.coverLoadResults
+      : (audioState.coverLoadResults = new Map());
+  const promiseCache =
+    audioState.coverLoadPromises instanceof Map
+      ? audioState.coverLoadPromises
+      : (audioState.coverLoadPromises = new Map());
   const cached = resultCache.get(url);
   const cachedAt = cached && Number(cached.cachedAt || 0);
   if (cached && (cached.ok || (cachedAt > 0 && Date.now() - cachedAt < 5000))) {
@@ -445,7 +456,8 @@ function preloadImage(src, options) {
 function setCoverWhenReady(imgElement, nextSrc, fallbackSrc, token) {
   if (!imgElement) return Promise.resolve(false);
 
-  const fallback = normalizeCoverUrl(fallbackSrc || "", { responsive: false }) || getCurrentTrackArtwork(null);
+  const fallback =
+    normalizeCoverUrl(fallbackSrc || "", { responsive: false }) || getCurrentTrackArtwork(null);
   const target = normalizeCoverUrl(nextSrc || "", { width: 1200 }) || fallback;
   if (!target) return Promise.resolve(false);
 
@@ -453,7 +465,10 @@ function setCoverWhenReady(imgElement, nextSrc, fallbackSrc, token) {
   if (current && srcMatches(current, target)) return Promise.resolve(true);
 
   const track = getCurrentPlaylistTrack();
-  const trackPath = getAudioAssetPath(track && track.src ? track.src : getCurrentLogicalAudioSrc(), window.location.href);
+  const trackPath = getAudioAssetPath(
+    track && track.src ? track.src : getCurrentLogicalAudioSrc(),
+    window.location.href
+  );
   if (!trackPath && srcMatches(target, getMediaSessionFallbackArtwork())) {
     return Promise.resolve(false);
   }
@@ -474,13 +489,19 @@ function setCoverWhenReady(imgElement, nextSrc, fallbackSrc, token) {
   return preloadImage(target, { highPriority: true }).then(function (result) {
     if (!isFresh()) return false;
     if (result && result.ok) {
-      trackAudioRuntimeEvent("cover_loaded", Object.assign({
-        album: normalizeAlbumTitle(track && track.album ? track.album : getCurrentAlbumTitle()),
-        source: getCoverTelemetrySource(target, track),
-        cover_url: target,
-        duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - coverStartedAt)),
-        track_path: trackPath
-      }, getResourceTimingHint(target, coverStartedAt)));
+      trackAudioRuntimeEvent(
+        "cover_loaded",
+        Object.assign(
+          {
+            album: normalizeAlbumTitle(track && track.album ? track.album : getCurrentAlbumTitle()),
+            source: getCoverTelemetrySource(target, track),
+            cover_url: target,
+            duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - coverStartedAt)),
+            track_path: trackPath
+          },
+          getResourceTimingHint(target, coverStartedAt)
+        )
+      );
       imgElement.src = target;
       return true;
     }
@@ -503,13 +524,19 @@ function setCoverWhenReady(imgElement, nextSrc, fallbackSrc, token) {
     return preloadImage(fallback, { highPriority: true }).then(function (fallbackResult) {
       if (!isFresh()) return false;
       if (fallbackResult && fallbackResult.ok) {
-        trackAudioRuntimeEvent("cover_loaded", Object.assign({
-          album: normalizeAlbumTitle(track && track.album ? track.album : getCurrentAlbumTitle()),
-          source: "fallback",
-          cover_url: fallback,
-          duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - fallbackStartedAt)),
-          track_path: trackPath
-        }, getResourceTimingHint(fallback, fallbackStartedAt)));
+        trackAudioRuntimeEvent(
+          "cover_loaded",
+          Object.assign(
+            {
+              album: normalizeAlbumTitle(track && track.album ? track.album : getCurrentAlbumTitle()),
+              source: "fallback",
+              cover_url: fallback,
+              duration_ms: Math.max(0, Math.round(getAudioTelemetryNow() - fallbackStartedAt)),
+              track_path: trackPath
+            },
+            getResourceTimingHint(fallback, fallbackStartedAt)
+          )
+        );
         imgElement.src = fallback;
         return true;
       }
@@ -527,7 +554,8 @@ function setCoverWhenReady(imgElement, nextSrc, fallbackSrc, token) {
 
 function setCoverBackgroundStable(element, nextSrc, fallbackSrc, token) {
   if (!element) return Promise.resolve(false);
-  const fallback = normalizeCoverUrl(fallbackSrc || "", { responsive: false }) || getMediaSessionFallbackArtwork();
+  const fallback =
+    normalizeCoverUrl(fallbackSrc || "", { responsive: false }) || getMediaSessionFallbackArtwork();
   const target = normalizeCoverUrl(nextSrc || "", { width: 1200 }) || fallback;
   if (!target) return Promise.resolve(false);
 
@@ -551,18 +579,19 @@ function setCoverBackgroundStable(element, nextSrc, fallbackSrc, token) {
 function resolveCatalogAlbumArtwork(track) {
   const page = toAbsoluteUrlOrEmpty(track && track.page ? track.page : "");
   const album = normalizeAlbumTitle(track && track.album ? track.album : "");
-  const catalog = catalogState.data && Array.isArray(catalogState.data.albums)
-    ? catalogState.data
-    : fallbackCatalog;
+  const catalog =
+    catalogState.data && Array.isArray(catalogState.data.albums) ? catalogState.data : fallbackCatalog;
   const albums = Array.isArray(catalog && catalog.albums) ? catalog.albums : [];
   if (!albums.length) return "";
 
   let matched = null;
   if (page) {
-    matched = albums.find((entry) => toAbsoluteUrlOrEmpty(entry && entry.page ? entry.page : "") === page) || null;
+    matched =
+      albums.find((entry) => toAbsoluteUrlOrEmpty(entry && entry.page ? entry.page : "") === page) || null;
   }
   if (!matched && album) {
-    matched = albums.find((entry) => normalizeAlbumTitle(entry && entry.title ? entry.title : "") === album) || null;
+    matched =
+      albums.find((entry) => normalizeAlbumTitle(entry && entry.title ? entry.title : "") === album) || null;
   }
   const thumb = matched && matched.thumb ? toRuntimeAbsoluteUrl(matched.thumb) : "";
   return thumb || "";
@@ -581,18 +610,57 @@ function resolveTracksAlbumArtwork(track) {
   let matched = null;
 
   if (page) {
-    matched = albums.find(function (entry) {
-      return toRuntimeAbsoluteUrl(entry && entry.page ? entry.page : "") === page;
-    }) || null;
+    matched =
+      albums.find(function (entry) {
+        return toRuntimeAbsoluteUrl(entry && entry.page ? entry.page : "") === page;
+      }) || null;
   }
 
   if (!matched && album) {
-    matched = albums.find(function (entry) {
-      return normalizeAlbumTitle(entry && entry.title ? entry.title : "") === album;
-    }) || null;
+    matched =
+      albums.find(function (entry) {
+        return normalizeAlbumTitle(entry && entry.title ? entry.title : "") === album;
+      }) || null;
   }
 
   return matched && matched.cover ? toRuntimeAbsoluteUrl(matched.cover) : "";
 }
 
-export { toAbsoluteUrl, toAbsoluteUrlOrEmpty, toRuntimeAbsoluteUrl, encodeAssetPathForUrl, getAudioAssetPath, getAudioAssetPathKey, resolveManagedAudioSrc, normalizeUrlAgainstBase, normalizeSrcValue, srcMatches, hashString, registerTrackFailure, clearTrackFailure, clearTrackFailureForCurrent, loadMediaElementForPlayback, normalizeAudioSourceUrl, isBlobObjectUrl, getCurrentPlayableAudioSrc, getCurrentLogicalAudioSrc, revokeActiveBlobUrl, setTrackStatus, clearTrackStatus, clearOtherTrackStatuses, getTrackByIndex, normalizeTrackTitle, normalizeAlbumTitle, displayAlbumCardTitle, getCurrentAlbumTitle, getCurrentPlaylistTrack, getCurrentTrackAlbumPage, getCurrentTrackArtwork, preloadImage, setCoverWhenReady, setCoverBackgroundStable, resolveCatalogAlbumArtwork, resolveTracksAlbumArtwork };
+export {
+  toAbsoluteUrl,
+  toAbsoluteUrlOrEmpty,
+  toRuntimeAbsoluteUrl,
+  encodeAssetPathForUrl,
+  getAudioAssetPath,
+  getAudioAssetPathKey,
+  resolveManagedAudioSrc,
+  normalizeUrlAgainstBase,
+  normalizeSrcValue,
+  srcMatches,
+  hashString,
+  registerTrackFailure,
+  clearTrackFailure,
+  clearTrackFailureForCurrent,
+  loadMediaElementForPlayback,
+  normalizeAudioSourceUrl,
+  isBlobObjectUrl,
+  getCurrentPlayableAudioSrc,
+  getCurrentLogicalAudioSrc,
+  revokeActiveBlobUrl,
+  setTrackStatus,
+  clearTrackStatus,
+  clearOtherTrackStatuses,
+  getTrackByIndex,
+  normalizeTrackTitle,
+  normalizeAlbumTitle,
+  displayAlbumCardTitle,
+  getCurrentAlbumTitle,
+  getCurrentPlaylistTrack,
+  getCurrentTrackAlbumPage,
+  getCurrentTrackArtwork,
+  preloadImage,
+  setCoverWhenReady,
+  setCoverBackgroundStable,
+  resolveCatalogAlbumArtwork,
+  resolveTracksAlbumArtwork
+};

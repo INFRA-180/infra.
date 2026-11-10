@@ -848,7 +848,7 @@
     }
   }
 
-  function ensureAlbumFavoriteControls(row, track, meta) {
+  function ensureAlbumFavoriteControls(row, track, _meta) {
     if (!row) return;
     const audioEl = row.querySelector("audio");
     const rowAudioSrc = row.getAttribute("data-audio-src") ||
@@ -1536,7 +1536,7 @@
         });
         event.preventDefault();
       });
-      handle.addEventListener("pointerup", function (event) {
+      handle.addEventListener("pointerup", function (_event) {
         const state = audioState.favoritesDragState;
         audioState.favoritesDragState = null;
         const sourceRow = state && state.row ? state.row : view.querySelector(".favorites-track-row.is-dragging");

@@ -1,18 +1,73 @@
 // Ouverture d'album, navigation, démarrage de la page et bilan de lancement.
 // Extrait de l'ancien scripts.js (chantier JavaScript d'INFRA, 10/11/2026). Uniquement des fonctions
 // et leurs variables : l'état partagé et l'ordre de démarrage restent dans scripts.js.
-import { LOCAL_CATALOG_VERSION, SPA_SCROLL_HISTORY_DEBOUNCE_MS, audioState, catalogState, fallbackCatalog, spaRouterApi, spaState } from "../scripts.js";
+import {
+  LOCAL_CATALOG_VERSION,
+  SPA_SCROLL_HISTORY_DEBOUNCE_MS,
+  audioState,
+  catalogState,
+  fallbackCatalog,
+  spaRouterApi,
+  spaState
+} from "../scripts.js";
 import { getAudioTelemetryNow } from "./config.js";
-import { closeNowPlayingOverlay, hydrateCurrentAlbumTrackRows, initMinimalPlayers, loadTrackDurationData, snapshotCurrentSpaPage, syncAudioUi, syncTransportUi } from "./module-bridges.js";
-import { enhanceAlbumDownloadButtons, initFavoritesRoute, loadFavoritesWithReset, scheduleFavoritesPreload, syncFavoriteButtons, syncFavoritesRoute } from "./favorites-bridge.js";
-import { hydrateHomeCatalog, loadCatalogData, loadTracksData, prepareInitialGlobalRandomPlayback } from "./catalog-playback.js";
-import { optimizeAlbumCoverImage, primeLinkedAlbumCoverForPwa, releasePwaCoverHold, scheduleAlbumCoverCacheWarmup, shouldInitAudioFeatures } from "./cover-warmup.js";
-import { applyThemePreset, initAdminFeatures, initPwaInstallPrompt, initThemePreset, isAdminModeEnabled, isIosDevice, isStandaloneDisplayMode, serviceWorkerControllerChangeAt, teardownAdminFeatures } from "./theme-admin-pwa.js";
-import { cancelPendingSpaScrollSave, isSpaNavigableUrl, navigateTo, prefetchSpaPage, saveCurrentScrollPositionInHistory } from "./navigation.js";
+import {
+  closeNowPlayingOverlay,
+  hydrateCurrentAlbumTrackRows,
+  initMinimalPlayers,
+  loadTrackDurationData,
+  snapshotCurrentSpaPage,
+  syncAudioUi,
+  syncTransportUi
+} from "./module-bridges.js";
+import {
+  enhanceAlbumDownloadButtons,
+  initFavoritesRoute,
+  loadFavoritesWithReset,
+  scheduleFavoritesPreload,
+  syncFavoriteButtons,
+  syncFavoritesRoute
+} from "./favorites-bridge.js";
+import {
+  hydrateHomeCatalog,
+  loadCatalogData,
+  loadTracksData,
+  prepareInitialGlobalRandomPlayback
+} from "./catalog-playback.js";
+import {
+  optimizeAlbumCoverImage,
+  primeLinkedAlbumCoverForPwa,
+  releasePwaCoverHold,
+  scheduleAlbumCoverCacheWarmup,
+  shouldInitAudioFeatures
+} from "./cover-warmup.js";
+import {
+  applyThemePreset,
+  initAdminFeatures,
+  initPwaInstallPrompt,
+  initThemePreset,
+  isAdminModeEnabled,
+  isIosDevice,
+  isStandaloneDisplayMode,
+  serviceWorkerControllerChangeAt,
+  teardownAdminFeatures
+} from "./theme-admin-pwa.js";
+import {
+  cancelPendingSpaScrollSave,
+  isSpaNavigableUrl,
+  navigateTo,
+  prefetchSpaPage,
+  saveCurrentScrollPositionInHistory
+} from "./navigation.js";
 import { getCurrentAlbumTitle } from "./audio-sources.js";
 import { initAudioSessionTelemetry } from "./media-artwork.js";
 import { flushAudioTelemetryQueue } from "./audio-monitor.js";
-import { ensureGlobalAudio, ensurePlayablePlaylistContext, getAlbumNameFromUrlLike, trackAudioRuntimeEvent } from "./playback.js";
+import {
+  ensureGlobalAudio,
+  ensurePlayablePlaylistContext,
+  getAlbumNameFromUrlLike,
+  trackAudioRuntimeEvent
+} from "./playback.js";
 
 function isAlbumOpenUrl(urlLike) {
   try {
@@ -94,25 +149,35 @@ function createAlbumOpenTelemetryContext(url, rendered, opts) {
 function finishAlbumOpenTelemetry(context, eventName, extra) {
   if (!context || !context.startedAt) return;
   const endedAt = getAudioTelemetryNow();
-  const controllerBetween = isTelemetryTimestampBetween(serviceWorkerControllerChangeAt, context.startedAt, endedAt);
-  trackAudioRuntimeEvent(eventName, Object.assign({
-    track: "album_open",
-    album: context.toAlbum || "",
-    from_album: context.fromAlbum || "",
-    to_album: context.toAlbum || getAlbumNameFromUrlLike(context.toUrl),
-    from_url: context.fromUrl,
-    to_url: context.toUrl,
-    delta_ms: Math.max(0, Math.round(endedAt - context.startedAt)),
-    controllerchange: controllerBetween,
-    sw_reload_between: false,
-    reload_executed: false,
-    navigation_token: context.navigationToken,
-    trigger: context.trigger,
-    surface: context.surface,
-    card_rank: context.cardRank,
-    lower_half: context.lowerHalf,
-    gesture_token: context.gestureToken
-  }, extra || {}));
+  const controllerBetween = isTelemetryTimestampBetween(
+    serviceWorkerControllerChangeAt,
+    context.startedAt,
+    endedAt
+  );
+  trackAudioRuntimeEvent(
+    eventName,
+    Object.assign(
+      {
+        track: "album_open",
+        album: context.toAlbum || "",
+        from_album: context.fromAlbum || "",
+        to_album: context.toAlbum || getAlbumNameFromUrlLike(context.toUrl),
+        from_url: context.fromUrl,
+        to_url: context.toUrl,
+        delta_ms: Math.max(0, Math.round(endedAt - context.startedAt)),
+        controllerchange: controllerBetween,
+        sw_reload_between: false,
+        reload_executed: false,
+        navigation_token: context.navigationToken,
+        trigger: context.trigger,
+        surface: context.surface,
+        card_rank: context.cardRank,
+        lower_half: context.lowerHalf,
+        gesture_token: context.gestureToken
+      },
+      extra || {}
+    )
+  );
   if (context.gestureToken) {
     const completed = eventName === "album_open_done";
     trackAudioRuntimeEvent("album_swipe", {
@@ -128,7 +193,7 @@ function finishAlbumOpenTelemetry(context, eventName, extra) {
       navigation_result: completed ? "done" : "failed",
       navigation_method: "spa",
       result: completed ? "opened" : "cancelled",
-      cancel_reason: completed ? "" : String(extra && extra.reason || "navigation_failed")
+      cancel_reason: completed ? "" : String((extra && extra.reason) || "navigation_failed")
     });
   }
 }
@@ -197,7 +262,8 @@ function initSpaNavigation() {
     if (!isSpaNavigableUrl(url)) return;
 
     const current = new URL(window.location.href);
-    if (url.pathname === current.pathname && url.search === current.search && url.hash === current.hash) return;
+    if (url.pathname === current.pathname && url.search === current.search && url.hash === current.hash)
+      return;
 
     primeLinkedAlbumCoverForPwa(link, url.href);
     prefetchSpaPage(url.href, { cacheMode: "default" });
@@ -207,61 +273,72 @@ function initSpaNavigation() {
   document.addEventListener("touchstart", prefetchFromLinkIntent, { capture: true, passive: true });
   document.addEventListener("focusin", prefetchFromLinkIntent, true);
 
-  document.addEventListener("click", function (event) {
-    if (event.defaultPrevented) return;
-    if (event.button !== 0) return;
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  document.addEventListener(
+    "click",
+    function (event) {
+      if (event.defaultPrevented) return;
+      if (event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
-    const target = event.target;
-    const link = target && typeof target.closest === "function" ? target.closest("a[href]") : null;
-    if (!link) return;
-    if (link.hasAttribute("download")) return;
-    if (link.hasAttribute("data-no-spa")) return;
-    if (link.target && link.target !== "_self") return;
+      const target = event.target;
+      const link = target && typeof target.closest === "function" ? target.closest("a[href]") : null;
+      if (!link) return;
+      if (link.hasAttribute("download")) return;
+      if (link.hasAttribute("data-no-spa")) return;
+      if (link.target && link.target !== "_self") return;
 
-    const href = link.getAttribute("href") || "";
-    if (!href || href.startsWith("#")) return;
-    if (href.startsWith("mailto:") || href.startsWith("tel:")) return;
+      const href = link.getAttribute("href") || "";
+      if (!href || href.startsWith("#")) return;
+      if (href.startsWith("mailto:") || href.startsWith("tel:")) return;
 
-    let url = null;
-    try {
-      url = new URL(link.href, window.location.href);
-    } catch (_err) {
-      return;
-    }
-
-    if (window.location.origin !== "null" && url.origin !== window.location.origin) return;
-
-    const wantsBackLink = link.classList && link.classList.contains("back");
-    const currentState = history.state && typeof history.state === "object" ? history.state : null;
-    if (wantsBackLink && currentState?.__infraPreviousUrl && window.history.length > 1) {
-      const previous = new URL(currentState.__infraPreviousUrl, window.location.href);
-      const pagePath = (route) => route.pathname.replace(/\/index\.html$/, "/");
-      if (previous.origin === url.origin && pagePath(previous) === pagePath(url) && previous.search === url.search) {
-        event.preventDefault();
-        history.back();
+      let url = null;
+      try {
+        url = new URL(link.href, window.location.href);
+      } catch (_err) {
         return;
       }
-    }
 
-    event.preventDefault();
-    primeLinkedAlbumCoverForPwa(link, url.href);
-    // Keep the current interactive page and persistent mini-player visible
-    // until the destination document is ready. The former foreground cover
-    // clone made a slow first visit look like a frozen application.
-    releasePwaCoverHold("replace");
-    const albumCard = link.matches && link.matches("a.album-card[href]:not(.playlist-card)") ? link : null;
-    const albumGrid = albumCard && albumCard.closest ? albumCard.closest('[data-catalog-grid="albums"]') : null;
-    const albumCards = albumGrid ? Array.from(albumGrid.querySelectorAll("a.album-card[href]:not(.playlist-card)")) : [];
-    const cardRank = albumCard ? Math.max(0, albumCards.indexOf(albumCard) + 1) : 0;
-    navigateTo(url.href, {
-      history: "push",
-      trigger: albumCard ? "tap" : "link",
-      surface: albumCard ? "home_album_grid" : "link",
-      cardRank,
-      lowerHalf: Boolean(albumCards.length && cardRank > Math.ceil(albumCards.length / 2))
-    });
-  }, true);
+      if (window.location.origin !== "null" && url.origin !== window.location.origin) return;
+
+      const wantsBackLink = link.classList && link.classList.contains("back");
+      const currentState = history.state && typeof history.state === "object" ? history.state : null;
+      if (wantsBackLink && currentState?.__infraPreviousUrl && window.history.length > 1) {
+        const previous = new URL(currentState.__infraPreviousUrl, window.location.href);
+        const pagePath = (route) => route.pathname.replace(/\/index\.html$/, "/");
+        if (
+          previous.origin === url.origin &&
+          pagePath(previous) === pagePath(url) &&
+          previous.search === url.search
+        ) {
+          event.preventDefault();
+          history.back();
+          return;
+        }
+      }
+
+      event.preventDefault();
+      primeLinkedAlbumCoverForPwa(link, url.href);
+      // Keep the current interactive page and persistent mini-player visible
+      // until the destination document is ready. The former foreground cover
+      // clone made a slow first visit look like a frozen application.
+      releasePwaCoverHold("replace");
+      const albumCard = link.matches && link.matches("a.album-card[href]:not(.playlist-card)") ? link : null;
+      const albumGrid =
+        albumCard && albumCard.closest ? albumCard.closest('[data-catalog-grid="albums"]') : null;
+      const albumCards = albumGrid
+        ? Array.from(albumGrid.querySelectorAll("a.album-card[href]:not(.playlist-card)"))
+        : [];
+      const cardRank = albumCard ? Math.max(0, albumCards.indexOf(albumCard) + 1) : 0;
+      navigateTo(url.href, {
+        history: "push",
+        trigger: albumCard ? "tap" : "link",
+        surface: albumCard ? "home_album_grid" : "link",
+        cardRank,
+        lowerHalf: Boolean(albumCards.length && cardRank > Math.ceil(albumCards.length / 2))
+      });
+    },
+    true
+  );
 
   window.addEventListener("popstate", function (event) {
     navigateTo(window.location.href, {
@@ -336,12 +413,8 @@ async function initPage() {
 
   const isHomeScreen = document.body.classList.contains("home-screen");
   const audioFeaturesNeeded = isHomeScreen || shouldInitAudioFeatures();
-  const durationDataReady = audioFeaturesNeeded
-    ? loadTrackDurationData()
-    : Promise.resolve();
-  const tracksDataReady = audioFeaturesNeeded
-    ? loadTracksData()
-    : Promise.resolve();
+  const durationDataReady = audioFeaturesNeeded ? loadTrackDurationData() : Promise.resolve();
+  const tracksDataReady = audioFeaturesNeeded ? loadTracksData() : Promise.resolve();
   if (isHomeScreen || audioFeaturesNeeded) {
     ensureGlobalAudio();
     initAudioSessionTelemetry();
@@ -349,19 +422,21 @@ async function initPage() {
   }
   const initialRadioMetadataReady = audioFeaturesNeeded
     ? tracksDataReady.then(function () {
-      return prepareInitialGlobalRandomPlayback(isHomeScreen ? "home_init" : "route_init");
-    })
+        return prepareInitialGlobalRandomPlayback(isHomeScreen ? "home_init" : "route_init");
+      })
     : Promise.resolve(null);
 
   if (isHomeScreen) {
     initFavoritesRoute();
     scheduleFavoritesPreload("home_init");
-    loadFavoritesWithReset().catch(function () {
-      audioState.favoritesDbSupported = false;
-      syncFavoriteButtons();
-    }).finally(function () {
-      syncFavoritesRoute();
-    });
+    loadFavoritesWithReset()
+      .catch(function () {
+        audioState.favoritesDbSupported = false;
+        syncFavoriteButtons();
+      })
+      .finally(function () {
+        syncFavoritesRoute();
+      });
     loadCatalogData().catch(function () {
       // Keep fallback in place if remote catalog loading fails.
     });
@@ -402,10 +477,15 @@ async function initPage() {
 
 function nextApplicationFrames() {
   return new Promise(function (resolve) {
-    const schedule = typeof window.requestAnimationFrame === "function"
-      ? window.requestAnimationFrame.bind(window)
-      : function (callback) { return setTimeout(callback, 16); };
-    schedule(function () { schedule(resolve); });
+    const schedule =
+      typeof window.requestAnimationFrame === "function"
+        ? window.requestAnimationFrame.bind(window)
+        : function (callback) {
+            return setTimeout(callback, 16);
+          };
+    schedule(function () {
+      schedule(resolve);
+    });
   });
 }
 
@@ -437,41 +517,70 @@ function disconnectLaunchPerformanceObservers(probe) {
 
 function buildLaunchSummary(state, finalReason) {
   const probe = state.probe;
-  const paints = typeof performance !== "undefined" && typeof performance.getEntriesByType === "function"
-    ? performance.getEntriesByType("paint")
-    : [];
-  const fcp = paints.find(function (entry) { return entry && entry.name === "first-contentful-paint"; });
-  const navigation = typeof performance !== "undefined" && typeof performance.getEntriesByType === "function"
-    ? performance.getEntriesByType("navigation")[0]
-    : null;
+  const paints =
+    typeof performance !== "undefined" && typeof performance.getEntriesByType === "function"
+      ? performance.getEntriesByType("paint")
+      : [];
+  const fcp = paints.find(function (entry) {
+    return entry && entry.name === "first-contentful-paint";
+  });
+  const navigation =
+    typeof performance !== "undefined" && typeof performance.getEntriesByType === "function"
+      ? performance.getEntriesByType("navigation")[0]
+      : null;
   return {
     launch_head_ms: Math.max(0, Math.round(Number(probe.head_ms) || 0)),
-    dom_ready_ms: Math.max(0, Math.round(Number(navigation && navigation.domContentLoadedEventEnd) || Number(state.initStartedAt) || 0)),
+    dom_ready_ms: Math.max(
+      0,
+      Math.round(
+        Number(navigation && navigation.domContentLoadedEventEnd) || Number(state.initStartedAt) || 0
+      )
+    ),
     first_contentful_paint_ms: Math.max(0, Math.round(Number(fcp && fcp.startTime) || 0)),
     first_app_frame_ms: Math.max(0, Math.round(state.firstAppFrameMs)),
     app_ready_frame_ms: Math.max(0, Math.round(state.firstAppFrameMs)),
     init_done_ms: Math.max(0, Math.round(state.initDoneMs)),
     catalog_ready_ms: state.catalogReady ? Math.max(0, Math.round(state.initDoneMs)) : 0,
     document_ttfb_ms: Math.max(0, Math.round(Number(navigation && navigation.responseStart) || 0)),
-    document_download_ms: Math.max(0, Math.round(
-      (Number(navigation && navigation.responseEnd) || 0) - (Number(navigation && navigation.responseStart) || 0)
-    )),
-    dom_parse_ms: Math.max(0, Math.round(
-      (Number(navigation && navigation.domContentLoadedEventEnd) || Number(state.initStartedAt) || 0) -
-      (Number(navigation && navigation.responseEnd) || 0)
-    )),
-    critical_css_ready_ms: Math.max(0, Math.round(latestResourceReadyMs(/\/assets\/css\/(?:styles|playlists)\.css(?:\?|$)/))),
-    runtime_scripts_ready_ms: Math.max(0, Math.round(latestResourceReadyMs(/\/assets\/js\/[^/?]+\.js(?:\?|$)/))),
+    document_download_ms: Math.max(
+      0,
+      Math.round(
+        (Number(navigation && navigation.responseEnd) || 0) -
+          (Number(navigation && navigation.responseStart) || 0)
+      )
+    ),
+    dom_parse_ms: Math.max(
+      0,
+      Math.round(
+        (Number(navigation && navigation.domContentLoadedEventEnd) || Number(state.initStartedAt) || 0) -
+          (Number(navigation && navigation.responseEnd) || 0)
+      )
+    ),
+    critical_css_ready_ms: Math.max(
+      0,
+      Math.round(latestResourceReadyMs(/\/assets\/css\/(?:styles|playlists)\.css(?:\?|$)/))
+    ),
+    runtime_scripts_ready_ms: Math.max(
+      0,
+      Math.round(latestResourceReadyMs(/\/assets\/js\/[^/?]+\.js(?:\?|$)/))
+    ),
     largest_contentful_paint_ms: Math.max(0, Math.round(Number(probe.largest_contentful_paint_ms) || 0)),
-    cumulative_layout_shift_milli: Math.max(0, Math.round((Number(probe.cumulative_layout_shift) || 0) * 1000)),
+    cumulative_layout_shift_milli: Math.max(
+      0,
+      Math.round((Number(probe.cumulative_layout_shift) || 0) * 1000)
+    ),
     interaction_to_next_paint_ms: Math.max(0, Math.round(Number(probe.interaction_to_next_paint_ms) || 0)),
-    previous_incomplete_launch_age_ms: Math.max(0, Math.round(Number(probe.previous_incomplete_launch_age_ms) || 0)),
+    previous_incomplete_launch_age_ms: Math.max(
+      0,
+      Math.round(Number(probe.previous_incomplete_launch_age_ms) || 0)
+    ),
     service_worker_activity_count: Number(probe.service_worker_activity_count) || 0,
     catalog_ready: state.catalogReady,
     catalog_source: state.catalogSource,
     state: state.catalogRelease,
     service_worker_controlled: Boolean(navigator.serviceWorker && navigator.serviceWorker.controller),
-    service_worker_state: navigator.serviceWorker && navigator.serviceWorker.controller ? "controlled" : "uncontrolled",
+    service_worker_state:
+      navigator.serviceWorker && navigator.serviceWorker.controller ? "controlled" : "uncontrolled",
     document_was_discarded: Boolean(document.wasDiscarded),
     app_frame_ready: true,
     fcp_available: Boolean(fcp),
@@ -504,31 +613,38 @@ function scheduleFinalLaunchSummary(state) {
   const onVisibilityChange = function () {
     if (document.visibilityState === "hidden") finalize("visibility_hidden", true);
   };
-  const onPageHide = function () { finalize("pagehide", true); };
+  const onPageHide = function () {
+    finalize("pagehide", true);
+  };
   document.addEventListener("visibilitychange", onVisibilityChange);
   window.addEventListener("pagehide", onPageHide, { once: true });
 
-  const elapsed = typeof performance !== "undefined" && typeof performance.now === "function"
-    ? performance.now()
-    : 0;
-  timerId = window.setTimeout(function () {
-    finalize("vitals_timeout", false);
-  }, Math.max(0, 10000 - elapsed));
+  const elapsed =
+    typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : 0;
+  timerId = window.setTimeout(
+    function () {
+      finalize("vitals_timeout", false);
+    },
+    Math.max(0, 10000 - elapsed)
+  );
   if (document.visibilityState === "hidden") finalize("visibility_hidden", true);
 }
 
 async function reportLaunchSummary(initStartedAt) {
-  const initDoneMs = typeof performance !== "undefined" && typeof performance.now === "function"
-    ? performance.now()
-    : 0;
+  const initDoneMs =
+    typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : 0;
   await nextApplicationFrames();
-  const firstAppFrameMs = typeof performance !== "undefined" && typeof performance.now === "function"
-    ? performance.now()
-    : initDoneMs;
-  const probe = window.__infraLaunchProbe && typeof window.__infraLaunchProbe === "object"
-    ? window.__infraLaunchProbe
-    : {};
-  const catalogReady = Boolean(catalogState.data || (fallbackCatalog && fallbackCatalog.albums && fallbackCatalog.albums.length));
+  const firstAppFrameMs =
+    typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : initDoneMs;
+  const probe =
+    window.__infraLaunchProbe && typeof window.__infraLaunchProbe === "object"
+      ? window.__infraLaunchProbe
+      : {};
+  const catalogReady = Boolean(
+    catalogState.data || (fallbackCatalog && fallbackCatalog.albums && fallbackCatalog.albums.length)
+  );
   markLaunchWatchdogComplete(probe);
   scheduleFinalLaunchSummary({
     initStartedAt,
@@ -536,9 +652,28 @@ async function reportLaunchSummary(initStartedAt) {
     firstAppFrameMs,
     probe,
     catalogReady,
-    catalogSource: catalogState.catalogBundleSource || (catalogState.data ? "embedded-fallback" : "unavailable"),
+    catalogSource:
+      catalogState.catalogBundleSource || (catalogState.data ? "embedded-fallback" : "unavailable"),
     catalogRelease: catalogState.catalogBundleReleaseId || `local-${LOCAL_CATALOG_VERSION}`
   });
 }
 
-export { isAlbumOpenUrl, openHomeAlbumCard, isTelemetryTimestampBetween, createAlbumOpenTelemetryContext, finishAlbumOpenTelemetry, initSpaNavigation, enforceHomeModuleOrder, enforceHomeAppsCollapsed, resumeLiveHomeRoute, initPage, nextApplicationFrames, latestResourceReadyMs, markLaunchWatchdogComplete, disconnectLaunchPerformanceObservers, buildLaunchSummary, scheduleFinalLaunchSummary, reportLaunchSummary };
+export {
+  isAlbumOpenUrl,
+  openHomeAlbumCard,
+  isTelemetryTimestampBetween,
+  createAlbumOpenTelemetryContext,
+  finishAlbumOpenTelemetry,
+  initSpaNavigation,
+  enforceHomeModuleOrder,
+  enforceHomeAppsCollapsed,
+  resumeLiveHomeRoute,
+  initPage,
+  nextApplicationFrames,
+  latestResourceReadyMs,
+  markLaunchWatchdogComplete,
+  disconnectLaunchPerformanceObservers,
+  buildLaunchSummary,
+  scheduleFinalLaunchSummary,
+  reportLaunchSummary
+};

@@ -1,19 +1,238 @@
 // Ponts vers les autres fichiers (télémétrie, catalogue, radio, cœur audio, SPA, fiches, lecteur).
 // Extrait de l'ancien scripts.js (chantier JavaScript d'INFRA, 10/11/2026). Uniquement des fonctions
 // et leurs variables : l'état partagé et l'ordre de démarrage restent dans scripts.js.
-import { ALBUM_GRID_INITIAL_BATCH, ALBUM_GRID_NEXT_BATCH, COVERS_CACHE_NAME, COVER_SESSION_NAVIGATION_GATE_ENABLED, COVER_SESSION_PREPARE_ENABLED, DESKTOP_TRANSPORT_COVER_MIN_HEIGHT, DESKTOP_TRANSPORT_COVER_MIN_WIDTH, DESKTOP_TRANSPORT_DRAG_THRESHOLD, DESKTOP_TRANSPORT_LEGACY_STORAGE_KEY, DESKTOP_TRANSPORT_MARGIN, DESKTOP_TRANSPORT_MIN_HEIGHT, DESKTOP_TRANSPORT_MIN_WIDTH, DESKTOP_TRANSPORT_STORAGE_KEY, HEART_ICON_OUTLINE, NOW_PLAYING_OVERLAY_ENABLED, PLAYER_ICON_NEXT, PLAYER_ICON_PLAY, PLAYER_ICON_PREVIOUS, PLAYER_ICON_STOP, PREFETCH_BUFFER_ABORT_SECONDS, PREFETCH_BUFFER_STABLE_SECONDS, PREFETCH_MAX_ATTEMPTS, PREFETCH_NEXT_CACHE_NAME, PREFETCH_NEXT_CONCURRENCY, PREFETCH_NEXT_ENABLED, PREFETCH_NEXT_MAX_BYTES, PREFETCH_NEXT_MAX_ENTRIES, PREFETCH_NEXT_QUEUE_DEPTH, PREFETCH_NEXT_SEGMENT_BYTES, PREFETCH_NEXT_THRESHOLD_SECONDS, PREFETCH_REQUEST_TIMEOUT_MS, RADIO_ICON, SHUFFLE_ICON, TRACK_CLICK_COOLDOWN_MS, WORKER_URL, albumPlayerUiApi, audioRadioApi, audioState, audioTelemetryApi, audioTelemetryModule, catalogState, clipState, fallbackCatalog, nowPlayingApi, prefetchApi, pwaState, runtime, runtimeVersion, spaRendererApi, spaRouterApi, spaState, themePresets, transportUiApi } from "../scripts.js";
+import {
+  ALBUM_GRID_INITIAL_BATCH,
+  ALBUM_GRID_NEXT_BATCH,
+  COVERS_CACHE_NAME,
+  COVER_SESSION_NAVIGATION_GATE_ENABLED,
+  COVER_SESSION_PREPARE_ENABLED,
+  DESKTOP_TRANSPORT_COVER_MIN_HEIGHT,
+  DESKTOP_TRANSPORT_COVER_MIN_WIDTH,
+  DESKTOP_TRANSPORT_DRAG_THRESHOLD,
+  DESKTOP_TRANSPORT_LEGACY_STORAGE_KEY,
+  DESKTOP_TRANSPORT_MARGIN,
+  DESKTOP_TRANSPORT_MIN_HEIGHT,
+  DESKTOP_TRANSPORT_MIN_WIDTH,
+  DESKTOP_TRANSPORT_STORAGE_KEY,
+  HEART_ICON_OUTLINE,
+  NOW_PLAYING_OVERLAY_ENABLED,
+  PLAYER_ICON_NEXT,
+  PLAYER_ICON_PLAY,
+  PLAYER_ICON_PREVIOUS,
+  PLAYER_ICON_STOP,
+  PREFETCH_BUFFER_ABORT_SECONDS,
+  PREFETCH_BUFFER_STABLE_SECONDS,
+  PREFETCH_MAX_ATTEMPTS,
+  PREFETCH_NEXT_CACHE_NAME,
+  PREFETCH_NEXT_CONCURRENCY,
+  PREFETCH_NEXT_ENABLED,
+  PREFETCH_NEXT_MAX_BYTES,
+  PREFETCH_NEXT_MAX_ENTRIES,
+  PREFETCH_NEXT_QUEUE_DEPTH,
+  PREFETCH_NEXT_SEGMENT_BYTES,
+  PREFETCH_NEXT_THRESHOLD_SECONDS,
+  PREFETCH_REQUEST_TIMEOUT_MS,
+  RADIO_ICON,
+  SHUFFLE_ICON,
+  TRACK_CLICK_COOLDOWN_MS,
+  WORKER_URL,
+  albumPlayerUiApi,
+  audioRadioApi,
+  audioState,
+  audioTelemetryApi,
+  audioTelemetryModule,
+  catalogState,
+  clipState,
+  fallbackCatalog,
+  nowPlayingApi,
+  prefetchApi,
+  pwaState,
+  runtime,
+  runtimeVersion,
+  spaRendererApi,
+  spaRouterApi,
+  spaState,
+  themePresets,
+  transportUiApi
+} from "../scripts.js";
 import { getAudioTelemetryNow } from "./config.js";
-import { ensureAlbumFavoriteControls, ensureAlbumFavoriteSelectionToolbar, ensureAlbumHeaderActions, normalizeFavoritePath, syncCurrentFavoriteButtons, toggleAlbumFavoriteSelection, toggleCurrentFavorite } from "./favorites-bridge.js";
-import { bindGlobalKeyboardShortcuts, canStartInitialGlobalRandomPlayback, ensureRadioPlaylistForNavigation, ensureRadioPlaylistLoaded, ensureRadioQueue, fetchLiveCatalogDocument, fetchLocalCatalogDocument, getTrackMetaByAssetPath, hasPlaybackSession, injectCurrentTrackIntoRadioQueue, isDurationsDocument, loadCatalogData, loadTracksData, mergeTrackMetadata, resetPreparedInitialGlobalRandomPlayback, sanitizeCatalog, startGlobalRandomPlayback, startSelectedTrackInRadioFromCold, syncRadioQueueToPlaylist, toggleAlbumShuffleMode, toggleRadioModeFromTransport } from "./catalog-playback.js";
-import { prepareAlbumCoversForSession, releasePwaCoverHold, rememberAlbumCoverImage, scheduleAlbumCoverCacheWarmup } from "./cover-warmup.js";
-import { currentTheme, getCurrentThemeColor, getPwaStatusColor, isAndroidDevice, isDarkColor, isIosDevice, isStandaloneDisplayMode, serviceWorkerReportedVersion, setThemeColor, syncPwaStatusColor } from "./theme-admin-pwa.js";
-import { absolutizeSrcsetForBase, buildSpaHistoryState, commitSpaHistoryState, getScrollFromHistoryState, getSpaCachedHtml, getSpaPersistRoot, loadSpaPageDocument, normalizeCoverElementsForBase, prefetchSpaPage, saveCurrentScrollPositionInHistory, setSpaCachedHtml } from "./navigation.js";
-import { clearOtherTrackStatuses, clearTrackFailure, clearTrackFailureForCurrent, clearTrackStatus, displayAlbumCardTitle, getAudioAssetPath, getAudioAssetPathKey, getCurrentAlbumTitle, getCurrentLogicalAudioSrc, getCurrentPlayableAudioSrc, getCurrentPlaylistTrack, getCurrentTrackAlbumPage, getCurrentTrackArtwork, getTrackByIndex, hashString, isBlobObjectUrl, loadMediaElementForPlayback, normalizeAlbumTitle, normalizeAudioSourceUrl, normalizeTrackTitle, normalizeUrlAgainstBase, registerTrackFailure, resolveManagedAudioSrc, resolveTracksAlbumArtwork, revokeActiveBlobUrl, setCoverBackgroundStable, setCoverWhenReady, setTrackStatus, srcMatches, toAbsoluteUrl, toAbsoluteUrlOrEmpty, toRuntimeAbsoluteUrl } from "./audio-sources.js";
-import { buildPreservedTrack, extendAlbumPlaylistToNextAlbum, extendAlbumPlaylistToPreviousAlbum, savePlaybackQueueContext, seekCurrentAudioToRatio } from "./album-continuity.js";
-import { bindMediaSessionActions, clearWaitingRecovery, configurePlaybackAudioSession, getAlbumCoverFromDoc, getMediaSessionFallbackArtwork, normalizeArtworkUrl, normalizeCoverUrl, parseSrcsetCandidates, resolveCoverUrl, scheduleMediaSessionResync, scheduleWaitingRecovery, syncMediaSessionMetadata } from "./media-artwork.js";
-import { beginAudioRecovery, buildAudioMonitorPayload, clearNextTrackPrefetch, confirmAudioRecovery, failAudioRecovery, getAudioBufferedEnd, getAudioRuntimeProbeState, getAudioSource, getAutoPrefetchedNextIndex, isCloudflareAudioUrl, markAudioTelemetryInactive, maybePrefetchNextTrack, probeAudioSourceForRecovery, scheduleSilentCheck, startAudioTelemetryHeartbeat, startNextTrackPrefetch, stopAudioTelemetryHeartbeat } from "./audio-monitor.js";
-import { clearFadeTimer, ensureCurrentIndexFromAudio, ensureGlobalAudio, ensurePlayablePlaylistContext, fadeInAudio, fadeOutAudio, forceAudioFullVolume, getAlbumNameFromUrlLike, getCurrentPlaylistIndexSafe, getQueuePreviewIndices, getRandomIndex, handleGlobalTransportToggle, logAudioAuditEvent, logAudioRuntimeAlbumSwitch, markAudioPauseIntent, movePlaylistItem, playNext, playPrevious, recoverFromTrackFailure, resetAudioElementForSource, saveResumeState, sendAudioMonitoringLog, startAudioRaf, startRadioPlaybackFromIdle, startTrack, syncPlaylistContext, toggleCurrentPageCollection, togglePlayPause, trackAudioRuntimeEvent, updateProgressUi } from "./playback.js";
-import { createAlbumOpenTelemetryContext, finishAlbumOpenTelemetry, initPage, openHomeAlbumCard, resumeLiveHomeRoute } from "./page-init.js";
+import {
+  ensureAlbumFavoriteControls,
+  ensureAlbumFavoriteSelectionToolbar,
+  ensureAlbumHeaderActions,
+  normalizeFavoritePath,
+  syncCurrentFavoriteButtons,
+  toggleAlbumFavoriteSelection,
+  toggleCurrentFavorite
+} from "./favorites-bridge.js";
+import {
+  bindGlobalKeyboardShortcuts,
+  canStartInitialGlobalRandomPlayback,
+  ensureRadioPlaylistForNavigation,
+  ensureRadioPlaylistLoaded,
+  ensureRadioQueue,
+  fetchLiveCatalogDocument,
+  fetchLocalCatalogDocument,
+  getTrackMetaByAssetPath,
+  hasPlaybackSession,
+  injectCurrentTrackIntoRadioQueue,
+  isDurationsDocument,
+  loadCatalogData,
+  loadTracksData,
+  mergeTrackMetadata,
+  resetPreparedInitialGlobalRandomPlayback,
+  sanitizeCatalog,
+  startGlobalRandomPlayback,
+  startSelectedTrackInRadioFromCold,
+  syncRadioQueueToPlaylist,
+  toggleAlbumShuffleMode,
+  toggleRadioModeFromTransport
+} from "./catalog-playback.js";
+import {
+  prepareAlbumCoversForSession,
+  releasePwaCoverHold,
+  rememberAlbumCoverImage,
+  scheduleAlbumCoverCacheWarmup
+} from "./cover-warmup.js";
+import {
+  currentTheme,
+  getCurrentThemeColor,
+  getPwaStatusColor,
+  isAndroidDevice,
+  isDarkColor,
+  isIosDevice,
+  isStandaloneDisplayMode,
+  serviceWorkerReportedVersion,
+  setThemeColor,
+  syncPwaStatusColor
+} from "./theme-admin-pwa.js";
+import {
+  absolutizeSrcsetForBase,
+  buildSpaHistoryState,
+  commitSpaHistoryState,
+  getScrollFromHistoryState,
+  getSpaCachedHtml,
+  getSpaPersistRoot,
+  loadSpaPageDocument,
+  normalizeCoverElementsForBase,
+  prefetchSpaPage,
+  saveCurrentScrollPositionInHistory,
+  setSpaCachedHtml
+} from "./navigation.js";
+import {
+  clearOtherTrackStatuses,
+  clearTrackFailure,
+  clearTrackFailureForCurrent,
+  clearTrackStatus,
+  displayAlbumCardTitle,
+  getAudioAssetPath,
+  getAudioAssetPathKey,
+  getCurrentAlbumTitle,
+  getCurrentLogicalAudioSrc,
+  getCurrentPlayableAudioSrc,
+  getCurrentPlaylistTrack,
+  getCurrentTrackAlbumPage,
+  getCurrentTrackArtwork,
+  getTrackByIndex,
+  hashString,
+  isBlobObjectUrl,
+  loadMediaElementForPlayback,
+  normalizeAlbumTitle,
+  normalizeAudioSourceUrl,
+  normalizeTrackTitle,
+  normalizeUrlAgainstBase,
+  registerTrackFailure,
+  resolveManagedAudioSrc,
+  resolveTracksAlbumArtwork,
+  revokeActiveBlobUrl,
+  setCoverBackgroundStable,
+  setCoverWhenReady,
+  setTrackStatus,
+  srcMatches,
+  toAbsoluteUrl,
+  toAbsoluteUrlOrEmpty,
+  toRuntimeAbsoluteUrl
+} from "./audio-sources.js";
+import {
+  buildPreservedTrack,
+  extendAlbumPlaylistToNextAlbum,
+  extendAlbumPlaylistToPreviousAlbum,
+  savePlaybackQueueContext,
+  seekCurrentAudioToRatio
+} from "./album-continuity.js";
+import {
+  bindMediaSessionActions,
+  clearWaitingRecovery,
+  configurePlaybackAudioSession,
+  getAlbumCoverFromDoc,
+  getMediaSessionFallbackArtwork,
+  normalizeArtworkUrl,
+  normalizeCoverUrl,
+  parseSrcsetCandidates,
+  resolveCoverUrl,
+  scheduleMediaSessionResync,
+  scheduleWaitingRecovery,
+  syncMediaSessionMetadata
+} from "./media-artwork.js";
+import {
+  beginAudioRecovery,
+  buildAudioMonitorPayload,
+  clearNextTrackPrefetch,
+  confirmAudioRecovery,
+  failAudioRecovery,
+  getAudioBufferedEnd,
+  getAudioRuntimeProbeState,
+  getAudioSource,
+  getAutoPrefetchedNextIndex,
+  isCloudflareAudioUrl,
+  markAudioTelemetryInactive,
+  maybePrefetchNextTrack,
+  probeAudioSourceForRecovery,
+  scheduleSilentCheck,
+  startAudioTelemetryHeartbeat,
+  startNextTrackPrefetch,
+  stopAudioTelemetryHeartbeat
+} from "./audio-monitor.js";
+import {
+  clearFadeTimer,
+  ensureCurrentIndexFromAudio,
+  ensureGlobalAudio,
+  ensurePlayablePlaylistContext,
+  fadeInAudio,
+  fadeOutAudio,
+  forceAudioFullVolume,
+  getAlbumNameFromUrlLike,
+  getCurrentPlaylistIndexSafe,
+  getQueuePreviewIndices,
+  getRandomIndex,
+  handleGlobalTransportToggle,
+  logAudioAuditEvent,
+  logAudioRuntimeAlbumSwitch,
+  markAudioPauseIntent,
+  movePlaylistItem,
+  playNext,
+  playPrevious,
+  recoverFromTrackFailure,
+  resetAudioElementForSource,
+  saveResumeState,
+  sendAudioMonitoringLog,
+  startAudioRaf,
+  startRadioPlaybackFromIdle,
+  startTrack,
+  syncPlaylistContext,
+  toggleCurrentPageCollection,
+  togglePlayPause,
+  trackAudioRuntimeEvent,
+  updateProgressUi
+} from "./playback.js";
+import {
+  createAlbumOpenTelemetryContext,
+  finishAlbumOpenTelemetry,
+  initPage,
+  openHomeAlbumCard,
+  resumeLiveHomeRoute
+} from "./page-init.js";
 
 function normalizePwaHeadAssetLinks() {
   document.querySelectorAll("link[href]").forEach(function (link) {
@@ -36,19 +255,28 @@ function normalizePwaHeadAssetLinks() {
 }
 
 function createAudioTelemetryApi() {
-  const factory = audioTelemetryModule && typeof audioTelemetryModule.createTelemetry === "function"
-    ? audioTelemetryModule.createTelemetry
-    : null;
+  const factory =
+    audioTelemetryModule && typeof audioTelemetryModule.createTelemetry === "function"
+      ? audioTelemetryModule.createTelemetry
+      : null;
   if (!factory) return createNoopAudioTelemetryApi();
   return factory({
     fineTelemetryEnabled: true,
     isTelemetryOriginAllowed: function () {
       return window.location.origin === "https://infra-180.github.io";
     },
-    getWorkerUrl: function () { return WORKER_URL; },
-    getRuntimeVersion: function () { return runtimeVersion; },
-    getAudioState: function () { return audioState; },
-    getAudio: function () { return audioState.audio || null; },
+    getWorkerUrl: function () {
+      return WORKER_URL;
+    },
+    getRuntimeVersion: function () {
+      return runtimeVersion;
+    },
+    getAudioState: function () {
+      return audioState;
+    },
+    getAudio: function () {
+      return audioState.audio || null;
+    },
     getAudioSource: getAudioSource,
     isIosDevice: isIosDevice,
     isStandaloneDisplayMode: isStandaloneDisplayMode,
@@ -61,9 +289,15 @@ function createAudioTelemetryApi() {
 
 function createNoopAudioTelemetryApi() {
   return {
-    getBufferedEnd: function () { return null; },
-    getRuntimeProbeState: function () { return {}; },
-    flushQueue: function () { return Promise.resolve(false); },
+    getBufferedEnd: function () {
+      return null;
+    },
+    getRuntimeProbeState: function () {
+      return {};
+    },
+    flushQueue: function () {
+      return Promise.resolve(false);
+    },
     markHealthSessionInactive: function () {},
     startHeartbeat: function () {},
     stopHeartbeat: function () {},
@@ -72,18 +306,17 @@ function createNoopAudioTelemetryApi() {
     recordStorageSnapshot: function () {},
     sendMonitoringLog: function () {},
     logAuditEvent: function () {},
-    hasPendingEvents: function () { return false; },
+    hasPendingEvents: function () {
+      return false;
+    },
     initLifecycle: function () {}
   };
 }
 
 function createHomeCatalogApi() {
-  const module = window.InfraHomeCatalog && typeof window.InfraHomeCatalog === "object"
-    ? window.InfraHomeCatalog
-    : null;
-  const factory = module && typeof module.createHomeCatalog === "function"
-    ? module.createHomeCatalog
-    : null;
+  const module =
+    window.InfraHomeCatalog && typeof window.InfraHomeCatalog === "object" ? window.InfraHomeCatalog : null;
+  const factory = module && typeof module.createHomeCatalog === "function" ? module.createHomeCatalog : null;
   if (!factory) return createNoopHomeCatalogApi();
   return factory({
     fallbackCatalog,
@@ -102,18 +335,17 @@ function createHomeCatalogApi() {
 
 function createNoopHomeCatalogApi() {
   return {
-    hydrateHomeCatalog: function () { return Promise.resolve(); },
+    hydrateHomeCatalog: function () {
+      return Promise.resolve();
+    },
     initAlbumSwipeNavigation: function () {}
   };
 }
 
 function createAudioRadioApi() {
-  const module = window.InfraAudioRadio && typeof window.InfraAudioRadio === "object"
-    ? window.InfraAudioRadio
-    : null;
-  const factory = module && typeof module.createAudioRadio === "function"
-    ? module.createAudioRadio
-    : null;
+  const module =
+    window.InfraAudioRadio && typeof window.InfraAudioRadio === "object" ? window.InfraAudioRadio : null;
+  const factory = module && typeof module.createAudioRadio === "function" ? module.createAudioRadio : null;
   if (!factory) return createNoopAudioRadioApi();
   return factory({
     audioState,
@@ -224,7 +456,9 @@ function createNoopAudioRadioApi() {
     syncRadioQueueToPlaylist: function () {},
     ensureRadioQueue: function () {},
     injectCurrentTrackIntoRadioQueue: function () {},
-    startSelectedTrackInRadioFromCold: function () { return false; },
+    startSelectedTrackInRadioFromCold: function () {
+      return false;
+    },
     ensureRadioPlaylistForNavigation: function () {},
     setHomePlayMode: function () {},
     activateRadioModeFromTransport: function () {},
@@ -243,10 +477,14 @@ function createNoopAudioRadioApi() {
     ensurePlayablePlaylistContext: function () {},
     markAudioPauseIntent: function () {},
     cancelSystemInterruptionResume: function () {},
-    scheduleSystemInterruptionResumeAfterActive: function () { return false; },
+    scheduleSystemInterruptionResumeAfterActive: function () {
+      return false;
+    },
     cancelExternalResumeCommand: function () {},
     playFromExternalControl: function () {},
-    toggleCurrentPageCollection: function () { return false; },
+    toggleCurrentPageCollection: function () {
+      return false;
+    },
     handleGlobalTransportToggle: function () {},
     ensureGlobalAudio: function () {},
     stopAudioRaf: function () {},
@@ -255,19 +493,14 @@ function createNoopAudioRadioApi() {
 }
 
 function callAudioRadio(name, args) {
-  const fn = audioRadioApi && typeof audioRadioApi[name] === "function"
-    ? audioRadioApi[name]
-    : null;
+  const fn = audioRadioApi && typeof audioRadioApi[name] === "function" ? audioRadioApi[name] : null;
   return fn ? fn.apply(audioRadioApi, args || []) : undefined;
 }
 
 function createAudioCoreApi() {
-  const module = window.InfraAudioCore && typeof window.InfraAudioCore === "object"
-    ? window.InfraAudioCore
-    : null;
-  const factory = module && typeof module.createAudioCore === "function"
-    ? module.createAudioCore
-    : null;
+  const module =
+    window.InfraAudioCore && typeof window.InfraAudioCore === "object" ? window.InfraAudioCore : null;
+  const factory = module && typeof module.createAudioCore === "function" ? module.createAudioCore : null;
   if (!factory) return createNoopAudioCoreApi();
   return factory({
     audioState,
@@ -331,28 +564,37 @@ function createNoopAudioCoreApi() {
   return {
     seekCurrentAudioToRatio: function () {},
     syncPlaylistContext: function () {},
-    ensureCurrentIndexFromAudio: function () { return -1; },
-    getCurrentPlaylistIndexSafe: function () { return -1; },
-    getQueuePreviewIndices: function () { return []; },
-    resetAudioElementForSource: function () { return false; },
+    ensureCurrentIndexFromAudio: function () {
+      return -1;
+    },
+    getCurrentPlaylistIndexSafe: function () {
+      return -1;
+    },
+    getQueuePreviewIndices: function () {
+      return [];
+    },
+    resetAudioElementForSource: function () {
+      return false;
+    },
     recoverFromTrackFailure: function () {},
-    getRandomIndex: function () { return -1; },
+    getRandomIndex: function () {
+      return -1;
+    },
     startTrack: function () {},
     playNext: function () {},
     playPrevious: function () {},
-    movePlaylistItem: function () { return false; },
+    movePlaylistItem: function () {
+      return false;
+    },
     startRadioPlaybackFromIdle: function () {},
     togglePlayPause: function () {}
   };
 }
 
 function createPwaInstallApi() {
-  const module = window.InfraPwaInstall && typeof window.InfraPwaInstall === "object"
-    ? window.InfraPwaInstall
-    : null;
-  const factory = module && typeof module.createPwaInstall === "function"
-    ? module.createPwaInstall
-    : null;
+  const module =
+    window.InfraPwaInstall && typeof window.InfraPwaInstall === "object" ? window.InfraPwaInstall : null;
+  const factory = module && typeof module.createPwaInstall === "function" ? module.createPwaInstall : null;
   if (!factory) return createNoopPwaInstallApi();
   return factory({
     pwaState,
@@ -364,10 +606,18 @@ function createPwaInstallApi() {
 
 function createNoopPwaInstallApi() {
   return {
-    getIosBrowserKind: function () { return "other"; },
-    getAndroidBrowserKind: function () { return "other"; },
-    getInstallBrowserKind: function () { return "other"; },
-    isSafariOnIos: function () { return false; },
+    getIosBrowserKind: function () {
+      return "other";
+    },
+    getAndroidBrowserKind: function () {
+      return "other";
+    },
+    getInstallBrowserKind: function () {
+      return "other";
+    },
+    isSafariOnIos: function () {
+      return false;
+    },
     getPwaGuideContent: function () {
       return {
         text: "Sur mobile, installe INFRA depuis iPhone (Safari) ou Android (menu navigateur).",
@@ -379,20 +629,21 @@ function createNoopPwaInstallApi() {
       };
     },
     fillPwaGuide: function () {},
-    readPwaChoice: function () { return ""; },
+    readPwaChoice: function () {
+      return "";
+    },
     persistPwaChoice: function () {},
-    ensurePwaInstallPromptUi: function () { return null; },
+    ensurePwaInstallPromptUi: function () {
+      return null;
+    },
     initPwaInstallPrompt: function () {}
   };
 }
 
 function createSpaRendererApi() {
-  const module = window.InfraSpaRenderer && typeof window.InfraSpaRenderer === "object"
-    ? window.InfraSpaRenderer
-    : null;
-  const factory = module && typeof module.createSpaRenderer === "function"
-    ? module.createSpaRenderer
-    : null;
+  const module =
+    window.InfraSpaRenderer && typeof window.InfraSpaRenderer === "object" ? window.InfraSpaRenderer : null;
+  const factory = module && typeof module.createSpaRenderer === "function" ? module.createSpaRenderer : null;
   if (!factory) return createNoopSpaRendererApi();
   return factory({
     spaState,
@@ -433,13 +684,17 @@ function createSpaRendererApi() {
     isStandaloneDisplayMode,
     isIosDevice,
     isAndroidDevice,
-    getServiceWorkerReportedVersion: function () { return serviceWorkerReportedVersion; }
+    getServiceWorkerReportedVersion: function () {
+      return serviceWorkerReportedVersion;
+    }
   });
 }
 
 function createNoopSpaRendererApi() {
   return {
-    buildSpaSnapshotHtml: function () { return ""; },
+    buildSpaSnapshotHtml: function () {
+      return "";
+    },
     snapshotCurrentSpaPage: function () {},
     parseSpaDocument: function (html) {
       const raw = String(html || "");
@@ -447,59 +702,103 @@ function createNoopSpaRendererApi() {
       const doc = new DOMParser().parseFromString(raw, "text/html");
       return doc && doc.body ? doc : null;
     },
-    buildSpaDocumentFragment: function () { return document.createDocumentFragment(); },
-    getSpaCriticalImages: function () { return []; },
-    decodeSpaImage: function () { return Promise.resolve(false); },
-    decodeSpaCriticalImages: function () { return Promise.resolve(); },
-    getSpaAlbumCoverImage: function () { return null; },
-    getImagePreferredSrc: function () { return ""; },
-    waitForSpaAlbumCoverReady: function () { return Promise.resolve(); },
-    swapSpaFragment: function () { return Promise.resolve(); },
-    renderSpaDocument: function () { return Promise.resolve(); },
-    spaNavigate: function (href) { window.location.href = href; }
+    buildSpaDocumentFragment: function () {
+      return document.createDocumentFragment();
+    },
+    getSpaCriticalImages: function () {
+      return [];
+    },
+    decodeSpaImage: function () {
+      return Promise.resolve(false);
+    },
+    decodeSpaCriticalImages: function () {
+      return Promise.resolve();
+    },
+    getSpaAlbumCoverImage: function () {
+      return null;
+    },
+    getImagePreferredSrc: function () {
+      return "";
+    },
+    waitForSpaAlbumCoverReady: function () {
+      return Promise.resolve();
+    },
+    swapSpaFragment: function () {
+      return Promise.resolve();
+    },
+    renderSpaDocument: function () {
+      return Promise.resolve();
+    },
+    spaNavigate: function (href) {
+      window.location.href = href;
+    }
   };
 }
 
 function callSpaRenderer(name, args) {
-  const fn = spaRendererApi && typeof spaRendererApi[name] === "function"
-    ? spaRendererApi[name]
-    : null;
+  const fn = spaRendererApi && typeof spaRendererApi[name] === "function" ? spaRendererApi[name] : null;
   return fn ? fn.apply(spaRendererApi, args || []) : undefined;
 }
 
-function buildSpaSnapshotHtml() { return callSpaRenderer("buildSpaSnapshotHtml", arguments); }
+function buildSpaSnapshotHtml() {
+  return callSpaRenderer("buildSpaSnapshotHtml", arguments);
+}
 
-function snapshotCurrentSpaPage() { return callSpaRenderer("snapshotCurrentSpaPage", arguments); }
+function snapshotCurrentSpaPage() {
+  return callSpaRenderer("snapshotCurrentSpaPage", arguments);
+}
 
-function parseSpaDocument() { return callSpaRenderer("parseSpaDocument", arguments); }
+function parseSpaDocument() {
+  return callSpaRenderer("parseSpaDocument", arguments);
+}
 
-function buildSpaDocumentFragment() { return callSpaRenderer("buildSpaDocumentFragment", arguments); }
+function buildSpaDocumentFragment() {
+  return callSpaRenderer("buildSpaDocumentFragment", arguments);
+}
 
-function getSpaCriticalImages() { return callSpaRenderer("getSpaCriticalImages", arguments); }
+function getSpaCriticalImages() {
+  return callSpaRenderer("getSpaCriticalImages", arguments);
+}
 
-function decodeSpaImage() { return callSpaRenderer("decodeSpaImage", arguments); }
+function decodeSpaImage() {
+  return callSpaRenderer("decodeSpaImage", arguments);
+}
 
-function decodeSpaCriticalImages() { return callSpaRenderer("decodeSpaCriticalImages", arguments); }
+function decodeSpaCriticalImages() {
+  return callSpaRenderer("decodeSpaCriticalImages", arguments);
+}
 
-function getSpaAlbumCoverImage() { return callSpaRenderer("getSpaAlbumCoverImage", arguments); }
+function getSpaAlbumCoverImage() {
+  return callSpaRenderer("getSpaAlbumCoverImage", arguments);
+}
 
-function getImagePreferredSrc() { return callSpaRenderer("getImagePreferredSrc", arguments); }
+function getImagePreferredSrc() {
+  return callSpaRenderer("getImagePreferredSrc", arguments);
+}
 
-function waitForSpaAlbumCoverReady() { return callSpaRenderer("waitForSpaAlbumCoverReady", arguments); }
+function waitForSpaAlbumCoverReady() {
+  return callSpaRenderer("waitForSpaAlbumCoverReady", arguments);
+}
 
-function swapSpaFragment() { return callSpaRenderer("swapSpaFragment", arguments); }
+function swapSpaFragment() {
+  return callSpaRenderer("swapSpaFragment", arguments);
+}
 
-function renderSpaDocument() { return callSpaRenderer("renderSpaDocument", arguments); }
+function renderSpaDocument() {
+  return callSpaRenderer("renderSpaDocument", arguments);
+}
 
-function spaNavigate() { return callSpaRenderer("spaNavigate", arguments); }
+function spaNavigate() {
+  return callSpaRenderer("spaNavigate", arguments);
+}
 
 function createAlbumPlayerUiApi() {
-  const module = window.InfraAlbumPlayerUi && typeof window.InfraAlbumPlayerUi === "object"
-    ? window.InfraAlbumPlayerUi
-    : null;
-  const factory = module && typeof module.createAlbumPlayerUi === "function"
-    ? module.createAlbumPlayerUi
-    : null;
+  const module =
+    window.InfraAlbumPlayerUi && typeof window.InfraAlbumPlayerUi === "object"
+      ? window.InfraAlbumPlayerUi
+      : null;
+  const factory =
+    module && typeof module.createAlbumPlayerUi === "function" ? module.createAlbumPlayerUi : null;
   if (!factory) return createNoopAlbumPlayerUiApi();
   return factory({
     audioState,
@@ -546,8 +845,12 @@ function createAlbumPlayerUiApi() {
     injectCurrentTrackIntoRadioQueue,
     startSelectedTrackInRadioFromCold,
     toggleCurrentPageCollection,
-    playCurrentPageCollectionShuffled: function () { return callAudioRadio("playCurrentPageCollectionShuffled", arguments); },
-    isCurrentPagePlaylistActive: function (collection) { return callAudioRadio("isCurrentPagePlaylistActive", [collection]); }
+    playCurrentPageCollectionShuffled: function () {
+      return callAudioRadio("playCurrentPageCollectionShuffled", arguments);
+    },
+    isCurrentPagePlaylistActive: function (collection) {
+      return callAudioRadio("isCurrentPagePlaylistActive", [collection]);
+    }
   });
 }
 
@@ -559,76 +862,117 @@ function createNoopAlbumPlayerUiApi() {
       const total = Math.round(seconds);
       return Math.floor(total / 60) + ":" + String(total % 60).padStart(2, "0");
     },
-    parseTrackDurationSeconds: function () { return 0; },
+    parseTrackDurationSeconds: function () {
+      return 0;
+    },
     updateAlbumTracksHeading: function () {},
     rememberTrackDuration: function () {},
-    getCachedTrackDuration: function () { return ""; },
-    loadTrackDurationData: function () { return Promise.resolve({}); },
+    getCachedTrackDuration: function () {
+      return "";
+    },
+    loadTrackDurationData: function () {
+      return Promise.resolve({});
+    },
     applyCachedTrackDurations: function () {},
     syncCurrentTrackDurationFromAudio: function () {},
     hydrateTrackDurations: function () {},
-    createEqualizerHtml: function () { return ""; },
+    createEqualizerHtml: function () {
+      return "";
+    },
     setRowPlaying: function () {},
-    syncAudioUi: function () { syncTransportUi(); },
+    syncAudioUi: function () {
+      syncTransportUi();
+    },
     ensurePlaylistFromUi: function () {},
-    prepareAlbumUiTrackForPlayback: function (_ui, index) { return index; },
+    prepareAlbumUiTrackForPlayback: function (_ui, index) {
+      return index;
+    },
     initMinimalPlayers: function () {},
     hydrateCurrentAlbumTrackRows: function () {}
   };
 }
 
 function callAlbumPlayerUi(name, args) {
-  const fn = albumPlayerUiApi && typeof albumPlayerUiApi[name] === "function"
-    ? albumPlayerUiApi[name]
-    : null;
+  const fn = albumPlayerUiApi && typeof albumPlayerUiApi[name] === "function" ? albumPlayerUiApi[name] : null;
   return fn ? fn.apply(albumPlayerUiApi, args || []) : undefined;
 }
 
-function formatTrackDuration() { return callAlbumPlayerUi("formatTrackDuration", arguments); }
+function formatTrackDuration() {
+  return callAlbumPlayerUi("formatTrackDuration", arguments);
+}
 
-function parseTrackDurationSeconds() { return callAlbumPlayerUi("parseTrackDurationSeconds", arguments); }
+function parseTrackDurationSeconds() {
+  return callAlbumPlayerUi("parseTrackDurationSeconds", arguments);
+}
 
-function updateAlbumTracksHeading() { return callAlbumPlayerUi("updateAlbumTracksHeading", arguments); }
+function updateAlbumTracksHeading() {
+  return callAlbumPlayerUi("updateAlbumTracksHeading", arguments);
+}
 
-function rememberTrackDuration() { return callAlbumPlayerUi("rememberTrackDuration", arguments); }
+function rememberTrackDuration() {
+  return callAlbumPlayerUi("rememberTrackDuration", arguments);
+}
 
-function getCachedTrackDuration() { return callAlbumPlayerUi("getCachedTrackDuration", arguments); }
+function getCachedTrackDuration() {
+  return callAlbumPlayerUi("getCachedTrackDuration", arguments);
+}
 
-function loadTrackDurationData() { return callAlbumPlayerUi("loadTrackDurationData", arguments); }
+function loadTrackDurationData() {
+  return callAlbumPlayerUi("loadTrackDurationData", arguments);
+}
 
-function applyCachedTrackDurations() { return callAlbumPlayerUi("applyCachedTrackDurations", arguments); }
+function applyCachedTrackDurations() {
+  return callAlbumPlayerUi("applyCachedTrackDurations", arguments);
+}
 
-function syncCurrentTrackDurationFromAudio() { return callAlbumPlayerUi("syncCurrentTrackDurationFromAudio", arguments); }
+function syncCurrentTrackDurationFromAudio() {
+  return callAlbumPlayerUi("syncCurrentTrackDurationFromAudio", arguments);
+}
 
-function hydrateTrackDurations() { return callAlbumPlayerUi("hydrateTrackDurations", arguments); }
+function hydrateTrackDurations() {
+  return callAlbumPlayerUi("hydrateTrackDurations", arguments);
+}
 
-function createEqualizerHtml() { return callAlbumPlayerUi("createEqualizerHtml", arguments); }
+function createEqualizerHtml() {
+  return callAlbumPlayerUi("createEqualizerHtml", arguments);
+}
 
-function setRowPlaying() { return callAlbumPlayerUi("setRowPlaying", arguments); }
+function setRowPlaying() {
+  return callAlbumPlayerUi("setRowPlaying", arguments);
+}
 
-function syncAudioUi() { return callAlbumPlayerUi("syncAudioUi", arguments); }
+function syncAudioUi() {
+  return callAlbumPlayerUi("syncAudioUi", arguments);
+}
 
-function ensurePlaylistFromUi() { return callAlbumPlayerUi("ensurePlaylistFromUi", arguments); }
+function ensurePlaylistFromUi() {
+  return callAlbumPlayerUi("ensurePlaylistFromUi", arguments);
+}
 
-function prepareAlbumUiTrackForPlayback() { return callAlbumPlayerUi("prepareAlbumUiTrackForPlayback", arguments); }
+function prepareAlbumUiTrackForPlayback() {
+  return callAlbumPlayerUi("prepareAlbumUiTrackForPlayback", arguments);
+}
 
-function initMinimalPlayers() { return callAlbumPlayerUi("initMinimalPlayers", arguments); }
+function initMinimalPlayers() {
+  return callAlbumPlayerUi("initMinimalPlayers", arguments);
+}
 
-function hydrateCurrentAlbumTrackRows() { return callAlbumPlayerUi("hydrateCurrentAlbumTrackRows", arguments); }
+function hydrateCurrentAlbumTrackRows() {
+  return callAlbumPlayerUi("hydrateCurrentAlbumTrackRows", arguments);
+}
 
 function createNowPlayingApi() {
-  const module = window.InfraNowPlaying && typeof window.InfraNowPlaying === "object"
-    ? window.InfraNowPlaying
-    : null;
-  const factory = module && typeof module.createNowPlaying === "function"
-    ? module.createNowPlaying
-    : null;
+  const module =
+    window.InfraNowPlaying && typeof window.InfraNowPlaying === "object" ? window.InfraNowPlaying : null;
+  const factory = module && typeof module.createNowPlaying === "function" ? module.createNowPlaying : null;
   if (!factory) return createNoopNowPlayingApi();
   return factory({
     audioState,
     NOW_PLAYING_OVERLAY_ENABLED,
     isIosDevice,
-    getThemePreset: function () { return themePresets[currentTheme] || themePresets.blanc; },
+    getThemePreset: function () {
+      return themePresets[currentTheme] || themePresets.blanc;
+    },
     getPwaStatusColor,
     isDarkColor,
     toAbsoluteUrlOrEmpty,
@@ -661,18 +1005,30 @@ function createNowPlayingApi() {
 
 function createNoopNowPlayingApi() {
   return {
-    readNowPlayingVolumeVisible: function () { return !isIosDevice(); },
+    readNowPlayingVolumeVisible: function () {
+      return !isIosDevice();
+    },
     persistNowPlayingVolumeVisible: function () {},
     setNowPlayingVolumeVisible: function () {},
     toggleNowPlayingVolumeVisible: function () {},
-    getFallbackNowPlayingThemeColor: function () { return "#14141c"; },
+    getFallbackNowPlayingThemeColor: function () {
+      return "#14141c";
+    },
     extractImageThemeColor: function () {},
     applyNowPlayingThemeColor: function () {},
-    restoreNowPlayingThemeColor: function () { syncPwaStatusColor(); },
-    prefersReducedMotion: function () { return false; },
-    getNowPlayingMiniRect: function () { return null; },
+    restoreNowPlayingThemeColor: function () {
+      syncPwaStatusColor();
+    },
+    prefersReducedMotion: function () {
+      return false;
+    },
+    getNowPlayingMiniRect: function () {
+      return null;
+    },
     cancelNowPlayingPanelAnimations: function () {},
-    animateNowPlayingPanel: function (_direction, done) { if (typeof done === "function") done(); },
+    animateNowPlayingPanel: function (_direction, done) {
+      if (typeof done === "function") done();
+    },
     disableNowPlayingOverlayUi: function () {},
     openNowPlayingOverlay: function () {},
     closeNowPlayingOverlay: function () {},
@@ -684,9 +1040,7 @@ function createNoopNowPlayingApi() {
 }
 
 function callNowPlaying(name, args) {
-  const fn = nowPlayingApi && typeof nowPlayingApi[name] === "function"
-    ? nowPlayingApi[name]
-    : null;
+  const fn = nowPlayingApi && typeof nowPlayingApi[name] === "function" ? nowPlayingApi[name] : null;
   return fn ? fn.apply(nowPlayingApi, args || []) : undefined;
 }
 
@@ -767,12 +1121,9 @@ function syncNowPlayingOverlayProgress() {
 }
 
 function createTransportUiApi() {
-  const module = window.InfraTransportUi && typeof window.InfraTransportUi === "object"
-    ? window.InfraTransportUi
-    : null;
-  const factory = module && typeof module.createTransportUi === "function"
-    ? module.createTransportUi
-    : null;
+  const module =
+    window.InfraTransportUi && typeof window.InfraTransportUi === "object" ? window.InfraTransportUi : null;
+  const factory = module && typeof module.createTransportUi === "function" ? module.createTransportUi : null;
   if (!factory) return createNoopTransportUiApi();
   return factory({
     audioState,
@@ -835,9 +1186,7 @@ function createNoopTransportUiApi() {
 }
 
 function callTransportUi(name, args) {
-  const fn = transportUiApi && typeof transportUiApi[name] === "function"
-    ? transportUiApi[name]
-    : null;
+  const fn = transportUiApi && typeof transportUiApi[name] === "function" ? transportUiApi[name] : null;
   return fn ? fn.apply(transportUiApi, args || []) : undefined;
 }
 
@@ -925,4 +1274,95 @@ function syncPersistentUiAfterSpaSwap() {
   }
 }
 
-export { normalizePwaHeadAssetLinks, createAudioTelemetryApi, createNoopAudioTelemetryApi, createHomeCatalogApi, createNoopHomeCatalogApi, createAudioRadioApi, createNoopAudioRadioApi, callAudioRadio, createAudioCoreApi, createNoopAudioCoreApi, createPwaInstallApi, createNoopPwaInstallApi, createSpaRendererApi, createNoopSpaRendererApi, callSpaRenderer, buildSpaSnapshotHtml, snapshotCurrentSpaPage, parseSpaDocument, buildSpaDocumentFragment, getSpaCriticalImages, decodeSpaImage, decodeSpaCriticalImages, getSpaAlbumCoverImage, getImagePreferredSrc, waitForSpaAlbumCoverReady, swapSpaFragment, renderSpaDocument, spaNavigate, createAlbumPlayerUiApi, createNoopAlbumPlayerUiApi, callAlbumPlayerUi, formatTrackDuration, parseTrackDurationSeconds, updateAlbumTracksHeading, rememberTrackDuration, getCachedTrackDuration, loadTrackDurationData, applyCachedTrackDurations, syncCurrentTrackDurationFromAudio, hydrateTrackDurations, createEqualizerHtml, setRowPlaying, syncAudioUi, ensurePlaylistFromUi, prepareAlbumUiTrackForPlayback, initMinimalPlayers, hydrateCurrentAlbumTrackRows, createNowPlayingApi, createNoopNowPlayingApi, callNowPlaying, readNowPlayingVolumeVisible, persistNowPlayingVolumeVisible, setNowPlayingVolumeVisible, toggleNowPlayingVolumeVisible, getFallbackNowPlayingThemeColor, extractImageThemeColor, applyNowPlayingThemeColor, restoreNowPlayingThemeColor, prefersReducedMotion, getNowPlayingMiniRect, cancelNowPlayingPanelAnimations, animateNowPlayingPanel, disableNowPlayingOverlayUi, openNowPlayingOverlay, closeNowPlayingOverlay, setNowPlayingQueueOpen, syncNowPlayingOverlay, syncNowPlayingQueue, syncNowPlayingOverlayProgress, createTransportUiApi, createNoopTransportUiApi, callTransportUi, isDesktopTransportViewport, getDesktopTransportState, readDesktopTransportLayout, writeDesktopTransportLayout, clampDesktopTransportLayout, clampDesktopTransportPosition, syncDesktopTransportCover, applyDesktopTransportLayout, applyDesktopTransportPosition, clearDesktopTransportInlineStyles, syncDesktopTransportLayout, isDesktopTransportPointer, bindDesktopTransportUi, ensureGlobalTransportUi, syncTransportMiniUi, syncMobilePlayerSpace, syncTransportUi, syncPersistentUiAfterSpaSwap };
+export {
+  normalizePwaHeadAssetLinks,
+  createAudioTelemetryApi,
+  createNoopAudioTelemetryApi,
+  createHomeCatalogApi,
+  createNoopHomeCatalogApi,
+  createAudioRadioApi,
+  createNoopAudioRadioApi,
+  callAudioRadio,
+  createAudioCoreApi,
+  createNoopAudioCoreApi,
+  createPwaInstallApi,
+  createNoopPwaInstallApi,
+  createSpaRendererApi,
+  createNoopSpaRendererApi,
+  callSpaRenderer,
+  buildSpaSnapshotHtml,
+  snapshotCurrentSpaPage,
+  parseSpaDocument,
+  buildSpaDocumentFragment,
+  getSpaCriticalImages,
+  decodeSpaImage,
+  decodeSpaCriticalImages,
+  getSpaAlbumCoverImage,
+  getImagePreferredSrc,
+  waitForSpaAlbumCoverReady,
+  swapSpaFragment,
+  renderSpaDocument,
+  spaNavigate,
+  createAlbumPlayerUiApi,
+  createNoopAlbumPlayerUiApi,
+  callAlbumPlayerUi,
+  formatTrackDuration,
+  parseTrackDurationSeconds,
+  updateAlbumTracksHeading,
+  rememberTrackDuration,
+  getCachedTrackDuration,
+  loadTrackDurationData,
+  applyCachedTrackDurations,
+  syncCurrentTrackDurationFromAudio,
+  hydrateTrackDurations,
+  createEqualizerHtml,
+  setRowPlaying,
+  syncAudioUi,
+  ensurePlaylistFromUi,
+  prepareAlbumUiTrackForPlayback,
+  initMinimalPlayers,
+  hydrateCurrentAlbumTrackRows,
+  createNowPlayingApi,
+  createNoopNowPlayingApi,
+  callNowPlaying,
+  readNowPlayingVolumeVisible,
+  persistNowPlayingVolumeVisible,
+  setNowPlayingVolumeVisible,
+  toggleNowPlayingVolumeVisible,
+  getFallbackNowPlayingThemeColor,
+  extractImageThemeColor,
+  applyNowPlayingThemeColor,
+  restoreNowPlayingThemeColor,
+  prefersReducedMotion,
+  getNowPlayingMiniRect,
+  cancelNowPlayingPanelAnimations,
+  animateNowPlayingPanel,
+  disableNowPlayingOverlayUi,
+  openNowPlayingOverlay,
+  closeNowPlayingOverlay,
+  setNowPlayingQueueOpen,
+  syncNowPlayingOverlay,
+  syncNowPlayingQueue,
+  syncNowPlayingOverlayProgress,
+  createTransportUiApi,
+  createNoopTransportUiApi,
+  callTransportUi,
+  isDesktopTransportViewport,
+  getDesktopTransportState,
+  readDesktopTransportLayout,
+  writeDesktopTransportLayout,
+  clampDesktopTransportLayout,
+  clampDesktopTransportPosition,
+  syncDesktopTransportCover,
+  applyDesktopTransportLayout,
+  applyDesktopTransportPosition,
+  clearDesktopTransportInlineStyles,
+  syncDesktopTransportLayout,
+  isDesktopTransportPointer,
+  bindDesktopTransportUi,
+  ensureGlobalTransportUi,
+  syncTransportMiniUi,
+  syncMobilePlayerSpace,
+  syncTransportUi,
+  syncPersistentUiAfterSpaSwap
+};

@@ -44,11 +44,11 @@
   function runQuickAction(action, navigateTo) {
     if (!action) return;
     if (action.type === "app_download") {
-      openAppDownloadGatekeeper(action.appName, action.url);
+      window.openAppDownloadGatekeeper(action.appName, action.url);
       return;
     }
     if (action.type === "download") {
-      downloadNow(action.url);
+      window.downloadNow(action.url);
       return;
     }
     if (action.url && typeof navigateTo === "function") {

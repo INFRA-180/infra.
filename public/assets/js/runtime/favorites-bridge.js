@@ -1,12 +1,42 @@
 // Favoris (pont vers favorites-ui.js) et réglages admin/Service Worker.
 // Extrait de l'ancien scripts.js (chantier JavaScript d'INFRA, 10/11/2026). Uniquement des fonctions
 // et leurs variables : l'état partagé et l'ordre de démarrage restent dans scripts.js.
-import { DONE_MODE_ICON, DOWNLOAD_ICON, FAVORITES_RESET_DB_MARKER, HEART_ICON_FILLED, HEART_ICON_OUTLINE, SELECT_MODE_ICON, audioState, favoritesUiApi, infraDownloadsApi, legacyThemeMap, runtime, themePresets } from "../scripts.js";
+import {
+  DONE_MODE_ICON,
+  DOWNLOAD_ICON,
+  FAVORITES_RESET_DB_MARKER,
+  HEART_ICON_FILLED,
+  HEART_ICON_OUTLINE,
+  SELECT_MODE_ICON,
+  audioState,
+  favoritesUiApi,
+  infraDownloadsApi,
+  legacyThemeMap,
+  runtime,
+  themePresets
+} from "../scripts.js";
 import { getAudioTelemetryNow } from "./config.js";
 import { formatTrackDuration, syncAudioUi } from "./module-bridges.js";
-import { clearRadioQueue, getTrackMetaByAssetPath, loadTracksData, mergeTrackMetadata, persistHomePlayMode } from "./catalog-playback.js";
-import { getAudioAssetPathKey, getCurrentAlbumTitle, getCurrentLogicalAudioSrc, getCurrentPlaylistTrack, resolveManagedAudioSrc, srcMatches } from "./audio-sources.js";
-import { getMediaSessionFallbackArtwork, resolveCoverUrl, syncMediaSessionMetadata } from "./media-artwork.js";
+import {
+  clearRadioQueue,
+  getTrackMetaByAssetPath,
+  loadTracksData,
+  mergeTrackMetadata,
+  persistHomePlayMode
+} from "./catalog-playback.js";
+import {
+  getAudioAssetPathKey,
+  getCurrentAlbumTitle,
+  getCurrentLogicalAudioSrc,
+  getCurrentPlaylistTrack,
+  resolveManagedAudioSrc,
+  srcMatches
+} from "./audio-sources.js";
+import {
+  getMediaSessionFallbackArtwork,
+  resolveCoverUrl,
+  syncMediaSessionMetadata
+} from "./media-artwork.js";
 import { getRandomIndex, startTrack, syncPlaylistContext, trackAudioRuntimeEvent } from "./playback.js";
 
 function purgeAdminUi() {
@@ -25,7 +55,9 @@ function purgeAdminUi() {
 }
 
 function normalizeThemeName(themeName) {
-  const raw = String(themeName || "").trim().toLowerCase();
+  const raw = String(themeName || "")
+    .trim()
+    .toLowerCase();
   if (!raw) return "blanc";
   if (themePresets[raw]) return raw;
   if (legacyThemeMap[raw]) return legacyThemeMap[raw];
@@ -33,12 +65,9 @@ function normalizeThemeName(themeName) {
 }
 
 function createFavoritesUiApi() {
-  const module = window.InfraFavoritesUi && typeof window.InfraFavoritesUi === "object"
-    ? window.InfraFavoritesUi
-    : null;
-  const factory = module && typeof module.createFavoritesUi === "function"
-    ? module.createFavoritesUi
-    : null;
+  const module =
+    window.InfraFavoritesUi && typeof window.InfraFavoritesUi === "object" ? window.InfraFavoritesUi : null;
+  const factory = module && typeof module.createFavoritesUi === "function" ? module.createFavoritesUi : null;
   if (!factory) return createNoopFavoritesUiApi();
   return factory({
     audioState,
@@ -79,9 +108,7 @@ function createNoopFavoritesUiApi() {
 }
 
 function callFavoritesUi(name, args) {
-  const fn = favoritesUiApi && typeof favoritesUiApi[name] === "function"
-    ? favoritesUiApi[name]
-    : null;
+  const fn = favoritesUiApi && typeof favoritesUiApi[name] === "function" ? favoritesUiApi[name] : null;
   return fn ? fn.apply(favoritesUiApi, args || []) : undefined;
 }
 
@@ -437,4 +464,98 @@ function initFavoritesRoute() {
   return callFavoritesUi("initFavoritesRoute", arguments);
 }
 
-export { purgeAdminUi, normalizeThemeName, createFavoritesUiApi, createNoopFavoritesUiApi, callFavoritesUi, createUnavailableFavoritesStorage, getFavoritesStorage, openFavoritesDb, withFavoritesStore, canonicalFavoritePath, normalizeFavoritePath, getTelemetryElementSelector, getTapTelemetry, trackFavoriteDebug, trackFavoritePathResolved, sortFavoriteEntries, assignFavoriteSortIndexes, readLocalFavoriteEntries, writeLocalFavoriteEntries, persistFavoriteOrder, syncFavoriteEntryState, loadFavoriteEntries, readFavoritesResetVersion, writeFavoritesResetVersion, replaceFavoritesStoreWithResetMarker, ensureFavoritesReset, loadFavoritesWithReset, getCurrentFavoritePath, isFavoritePath, getHeartIcon, setFavoriteButtonState, setFavoriteButtonPath, getFavoriteButtonPath, deleteFavoriteEntry, syncCurrentFavoriteButtons, syncFavoriteButtons, syncFavoriteSurface, pulseFavoriteButton, getNextFavoriteSortIndex, getFavoriteSnapshot, restoreFavoriteSnapshot, createFavoritePersistResult, isFavoritePersistOk, applyFavoriteMemoryState, persistFavoriteMemoryState, setFavoritePath, toggleFavoritePath, toggleFavoriteAndSync, getAlbumRowFavoritePath, getAlbumRowFavoriteMeta, syncAlbumFavoriteRow, syncAlbumFavoriteButtons, setAlbumFavoriteSelectionMode, logFavoriteSelectTap, toggleAlbumFavoriteSelection, ensureAlbumHeaderActions, ensureAlbumFavoriteSelectionToolbar, ensureAlbumFavoriteControls, toggleCurrentFavorite, buildFavoritesPlaylist, setFavoritesPlaylist, startFavoritesPlaybackAt, startFavoritesPlayback, enhanceAlbumDownloadButtons, scheduleFavoritesPreload, isFavoritesRoute, getFavoritesViewRoot, closeFavoritesPage, openFavoritesPage, refreshFavoritesViewIfOpen, escapeHtml, escapeAttribute, createFavoriteRowCover, getFavoriteRowTitle, getFavoriteRowAlbum, buildFavoritesViewRows, getOrCreateFavoritesView, getFavoritesRenderStartTs, beginFavoritesRenderTelemetry, getFavoritesRenderDuration, getFavoritesBackIcon, getFavoritesSelectIcon, getFavoritesSelectedCount, setFavoritesSelectionMode, syncFavoritesSelectionUi, toggleFavoritesSelectionPath, removeSelectedFavorites, renderFavoritesShell, renderFavoritesPage, bindFavoritesView, reorderFavorites, syncFavoritesRoute, initFavoritesRoute };
+export {
+  purgeAdminUi,
+  normalizeThemeName,
+  createFavoritesUiApi,
+  createNoopFavoritesUiApi,
+  callFavoritesUi,
+  createUnavailableFavoritesStorage,
+  getFavoritesStorage,
+  openFavoritesDb,
+  withFavoritesStore,
+  canonicalFavoritePath,
+  normalizeFavoritePath,
+  getTelemetryElementSelector,
+  getTapTelemetry,
+  trackFavoriteDebug,
+  trackFavoritePathResolved,
+  sortFavoriteEntries,
+  assignFavoriteSortIndexes,
+  readLocalFavoriteEntries,
+  writeLocalFavoriteEntries,
+  persistFavoriteOrder,
+  syncFavoriteEntryState,
+  loadFavoriteEntries,
+  readFavoritesResetVersion,
+  writeFavoritesResetVersion,
+  replaceFavoritesStoreWithResetMarker,
+  ensureFavoritesReset,
+  loadFavoritesWithReset,
+  getCurrentFavoritePath,
+  isFavoritePath,
+  getHeartIcon,
+  setFavoriteButtonState,
+  setFavoriteButtonPath,
+  getFavoriteButtonPath,
+  deleteFavoriteEntry,
+  syncCurrentFavoriteButtons,
+  syncFavoriteButtons,
+  syncFavoriteSurface,
+  pulseFavoriteButton,
+  getNextFavoriteSortIndex,
+  getFavoriteSnapshot,
+  restoreFavoriteSnapshot,
+  createFavoritePersistResult,
+  isFavoritePersistOk,
+  applyFavoriteMemoryState,
+  persistFavoriteMemoryState,
+  setFavoritePath,
+  toggleFavoritePath,
+  toggleFavoriteAndSync,
+  getAlbumRowFavoritePath,
+  getAlbumRowFavoriteMeta,
+  syncAlbumFavoriteRow,
+  syncAlbumFavoriteButtons,
+  setAlbumFavoriteSelectionMode,
+  logFavoriteSelectTap,
+  toggleAlbumFavoriteSelection,
+  ensureAlbumHeaderActions,
+  ensureAlbumFavoriteSelectionToolbar,
+  ensureAlbumFavoriteControls,
+  toggleCurrentFavorite,
+  buildFavoritesPlaylist,
+  setFavoritesPlaylist,
+  startFavoritesPlaybackAt,
+  startFavoritesPlayback,
+  enhanceAlbumDownloadButtons,
+  scheduleFavoritesPreload,
+  isFavoritesRoute,
+  getFavoritesViewRoot,
+  closeFavoritesPage,
+  openFavoritesPage,
+  refreshFavoritesViewIfOpen,
+  escapeHtml,
+  escapeAttribute,
+  createFavoriteRowCover,
+  getFavoriteRowTitle,
+  getFavoriteRowAlbum,
+  buildFavoritesViewRows,
+  getOrCreateFavoritesView,
+  getFavoritesRenderStartTs,
+  beginFavoritesRenderTelemetry,
+  getFavoritesRenderDuration,
+  getFavoritesBackIcon,
+  getFavoritesSelectIcon,
+  getFavoritesSelectedCount,
+  setFavoritesSelectionMode,
+  syncFavoritesSelectionUi,
+  toggleFavoritesSelectionPath,
+  removeSelectedFavorites,
+  renderFavoritesShell,
+  renderFavoritesPage,
+  bindFavoritesView,
+  reorderFavorites,
+  syncFavoritesRoute,
+  initFavoritesRoute
+};

@@ -5,9 +5,34 @@ import { audioState, coverApi, mediaSessionApi, runtime } from "../scripts.js";
 import { callAudioRadio } from "./module-bridges.js";
 import { mergeTrackMetadata } from "./catalog-playback.js";
 import { isIosDevice } from "./theme-admin-pwa.js";
-import { getCurrentAlbumTitle, getCurrentLogicalAudioSrc, getCurrentPlaylistTrack, normalizeAlbumTitle, normalizeTrackTitle, normalizeUrlAgainstBase, preloadImage, resolveCatalogAlbumArtwork, resolveTracksAlbumArtwork, srcMatches, toAbsoluteUrlOrEmpty } from "./audio-sources.js";
-import { beginAudioRecovery, buildAudioMonitorPayload, failAudioRecovery, getAudioRuntimeProbeState } from "./audio-monitor.js";
-import { cancelExternalResumeCommand, cancelSystemInterruptionResume, markAudioPauseIntent, playFromExternalControl, playNext, playPrevious, trackAudioRuntimeEvent } from "./playback.js";
+import {
+  getCurrentAlbumTitle,
+  getCurrentLogicalAudioSrc,
+  getCurrentPlaylistTrack,
+  normalizeAlbumTitle,
+  normalizeTrackTitle,
+  normalizeUrlAgainstBase,
+  preloadImage,
+  resolveCatalogAlbumArtwork,
+  resolveTracksAlbumArtwork,
+  srcMatches,
+  toAbsoluteUrlOrEmpty
+} from "./audio-sources.js";
+import {
+  beginAudioRecovery,
+  buildAudioMonitorPayload,
+  failAudioRecovery,
+  getAudioRuntimeProbeState
+} from "./audio-monitor.js";
+import {
+  cancelExternalResumeCommand,
+  cancelSystemInterruptionResume,
+  markAudioPauseIntent,
+  playFromExternalControl,
+  playNext,
+  playPrevious,
+  trackAudioRuntimeEvent
+} from "./playback.js";
 
 function parseSrcsetCandidates(srcsetValue) {
   const raw = String(srcsetValue || "").trim();
@@ -19,10 +44,10 @@ function parseSrcsetCandidates(srcsetValue) {
     .map((entry) => {
       const pieces = entry.split(/\s+/).filter(Boolean);
       const src = String(pieces[0] || "").trim();
-      const widthToken = String(pieces[1] || "").trim().toLowerCase();
-      const width = widthToken.endsWith("w")
-        ? Number.parseInt(widthToken.slice(0, -1), 10)
-        : NaN;
+      const widthToken = String(pieces[1] || "")
+        .trim()
+        .toLowerCase();
+      const width = widthToken.endsWith("w") ? Number.parseInt(widthToken.slice(0, -1), 10) : NaN;
       return {
         src,
         width: Number.isFinite(width) ? width : null
@@ -39,14 +64,12 @@ function choosePreferredSrcsetSource(srcsetValue, targetWidth) {
   const withWidth = candidates.filter((item) => Number.isFinite(item.width));
   if (!withWidth.length) return candidates[0].src;
 
-  const preferred = withWidth
-    .slice()
-    .sort((left, right) => {
-      const leftDistance = Math.abs((left.width || target) - target);
-      const rightDistance = Math.abs((right.width || target) - target);
-      if (leftDistance !== rightDistance) return leftDistance - rightDistance;
-      return (right.width || 0) - (left.width || 0);
-    })[0];
+  const preferred = withWidth.slice().sort((left, right) => {
+    const leftDistance = Math.abs((left.width || target) - target);
+    const rightDistance = Math.abs((right.width || target) - target);
+    if (leftDistance !== rightDistance) return leftDistance - rightDistance;
+    return (right.width || 0) - (left.width || 0);
+  })[0];
   return preferred ? preferred.src : candidates[0].src;
 }
 
@@ -58,14 +81,9 @@ function getAlbumCoverFromDoc(docLike, baseUrl) {
   if (!docLike) return "";
   const cover = docLike.querySelector(".album-layout .cover, .cover");
   if (!cover) return "";
-  const documentBaseURL = baseUrl || (docLike.URL || docLike.baseURI || window.location.href);
+  const documentBaseURL = baseUrl || docLike.URL || docLike.baseURI || window.location.href;
   const srcset = getSourceFromSrcset(cover.getAttribute("srcset") || "");
-  const raw = String(
-    srcset ||
-    cover.getAttribute("src") ||
-    cover.currentSrc ||
-    ""
-  ).trim();
+  const raw = String(srcset || cover.getAttribute("src") || cover.currentSrc || "").trim();
   if (!raw) return "";
   return normalizeUrlAgainstBase(raw, documentBaseURL);
 }
@@ -87,14 +105,17 @@ function getMediaSessionFallbackArtwork() {
 }
 
 function getCoverUrlOptions(options) {
-  return Object.assign({
-    baseUrl: runtime.baseUrl.href,
-    currentHref: window.location.href,
-    currentOrigin: window.location.origin,
-    fallbackArtwork: getMediaSessionFallbackArtwork(),
-    toAbsoluteUrlOrEmpty,
-    srcMatches
-  }, options || {});
+  return Object.assign(
+    {
+      baseUrl: runtime.baseUrl.href,
+      currentHref: window.location.href,
+      currentOrigin: window.location.origin,
+      fallbackArtwork: getMediaSessionFallbackArtwork(),
+      toAbsoluteUrlOrEmpty,
+      srcMatches
+    },
+    options || {}
+  );
 }
 
 function normalizeArtworkUrl(coverPath) {
@@ -148,21 +169,24 @@ function inferArtworkSizeHint(urlValue) {
   return "512x512";
 }
 
-function withMediaSessionArtworkVersion(urlValue, track) {
+function withMediaSessionArtworkVersion(urlValue, _track) {
   return normalizeArtworkUrl(urlValue);
 }
 
 function getMediaSessionAlbumArtwork(artworkEntries) {
   const fallbackArtwork = getMediaSessionFallbackArtwork();
-  return (Array.isArray(artworkEntries) ? artworkEntries : []).find(function (entry) {
-    return Boolean(entry && entry.src && !srcMatches(entry.src, fallbackArtwork));
-  }) || null;
+  return (
+    (Array.isArray(artworkEntries) ? artworkEntries : []).find(function (entry) {
+      return Boolean(entry && entry.src && !srcMatches(entry.src, fallbackArtwork));
+    }) || null
+  );
 }
 
 function buildArtworkBlobAndSetMetadata(track, metadataArgs) {
-  const artworkEntries = metadataArgs && Array.isArray(metadataArgs.artworkEntries)
-    ? metadataArgs.artworkEntries
-    : buildMediaSessionArtwork(track);
+  const artworkEntries =
+    metadataArgs && Array.isArray(metadataArgs.artworkEntries)
+      ? metadataArgs.artworkEntries
+      : buildMediaSessionArtwork(track);
   const albumArtwork = getMediaSessionAlbumArtwork(artworkEntries);
   const metadataKey = String(metadataArgs && metadataArgs.key ? metadataArgs.key : "");
 
@@ -174,18 +198,22 @@ function buildArtworkBlobAndSetMetadata(track, metadataArgs) {
     if (!isCurrentMetadataRequest()) return;
     const artwork = artworkEntries.length
       ? artworkEntries
-      : [{
-          src: getMediaSessionFallbackArtwork(),
-          sizes: "512x512",
-          type: "image/png"
-        }];
+      : [
+          {
+            src: getMediaSessionFallbackArtwork(),
+            sizes: "512x512",
+            type: "image/png"
+          }
+        ];
     if (mediaSessionApi && typeof mediaSessionApi.setMetadata === "function") {
-      return mediaSessionApi.setMetadata({
-        title: metadataArgs.title,
-        artist: metadataArgs.artist,
-        album: metadataArgs.album,
-        artwork
-      }) !== false;
+      return (
+        mediaSessionApi.setMetadata({
+          title: metadataArgs.title,
+          artist: metadataArgs.artist,
+          album: metadataArgs.album,
+          artwork
+        }) !== false
+      );
     }
     try {
       navigator.mediaSession.metadata = new window.MediaMetadata({
@@ -228,11 +256,13 @@ function buildMediaSessionArtwork(track) {
   const fallbackArtwork = getMediaSessionFallbackArtwork();
   const canonicalArtwork = resolveCoverUrl(track || null, { width: 1200 }) || fallbackArtwork;
   const normalizedSrc = normalizeArtworkUrl(canonicalArtwork || fallbackArtwork);
-  return [{
-    src: withMediaSessionArtworkVersion(normalizedSrc, track),
-    sizes: srcMatches(normalizedSrc, fallbackArtwork) ? "512x512" : inferArtworkSizeHint(normalizedSrc),
-    type: getArtworkType(normalizedSrc)
-  }];
+  return [
+    {
+      src: withMediaSessionArtworkVersion(normalizedSrc, track),
+      sizes: srcMatches(normalizedSrc, fallbackArtwork) ? "512x512" : inferArtworkSizeHint(normalizedSrc),
+      type: getArtworkType(normalizedSrc)
+    }
+  ];
 }
 
 function clearWaitingRecovery(options) {
@@ -340,11 +370,9 @@ function isIOSStandaloneMediaSession() {
   const ua = String(navigator.userAgent || "");
   const platform = String(navigator.platform || "");
   const isIOS =
-    /iPad|iPhone|iPod/i.test(ua) ||
-    (platform === "MacIntel" && Number(navigator.maxTouchPoints || 0) > 1);
-  const standaloneDisplay = typeof window.matchMedia === "function"
-    ? window.matchMedia("(display-mode: standalone)").matches
-    : false;
+    /iPad|iPhone|iPod/i.test(ua) || (platform === "MacIntel" && Number(navigator.maxTouchPoints || 0) > 1);
+  const standaloneDisplay =
+    typeof window.matchMedia === "function" ? window.matchMedia("(display-mode: standalone)").matches : false;
   const legacyStandalone = window.navigator.standalone === true;
   return Boolean(isIOS && (legacyStandalone || standaloneDisplay));
 }
@@ -415,32 +443,40 @@ function emitScriptMediaCommand(command, details) {
   if (!command || !command.id) return;
   const audio = audioState.audio;
   const visibility = String(document.visibilityState || "");
-  const surfaceHint = command.surface === "media_session"
-    ? (visibility === "hidden" ? "remote_hidden" : (visibility === "visible" ? "remote_visible" : "remote_unknown"))
-    : command.surface;
-  trackAudioRuntimeEvent("media_command", Object.assign(
-    buildAudioMonitorPayload(
-      getCurrentPlaylistTrack(),
-      audioState.currentIndex,
-      audioState.activeLogicalSrc || (audio && (audio.currentSrc || audio.src)) || ""
-    ),
-    {
-      command_token: command.id,
-      command_sequence: command.sequence,
-      action: command.action,
-      origin: command.surface === "media_session" ? "media_session" : "transport",
-      surface: command.surface,
-      surface_hint: surfaceHint,
-      before_paused: command.beforePaused,
-      before_current_time: command.beforeCurrentTime,
-      after_paused: Boolean(audio && audio.paused),
-      after_current_time: audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
-      from_index: Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1,
-      to_index: Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1,
-      command_latency_ms: Math.max(0, Date.now() - command.at)
-    },
-    details || {}
-  ));
+  const surfaceHint =
+    command.surface === "media_session"
+      ? visibility === "hidden"
+        ? "remote_hidden"
+        : visibility === "visible"
+          ? "remote_visible"
+          : "remote_unknown"
+      : command.surface;
+  trackAudioRuntimeEvent(
+    "media_command",
+    Object.assign(
+      buildAudioMonitorPayload(
+        getCurrentPlaylistTrack(),
+        audioState.currentIndex,
+        audioState.activeLogicalSrc || (audio && (audio.currentSrc || audio.src)) || ""
+      ),
+      {
+        command_token: command.id,
+        command_sequence: command.sequence,
+        action: command.action,
+        origin: command.surface === "media_session" ? "media_session" : "transport",
+        surface: command.surface,
+        surface_hint: surfaceHint,
+        before_paused: command.beforePaused,
+        before_current_time: command.beforeCurrentTime,
+        after_paused: Boolean(audio && audio.paused),
+        after_current_time: audio && Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+        from_index: Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1,
+        to_index: Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1,
+        command_latency_ms: Math.max(0, Date.now() - command.at)
+      },
+      details || {}
+    )
+  );
 }
 
 function bindMediaSessionActions(options) {
@@ -478,21 +514,24 @@ function bindMediaSessionActions(options) {
     const audio = audioState.audio;
     if (!audio) return;
     const command = createScriptMediaCommand("pause", "media_session", audio);
-    const pauseIntentReason = audioState.systemInterruptionGuard ||
-      String(audioState.audioSessionLastState || "") === "interrupted"
-      ? "system_interruption"
-      : "explicit_remote";
+    const pauseIntentReason =
+      audioState.systemInterruptionGuard || String(audioState.audioSessionLastState || "") === "interrupted"
+        ? "system_interruption"
+        : "explicit_remote";
     if (pauseIntentReason === "explicit_remote") cancelSystemInterruptionResume("media_session");
     cancelExternalResumeCommand();
-    trackAudioRuntimeEvent("media_session_pause", Object.assign(
-      buildAudioMonitorPayload(
-        getCurrentPlaylistTrack(),
-        audioState.currentIndex,
-        audioState.activeLogicalSrc || audio.currentSrc || audio.src
-      ),
-      getAudioRuntimeProbeState(),
-      { surface: "media_session" }
-    ));
+    trackAudioRuntimeEvent(
+      "media_session_pause",
+      Object.assign(
+        buildAudioMonitorPayload(
+          getCurrentPlaylistTrack(),
+          audioState.currentIndex,
+          audioState.activeLogicalSrc || audio.currentSrc || audio.src
+        ),
+        getAudioRuntimeProbeState(),
+        { surface: "media_session" }
+      )
+    );
     if (!audio.paused) {
       markAudioPauseIntent(
         pauseIntentReason === "system_interruption" ? "system_suspected" : "media_session",
@@ -524,15 +563,22 @@ function bindMediaSessionActions(options) {
     try {
       audio.currentTime = clamped;
       syncMediaSessionMetadata({ forcePosition: true });
-      trackAudioRuntimeEvent("seek", Object.assign(
-        buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, audioState.activeLogicalSrc || audio.currentSrc || audio.src),
-        {
-          source: "media_session",
-          action: actionName,
-          from_ms: Math.floor(previous * 1000),
-          to_ms: Math.floor(clamped * 1000)
-        }
-      ));
+      trackAudioRuntimeEvent(
+        "seek",
+        Object.assign(
+          buildAudioMonitorPayload(
+            getCurrentPlaylistTrack(),
+            audioState.currentIndex,
+            audioState.activeLogicalSrc || audio.currentSrc || audio.src
+          ),
+          {
+            source: "media_session",
+            action: actionName,
+            from_ms: Math.floor(previous * 1000),
+            to_ms: Math.floor(clamped * 1000)
+          }
+        )
+      );
       emitScriptMediaCommand(command, {
         decision: "seek",
         outcome: "success",
@@ -587,9 +633,15 @@ function bindMediaSessionActions(options) {
     playNext({ seamless: true, fromMediaSession: true });
   });
 
-  const supportedActions = Object.keys(actionResults).filter(function (action) { return actionResults[action] === true; });
-  const unsupportedActions = Object.keys(actionResults).filter(function (action) { return actionResults[action] === false; });
-  const clearedActions = Object.keys(actionResults).filter(function (action) { return actionResults[action] === "cleared"; });
+  const supportedActions = Object.keys(actionResults).filter(function (action) {
+    return actionResults[action] === true;
+  });
+  const unsupportedActions = Object.keys(actionResults).filter(function (action) {
+    return actionResults[action] === false;
+  });
+  const clearedActions = Object.keys(actionResults).filter(function (action) {
+    return actionResults[action] === "cleared";
+  });
   trackAudioRuntimeEvent("media_capabilities", {
     track: "media-session",
     album: "session",
@@ -626,11 +678,7 @@ function syncMediaSessionMetadata(options) {
   const audio = audioState.audio;
   const track = getCurrentPlaylistTrack();
   const title = normalizeTrackTitle(track && track.name ? track.name : "") || "INFRA.";
-  const album = normalizeAlbumTitle(
-    track && track.album
-      ? track.album
-      : getCurrentAlbumTitle()
-  ) || "INFRA.";
+  const album = normalizeAlbumTitle(track && track.album ? track.album : getCurrentAlbumTitle()) || "INFRA.";
   const artist = String(track && track.artist ? track.artist : "INFRA.").trim() || "INFRA.";
   const artworkEntries = buildMediaSessionArtwork(track);
   const hasAlbumArtwork = Boolean(getMediaSessionAlbumArtwork(artworkEntries));
@@ -662,14 +710,19 @@ function syncMediaSessionMetadata(options) {
 
   if (audio && typeof navigator.mediaSession.setPositionState === "function") {
     const now = Date.now();
-    const shouldSyncPosition = Boolean(opts.forcePosition) || !audioState.mediaSessionPositionTs || (now - audioState.mediaSessionPositionTs >= 900);
+    const shouldSyncPosition =
+      Boolean(opts.forcePosition) ||
+      !audioState.mediaSessionPositionTs ||
+      now - audioState.mediaSessionPositionTs >= 900;
     if (!shouldSyncPosition) return;
 
-    const duration = !audioState.sourceMetadataPending && Number.isFinite(audio.duration) && audio.duration > 0
-      ? audio.duration
-      : 0;
+    const duration =
+      !audioState.sourceMetadataPending && Number.isFinite(audio.duration) && audio.duration > 0
+        ? audio.duration
+        : 0;
     const position = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-    const playbackRate = mediaSessionActuallyPlaying && Number.isFinite(audio.playbackRate) ? audio.playbackRate : 1;
+    const playbackRate =
+      mediaSessionActuallyPlaying && Number.isFinite(audio.playbackRate) ? audio.playbackRate : 1;
     try {
       if (duration > 0) {
         const positionState = {
@@ -702,4 +755,33 @@ function scheduleMediaSessionResync(requestToken) {
   }, 300);
 }
 
-export { parseSrcsetCandidates, choosePreferredSrcsetSource, getSourceFromSrcset, getAlbumCoverFromDoc, inferImageMimeType, getMediaSessionFallbackArtwork, getCoverUrlOptions, normalizeArtworkUrl, normalizeCoverUrl, resolveCoverUrl, getArtworkType, inferArtworkSizeHint, withMediaSessionArtworkVersion, getMediaSessionAlbumArtwork, buildArtworkBlobAndSetMetadata, buildResponsiveCoverCandidate, buildMediaSessionArtwork, clearWaitingRecovery, recoverPlaybackFromStall, scheduleWaitingRecovery, isIOSStandaloneMediaSession, configurePlaybackAudioSession, initAudioSessionTelemetry, createScriptMediaCommand, emitScriptMediaCommand, bindMediaSessionActions, syncMediaSessionMetadata, scheduleMediaSessionResync };
+export {
+  parseSrcsetCandidates,
+  choosePreferredSrcsetSource,
+  getSourceFromSrcset,
+  getAlbumCoverFromDoc,
+  inferImageMimeType,
+  getMediaSessionFallbackArtwork,
+  getCoverUrlOptions,
+  normalizeArtworkUrl,
+  normalizeCoverUrl,
+  resolveCoverUrl,
+  getArtworkType,
+  inferArtworkSizeHint,
+  withMediaSessionArtworkVersion,
+  getMediaSessionAlbumArtwork,
+  buildArtworkBlobAndSetMetadata,
+  buildResponsiveCoverCandidate,
+  buildMediaSessionArtwork,
+  clearWaitingRecovery,
+  recoverPlaybackFromStall,
+  scheduleWaitingRecovery,
+  isIOSStandaloneMediaSession,
+  configurePlaybackAudioSession,
+  initAudioSessionTelemetry,
+  createScriptMediaCommand,
+  emitScriptMediaCommand,
+  bindMediaSessionActions,
+  syncMediaSessionMetadata,
+  scheduleMediaSessionResync
+};

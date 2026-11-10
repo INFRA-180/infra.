@@ -68,7 +68,7 @@
     const getRuntimeAssetUrl = method(ctx, "getRuntimeAssetUrl", function (path) {
       try {
         return new URL(String(path || ""), document.baseURI).href;
-      } catch (error) {
+      } catch (_error) {
         return String(path || "");
       }
     });
@@ -272,7 +272,7 @@
     if (sourceLink) {
       try {
         query = new URL(sourceLink.href, document.baseURI).search;
-      } catch (error) {
+      } catch (_error) {
         query = "";
       }
     }
@@ -642,7 +642,7 @@
     syncTransportUi();
   }
 
-  function requestTransportPictureInPicture(options) {
+  function requestTransportPictureInPicture(_options) {
     const api = getDocumentPictureInPictureApi();
     if (!api || !isDesktopTransportViewport() || !hasPlaybackSession()) return Promise.resolve(false);
     const pipState = getTransportPictureInPictureState();
@@ -2984,7 +2984,7 @@
   function setMiniPlayerVisibility(root, shouldShow, details) {
     if (!root) return;
     const wasHidden = Boolean(root.hidden);
-    const nextHidden = !Boolean(shouldShow);
+    const nextHidden = !shouldShow;
     root.hidden = nextHidden;
     if (wasHidden === nextHidden) return;
 

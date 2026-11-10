@@ -28,9 +28,15 @@ assert.doesNotMatch(runtime, /sw_reload_pending|sw_reload_executed/, "audiofix40
 
 assert.match(scripts, /\.register\(swUrl, \{ scope: runtime\.baseUrl\.pathname, updateViaCache: "none" \}\)/);
 assert.match(scripts, /serviceWorkerRegistrationRef\.update\(\)\.catch/);
-assert.match(
-  scripts,
-  /addEventListener\("controllerchange", function \(\) \{[\s\S]*?requestActiveServiceWorkerVersion[\s\S]*?trackAudioRuntimeEvent\("sw_controllerchange"[\s\S]*?strategy: "natural_lifecycle"[\s\S]*?\}\);/,
+// Chaque écoute « controllerchange » est examinée seule (formatage libre, 10/11/2026).
+assert.ok(
+  scripts
+    .split('addEventListener("controllerchange", function () {')
+    .slice(1)
+    .map((block) => block.split("addEventListener(")[0])
+    .some((block) =>
+      /requestActiveServiceWorkerVersion[\s\S]*?trackAudioRuntimeEvent\(\s*"sw_controllerchange"[\s\S]*?strategy: "natural_lifecycle"/.test(block)
+    ),
   "controllerchange must only observe the naturally activated worker"
 );
 assert.match(worker, /self\.addEventListener\("install", \(event\) => \{\s*event\.waitUntil\(installShellCache\(\)\);\s*\}\);/);

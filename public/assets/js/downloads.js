@@ -111,8 +111,8 @@
     const appBundle = `${safeName}.app`;
     const appPath = `/Applications/${appBundle}`;
     const instructions = [
-      `xattr -dr com.apple.quarantine \"${appPath}\"`,
-      `spctl --add --label \"INFRA\" \"${appPath}\"`
+      `xattr -dr com.apple.quarantine "${appPath}"`,
+      `spctl --add --label "INFRA" "${appPath}"`
     ].join("\n");
   
     if (code) code.textContent = instructions;

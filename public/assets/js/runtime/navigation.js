@@ -1,7 +1,13 @@
 // Navigation interne (historique, cache de pages, adresses).
 // Extrait de l'ancien scripts.js (chantier JavaScript d'INFRA, 10/11/2026). Uniquement des fonctions
 // et leurs variables : l'état partagé et l'ordre de démarrage restent dans scripts.js.
-import { SPA_PAGE_FETCH_TIMEOUT_MS, SPA_SHELL_CACHE_NAME, audioState, spaRouterApi, spaState } from "../scripts.js";
+import {
+  SPA_PAGE_FETCH_TIMEOUT_MS,
+  SPA_SHELL_CACHE_NAME,
+  audioState,
+  spaRouterApi,
+  spaState
+} from "../scripts.js";
 import { spaNavigate } from "./module-bridges.js";
 import { releasePwaCoverHold } from "./cover-warmup.js";
 import { getCurrentPlayableAudioSrc, normalizeUrlAgainstBase } from "./audio-sources.js";
@@ -93,7 +99,13 @@ function commitSpaHistoryState(mode, urlLike, scrollX, scrollY) {
   } else {
     try {
       if (mode === "push") {
-        history.pushState(Object.assign(buildSpaHistoryState(href, x, y), { __infraPreviousUrl: baseState.__infraPreviousUrl }), "", href);
+        history.pushState(
+          Object.assign(buildSpaHistoryState(href, x, y), {
+            __infraPreviousUrl: baseState.__infraPreviousUrl
+          }),
+          "",
+          href
+        );
       } else if (mode === "replace") {
         history.replaceState(buildSpaHistoryState(href, x, y), "", href);
       }
@@ -149,9 +161,7 @@ function isSpaNavigableUrl(url) {
 
   // Only prefetch/navigate HTML-like documents.
   if (/\.(?:html?)$/i.test(path) || path.endsWith("/")) return true;
-  if (
-    /\.(?:mp3|m4a|aac|wav|flac|ogg|png|jpe?g|webp|gif|svg|ico|pdf|zip|json|js|css|woff2?)$/i.test(path)
-  ) {
+  if (/\.(?:mp3|m4a|aac|wav|flac|ogg|png|jpe?g|webp|gif|svg|ico|pdf|zip|json|js|css|woff2?)$/i.test(path)) {
     return false;
   }
   return true;
@@ -231,7 +241,10 @@ function normalizeCoverElementsForBase(docLike, baseUrl) {
     const fallbackMatch = onerror && onerror.match(/this\.src\s*=\s*(['"])([^'"]+)\1/);
     if (fallbackMatch) {
       const fallback = normalizeUrlAgainstBase(fallbackMatch[2], baseUrl);
-      cover.setAttribute("onerror", onerror.replace(fallbackMatch[0], `this.src=${JSON.stringify(fallback)}`));
+      cover.setAttribute(
+        "onerror",
+        onerror.replace(fallbackMatch[0], `this.src=${JSON.stringify(fallback)}`)
+      );
     }
   });
 }
@@ -266,10 +279,13 @@ function prefetchSpaPage(href, options) {
   if (!opts.force && isAggressivePrefetchPaused()) return Promise.resolve(false);
 
   if (spaState.pageCacheApi && typeof spaState.pageCacheApi.prefetch === "function") {
-    return spaState.pageCacheApi.prefetch(href, Object.assign({}, opts, {
-      cacheName: SPA_SHELL_CACHE_NAME,
-      timeoutMs: SPA_PAGE_FETCH_TIMEOUT_MS
-    }));
+    return spaState.pageCacheApi.prefetch(
+      href,
+      Object.assign({}, opts, {
+        cacheName: SPA_SHELL_CACHE_NAME,
+        timeoutMs: SPA_PAGE_FETCH_TIMEOUT_MS
+      })
+    );
   }
   return Promise.resolve(false);
 }
@@ -278,10 +294,13 @@ function loadSpaPageDocument(href, options) {
   if (!spaState.pageCacheApi || typeof spaState.pageCacheApi.load !== "function") {
     return Promise.resolve(null);
   }
-  return spaState.pageCacheApi.load(href, Object.assign({}, options || {}, {
-    cacheName: SPA_SHELL_CACHE_NAME,
-    timeoutMs: SPA_PAGE_FETCH_TIMEOUT_MS
-  }));
+  return spaState.pageCacheApi.load(
+    href,
+    Object.assign({}, options || {}, {
+      cacheName: SPA_SHELL_CACHE_NAME,
+      timeoutMs: SPA_PAGE_FETCH_TIMEOUT_MS
+    })
+  );
 }
 
 function getSpaPersistRoot() {
@@ -294,4 +313,25 @@ function getSpaPersistRoot() {
   return root;
 }
 
-export { navigateTo, handleUnhandledSpaNavigationError, buildSpaHistoryState, saveCurrentScrollPositionInHistory, commitSpaHistoryState, cancelPendingSpaScrollSave, getScrollFromHistoryState, isSpaNavigableUrl, getSpaPageCacheKey, getSpaCachedHtml, setSpaCachedHtml, absolutizeSrcsetForBase, normalizeCoverElementsForBase, isAudioPlaybackActive, isAggressivePrefetchPaused, getTrackLookaheadCount, getRuntimePrefetchCount, prefetchSpaPage, loadSpaPageDocument, getSpaPersistRoot };
+export {
+  navigateTo,
+  handleUnhandledSpaNavigationError,
+  buildSpaHistoryState,
+  saveCurrentScrollPositionInHistory,
+  commitSpaHistoryState,
+  cancelPendingSpaScrollSave,
+  getScrollFromHistoryState,
+  isSpaNavigableUrl,
+  getSpaPageCacheKey,
+  getSpaCachedHtml,
+  setSpaCachedHtml,
+  absolutizeSrcsetForBase,
+  normalizeCoverElementsForBase,
+  isAudioPlaybackActive,
+  isAggressivePrefetchPaused,
+  getTrackLookaheadCount,
+  getRuntimePrefetchCount,
+  prefetchSpaPage,
+  loadSpaPageDocument,
+  getSpaPersistRoot
+};

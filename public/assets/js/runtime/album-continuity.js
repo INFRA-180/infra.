@@ -4,7 +4,19 @@
 import { audioCoreApi, audioState, catalogState, fallbackCatalog, runtime } from "../scripts.js";
 import { callAudioRadio, formatTrackDuration } from "./module-bridges.js";
 import { loadTracksData, mergeTrackMetadata } from "./catalog-playback.js";
-import { getCurrentAlbumTitle, getCurrentLogicalAudioSrc, getCurrentPlaylistTrack, getCurrentTrackAlbumPage, getCurrentTrackArtwork, normalizeAlbumTitle, normalizeTrackTitle, resolveManagedAudioSrc, srcMatches, toAbsoluteUrlOrEmpty, toRuntimeAbsoluteUrl } from "./audio-sources.js";
+import {
+  getCurrentAlbumTitle,
+  getCurrentLogicalAudioSrc,
+  getCurrentPlaylistTrack,
+  getCurrentTrackAlbumPage,
+  getCurrentTrackArtwork,
+  normalizeAlbumTitle,
+  normalizeTrackTitle,
+  resolveManagedAudioSrc,
+  srcMatches,
+  toAbsoluteUrlOrEmpty,
+  toRuntimeAbsoluteUrl
+} from "./audio-sources.js";
 import { playNext, playPrevious, syncPlaylistContext, trackAudioRuntimeEvent } from "./playback.js";
 
 function normalizeAlbumContinuityPage(pageLike) {
@@ -25,7 +37,10 @@ function normalizeAlbumContinuityPage(pageLike) {
     url.search = "";
     return url.href.replace(/\/index\.html$/i, "/");
   } catch (_err) {
-    return href.split("#")[0].split("?")[0].replace(/\/index\.html$/i, "/");
+    return href
+      .split("#")[0]
+      .split("?")[0]
+      .replace(/\/index\.html$/i, "/");
   }
 }
 
@@ -33,16 +48,19 @@ function getAlbumContinuityTracksData() {
   const tracksData = audioState.tracksData;
   const albums = Array.isArray(tracksData && tracksData.albums) ? tracksData.albums : [];
   return albums.filter(function (album) {
-    return album && Array.isArray(album.tracks) && album.tracks.some(function (track) {
-      return track && track.src;
-    });
+    return (
+      album &&
+      Array.isArray(album.tracks) &&
+      album.tracks.some(function (track) {
+        return track && track.src;
+      })
+    );
   });
 }
 
 function getAlbumContinuityCatalogAlbums() {
-  const catalog = catalogState.data && Array.isArray(catalogState.data.albums)
-    ? catalogState.data
-    : fallbackCatalog;
+  const catalog =
+    catalogState.data && Array.isArray(catalogState.data.albums) ? catalogState.data : fallbackCatalog;
   return Array.isArray(catalog && catalog.albums) ? catalog.albums : [];
 }
 
@@ -59,9 +77,11 @@ function findTracksAlbumByCatalogEntry(catalogEntry, tracksAlbums) {
   }
 
   if (catalogTitle) {
-    return tracksAlbums.find(function (album) {
-      return normalizeAlbumTitle(album && album.title ? album.title : "") === catalogTitle;
-    }) || null;
+    return (
+      tracksAlbums.find(function (album) {
+        return normalizeAlbumTitle(album && album.title ? album.title : "") === catalogTitle;
+      }) || null
+    );
   }
 
   return null;
@@ -70,10 +90,10 @@ function findTracksAlbumByCatalogEntry(catalogEntry, tracksAlbums) {
 function findTracksAlbumForContinuityTrack(track, tracksAlbums) {
   const enriched = mergeTrackMetadata(track || null);
   const page = normalizeAlbumContinuityPage(
-    enriched && enriched.page ? enriched.page : (track && track.page ? track.page : "")
+    enriched && enriched.page ? enriched.page : track && track.page ? track.page : ""
   );
   const albumTitle = normalizeAlbumTitle(
-    enriched && enriched.album ? enriched.album : (track && track.album ? track.album : "")
+    enriched && enriched.album ? enriched.album : track && track.album ? track.album : ""
   );
 
   if (page) {
@@ -92,12 +112,14 @@ function findTracksAlbumForContinuityTrack(track, tracksAlbums) {
 
   const src = (track && track.src) || getCurrentLogicalAudioSrc();
   if (!src) return null;
-  return tracksAlbums.find(function (album) {
-    const tracks = Array.isArray(album && album.tracks) ? album.tracks : [];
-    return tracks.some(function (candidate) {
-      return candidate && candidate.src && srcMatches(candidate.src, src);
-    });
-  }) || null;
+  return (
+    tracksAlbums.find(function (album) {
+      const tracks = Array.isArray(album && album.tracks) ? album.tracks : [];
+      return tracks.some(function (candidate) {
+        return candidate && candidate.src && srcMatches(candidate.src, src);
+      });
+    }) || null
+  );
 }
 
 function findNextAlbumForContinuity(currentAlbum, tracksAlbums) {
@@ -188,7 +210,9 @@ function buildAlbumContinuityTrack(track, album, catalogEntry) {
   const page = toRuntimeAbsoluteUrl(album.page || (catalogEntry && catalogEntry.page) || "");
   const artwork = album.cover
     ? toRuntimeAbsoluteUrl(album.cover)
-    : (catalogEntry && catalogEntry.thumb ? toRuntimeAbsoluteUrl(catalogEntry.thumb) : "");
+    : catalogEntry && catalogEntry.thumb
+      ? toRuntimeAbsoluteUrl(catalogEntry.thumb)
+      : "";
 
   return {
     src,
@@ -205,9 +229,8 @@ function buildAlbumContinuityTrack(track, album, catalogEntry) {
 function extendAlbumPlaylistToNextAlbum(options) {
   const list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
   const currentIndex = Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1;
-  const requestedFromIndex = options && Number.isInteger(options.fromIndex)
-    ? options.fromIndex
-    : currentIndex;
+  const requestedFromIndex =
+    options && Number.isInteger(options.fromIndex) ? options.fromIndex : currentIndex;
   const anchorIndex = Math.min(list.length - 1, requestedFromIndex);
   if (!list.length || currentIndex < 0 || anchorIndex < list.length - 1) return -1;
   if (audioState.homeMode === "radio" || audioState.shuffleOn) return -1;
@@ -232,7 +255,9 @@ function extendAlbumPlaylistToNextAlbum(options) {
   if (!nextAlbum || !nextAlbum.album) return -1;
 
   const nextTracks = nextAlbum.album.tracks
-    .map(function (track) { return buildAlbumContinuityTrack(track, nextAlbum.album, nextAlbum.catalog); })
+    .map(function (track) {
+      return buildAlbumContinuityTrack(track, nextAlbum.album, nextAlbum.catalog);
+    })
     .filter(Boolean);
   if (!nextTracks.length) return -1;
 
@@ -263,9 +288,8 @@ function extendAlbumPlaylistToNextAlbum(options) {
 function extendAlbumPlaylistToPreviousAlbum(options) {
   const list = Array.isArray(audioState.playlist) ? audioState.playlist : [];
   const currentIndex = Number.isInteger(audioState.currentIndex) ? audioState.currentIndex : -1;
-  const requestedFromIndex = options && Number.isInteger(options.fromIndex)
-    ? options.fromIndex
-    : currentIndex;
+  const requestedFromIndex =
+    options && Number.isInteger(options.fromIndex) ? options.fromIndex : currentIndex;
   if (!list.length || currentIndex < 0 || requestedFromIndex > 0) return -1;
   if (audioState.homeMode === "radio" || audioState.shuffleOn) return -1;
   if (audioState.playlistKind !== "album") return -1;
@@ -286,7 +310,9 @@ function extendAlbumPlaylistToPreviousAlbum(options) {
   const previousAlbum = findPreviousAlbumForContinuity(currentAlbum, tracksAlbums);
   if (!previousAlbum || !previousAlbum.album) return -1;
   const previousTracks = previousAlbum.album.tracks
-    .map(function (track) { return buildAlbumContinuityTrack(track, previousAlbum.album, previousAlbum.catalog); })
+    .map(function (track) {
+      return buildAlbumContinuityTrack(track, previousAlbum.album, previousAlbum.catalog);
+    })
     .filter(Boolean);
   if (!previousTracks.length) return -1;
 
@@ -324,17 +350,15 @@ function scheduleAlbumContinuityNavigationRetry(direction, navigationOptions) {
   const guardMatches = function (request) {
     if (!request) return false;
     const liveTrack = getCurrentPlaylistTrack();
-    const liveSrc = toAbsoluteUrlOrEmpty(
-      getCurrentLogicalAudioSrc() || (liveTrack && liveTrack.src) || ""
-    );
-    const sameSrc = request.src
-      ? Boolean(liveSrc && srcMatches(liveSrc, request.src))
-      : !liveSrc;
-    return Number(audioState.startRequestToken || 0) === request.startRequestToken &&
+    const liveSrc = toAbsoluteUrlOrEmpty(getCurrentLogicalAudioSrc() || (liveTrack && liveTrack.src) || "");
+    const sameSrc = request.src ? Boolean(liveSrc && srcMatches(liveSrc, request.src)) : !liveSrc;
+    return (
+      Number(audioState.startRequestToken || 0) === request.startRequestToken &&
       Number(audioState.modeTransitionToken || 0) === request.modeTransitionToken &&
       audioState.homeMode === request.homeMode &&
       Boolean(audioState.shuffleOn) === request.shuffleOn &&
-      sameSrc;
+      sameSrc
+    );
   };
   const activeRequest = audioState.albumContinuityNavigationRequest;
   if (activeRequest && guardMatches(activeRequest)) {
@@ -353,25 +377,29 @@ function scheduleAlbumContinuityNavigationRetry(direction, navigationOptions) {
     src: guardSrc,
     homeMode: audioState.homeMode,
     shuffleOn: Boolean(audioState.shuffleOn),
-    commands: [{
-      direction: direction === "previous" ? "previous" : "next",
-      options: Object.assign({}, opts, { albumContinuityRetry: true })
-    }]
+    commands: [
+      {
+        direction: direction === "previous" ? "previous" : "next",
+        options: Object.assign({}, opts, { albumContinuityRetry: true })
+      }
+    ]
   };
   audioState.albumContinuityNavigationRequest = request;
-  loadTracksData().then(function () {
-    if (audioState.albumContinuityNavigationRequest !== request) return;
-    audioState.albumContinuityNavigationRequest = null;
-    if (!guardMatches(request)) return;
-    request.commands.splice(0, request.commands.length).forEach(function (command) {
-      if (command.direction === "previous") playPrevious(command.options);
-      else playNext(command.options);
-    });
-  }).catch(function () {
-    if (audioState.albumContinuityNavigationRequest === request) {
+  loadTracksData()
+    .then(function () {
+      if (audioState.albumContinuityNavigationRequest !== request) return;
       audioState.albumContinuityNavigationRequest = null;
-    }
-  });
+      if (!guardMatches(request)) return;
+      request.commands.splice(0, request.commands.length).forEach(function (command) {
+        if (command.direction === "previous") playPrevious(command.options);
+        else playNext(command.options);
+      });
+    })
+    .catch(function () {
+      if (audioState.albumContinuityNavigationRequest === request) {
+        audioState.albumContinuityNavigationRequest = null;
+      }
+    });
 }
 
 function buildPreservedTrack(track, fallbackSrc) {
@@ -415,4 +443,24 @@ function seekCurrentAudioToRatio(ratio) {
   return audioCoreApi.seekCurrentAudioToRatio(ratio);
 }
 
-export { normalizeAlbumContinuityPage, getAlbumContinuityTracksData, getAlbumContinuityCatalogAlbums, findTracksAlbumByCatalogEntry, findTracksAlbumForContinuityTrack, findNextAlbumForContinuity, findPreviousAlbumForContinuity, buildAlbumContinuityTrack, extendAlbumPlaylistToNextAlbum, extendAlbumPlaylistToPreviousAlbum, scheduleAlbumContinuityNavigationRetry, buildPreservedTrack, buildAlbumPlaylistFromRadioCache, sanitizeQueueTrack, savePlaybackQueueContext, queueMatchesCurrentPage, restorePlaybackQueueContext, expandSingleTrackAlbumFromRadioCache, seekCurrentAudioToRatio };
+export {
+  normalizeAlbumContinuityPage,
+  getAlbumContinuityTracksData,
+  getAlbumContinuityCatalogAlbums,
+  findTracksAlbumByCatalogEntry,
+  findTracksAlbumForContinuityTrack,
+  findNextAlbumForContinuity,
+  findPreviousAlbumForContinuity,
+  buildAlbumContinuityTrack,
+  extendAlbumPlaylistToNextAlbum,
+  extendAlbumPlaylistToPreviousAlbum,
+  scheduleAlbumContinuityNavigationRetry,
+  buildPreservedTrack,
+  buildAlbumPlaylistFromRadioCache,
+  sanitizeQueueTrack,
+  savePlaybackQueueContext,
+  queueMatchesCurrentPage,
+  restorePlaybackQueueContext,
+  expandSingleTrackAlbumFromRadioCache,
+  seekCurrentAudioToRatio
+};

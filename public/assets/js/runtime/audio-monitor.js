@@ -3,7 +3,14 @@
 // et leurs variables : l'état partagé et l'ordre de démarrage restent dans scripts.js.
 import { AUDIO_BASE, audioState, audioTelemetryApi } from "../scripts.js";
 import { callAudioRadio } from "./module-bridges.js";
-import { getAudioAssetPath, getCurrentAlbumTitle, getCurrentLogicalAudioSrc, getCurrentPlaylistTrack, normalizeAlbumTitle, normalizeAudioSourceUrl } from "./audio-sources.js";
+import {
+  getAudioAssetPath,
+  getCurrentAlbumTitle,
+  getCurrentLogicalAudioSrc,
+  getCurrentPlaylistTrack,
+  normalizeAlbumTitle,
+  normalizeAudioSourceUrl
+} from "./audio-sources.js";
 import { clearWaitingRecovery } from "./media-artwork.js";
 import { trackAudioRuntimeEvent } from "./playback.js";
 
@@ -51,7 +58,10 @@ function getAudioMonitorTrackLabel(track, index) {
 
 function buildAudioMonitorPayload(track, index, src) {
   const resolvedSrc = src || (track && track.src ? track.src : getCurrentLogicalAudioSrc());
-  const trackPath = getAudioAssetPath(resolvedSrc || (track && track.src ? track.src : ""), window.location.href);
+  const trackPath = getAudioAssetPath(
+    resolvedSrc || (track && track.src ? track.src : ""),
+    window.location.href
+  );
   return {
     track: getAudioMonitorTrackLabel(track, index),
     album: normalizeAlbumTitle(track && track.album ? track.album : getCurrentAlbumTitle()),
@@ -65,9 +75,10 @@ async function probeAudioSourceForRecovery(srcLike, details) {
   const source = normalizeAudioSourceUrl(srcLike || "");
   const context = details && typeof details === "object" ? details : {};
   const requestToken = Number(context.request_token) || audioState.startRequestToken;
-  const monitorPayload = context.monitor_payload && typeof context.monitor_payload === "object"
-    ? context.monitor_payload
-    : buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, source);
+  const monitorPayload =
+    context.monitor_payload && typeof context.monitor_payload === "object"
+      ? context.monitor_payload
+      : buildAudioMonitorPayload(getCurrentPlaylistTrack(), audioState.currentIndex, source);
   const startedAt = Date.now();
   let responseStatus = 0;
   let responseBytes = 0;
@@ -84,7 +95,7 @@ async function probeAudioSourceForRecovery(srcLike, details) {
       mode: "cors",
       credentials: "omit",
       cache: "no-store",
-      headers: { "Range": "bytes=0-1" }
+      headers: { Range: "bytes=0-1" }
     });
     responseStatus = Number(response.status) || 0;
     const contentRange = String(response.headers.get("Content-Range") || "");
@@ -93,11 +104,7 @@ async function probeAudioSourceForRecovery(srcLike, details) {
     rangeStart = rangeMatch ? Number(rangeMatch[1]) : null;
     rangeEnd = rangeMatch ? Number(rangeMatch[2]) : null;
     const validRange = Boolean(
-      responseStatus === 206 &&
-      rangeMatch &&
-      rangeStart === 0 &&
-      rangeEnd === 1 &&
-      Number(rangeMatch[3]) > 1
+      responseStatus === 206 && rangeMatch && rangeStart === 0 && rangeEnd === 1 && Number(rangeMatch[3]) > 1
     );
     const validType = /^audio\/(?:mp4|mpeg|aac|x-m4a)\b/i.test(contentType);
     let validBody = false;
@@ -119,26 +126,22 @@ async function probeAudioSourceForRecovery(srcLike, details) {
     else branch = "range_ok";
     result = branch === "range_ok" ? "ok" : "invalid_response";
 
-    const payload = Object.assign(
-      {},
-      monitorPayload,
-      {
-        request_token: requestToken,
-        reason: context.reason || "playback_recovery",
-        strategy: "range_probe_no_store",
-        branch,
-        result,
-        status: responseStatus,
-        response_ms: Math.max(0, Date.now() - startedAt),
-        range: true,
-        range_start: rangeStart,
-        range_end: rangeEnd,
-        bytes: responseBytes,
-        cached: false,
-        cache_hint: "network_no_store",
-        audio_fetch: true
-      }
-    );
+    const payload = Object.assign({}, monitorPayload, {
+      request_token: requestToken,
+      reason: context.reason || "playback_recovery",
+      strategy: "range_probe_no_store",
+      branch,
+      result,
+      status: responseStatus,
+      response_ms: Math.max(0, Date.now() - startedAt),
+      range: true,
+      range_start: rangeStart,
+      range_end: rangeEnd,
+      bytes: responseBytes,
+      cached: false,
+      cache_hint: "network_no_store",
+      audio_fetch: true
+    });
     trackAudioRuntimeEvent("audio_network_result", payload);
     return {
       ok: result === "ok",
@@ -152,10 +155,9 @@ async function probeAudioSourceForRecovery(srcLike, details) {
   } catch (error) {
     errorName = error && error.name ? error.name : "Error";
     branch = error && error.message === "audio_probe_unavailable" ? "probe_unavailable" : "fetch_rejected";
-    trackAudioRuntimeEvent("audio_network_result", Object.assign(
-      {},
-      monitorPayload,
-      {
+    trackAudioRuntimeEvent(
+      "audio_network_result",
+      Object.assign({}, monitorPayload, {
         request_token: requestToken,
         reason: context.reason || "playback_recovery",
         strategy: "range_probe_no_store",
@@ -171,8 +173,8 @@ async function probeAudioSourceForRecovery(srcLike, details) {
         cached: false,
         cache_hint: "network_no_store",
         audio_fetch: true
-      }
-    ));
+      })
+    );
     return {
       ok: false,
       result: "network_error",
@@ -188,9 +190,7 @@ function getAudioRuntimeProbeState() {
 }
 
 function getAudioBufferedEnd() {
-  return typeof audioTelemetryApi.getBufferedEnd === "function"
-    ? audioTelemetryApi.getBufferedEnd()
-    : null;
+  return typeof audioTelemetryApi.getBufferedEnd === "function" ? audioTelemetryApi.getBufferedEnd() : null;
 }
 
 function flushAudioTelemetryQueue(options) {
@@ -279,10 +279,13 @@ function confirmAudioRecovery(audio) {
   if (!audio || audio.paused || !Number.isFinite(audio.currentTime)) return;
   const advanced = Math.max(0, audio.currentTime - recovery.startTime);
   if (advanced < 0.2) return;
-  trackAudioRuntimeEvent("recovery_resolved", buildAudioRecoveryPayload(recovery, {
-    advanced_ms: Math.round(advanced * 1000),
-    paused: false
-  }));
+  trackAudioRuntimeEvent(
+    "recovery_resolved",
+    buildAudioRecoveryPayload(recovery, {
+      advanced_ms: Math.round(advanced * 1000),
+      paused: false
+    })
+  );
   clearActiveAudioRecovery();
 }
 
@@ -294,16 +297,16 @@ function failAudioRecovery(details) {
   if (Number.isFinite(requestToken) && requestToken !== recovery.requestToken) return;
   recovery.reason = String(source.reason || recovery.reason || "recovery_failed");
   recovery.strategy = String(source.strategy || recovery.strategy || "retry");
-  trackAudioRuntimeEvent("recovery_failed", buildAudioRecoveryPayload(recovery, {
-    paused: Boolean(audioState.audio && audioState.audio.paused),
-    error_name: source.error_name || "",
-    status: Number.isFinite(Number(source.status)) ? Number(source.status) : null,
-    result: source.result || ""
-  }));
-  if (
-    audioState.stallRecovery &&
-    audioState.stallRecovery.requestToken === recovery.requestToken
-  ) {
+  trackAudioRuntimeEvent(
+    "recovery_failed",
+    buildAudioRecoveryPayload(recovery, {
+      paused: Boolean(audioState.audio && audioState.audio.paused),
+      error_name: source.error_name || "",
+      status: Number.isFinite(Number(source.status)) ? Number(source.status) : null,
+      result: source.result || ""
+    })
+  );
+  if (audioState.stallRecovery && audioState.stallRecovery.requestToken === recovery.requestToken) {
     clearWaitingRecovery();
   }
   clearActiveAudioRecovery();
@@ -357,4 +360,34 @@ function scheduleSilentCheck() {
   return callAudioRadio("scheduleSilentCheck", arguments);
 }
 
-export { isManagedAudioUrl, isCloudflareAudioUrl, getAudioSource, getAudioMonitorTrackLabel, buildAudioMonitorPayload, probeAudioSourceForRecovery, getAudioRuntimeProbeState, getAudioBufferedEnd, flushAudioTelemetryQueue, startAudioTelemetryHeartbeat, stopAudioTelemetryHeartbeat, markAudioTelemetryInactive, clearActiveAudioRecovery, buildAudioRecoveryPayload, beginAudioRecovery, confirmAudioRecovery, failAudioRecovery, getPrefetchCacheRequest, resetNextTrackPrefetchState, clearNextTrackPrefetch, getCurrentBufferedEndForPrefetch, shouldPrefetchNextTrackNow, peekRadioNextIndexForPrefetch, peekNextIndexForPrefetch, rememberNextTrackPrefetch, getAutoPrefetchedNextIndex, startNextTrackPrefetch, maybePrefetchNextTrack, scheduleSilentCheck };
+export {
+  isManagedAudioUrl,
+  isCloudflareAudioUrl,
+  getAudioSource,
+  getAudioMonitorTrackLabel,
+  buildAudioMonitorPayload,
+  probeAudioSourceForRecovery,
+  getAudioRuntimeProbeState,
+  getAudioBufferedEnd,
+  flushAudioTelemetryQueue,
+  startAudioTelemetryHeartbeat,
+  stopAudioTelemetryHeartbeat,
+  markAudioTelemetryInactive,
+  clearActiveAudioRecovery,
+  buildAudioRecoveryPayload,
+  beginAudioRecovery,
+  confirmAudioRecovery,
+  failAudioRecovery,
+  getPrefetchCacheRequest,
+  resetNextTrackPrefetchState,
+  clearNextTrackPrefetch,
+  getCurrentBufferedEndForPrefetch,
+  shouldPrefetchNextTrackNow,
+  peekRadioNextIndexForPrefetch,
+  peekNextIndexForPrefetch,
+  rememberNextTrackPrefetch,
+  getAutoPrefetchedNextIndex,
+  startNextTrackPrefetch,
+  maybePrefetchNextTrack,
+  scheduleSilentCheck
+};

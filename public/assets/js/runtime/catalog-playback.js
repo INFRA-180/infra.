@@ -1,17 +1,37 @@
 // Catalogue, radio et lecture aléatoire de l'accueil.
 // Extrait de l'ancien scripts.js (chantier JavaScript d'INFRA, 10/11/2026). Uniquement des fonctions
 // et leurs variables : l'état partagé et l'ordre de démarrage restent dans scripts.js.
-import { LIVE_CATALOG_CACHE_NAME, LIVE_CATALOG_TIMEOUT_MS, LOCAL_CATALOG_VERSION, WORKER_URL, audioState, catalogLoaderApi, catalogState, fallbackCatalog, homeCatalogApi, runtime } from "../scripts.js";
+import {
+  LIVE_CATALOG_CACHE_NAME,
+  LIVE_CATALOG_TIMEOUT_MS,
+  LOCAL_CATALOG_VERSION,
+  WORKER_URL,
+  audioState,
+  catalogLoaderApi,
+  catalogState,
+  fallbackCatalog,
+  homeCatalogApi,
+  runtime
+} from "../scripts.js";
 import { callAudioRadio, formatTrackDuration, rememberTrackDuration } from "./module-bridges.js";
 import { canonicalFavoritePath } from "./favorites-bridge.js";
-import { getAudioAssetPathKey, getCurrentAlbumTitle, getCurrentLogicalAudioSrc, normalizeAlbumTitle, normalizeTrackTitle, resolveManagedAudioSrc, toRuntimeAbsoluteUrl } from "./audio-sources.js";
+import {
+  getAudioAssetPathKey,
+  getCurrentAlbumTitle,
+  getCurrentLogicalAudioSrc,
+  normalizeAlbumTitle,
+  normalizeTrackTitle,
+  resolveManagedAudioSrc,
+  toRuntimeAbsoluteUrl
+} from "./audio-sources.js";
 import { normalizeCoverUrl } from "./media-artwork.js";
 import { trackAudioRuntimeEvent } from "./playback.js";
 
 function createCatalogLoaderApi() {
-  const factory = window.InfraCatalogLoader && typeof window.InfraCatalogLoader.createLoader === "function"
-    ? window.InfraCatalogLoader.createLoader
-    : null;
+  const factory =
+    window.InfraCatalogLoader && typeof window.InfraCatalogLoader.createLoader === "function"
+      ? window.InfraCatalogLoader.createLoader
+      : null;
   if (!factory) return createNoopCatalogLoaderApi();
   return factory({
     fallbackCatalog,
@@ -37,24 +57,48 @@ function createCatalogLoaderApi() {
 
 function createNoopCatalogLoaderApi() {
   return {
-    sanitizeCatalog: function (raw) { return raw && typeof raw === "object" ? raw : fallbackCatalog; },
-    buildQuickActions: function () { return []; },
-    isCatalogDocument: function (payload) { return Boolean(payload && Array.isArray(payload.apps) && Array.isArray(payload.albums)); },
-    isTracksDocument: function (payload) { return Boolean(payload && Array.isArray(payload.albums)); },
-    isDurationsDocument: function (payload) { return Boolean(payload && Array.isArray(payload.tracks)); },
-    fetchLiveCatalogDocument: function () { return Promise.reject(new Error("catalog-loader unavailable")); },
+    sanitizeCatalog: function (raw) {
+      return raw && typeof raw === "object" ? raw : fallbackCatalog;
+    },
+    buildQuickActions: function () {
+      return [];
+    },
+    isCatalogDocument: function (payload) {
+      return Boolean(payload && Array.isArray(payload.apps) && Array.isArray(payload.albums));
+    },
+    isTracksDocument: function (payload) {
+      return Boolean(payload && Array.isArray(payload.albums));
+    },
+    isDurationsDocument: function (payload) {
+      return Boolean(payload && Array.isArray(payload.tracks));
+    },
+    fetchLiveCatalogDocument: function () {
+      return Promise.reject(new Error("catalog-loader unavailable"));
+    },
     fetchLocalCatalogDocument: function (fileName) {
       const url = new URL(`data/${fileName}`, runtime.baseUrl);
-      return fetch(url.href, { cache: "default", headers: { "Accept": "application/json" } }).then(function (response) {
-        if (!response.ok) throw new Error(`local catalog fetch failed: ${response.status}`);
-        return response.json();
-      });
+      return fetch(url.href, { cache: "default", headers: { Accept: "application/json" } }).then(
+        function (response) {
+          if (!response.ok) throw new Error(`local catalog fetch failed: ${response.status}`);
+          return response.json();
+        }
+      );
     },
-    loadCatalogData: function () { catalogState.data = fallbackCatalog; return Promise.resolve(fallbackCatalog); },
-    loadTracksData: function () { audioState.tracksData = audioState.tracksData || {}; return Promise.resolve(audioState.tracksData); },
+    loadCatalogData: function () {
+      catalogState.data = fallbackCatalog;
+      return Promise.resolve(fallbackCatalog);
+    },
+    loadTracksData: function () {
+      audioState.tracksData = audioState.tracksData || {};
+      return Promise.resolve(audioState.tracksData);
+    },
     indexTrackMetadata: function () {},
-    getTrackMetaByAssetPath: function () { return null; },
-    mergeTrackMetadata: function (track) { return track || {}; }
+    getTrackMetaByAssetPath: function () {
+      return null;
+    },
+    mergeTrackMetadata: function (track) {
+      return track || {};
+    }
   };
 }
 
@@ -257,21 +301,74 @@ function consumePendingEarlyAlbumSwipeNavigation() {
   if (!finishedAt || Date.now() - finishedAt > 2 * 60 * 1000) return;
   const token = String(record.gesture_token || "").trim();
   if (!token) return;
-  trackAudioRuntimeEvent("album_swipe", Object.assign({}, record, {
-    track: "gesture",
-    album: String(record.album || getCurrentAlbumTitle() || "album"),
-    gesture_token: token,
-    trigger: record.direction === "left" ? "swipe_left" : "swipe_right",
-    surface: "home_album_grid",
-    handler_ready: false,
-    handler_state: "native_fallback",
-    navigation_started: true,
-    navigation_completed: true,
-    navigation_method: "native_fallback",
-    navigation_result: "done",
-    result: "opened",
-    cancel_reason: ""
-  }));
+  trackAudioRuntimeEvent(
+    "album_swipe",
+    Object.assign({}, record, {
+      track: "gesture",
+      album: String(record.album || getCurrentAlbumTitle() || "album"),
+      gesture_token: token,
+      trigger: record.direction === "left" ? "swipe_left" : "swipe_right",
+      surface: "home_album_grid",
+      handler_ready: false,
+      handler_state: "native_fallback",
+      navigation_started: true,
+      navigation_completed: true,
+      navigation_method: "native_fallback",
+      navigation_result: "done",
+      result: "opened",
+      cancel_reason: ""
+    })
+  );
 }
 
-export { createCatalogLoaderApi, createNoopCatalogLoaderApi, sanitizeCatalog, buildQuickActions, isCatalogDocument, isTracksDocument, isDurationsDocument, fetchLiveCatalogDocument, fetchLocalCatalogDocument, loadCatalogData, loadTracksData, indexTrackMetadata, getTrackMetaByAssetPath, mergeTrackMetadata, readHomePlayMode, persistHomePlayMode, findPlaylistIndexByCurrentSrc, ensureRadioPlaylistLoaded, getTrackSource, getRecentPlayedSrcSet, shuffledCopy, buildRadioQueue, buildGlobalCatalogPlaylist, buildGlobalRandomPlaylistWithTelemetry, setGlobalCatalogPlaylist, startGlobalRandomPlayback, resetPreparedInitialGlobalRandomPlayback, consumePreparedInitialGlobalRandomPlaylist, shouldPrepareInitialGlobalRandomPlayback, prepareInitialGlobalRandomPlayback, scheduleInitialGlobalRandomPreparation, hasPlaybackSession, canStartInitialGlobalRandomPlayback, bindGlobalKeyboardShortcuts, clearRadioQueue, syncRadioQueueToPlaylist, ensureRadioQueue, injectCurrentTrackIntoRadioQueue, startSelectedTrackInRadioFromCold, ensureRadioPlaylistForNavigation, setHomePlayMode, activateRadioModeFromTransport, toggleRadioModeFromTransport, toggleAlbumShuffleMode, clearStoredPlaybackState, getQuickActions, hydrateHomeCatalog, initAlbumSwipeNavigation, consumePendingEarlyAlbumSwipeNavigation };
+export {
+  createCatalogLoaderApi,
+  createNoopCatalogLoaderApi,
+  sanitizeCatalog,
+  buildQuickActions,
+  isCatalogDocument,
+  isTracksDocument,
+  isDurationsDocument,
+  fetchLiveCatalogDocument,
+  fetchLocalCatalogDocument,
+  loadCatalogData,
+  loadTracksData,
+  indexTrackMetadata,
+  getTrackMetaByAssetPath,
+  mergeTrackMetadata,
+  readHomePlayMode,
+  persistHomePlayMode,
+  findPlaylistIndexByCurrentSrc,
+  ensureRadioPlaylistLoaded,
+  getTrackSource,
+  getRecentPlayedSrcSet,
+  shuffledCopy,
+  buildRadioQueue,
+  buildGlobalCatalogPlaylist,
+  buildGlobalRandomPlaylistWithTelemetry,
+  setGlobalCatalogPlaylist,
+  startGlobalRandomPlayback,
+  resetPreparedInitialGlobalRandomPlayback,
+  consumePreparedInitialGlobalRandomPlaylist,
+  shouldPrepareInitialGlobalRandomPlayback,
+  prepareInitialGlobalRandomPlayback,
+  scheduleInitialGlobalRandomPreparation,
+  hasPlaybackSession,
+  canStartInitialGlobalRandomPlayback,
+  bindGlobalKeyboardShortcuts,
+  clearRadioQueue,
+  syncRadioQueueToPlaylist,
+  ensureRadioQueue,
+  injectCurrentTrackIntoRadioQueue,
+  startSelectedTrackInRadioFromCold,
+  ensureRadioPlaylistForNavigation,
+  setHomePlayMode,
+  activateRadioModeFromTransport,
+  toggleRadioModeFromTransport,
+  toggleAlbumShuffleMode,
+  clearStoredPlaybackState,
+  getQuickActions,
+  hydrateHomeCatalog,
+  initAlbumSwipeNavigation,
+  consumePendingEarlyAlbumSwipeNavigation
+};

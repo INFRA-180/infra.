@@ -1,7 +1,22 @@
 // Thème, mode admin, stockage et Service Worker.
 // Extrait de l'ancien scripts.js (chantier JavaScript d'INFRA, 10/11/2026). Uniquement des fonctions
 // et leurs variables : l'état partagé et l'ordre de démarrage restent dans scripts.js.
-import { COVERS_CACHE_NAME, LIVE_CATALOG_CACHE_NAME, PREFETCH_NEXT_CACHE_NAME, SERVICE_WORKER_UPDATE_CHECK_MIN_MS, SPA_SHELL_CACHE_NAME, STORAGE_PERSIST_REQUEST_KEY, audioState, audioTelemetryApi, legacyThemeStorageKey, pwaInstallApi, runtime, spaState, themePresets, themeStorageKey } from "../scripts.js";
+import {
+  COVERS_CACHE_NAME,
+  LIVE_CATALOG_CACHE_NAME,
+  PREFETCH_NEXT_CACHE_NAME,
+  SERVICE_WORKER_UPDATE_CHECK_MIN_MS,
+  SPA_SHELL_CACHE_NAME,
+  STORAGE_PERSIST_REQUEST_KEY,
+  audioState,
+  audioTelemetryApi,
+  legacyThemeStorageKey,
+  pwaInstallApi,
+  runtime,
+  spaState,
+  themePresets,
+  themeStorageKey
+} from "../scripts.js";
 import { getAudioTelemetryNow } from "./config.js";
 import { normalizeThemeName, purgeAdminUi } from "./favorites-bridge.js";
 import { getQuickActions } from "./catalog-playback.js";
@@ -106,7 +121,7 @@ function isDarkColor(color) {
   const red = parseInt(value.slice(0, 2), 16);
   const green = parseInt(value.slice(2, 4), 16);
   const blue = parseInt(value.slice(4, 6), 16);
-  const luminance = ((red * 299) + (green * 587) + (blue * 114)) / 1000;
+  const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
   return luminance < 128;
 }
 
@@ -123,7 +138,8 @@ function ensureMetaTag(name, content) {
 
 function getPwaStatusColor(preset) {
   if (document.body && document.body.classList.contains("sphragis-screen")) return "#151515";
-  if (document.body && document.body.classList.contains("album-screen")) return preset["--bg-mid"] || "#f6f6f6";
+  if (document.body && document.body.classList.contains("album-screen"))
+    return preset["--bg-mid"] || "#f6f6f6";
   return preset["--bg-start"] || "#ffffff";
 }
 
@@ -180,8 +196,12 @@ async function ensureAdminScriptLoaded() {
     script.src = getAdminScriptUrl();
     script.async = true;
     script.dataset.infraAdmin = "1";
-    script.onload = function () { resolve(window.InfraAdmin); };
-    script.onerror = function () { reject(new Error("admin script failed to load")); };
+    script.onload = function () {
+      resolve(window.InfraAdmin);
+    };
+    script.onerror = function () {
+      reject(new Error("admin script failed to load"));
+    };
     document.head.appendChild(script);
   }).catch(function (err) {
     adminScriptPromise = null;
@@ -203,7 +223,9 @@ async function initAdminFeatures() {
     navigateTo,
     getQuickActions,
     applyThemePreset,
-    getCurrentTheme: function () { return currentTheme; }
+    getCurrentTheme: function () {
+      return currentTheme;
+    }
   });
   applyAdminUiVisibility(true);
 }
@@ -225,19 +247,22 @@ function buildServiceWorkerTransitionTelemetry(extra) {
     audioState.transportPipOpen ||
     audioState.transportPipOpening
   );
-  return Object.assign({
-    audioPlaying,
-    trackStarting: Boolean(audioState.trackStartInFlight),
-    overlayOpen,
-    controllerchange_delta_ms: serviceWorkerControllerChangeAt
-      ? Math.max(0, Math.round(getAudioTelemetryNow() - serviceWorkerControllerChangeAt))
-      : null,
-    visibility_state: document.visibilityState || "",
-    audio_playing: audioPlaying,
-    track_starting: Boolean(audioState.trackStartInFlight),
-    overlay_open: overlayOpen,
-    navigation_active: Boolean(spaState.navigationActive)
-  }, extra || {});
+  return Object.assign(
+    {
+      audioPlaying,
+      trackStarting: Boolean(audioState.trackStartInFlight),
+      overlayOpen,
+      controllerchange_delta_ms: serviceWorkerControllerChangeAt
+        ? Math.max(0, Math.round(getAudioTelemetryNow() - serviceWorkerControllerChangeAt))
+        : null,
+      visibility_state: document.visibilityState || "",
+      audio_playing: audioPlaying,
+      track_starting: Boolean(audioState.trackStartInFlight),
+      overlay_open: overlayOpen,
+      navigation_active: Boolean(spaState.navigationActive)
+    },
+    extra || {}
+  );
 }
 
 function readStoragePersistRequestMarker() {
@@ -259,10 +284,17 @@ function writeStoragePersistRequestMarker() {
 function countExistingCacheEntries(cacheNames, cacheName) {
   if (!Array.isArray(cacheNames) || !cacheNames.includes(cacheName)) return Promise.resolve(0);
   if (typeof caches === "undefined" || typeof caches.open !== "function") return Promise.resolve(0);
-  return caches.open(cacheName)
-    .then(function (cache) { return cache.keys(); })
-    .then(function (keys) { return Array.isArray(keys) ? keys.length : 0; })
-    .catch(function () { return 0; });
+  return caches
+    .open(cacheName)
+    .then(function (cache) {
+      return cache.keys();
+    })
+    .then(function (keys) {
+      return Array.isArray(keys) ? keys.length : 0;
+    })
+    .catch(function () {
+      return 0;
+    });
 }
 
 function beginPwaStorageObservation() {
@@ -274,9 +306,7 @@ function beginPwaStorageObservation() {
 
   const storageManager = navigator.storage || null;
   const shouldRequestPersistence = Boolean(
-    storageManager &&
-    typeof storageManager.persist === "function" &&
-    !readStoragePersistRequestMarker()
+    storageManager && typeof storageManager.persist === "function" && !readStoragePersistRequestMarker()
   );
   let persistRequestCount = 0;
   let persistPromise = Promise.resolve(null);
@@ -284,57 +314,73 @@ function beginPwaStorageObservation() {
     persistRequestCount = 1;
     writeStoragePersistRequestMarker();
     try {
-      persistPromise = Promise.resolve(storageManager.persist()).catch(function () { return false; });
+      persistPromise = Promise.resolve(storageManager.persist()).catch(function () {
+        return false;
+      });
     } catch (_err) {
       persistPromise = Promise.resolve(false);
     }
   } else if (storageManager && typeof storageManager.persisted === "function") {
     try {
-      persistPromise = Promise.resolve(storageManager.persisted()).catch(function () { return null; });
+      persistPromise = Promise.resolve(storageManager.persisted()).catch(function () {
+        return null;
+      });
     } catch (_err) {
       persistPromise = Promise.resolve(null);
     }
   }
 
-  const estimatePromise = storageManager && typeof storageManager.estimate === "function"
-    ? Promise.resolve(storageManager.estimate()).catch(function () { return {}; })
-    : Promise.resolve({});
-  const cacheNamesPromise = typeof caches !== "undefined" && typeof caches.keys === "function"
-    ? caches.keys().catch(function () { return []; })
-    : Promise.resolve([]);
+  const estimatePromise =
+    storageManager && typeof storageManager.estimate === "function"
+      ? Promise.resolve(storageManager.estimate()).catch(function () {
+          return {};
+        })
+      : Promise.resolve({});
+  const cacheNamesPromise =
+    typeof caches !== "undefined" && typeof caches.keys === "function"
+      ? caches.keys().catch(function () {
+          return [];
+        })
+      : Promise.resolve([]);
 
-  Promise.all([persistPromise, estimatePromise, cacheNamesPromise]).then(function (results) {
-    const persisted = results[0];
-    const estimate = results[1] && typeof results[1] === "object" ? results[1] : {};
-    const cacheNames = Array.isArray(results[2]) ? results[2] : [];
-    return Promise.all([
-      countExistingCacheEntries(cacheNames, COVERS_CACHE_NAME),
-      countExistingCacheEntries(cacheNames, PREFETCH_NEXT_CACHE_NAME),
-      countExistingCacheEntries(cacheNames, LIVE_CATALOG_CACHE_NAME)
-    ]).then(function (entryCounts) {
-      const bytesPerMiB = 1024 * 1024;
-      audioTelemetryApi.recordStorageSnapshot({
-        storage_persisted_state: persisted === true ? 2 : (persisted === false ? 1 : 0),
-        storage_persist_request_count: persistRequestCount,
-        storage_persist_granted_count: persistRequestCount && persisted === true ? 1 : 0,
-        storage_usage_mb: Math.max(0, Math.round((Number(estimate.usage) || 0) / bytesPerMiB)),
-        storage_quota_mb: Math.max(0, Math.round((Number(estimate.quota) || 0) / bytesPerMiB)),
-        storage_shell_present: cacheNames.includes(SPA_SHELL_CACHE_NAME) ? 1 : 0,
-        storage_sw_controlled: navigator.serviceWorker && navigator.serviceWorker.controller ? 1 : 0,
-        storage_cover_entries: entryCounts[0] || 0,
-        storage_audio_entries: entryCounts[1] || 0,
-        storage_catalog_entries: entryCounts[2] || 0
+  Promise.all([persistPromise, estimatePromise, cacheNamesPromise])
+    .then(function (results) {
+      const persisted = results[0];
+      const estimate = results[1] && typeof results[1] === "object" ? results[1] : {};
+      const cacheNames = Array.isArray(results[2]) ? results[2] : [];
+      return Promise.all([
+        countExistingCacheEntries(cacheNames, COVERS_CACHE_NAME),
+        countExistingCacheEntries(cacheNames, PREFETCH_NEXT_CACHE_NAME),
+        countExistingCacheEntries(cacheNames, LIVE_CATALOG_CACHE_NAME)
+      ]).then(function (entryCounts) {
+        const bytesPerMiB = 1024 * 1024;
+        audioTelemetryApi.recordStorageSnapshot({
+          storage_persisted_state: persisted === true ? 2 : persisted === false ? 1 : 0,
+          storage_persist_request_count: persistRequestCount,
+          storage_persist_granted_count: persistRequestCount && persisted === true ? 1 : 0,
+          storage_usage_mb: Math.max(0, Math.round((Number(estimate.usage) || 0) / bytesPerMiB)),
+          storage_quota_mb: Math.max(0, Math.round((Number(estimate.quota) || 0) / bytesPerMiB)),
+          storage_shell_present: cacheNames.includes(SPA_SHELL_CACHE_NAME) ? 1 : 0,
+          storage_sw_controlled: navigator.serviceWorker && navigator.serviceWorker.controller ? 1 : 0,
+          storage_cover_entries: entryCounts[0] || 0,
+          storage_audio_entries: entryCounts[1] || 0,
+          storage_catalog_entries: entryCounts[2] || 0
+        });
       });
+    })
+    .catch(function () {
+      // Storage telemetry is a best-effort session summary only.
     });
-  }).catch(function () {
-    // Storage telemetry is a best-effort session summary only.
-  });
 }
 
 function requestServiceWorkerUpdateCheck(reason) {
   if (!serviceWorkerRegistrationRef || typeof serviceWorkerRegistrationRef.update !== "function") return;
   const now = getAudioTelemetryNow();
-  if (reason !== "registered" && serviceWorkerLastUpdateCheckAt && now - serviceWorkerLastUpdateCheckAt < SERVICE_WORKER_UPDATE_CHECK_MIN_MS) {
+  if (
+    reason !== "registered" &&
+    serviceWorkerLastUpdateCheckAt &&
+    now - serviceWorkerLastUpdateCheckAt < SERVICE_WORKER_UPDATE_CHECK_MIN_MS
+  ) {
     return;
   }
   serviceWorkerLastUpdateCheckAt = now;
@@ -408,9 +454,12 @@ function registerServiceWorker() {
       serviceWorkerControllerChangeAt = getAudioTelemetryNow();
       serviceWorkerReportedVersion = "";
       window.setTimeout(requestActiveServiceWorkerVersion, 0);
-      trackAudioRuntimeEvent("sw_controllerchange", buildServiceWorkerTransitionTelemetry({
-        strategy: "natural_lifecycle"
-      }));
+      trackAudioRuntimeEvent(
+        "sw_controllerchange",
+        buildServiceWorkerTransitionTelemetry({
+          strategy: "natural_lifecycle"
+        })
+      );
     });
     serviceWorkerControllerChangeBound = true;
   }
@@ -445,9 +494,8 @@ function isAndroidDevice() {
 }
 
 function isStandaloneDisplayMode() {
-  const mediaStandalone = typeof window.matchMedia === "function"
-    ? window.matchMedia("(display-mode: standalone)").matches
-    : false;
+  const mediaStandalone =
+    typeof window.matchMedia === "function" ? window.matchMedia("(display-mode: standalone)").matches : false;
   const legacyStandalone = typeof navigator.standalone === "boolean" ? navigator.standalone : false;
   return Boolean(mediaStandalone || legacyStandalone);
 }
@@ -455,9 +503,10 @@ function isStandaloneDisplayMode() {
 function isMobilePwaCoverNavigation() {
   if (!isStandaloneDisplayMode()) return false;
   const mobileDevice = isIosDevice() || isAndroidDevice();
-  const mobileViewport = typeof window.matchMedia === "function"
-    ? window.matchMedia("(max-width: 980px)").matches
-    : window.innerWidth <= 980;
+  const mobileViewport =
+    typeof window.matchMedia === "function"
+      ? window.matchMedia("(max-width: 980px)").matches
+      : window.innerWidth <= 980;
   return Boolean(mobileDevice || mobileViewport);
 }
 
@@ -501,4 +550,55 @@ function initPwaInstallPrompt(adminMode) {
   return pwaInstallApi.initPwaInstallPrompt(adminMode);
 }
 
-export { currentTheme, storageObservationStarted, adminScriptPromise, serviceWorkerRegistered, serviceWorkerControllerChangeBound, serviceWorkerRegistrationRef, serviceWorkerReportedVersion, serviceWorkerLastUpdateCheckAt, serviceWorkerControllerChangeAt, isAdminModeEnabled, applyAdminUiVisibility, applyThemePreset, isDarkColor, ensureMetaTag, getPwaStatusColor, syncPwaStatusColor, getCurrentThemeColor, setThemeColor, initThemePreset, getAdminScriptUrl, ensureAdminScriptLoaded, initAdminFeatures, teardownAdminFeatures, buildServiceWorkerTransitionTelemetry, readStoragePersistRequestMarker, writeStoragePersistRequestMarker, countExistingCacheEntries, beginPwaStorageObservation, requestServiceWorkerUpdateCheck, serviceWorkerIdleUpdateRequested, isBusyForServiceWorkerUpdate, applyWaitingServiceWorkerWhenIdle, watchServiceWorkerInstall, rememberServiceWorkerReportedVersion, requestActiveServiceWorkerVersion, registerServiceWorker, isIosDevice, isAndroidDevice, isStandaloneDisplayMode, isMobilePwaCoverNavigation, getIosBrowserKind, getAndroidBrowserKind, getInstallBrowserKind, isSafariOnIos, getPwaGuideContent, fillPwaGuide, readPwaChoice, persistPwaChoice, ensurePwaInstallPromptUi, initPwaInstallPrompt };
+export {
+  currentTheme,
+  storageObservationStarted,
+  adminScriptPromise,
+  serviceWorkerRegistered,
+  serviceWorkerControllerChangeBound,
+  serviceWorkerRegistrationRef,
+  serviceWorkerReportedVersion,
+  serviceWorkerLastUpdateCheckAt,
+  serviceWorkerControllerChangeAt,
+  isAdminModeEnabled,
+  applyAdminUiVisibility,
+  applyThemePreset,
+  isDarkColor,
+  ensureMetaTag,
+  getPwaStatusColor,
+  syncPwaStatusColor,
+  getCurrentThemeColor,
+  setThemeColor,
+  initThemePreset,
+  getAdminScriptUrl,
+  ensureAdminScriptLoaded,
+  initAdminFeatures,
+  teardownAdminFeatures,
+  buildServiceWorkerTransitionTelemetry,
+  readStoragePersistRequestMarker,
+  writeStoragePersistRequestMarker,
+  countExistingCacheEntries,
+  beginPwaStorageObservation,
+  requestServiceWorkerUpdateCheck,
+  serviceWorkerIdleUpdateRequested,
+  isBusyForServiceWorkerUpdate,
+  applyWaitingServiceWorkerWhenIdle,
+  watchServiceWorkerInstall,
+  rememberServiceWorkerReportedVersion,
+  requestActiveServiceWorkerVersion,
+  registerServiceWorker,
+  isIosDevice,
+  isAndroidDevice,
+  isStandaloneDisplayMode,
+  isMobilePwaCoverNavigation,
+  getIosBrowserKind,
+  getAndroidBrowserKind,
+  getInstallBrowserKind,
+  isSafariOnIos,
+  getPwaGuideContent,
+  fillPwaGuide,
+  readPwaChoice,
+  persistPwaChoice,
+  ensurePwaInstallPromptUi,
+  initPwaInstallPrompt
+};

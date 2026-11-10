@@ -42,7 +42,6 @@
     const getAudioSource = method(ctx, "getAudioSource", function () { return ""; });
     const clearNextTrackPrefetch = method(ctx, "clearNextTrackPrefetch");
     const resetPreparedInitialGlobalRandomPlayback = method(ctx, "resetPreparedInitialGlobalRandomPlayback");
-    const clearTrackFailure = method(ctx, "clearTrackFailure");
     const fadeInAudio = method(ctx, "fadeInAudio");
     const forceAudioFullVolume = method(ctx, "forceAudioFullVolume");
     const bindMediaSessionActions = method(ctx, "bindMediaSessionActions");

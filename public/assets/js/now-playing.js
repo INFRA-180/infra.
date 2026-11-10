@@ -634,7 +634,7 @@
     if (transport.overlayToggle) {
       const isPlaying = Boolean(audio && !audio.paused);
       transport.overlayToggle.classList.toggle("is-on", isPlaying);
-      transport.overlayToggle.disabled = !Boolean(hasTrack || (audioState.playlist && audioState.playlist.length));
+      transport.overlayToggle.disabled = !(hasTrack || (audioState.playlist && audioState.playlist.length));
       transport.overlayToggle.setAttribute("aria-label", isPlaying ? "Pause" : "Lecture");
     }
     if (transport.overlayRadio) {

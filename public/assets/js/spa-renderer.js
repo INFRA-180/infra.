@@ -528,7 +528,7 @@
     return fragment.querySelector(".album-layout .cover");
   }
 
-  function getImagePreferredSrc(img, sourceUrl, options) {
+  function getImagePreferredSrc(img, sourceUrl, _options) {
     if (!img) return "";
     const canonicalWidth = 1200;
     const srcset = String(img.getAttribute("srcset") || "").trim();
@@ -550,7 +550,7 @@
     return value ? normalizeCoverUrl(value, { width: 1200 }) : "";
   }
 
-  function lockSpaCoverSource(image, sourceUrl, preferredWidth) {
+  function lockSpaCoverSource(image, sourceUrl, _preferredWidth) {
     if (!image) return "";
     const width = 1200;
     const target = getImagePreferredSrc(image, sourceUrl, { preferredWidth: width });

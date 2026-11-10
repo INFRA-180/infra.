@@ -27,7 +27,6 @@
     const syncTransportUi = method(ctx, "syncTransportUi");
     const updateProgressUi = method(ctx, "updateProgressUi");
     const savePlaybackQueueContext = method(ctx, "savePlaybackQueueContext");
-    const syncMediaSessionMetadata = method(ctx, "syncMediaSessionMetadata");
     const ensureGlobalAudio = method(ctx, "ensureGlobalAudio", function () { return null; });
     const ensureAlbumHeaderActions = method(ctx, "ensureAlbumHeaderActions", function () { return null; });
     const ensureAlbumFavoriteSelectionToolbar = method(ctx, "ensureAlbumFavoriteSelectionToolbar");
@@ -42,7 +41,6 @@
     const toggleAlbumFavoriteSelection = method(ctx, "toggleAlbumFavoriteSelection");
     const togglePlayPause = method(ctx, "togglePlayPause");
     const clearTrackFailure = method(ctx, "clearTrackFailure");
-    const resetAudioElementForSource = method(ctx, "resetAudioElementForSource");
     const startTrack = method(ctx, "startTrack");
     const syncPlaylistContext = method(ctx, "syncPlaylistContext");
     const bindGlobalKeyboardShortcuts = method(ctx, "bindGlobalKeyboardShortcuts");
@@ -183,7 +181,7 @@
     }
   }
 
-  function hydrateTrackDurations(tracks) {
+  function hydrateTrackDurations(_tracks) {
     // audiofix117: durations come only from cached data; no hidden audio probes before a real click/tap.
     return;
   }

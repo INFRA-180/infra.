@@ -23,9 +23,16 @@ function isolateLegacyScripts() {
       if (!id.startsWith(legacyDir) || !id.endsWith(".js")) return null;
       // Modules ES (import/export) : scripts.js et runtime/ — pas d'enveloppe, comme l'ancien scripts.js d'un seul tenant.
       if (id === legacyDir + "scripts.js" || id.startsWith(legacyDir + "runtime" + path.sep)) return null;
+      // Lot C : audio-radio/ (modules importés par audio-radio.js) — pas d'enveloppe propre ;
+      // audio-radio.js garde la sienne (bloc protégé, comme avant).
+      if (id.startsWith(legacyDir + "audio-radio" + path.sep)) return null;
       const name = path.basename(id);
+      // Lot C : les import d'en-tête (audio-radio.js → audio-radio/) restent hors du bloc protégé.
+      const imports = code.match(/^(?:import [^;]+;\s*)+/);
+      const head = imports ? imports[0] : "";
+      const rest = code.slice(head.length);
       return {
-        code: `try {\n${code}\n} catch (error) {\n  console.error("[INFRA] ${name} :", error);\n}\n`,
+        code: `${head}try {\n${rest}\n} catch (error) {\n  console.error("[INFRA] ${name} :", error);\n}\n`,
         map: null
       };
     }

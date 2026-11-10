@@ -18,13 +18,19 @@ const rules = {
 export default [
   { ignores: ["public/assets/js/app.js", "public/assets/vendor/**"] },
   {
-    files: ["public/assets/js/scripts.js", "public/assets/js/runtime/**/*.js"],
+    // Modules ES : scripts.js + runtime/ ; lot C : audio-radio.js + audio-radio/.
+    files: [
+      "public/assets/js/scripts.js",
+      "public/assets/js/runtime/**/*.js",
+      "public/assets/js/audio-radio.js",
+      "public/assets/js/audio-radio/**/*.js"
+    ],
     languageOptions: { ecmaVersion: 2022, sourceType: "module", globals: { ...globals.browser } },
     rules
   },
   {
     files: ["public/assets/js/*.js"],
-    ignores: ["public/assets/js/scripts.js"],
+    ignores: ["public/assets/js/scripts.js", "public/assets/js/audio-radio.js"],
     languageOptions: { ecmaVersion: 2022, sourceType: "script", globals: { ...globals.browser } },
     rules
   }

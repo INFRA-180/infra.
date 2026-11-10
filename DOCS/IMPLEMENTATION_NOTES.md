@@ -1726,3 +1726,13 @@
 - `tools/lib/code-text.js` : `codeHas`, `codeIndexOf`, `codeMatch`, `codeTest`, `codeAssertMatch`… cherchent d'abord le texte exact, puis le texte normalisé (blancs retirés, sauf un espace entre deux mots ; un blanc au bord d'une recherche reste une limite, ex. `/\ssrc="/` ne trouve pas `data-cover-src="`). **Toujours les utiliser** pour vérifier du code dans un test. Testé par `tools/test-code-text.js`.
 - 923 vérifications converties dans 20 fichiers de test ; 3 mises à jour à la main (parenthèses inutiles retirées, guillemets réécrits par Prettier). Contrôlé : des défauts introduits exprès restent détectés.
 - **Tout le JavaScript du site est formaté** (`npm run format`, Prettier) : 38 fichiers, un seul style. Le générateur de Codex réécrit `catalog-fallback.js` en JSON (repères `  const fallbackCatalog = {` / `  const globalObject =` conservés) : pas de contrôle de formatage dans `npm test` pour ne pas bloquer la synchro du catalogue.
+
+## 10/11/2026 — Tests : scripts construits avec Vite (lot B, Claude)
+- `tools/lib/load-script.js` : tout test qui exécute un script du site passe par `runInContext` / `runInNewContext`. Fichier inclus dans `app.js` → construit seul avec Vite (`tools/lib/build-one-script.mjs`, iife non réduite) ; sinon exécuté tel quel. Recherches de code : `sourceText()` (entrée + dossier de modules).
+- Convention pour découper un fichier `X.js` : ses modules vont dans `public/assets/js/X/` (exception historique : `scripts.js` → `runtime/`). L'empreinte de `app.js` et les tests les prennent automatiquement.
+
+## 10/11/2026 — audio-radio.js découpé en 8 modules (lot C, Claude, `audiofix430`)
+- `audio-radio.js` (4 529 l.) → entrée de 500 l. (réglages, accès au lecteur, assemblage, `window.InfraAudioRadio` inchangé) + `audio-radio/` : `external-commands`, `radio`, `keyboard`, `play-modes`, `queue-context`, `page-collection`, `audio-element`, `prefetch`.
+- Corps des 115 fonctions **inchangés** (comparaison par jetons avec l'original) : chaque module est une fonction `createX(R)` qui reçoit les réglages (`R`) et renvoie ses fonctions ; les fonctions des autres modules sont reliées par `link()` avant tout appel (mêmes fonctions, pas d'enveloppes : comparaisons et `removeEventListener` intacts).
+- Découpage fait par un outil d'analyse (espree + eslint-scope) qui refuse s'il trouve une variable modifiable partagée ou une instruction hors fonction ; ESLint a attrapé un nom de la portée englobante (`canAllowSystemInterruptionResume`) → transmis aussi.
+- Build : les `import` d'en-tête restent hors du bloc protégé `try` de `audio-radio.js`. ESLint : `audio-radio.js` et `audio-radio/` en modules ES. `app.js` 553 → 565 Ko (liaisons).

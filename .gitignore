@@ -87,7 +87,7 @@ DOCS/PLAN_*.md
 # Captures du lot 1 : résultats d’essai locaux (les références, elles, sont suivies)
 tools/visual/.resultats/
 playwright-report/
-package-lock.json
+# package-lock.json est suivi depuis le 11/11/2026 : GitHub installe les mêmes versions (npm ci) avant l'audit.
 
 # Construction du JavaScript avec Vite (10/11/2026) : la configuration est suivie
 !tools/build/

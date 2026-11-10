@@ -24,6 +24,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      # Outils de vérification (Vite, ESLint…) aux versions exactes de package-lock.json (INFRA, 11/11/2026).
+      # Ils servent seulement à l'audit : le site publié (public/, app.js déjà construit) n'en dépend pas.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install build tools
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Audit release
         run: node tools/release-audit.js
       - name: Configure Pages

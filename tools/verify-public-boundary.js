@@ -14,6 +14,7 @@ const allowedTrackedRoots = new Set([
   "DOCS",
   "README.md",
   "package.json",
+  "package-lock.json", // versions exactes pour npm ci au déploiement (INFRA, 11/11/2026)
   "public",
   "tools"
 ]);

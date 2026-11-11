@@ -1235,4 +1235,195 @@
       true
     );
   })();
+
+  // ---------- Fondu à droite des onglets seulement s'il reste des onglets cachés (V8) ----------
+  (function tabsRowEnd() {
+    function update() {
+      $$(".bib-tabs-row").forEach(function (row) {
+        row.classList.toggle("at-end", row.scrollLeft + row.clientWidth >= row.scrollWidth - 2);
+      });
+    }
+    document.addEventListener(
+      "scroll",
+      function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains("bib-tabs-row")) update();
+      },
+      true
+    );
+    window.addEventListener("resize", update);
+    document.addEventListener("click", function () {
+      window.setTimeout(update, 50);
+    });
+    if (typeof MutationObserver === "function" && document.body) {
+      new MutationObserver(update).observe(document.body, {
+        attributes: true,
+        attributeFilter: ["data-bib-view"]
+      });
+    }
+    update();
+  })();
+
+  // ---------- Glisser entre les onglets (maquette V8, INFRA 11/11/2026) ----------
+  // Bibliothèque : glisser ← = onglet suivant, → = onglet précédent. Le contenu suit le doigt ; lâcher
+  // au-delà d'un quart de l'écran (ou d'un geste vif) = changer d'onglet, sinon tout revient ; premier et
+  // dernier onglet : élastique. Pas depuis une rangée qui défile de côté (playlists, tri, onglets), ni
+  // depuis le bord gauche, ni avec la recherche ou le grand lecteur ouverts. Remplace le glisser des
+  // pochettes qui ouvrait l'album (home-catalog.js, albumCoverSwipeOpens) : toucher une pochette l'ouvre.
+  (function tabSwipe() {
+    var g = null,
+      swallowUntil = 0;
+    var EASE = "cubic-bezier(.2,.8,.2,1)";
+    function homeMain() {
+      var layer = document.querySelector(".spa-route-layer[data-spa-route-state='current']") || document;
+      return layer.querySelector("main.one-page-layout") || layer.querySelector("main");
+    }
+    function tabOrder() {
+      return $$("[data-bib-tab]")
+        .filter(function (b) {
+          return b.offsetParent !== null;
+        })
+        .map(function (b) {
+          return b.getAttribute("data-bib-tab");
+        });
+    }
+    function scrollsSideways(el, stop) {
+      for (var n = el; n && n !== stop && n !== document.body; n = n.parentElement) {
+        if (n.scrollWidth > n.clientWidth + 2) {
+          var ox = window.getComputedStyle(n).overflowX;
+          if (ox === "auto" || ox === "scroll") return true;
+        }
+      }
+      return false;
+    }
+    function canStart(e, main) {
+      if (!isHome() || !main || !e.touches || e.touches.length !== 1) return false;
+      var bar = $("[data-bib-tabs]");
+      if (state.q || (bar && bar.classList.contains("searching"))) return false;
+      if (document.body.classList.contains("now-playing-open")) return false;
+      var t = e.touches[0],
+        target = e.target && e.target.closest ? e.target : null;
+      if (!target || !main.contains(target) || t.clientX < 24) return false;
+      if (target.closest("input, textarea, select, .bib-sortrow, [data-bib-tabs]")) return false;
+      return !scrollsSideways(target, main);
+    }
+    function settle(main, ms) {
+      window.setTimeout(function () {
+        main.style.transition = "";
+        main.style.willChange = "";
+        main.style.opacity = "";
+      }, ms);
+    }
+    document.addEventListener(
+      "touchstart",
+      function (e) {
+        var main = homeMain();
+        if (!canStart(e, main)) {
+          g = null;
+          return;
+        }
+        var order = tabOrder();
+        g = {
+          main: main,
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY,
+          t: Date.now(),
+          dx: 0,
+          horiz: null,
+          order: order,
+          i: order.indexOf(state.view)
+        };
+        if (g.i < 0) g = null;
+      },
+      { passive: true, capture: true }
+    );
+    document.addEventListener(
+      "touchmove",
+      function (e) {
+        if (!g || !e.touches || !e.touches[0]) return;
+        var mx = e.touches[0].clientX - g.x,
+          my = e.touches[0].clientY - g.y;
+        if (g.horiz === null && Math.abs(mx) + Math.abs(my) > 10) {
+          g.horiz = Math.abs(mx) > Math.abs(my) * 1.2;
+          if (!g.horiz) {
+            g = null;
+            return;
+          }
+          g.main.style.transition = "none";
+          g.main.style.willChange = "transform";
+        }
+        if (!g.horiz) return;
+        if (e.cancelable) e.preventDefault(); // pas de défilement vertical pendant le geste
+        var next = g.i + (mx < 0 ? 1 : -1),
+          atEdge = next < 0 || next >= g.order.length;
+        g.dx = atEdge ? mx / 3 : mx; // élastique au premier et au dernier onglet
+        g.main.style.transform = "translate3d(" + g.dx + "px, 0, 0)";
+      },
+      { passive: false, capture: true }
+    );
+    function end() {
+      if (!g || !g.horiz) {
+        g = null;
+        return;
+      }
+      var main = g.main,
+        dx = g.dx,
+        order = g.order,
+        next = g.i + (dx < 0 ? 1 : -1),
+        fast = Math.abs(dx) / Math.max(1, Date.now() - g.t) > 0.5;
+      g = null;
+      swallowUntil = Date.now() + 450; // le toucher qui suit le glisser n'ouvre pas la pochette
+      var go =
+        next >= 0 &&
+        next < order.length &&
+        (Math.abs(dx) > window.innerWidth / 4 || (fast && Math.abs(dx) > 40));
+      if (!go) {
+        main.style.transition = "transform 260ms " + EASE;
+        main.style.transform = "";
+        settle(main, 270);
+        return;
+      }
+      if (reduced()) {
+        main.style.transform = "";
+        settle(main, 0);
+        selectView(order[next]);
+        return;
+      }
+      var out = dx < 0 ? -window.innerWidth : window.innerWidth;
+      main.style.transition = "transform 180ms " + EASE + ", opacity 180ms";
+      main.style.transform = "translate3d(" + out + "px, 0, 0)";
+      main.style.opacity = "0";
+      window.setTimeout(function () {
+        // Contenu remis en place AVANT de changer d'onglet : Favoris change l'adresse (#favoris) et Safari
+        // reconstruit alors la page depuis une copie de l'écran ; une copie prise transparente et décalée
+        // donnait une page blanche (vu dans le simulateur, 11/11/2026).
+        main.style.transition = "none";
+        main.style.transform = "";
+        main.style.opacity = "";
+        main.style.willChange = "";
+        selectView(order[next]);
+        if (homeMain() !== main || !main.isConnected) return; // page reconstruite : pas d'arrivée animée
+        main.style.transform = "translate3d(" + -out * 0.3 + "px, 0, 0)";
+        main.style.opacity = "0";
+        // Sans attendre une image du navigateur : position de départ appliquée tout de suite, puis l'arrivée.
+        void main.offsetWidth;
+        main.style.transition = "transform 260ms " + EASE + ", opacity 200ms";
+        main.style.transform = "";
+        main.style.opacity = "";
+        settle(main, 270);
+      }, 180);
+    }
+    document.addEventListener("touchend", end, true);
+    document.addEventListener("touchcancel", end, true);
+    // Sur la fenêtre, en capture : avant le gestionnaire de liens du site (page-init.js, document).
+    window.addEventListener(
+      "click",
+      function (e) {
+        if (Date.now() > swallowUntil) return;
+        swallowUntil = 0;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      },
+      true
+    );
+  })();
 })();

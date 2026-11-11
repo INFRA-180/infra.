@@ -76,7 +76,8 @@ function createHarness(options) {
       opened.push({ target, options });
       return true;
     },
-    trackAudioRuntimeEvent(type, data) { telemetry.push({ type, data }); }
+    trackAudioRuntimeEvent(type, data) { telemetry.push({ type, data }); },
+    albumCoverSwipeOpens: opts.albumCoverSwipeOpens !== false // ancien geste, gardé et testé (désactivé sur le site)
   });
   catalog.initAlbumSwipeNavigation();
 
@@ -177,6 +178,19 @@ function createHarness(options) {
   assert.equal(event.data.lower_half, true);
   assert.equal(harness.sandbox.__infraEarlyAlbumSwipeProbe.stopped, true);
   assert.equal(harness.opened.length, 0);
+})();
+
+// Maquette V8 (INFRA, 11/11/2026) : sur le site, glisser une pochette change d'onglet, n'ouvre plus l'album.
+(function testCoverSwipeDisabledByDefault() {
+  const harness = createHarness({ albumCoverSwipeOpens: false, earlyRecords: [] });
+  assert.equal((harness.listeners.get("pointerdown") || []).length, 0, "le glisser des pochettes ne doit plus être branché");
+  assert.equal(harness.sandbox.__infraEarlyAlbumSwipeProbe.stopped, true, "la sonde de démarrage doit être arrêtée");
+  harness.dispatch("pointerdown", { clientX: 20, clientY: 100 });
+  harness.dispatch("pointermove", { clientX: 100, clientY: 102 });
+  harness.dispatch("pointerup", { clientX: 100, clientY: 102 });
+  assert.equal(harness.opened.length, 0);
+  const homeIndex = fs.readFileSync(path.resolve(__dirname, "../public/index.html"), "utf8");
+  assert.ok(codeHas(homeIndex, "const ALBUM_COVER_SWIPE_OPENS = false;"), "la sonde de démarrage ne doit plus ouvrir d'album");
 })();
 
 (function testBindingIsIdempotent() {

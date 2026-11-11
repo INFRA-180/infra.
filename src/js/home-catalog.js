@@ -296,6 +296,10 @@
       if (catalogState.albumSwipeBound) return;
       catalogState.albumSwipeBound = true;
       consumeEarlyAlbumSwipeProbe();
+      // Maquette V8 (INFRA, 11/11/2026) : glisser ← → sur l'accueil change d'onglet (bibliotheque.js) ;
+      // glisser une pochette n'ouvre plus l'album (toucher l'ouvre toujours). Code gardé : rétabli avec
+      // albumCoverSwipeOpens: true dans le contexte.
+      if (ctx.albumCoverSwipeOpens !== true) return;
 
       document.addEventListener(
         "pointerdown",
@@ -1258,7 +1262,7 @@
   "use strict";
   if (typeof document === "undefined" || typeof window === "undefined") return;
   if (typeof document.createElement !== "function" || !document.head) return;
-  var VERSION = "bibliotheque-v25-20261111";
+  var VERSION = "bibliotheque-v28-20261111";
   try {
     var script = document.currentScript;
     if (!script || !script.src) return;

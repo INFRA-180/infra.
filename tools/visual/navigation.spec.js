@@ -265,3 +265,93 @@ test("Nav-2 : vignettes de l'accueil préparées au repos, sans défiler", async
   await expect.poll(pending, { timeout: 30000 }).toBe(0);
   expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(0);
 });
+
+// ---------- Maquette V8 (INFRA, 11/11/2026) : glisser entre les onglets ----------
+// Glisser ← = onglet suivant, → = précédent ; pas depuis une rangée qui défile de côté ; un glisser
+// sur une pochette ne l'ouvre plus. Gestes tactiles Chromium (projet téléphone).
+async function swipeHome(page, { from, xs, y, slow }) {
+  return page.evaluate(
+    async ({ current, from, xs, y, slow }) => {
+      const root = document.querySelector(current);
+      const target =
+        from === "playlists"
+          ? root.querySelector(".playlists-grid a, .playlists-grid li")
+          : from === "cover"
+            ? [...root.querySelectorAll("a.album-card[href*='music/'] img")].find((i) => {
+                const r = i.getBoundingClientRect();
+                return r.top > 0 && r.bottom < innerHeight - 120 && r.width > 0;
+              })
+            : root.querySelector("main");
+      const r = target.getBoundingClientRect();
+      const ty = y || Math.round(r.top + r.height / 2);
+      const touch = (x) => new Touch({ identifier: 3, target, clientX: x, clientY: ty });
+      const fire = (type, x) =>
+        target.dispatchEvent(
+          new TouchEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            touches: type === "touchend" ? [] : [touch(x)],
+            changedTouches: [touch(x)]
+          })
+        );
+      fire("touchstart", xs[0]);
+      let mid = "";
+      for (const x of xs.slice(1)) {
+        fire("touchmove", x);
+        await new Promise((res) => setTimeout(res, 16));
+      }
+      mid = root.querySelector("main").style.transform;
+      if (slow) await new Promise((res) => setTimeout(res, 400));
+      fire("touchend", xs[xs.length - 1]);
+      target.click(); // le toucher qui suit un glisser ne doit rien ouvrir
+      await new Promise((res) => setTimeout(res, 700));
+      return { mid, view: document.body.getAttribute("data-bib-view"), path: location.pathname };
+    },
+    { current: CURRENT, from, xs, y, slow }
+  );
+}
+
+async function openHomeTop(page) {
+  await page.goto("/");
+  await page.waitForLoadState("load");
+  await page.waitForTimeout(900);
+}
+
+test("V8 : glisser ← sur une pochette passe à Albums sans ouvrir l'album, → revient", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "telephone", "geste tactile : téléphone");
+  await openHomeTop(page);
+  await page.evaluate(() => window.scrollTo(0, 300));
+  let s = await swipeHome(page, { from: "cover", xs: [320, 290, 240, 180, 120, 70], slow: true });
+  expect(s.mid).toMatch(/translate/);
+  expect(s.view).toBe("albums");
+  expect(s.path).toMatch(/\/(index\.html)?$/);
+  s = await swipeHome(page, { from: "main", xs: [60, 90, 150, 220, 290, 340], slow: true });
+  expect(s.view).toBe("accueil");
+});
+
+test("V8 : petit glisser, bord du premier onglet, rangée des playlists : rien ne change", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "telephone", "geste tactile : téléphone");
+  await openHomeTop(page);
+  let s = await swipeHome(page, { from: "main", xs: [300, 285, 270, 255], slow: true });
+  expect(s.view).toBe("accueil");
+  s = await swipeHome(page, { from: "main", xs: [60, 120, 200, 300], slow: true });
+  expect(s.view).toBe("accueil");
+  s = await swipeHome(page, { from: "playlists", xs: [320, 260, 180, 90], slow: true });
+  expect(s.view).toBe("accueil");
+});
+
+test("V8 : quatre glissers jusqu'à Favoris, le contenu reste visible", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "telephone", "geste tactile : téléphone");
+  await openHomeTop(page);
+  for (const view of ["albums", "playlists", "titres", "favoris"]) {
+    const s = await swipeHome(page, { from: "main", xs: [320, 290, 230, 150, 80], y: 520 });
+    expect(s.view).toBe(view);
+  }
+  await page.waitForTimeout(500);
+  const main = await page.evaluate((current) => {
+    const m = document.querySelector(current + " main");
+    return { opacity: getComputedStyle(m).opacity, transform: m.style.transform };
+  }, CURRENT);
+  expect(main).toEqual({ opacity: "1", transform: "" });
+  await expect(page.locator(".favorites-view")).toBeVisible();
+});

@@ -1765,3 +1765,8 @@
 - Tests : `tools/visual/navigation.spec.js` (9 tests de comportement). Vérifié dans l'app installée (simulateur iPhone 17, iOS 26.2, port 8792) : vidéo du retour par le bouton (fondu, toutes les pochettes présentes, même position) et 3 retours par le bord (fiche qui suit le doigt, accueil peint dessous).
 - Non reproduit : un premier essai du bord n'a rien fait dans une app restée ouverte depuis avant la nouvelle version ; après relance, 3 essais sur 3 réussis (sonde temporaire : le geste est bien reçu). À surveiller sur iPhone réel.
 - Reste (lot Nav-2) : pile pour toutes les pages (playlist → album depuis le grand lecteur → retour à la playlist) + vignettes préparées au repos.
+
+## 11/11/2026 — Accueil : blanc sous les onglets réduit (Claude, `audiofix435`, « Réduis » d'INFRA)
+- Mesuré (375 px) : 43 px entre le bas des onglets et le titre de la 1re section (marge de section 12 + marge du titre 18 + 13 de centrage sur le bouton « Tout voir » de 44 px). Ramené à 16 px (`styles.css` : marge 0, haut du titre 3 px) dans les vues Accueil, Albums, Playlists ; « Tout voir » reste sur l'axe du titre.
+- Règle écrite **sans** `body.home-screen` : sinon l'accueil gardé sous une fiche perdait la règle et descendait de 27 px (attrapé par le test de navigation « accueil peint sous l'album, à sa place »).
+- 9 captures de référence mises à jour (accueil, accueil défilé, onglet Albums × 3 appareils) ; vérifié dans l'app installée du simulateur.

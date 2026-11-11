@@ -5278,6 +5278,13 @@ body.home-screen[data-bib-view="accueil"] .albums-grid > li.bib-hide-home { disp
 body.home-screen[data-bib-view="albums"] .one-page-layout > .module:not([data-module-id="albums"]) { display: none; }
 body.home-screen[data-bib-view="playlists"] .one-page-layout > .module:not([data-module-id="playlists"]) { display: none; }
 body.home-screen[data-bib-view="titres"] .one-page-layout > .module:not(.bib-panel) { display: none; }
+/* Première section sous les onglets : titre à 16 px des onglets au lieu de 43 (INFRA, 11/11/2026).
+   43 = marge de section 12 + marge du titre 18 + 13 (titre centré sur le bouton « Tout voir » de 44 px).
+   Sans « body.home-screen » : l'accueil gardé sous une fiche (pile d'écrans) doit rester identique. */
+body:not([data-bib-view="albums"]):not([data-bib-view="titres"]) .one-page-layout > [data-module-id="playlists"],
+body[data-bib-view="albums"] .one-page-layout > [data-module-id="albums"] { margin-top: 0; }
+body:not([data-bib-view="albums"]):not([data-bib-view="titres"]) .one-page-layout > [data-module-id="playlists"] .albums-menu-toggle,
+body[data-bib-view="albums"] .one-page-layout > [data-module-id="albums"] .albums-menu-toggle { padding-top: 3px; }
 body.home-screen.bib-searching .one-page-layout > .module:not(.bib-panel) { display: none; }
 
 /* Onglet Playlists : grille 2 colonnes (4 sur ordinateur) au lieu de la rangée */

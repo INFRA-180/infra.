@@ -1194,6 +1194,9 @@
         if (applied) return;
         applied = true;
         const mutationStartedAt = getAudioTelemetryNow();
+        // Position de l'accueil à l'écran, mesurée avant tout changement (classe du body, défilement).
+        const sourceTop =
+          opts.liveHomeCapture && sourceRoute ? Math.round(sourceRoute.getBoundingClientRect().top) : 0;
         freezeSourceRouteForCapture();
         document.body.className = bodyClassName;
         destinationRoute.setAttribute("data-spa-route-state", "current");
@@ -1204,6 +1207,8 @@
           opts.liveHomeCapture && sourceRoute && sourceRoute.classList.contains("home-screen")
         );
         if (retainConnectedHome) {
+          // Pile d'écrans (INFRA 11/11/2026) : l'accueil reste peint dessous, figé à sa position à l'écran.
+          sourceRoute.style.transform = "translate3d(0, " + sourceTop + "px, 0)";
           sourceRoute.setAttribute("data-spa-route-state", "retained");
           sourceRoute.setAttribute("aria-hidden", "true");
           sourceRoute.inert = true;
@@ -1389,13 +1394,18 @@
         const coverScrollY = Math.max(0, Number(window.scrollY) || 0);
         setSpaSwapPaintLock(true);
         try {
-          if (outgoing && outgoing !== retainedHome) {
+          // Page déjà sortie par le geste du bord gauche : elle est hors de l'écran, on la retire.
+          if (outgoing && outgoing !== retainedHome && outgoing.hasAttribute("data-spa-swiped-out")) {
+            outgoing.remove();
+          } else if (outgoing && outgoing !== retainedHome) {
             outgoing.setAttribute("data-spa-route-state", "covering");
             outgoing.style.transform = "translate3d(0, " + -coverScrollY + "px, 0)";
             outgoing.setAttribute("aria-hidden", "true");
             outgoing.inert = true;
             coveringOutgoing = outgoing;
           }
+          retainedHome.style.transform = "";
+          retainedHome.style.filter = "";
           retainedHome.setAttribute("data-spa-route-state", "current");
           retainedHome.removeAttribute("aria-hidden");
           retainedHome.inert = false;

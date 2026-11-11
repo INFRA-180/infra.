@@ -274,7 +274,23 @@ body::before {
   min-height: 100dvh;
 }
 
-.spa-route-layer[data-spa-route-state="retained"],
+/* Pile d'écrans (INFRA, 11/11/2026 ; maquette V7) : l'accueil gardé reste PEINT sous la page ouverte,
+   figé à l'endroit exact où on l'a quitté (transform posée par spa-renderer.js). La page ouverte le
+   recouvre entièrement (fond blanc plein écran de son ::before). Avant : opacité 0 et coupé à un écran,
+   WebKit libérait les pochettes et les repeignait au retour (clignotement). */
+.spa-route-layer[data-spa-route-state="retained"] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: -1;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  pointer-events: none;
+  transition: none !important;
+}
+
 .spa-route-layer[data-spa-route-state="retiring"] {
   position: fixed;
   inset: 0;

@@ -697,6 +697,13 @@
     if (el.closest("summary")) event.preventDefault(); // les outils sont dans le titre de section (<summary>)
     if (el.hasAttribute("data-bib-tab")) {
       var v = el.getAttribute("data-bib-tab");
+      // Toucher l'onglet déjà actif : remonte en haut (convention iPhone ; maquette V7, INFRA 11/11/2026)
+      var bar = $("[data-bib-tabs]");
+      if (el.getAttribute("aria-current") === "true" && !state.q && !(bar && bar.classList.contains("searching"))) {
+        var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+        return;
+      }
       selectView(v === "top" ? "accueil" : v);
       return;
     }
@@ -797,6 +804,52 @@
     if (state.q.trim()) loadData().then(render, render);
     else render();
   });
+
+  // ---------- Une seule règle « retour » au clavier (maquette V7, INFRA 11/11/2026) ----------
+  // Échap, Alt + ← et Cmd + [ : grand lecteur, puis fiche ouverte, puis recherche. « / » : recherche.
+  window.addEventListener(
+    "keydown",
+    function (event) {
+      if (event.defaultPrevented) return;
+      var target = event.target,
+        typing =
+          target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(String(target.tagName || "")));
+      var isEscape = event.key === "Escape",
+        isBack = isEscape || (event.altKey && event.key === "ArrowLeft") || (event.metaKey && event.key === "[");
+      if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey && isHome()) {
+        event.preventDefault();
+        openSearch();
+        return;
+      }
+      if (!isBack || (typing && !isEscape)) return;
+      var playerOpen = document.body.classList.contains("now-playing-open");
+      var modalOpen = !!document.querySelector(".is-open[aria-hidden='false']");
+      if (playerOpen || modalOpen) {
+        // Échap est déjà traité par le lecteur et les fenêtres ; Alt + ← / Cmd + [ font pareil.
+        if (!isEscape) {
+          event.preventDefault();
+          document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        }
+        return;
+      }
+      if (isHome()) {
+        var bar = $("[data-bib-tabs]");
+        if (!isEscape && (state.q || (bar && bar.classList.contains("searching")))) {
+          event.preventDefault();
+          closeSearch();
+        }
+        return; // Échap sur l'accueil : recherche et tri, gérés plus bas
+      }
+      var layer =
+        document.querySelector(".spa-route-layer[data-spa-route-state='current']") || document.body,
+        back = layer.querySelector(".back");
+      if (back) {
+        event.preventDefault();
+        back.click();
+      }
+    },
+    true
+  );
 
   document.addEventListener("keydown", function (event) {
     if (!isHome()) return;
@@ -1030,8 +1083,10 @@
     new MutationObserver(boot).observe(document.body, { attributes: true, attributeFilter: ["class"] });
   }
 
-  // ---------- Gestes iPhone (INFRA, 09/11/2026) ----------
-  // 1. Fiche album/playlist : glisser depuis le bord gauche = retour à la Bibliothèque.
+  // ---------- Gestes iPhone (INFRA, 09/11/2026 ; pile d'écrans 11/11/2026, maquette V7) ----------
+  // 1. Fiche album/playlist : glisser depuis le bord gauche = retour. La fiche suit le doigt et laisse
+  //    voir l'écran du dessous (accueil gardé peint, spa-renderer.js), qui s'éclaircit ; lâcher au-delà
+  //    d'un tiers de l'écran (ou d'un geste vif) = retour, sinon la fiche revient.
   // 2. Barre du lecteur : glisser ← / → = titre suivant / précédent ; glisser ↑ = grand lecteur.
   (function gestures() {
     var g = null;
@@ -1056,10 +1111,59 @@
         ) {
           g = { kind: "bar", x: t.clientX, y: t.clientY };
         } else if (t.clientX < 24 && currentLayer().querySelector(".back")) {
-          g = { kind: "edge", x: t.clientX, y: t.clientY };
+          g = { kind: "edge", x: t.clientX, y: t.clientY, t: Date.now(), horiz: null, dx: 0 };
         } else g = null;
       },
       { passive: true, capture: true }
+    );
+    function underLayer() {
+      return document.querySelector(".spa-route-layer[data-spa-route-state='retained']");
+    }
+    function paintEdge(layer, dx) {
+      var p = Math.min(1, Math.max(0, dx / Math.max(1, window.innerWidth)));
+      layer.style.transform = "translate3d(" + dx + "px, 0, 0)";
+      var under = underLayer();
+      if (under) under.style.filter = "brightness(" + (0.78 + 0.22 * p).toFixed(3) + ")";
+    }
+    function settleEdge(layer, toX, done) {
+      var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var under = underLayer();
+      layer.style.transition = reduce ? "none" : "transform 260ms cubic-bezier(.2,.8,.2,1)";
+      if (under) under.style.transition = reduce ? "none" : "filter 260ms cubic-bezier(.2,.8,.2,1)";
+      layer.style.transform = "translate3d(" + toX + "px, 0, 0)";
+      if (under) under.style.filter = toX > 0 ? "brightness(1)" : "brightness(.78)";
+      window.setTimeout(
+        function () {
+          if (under) {
+            under.style.transition = "";
+            if (toX <= 0) under.style.filter = "";
+          }
+          done();
+        },
+        reduce ? 0 : 270
+      );
+    }
+    document.addEventListener(
+      "touchmove",
+      function (e) {
+        if (!g || g.kind !== "edge" || !e.touches || !e.touches[0]) return;
+        var t = e.touches[0],
+          mx = t.clientX - g.x,
+          my = t.clientY - g.y;
+        if (g.horiz === null && Math.abs(mx) + Math.abs(my) > 8) {
+          g.horiz = mx > 0 && Math.abs(mx) > Math.abs(my);
+          if (g.horiz) {
+            g.layer = currentLayer();
+            g.layer.style.transition = "none";
+            g.layer.style.willChange = "transform";
+          }
+        }
+        if (!g.horiz) return;
+        if (e.cancelable) e.preventDefault(); // pas de défilement vertical pendant le geste
+        g.dx = Math.max(0, mx);
+        paintEdge(g.layer, g.dx);
+      },
+      { passive: false, capture: true }
     );
     document.addEventListener(
       "touchend",
@@ -1071,11 +1175,29 @@
         var t = e.changedTouches[0],
           dx = t.clientX - g.x,
           dy = t.clientY - g.y,
-          kind = g.kind;
+          kind = g.kind,
+          edge = g;
         g = null;
-        if (kind === "edge" && dx > 70 && Math.abs(dy) < dx / 2) {
-          var back = currentLayer().querySelector(".back");
-          if (back) back.click();
+        if (kind === "edge" && edge.horiz && edge.layer) {
+          var layer = edge.layer,
+            fast = edge.dx / Math.max(1, Date.now() - edge.t) > 0.6;
+          if (edge.dx > window.innerWidth / 3 || (fast && edge.dx > 40)) {
+            settleEdge(layer, window.innerWidth, function () {
+              // La page est sortie de l'écran : le retour la retire sans la reposer par-dessus.
+              layer.setAttribute("data-spa-swiped-out", "");
+              var back = layer.querySelector(".back");
+              if (back) back.click();
+            });
+          } else {
+            settleEdge(layer, 0, function () {
+              layer.style.transform = "";
+              layer.style.transition = "";
+              layer.style.willChange = "";
+            });
+          }
+        } else if (kind === "edge" && dx > 70 && Math.abs(dy) < dx / 2) {
+          var backBtn = currentLayer().querySelector(".back");
+          if (backBtn) backBtn.click();
         } else if (kind === "bar") {
           var bar = transport();
           if (!bar) return;
@@ -1094,6 +1216,14 @@
     document.addEventListener(
       "touchcancel",
       function () {
+        if (g && g.kind === "edge" && g.horiz && g.layer) {
+          var layer = g.layer;
+          settleEdge(layer, 0, function () {
+            layer.style.transform = "";
+            layer.style.transition = "";
+            layer.style.willChange = "";
+          });
+        }
         g = null;
       },
       true

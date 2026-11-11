@@ -301,6 +301,14 @@ function initSpaNavigation() {
       if (window.location.origin !== "null" && url.origin !== window.location.origin) return;
 
       const wantsBackLink = link.classList && link.classList.contains("back");
+      // Fiche ouverte par-dessus une autre (pile d'écrans, lot Nav-2) : le retour vise la fiche du dessous.
+      if (wantsBackLink && link.getAttribute("data-back-href")) {
+        try {
+          url = new URL(link.getAttribute("data-back-href"), window.location.href);
+        } catch (_err) {
+          // Garde l'adresse du lien.
+        }
+      }
       const currentState = history.state && typeof history.state === "object" ? history.state : null;
       if (wantsBackLink && currentState?.__infraPreviousUrl && window.history.length > 1) {
         const previous = new URL(currentState.__infraPreviousUrl, window.location.href);
@@ -380,7 +388,19 @@ function enforceHomeAppsCollapsed(adminMode) {
 }
 
 function resumeLiveHomeRoute() {
-  if (!document.body.classList.contains("home-screen")) return;
+  if (!document.body.classList.contains("home-screen")) {
+    // Fiche album/playlist gardée sous une autre (pile d'écrans, lot Nav-2) : réaffichée telle quelle,
+    // seuls le lecteur, les favoris et le titre en cours sont remis à jour.
+    document.body.classList.toggle("ios-device", isIosDevice());
+    closeNowPlayingOverlay();
+    initThemePreset();
+    if (!isAdminModeEnabled()) applyThemePreset("blanc", false);
+    syncFavoriteButtons();
+    syncTransportUi();
+    syncAudioUi();
+    snapshotCurrentSpaPage(spaState.currentUrl || window.location.href);
+    return;
+  }
   const adminMode = isAdminModeEnabled();
   document.body.classList.toggle("ios-device", isIosDevice());
   closeNowPlayingOverlay();

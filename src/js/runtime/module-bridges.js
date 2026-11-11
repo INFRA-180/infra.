@@ -90,6 +90,7 @@ import {
   toggleRadioModeFromTransport
 } from "./catalog-playback.js";
 import {
+  isAudioBusyForIdleWork,
   prepareAlbumCoversForSession,
   releasePwaCoverHold,
   rememberAlbumCoverImage,
@@ -328,6 +329,7 @@ function createHomeCatalogApi() {
     sanitizeCatalog,
     loadCatalogData,
     openAlbumCard: openHomeAlbumCard,
+    isAudioBusyForIdleWork,
     trackAudioRuntimeEvent,
     toRuntimeAbsoluteUrl
   });

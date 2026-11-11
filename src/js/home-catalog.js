@@ -75,6 +75,12 @@
           };
     const trackAudioRuntimeEvent =
       typeof ctx.trackAudioRuntimeEvent === "function" ? ctx.trackAudioRuntimeEvent : function () {};
+    const isAudioBusyForIdleWork =
+      typeof ctx.isAudioBusyForIdleWork === "function"
+        ? ctx.isAudioBusyForIdleWork
+        : function () {
+            return false;
+          };
     const ALBUM_SWIPE_AXIS_LOCK_PX = 10;
     const ALBUM_SWIPE_OPEN_PX = 58;
     const ALBUM_SWIPE_MAX_VISUAL_PX = 88;
@@ -576,20 +582,75 @@
       }
     }
 
+    function loadDeferredAlbumCover(image) {
+      if (image.classList.contains("album-cover") || image.classList.contains("playlist-cover-tile")) {
+        setHomeCoverCandidates(
+          image,
+          resolveRuntimeAssetUrl(image.dataset.coverSrc),
+          !image.getAttribute("src")
+        );
+      }
+      loadDeferredImage(image, "coverSrc", "coverSrcset", "coverSizes");
+    }
+
+    // Vignettes préparées au repos (lot Nav-2, INFRA 11/11/2026) : après l'affichage de l'accueil,
+    // les vignettes pas encore chargées le sont une à une, de haut en bas, quand le téléphone ne fait
+    // rien (pas pendant un démarrage de titre ni un changement de page). En défilant, elles sont prêtes.
+    function scheduleIdleHomeCoverPreparation() {
+      if (catalogState.idleCoverPreparationScheduled) return;
+      if (typeof window.setTimeout !== "function" || !document.body) return;
+      catalogState.idleCoverPreparationScheduled = true;
+      // Safari iPhone n'a pas requestIdleCallback : petite pause fixe entre deux vignettes.
+      const idle = function (callback, timeout, fallbackDelay) {
+        if (typeof window.requestIdleCallback === "function") {
+          window.requestIdleCallback(callback, { timeout: timeout });
+        } else {
+          window.setTimeout(callback, Number.isFinite(fallbackDelay) ? fallbackDelay : 1200);
+        }
+      };
+      const later = function () {
+        window.setTimeout(function () {
+          idle(step, 3000);
+        }, 1500);
+      };
+      const step = function () {
+        if (!document.body.classList.contains("home-screen") || isAudioBusyForIdleWork()) {
+          later();
+          return;
+        }
+        const route = document.querySelector(".spa-route-layer[data-spa-route-state='current']") || document;
+        const image = route.querySelector(
+          "img.album-cover[data-cover-src], img.playlist-cover-tile[data-cover-src]"
+        );
+        if (!image) {
+          catalogState.idleCoverPreparationScheduled = false;
+          return;
+        }
+        if (catalogState.albumCoverObserver) catalogState.albumCoverObserver.unobserve(image);
+        image.loading = "eager";
+        loadDeferredAlbumCover(image);
+        let done = false;
+        const next = function () {
+          if (done) return;
+          done = true;
+          idle(step, 2000, 150);
+        };
+        if (image.complete) next();
+        else {
+          image.addEventListener("load", next, { once: true });
+          image.addEventListener("error", next, { once: true });
+          window.setTimeout(next, 4000);
+        }
+      };
+      idle(step, 4000);
+    }
+
     function observeDeferredAlbumCovers(root) {
       const scope = root || document;
       const images = Array.from(scope.querySelectorAll("img[data-cover-src]"));
       if (!images.length) return;
-      const load = function (image) {
-        if (image.classList.contains("album-cover") || image.classList.contains("playlist-cover-tile")) {
-          setHomeCoverCandidates(
-            image,
-            resolveRuntimeAssetUrl(image.dataset.coverSrc),
-            !image.getAttribute("src")
-          );
-        }
-        loadDeferredImage(image, "coverSrc", "coverSrcset", "coverSizes");
-      };
+      const load = loadDeferredAlbumCover;
+      scheduleIdleHomeCoverPreparation();
       if (!("IntersectionObserver" in window)) {
         images.forEach(load);
         return;
@@ -1197,7 +1258,7 @@
   "use strict";
   if (typeof document === "undefined" || typeof window === "undefined") return;
   if (typeof document.createElement !== "function" || !document.head) return;
-  var VERSION = "bibliotheque-v24-20261111";
+  var VERSION = "bibliotheque-v25-20261111";
   try {
     var script = document.currentScript;
     if (!script || !script.src) return;

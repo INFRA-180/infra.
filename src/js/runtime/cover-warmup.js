@@ -233,6 +233,22 @@ function limitAlbumCoverWarmupUrls(covers) {
   return covers.slice(0, Math.min(ALBUM_COVER_PREPARE_LIMIT, covers.length));
 }
 
+// Vignettes de l'accueil préparées au repos (lot Nav-2, INFRA 11/11/2026) : petites images (400 px),
+// une à la fois. Contrairement au préchauffage des grandes pochettes, la lecture en cours ne bloque pas :
+// seuls un démarrage de titre, une reprise après coupure ou un changement de page mettent en pause.
+function isAudioBusyForIdleWork() {
+  const recentPlayRequest =
+    Number(audioState.playRequestTs || 0) > 0 && Date.now() - Number(audioState.playRequestTs || 0) < 3000;
+  return Boolean(
+    audioState.trackStartInFlight ||
+    audioState.sourceMetadataPending ||
+    audioState.activeAudioRecovery ||
+    audioState.stallRecovery ||
+    recentPlayRequest ||
+    spaState.navigationActive
+  );
+}
+
 function shouldPauseAlbumCoverWarmup() {
   const audio = audioState.audio;
   const recentPlayRequest =
@@ -692,6 +708,7 @@ export {
   orderAlbumCoverWarmupUrls,
   limitAlbumCoverWarmupUrls,
   shouldPauseAlbumCoverWarmup,
+  isAudioBusyForIdleWork,
   decodeCoverForSession,
   prepareAlbumCoverEntry,
   rememberAlbumCoverImage,

@@ -57,8 +57,10 @@ async function testIosSwapUsesSingleRouteAtomicCommit() {
   const atomicSwap = spaSource.slice(atomicSwapStart, atomicSwapEnd);
   const bodyIndex = codeIndexOf(atomicSwap, "document.body.className = bodyClassName");
   const beforeCountIndex = codeIndexOf(atomicSwap, "routeLayersBeforeCommit =");
-  const retainIndex = codeIndexOf(atomicSwap, "const retainConnectedHome");
-  const appendIndex = codeIndexOf(atomicSwap, "routeHost.appendChild(destinationRoute)");
+  // Pile d'écrans (lot Nav-2, 11/11/2026) : l'écran quitté (accueil ou fiche) reste branché ; la page
+  // affichée est posée en tête de l'hôte (premier élément du document pour le code des fiches).
+  const retainIndex = codeIndexOf(atomicSwap, "if (retainSource)");
+  const appendIndex = codeIndexOf(atomicSwap, "routeHost.insertBefore(destinationRoute, routeHost.firstChild)");
   const replaceIndex = codeIndexOf(atomicSwap, "routeHost.replaceChildren(destinationRoute)");
   const afterCountIndex = codeIndexOf(atomicSwap, "routeLayersAfterCommit =");
   const preserveIndex = codeIndexOf(atomicSwap, "preserveSourceRoute()");

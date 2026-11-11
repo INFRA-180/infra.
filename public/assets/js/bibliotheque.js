@@ -699,7 +699,11 @@
       var v = el.getAttribute("data-bib-tab");
       // Toucher l'onglet déjà actif : remonte en haut (convention iPhone ; maquette V7, INFRA 11/11/2026)
       var bar = $("[data-bib-tabs]");
-      if (el.getAttribute("aria-current") === "true" && !state.q && !(bar && bar.classList.contains("searching"))) {
+      if (
+        el.getAttribute("aria-current") === "true" &&
+        !state.q &&
+        !(bar && bar.classList.contains("searching"))
+      ) {
         var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
         return;
@@ -813,9 +817,11 @@
       if (event.defaultPrevented) return;
       var target = event.target,
         typing =
-          target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(String(target.tagName || "")));
+          target &&
+          (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(String(target.tagName || "")));
       var isEscape = event.key === "Escape",
-        isBack = isEscape || (event.altKey && event.key === "ArrowLeft") || (event.metaKey && event.key === "[");
+        isBack =
+          isEscape || (event.altKey && event.key === "ArrowLeft") || (event.metaKey && event.key === "[");
       if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey && isHome()) {
         event.preventDefault();
         openSearch();
@@ -840,8 +846,7 @@
         }
         return; // Échap sur l'accueil : recherche et tri, gérés plus bas
       }
-      var layer =
-        document.querySelector(".spa-route-layer[data-spa-route-state='current']") || document.body,
+      var layer = document.querySelector(".spa-route-layer[data-spa-route-state='current']") || document.body,
         back = layer.querySelector(".back");
       if (back) {
         event.preventDefault();
@@ -1117,6 +1122,7 @@
       { passive: true, capture: true }
     );
     function underLayer() {
+      // Pile d'écrans : l'écran juste dessous est la première couche gardée (la plus récente).
       return document.querySelector(".spa-route-layer[data-spa-route-state='retained']");
     }
     function paintEdge(layer, dx) {

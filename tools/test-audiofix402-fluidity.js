@@ -83,7 +83,8 @@ codeAssertMatch(scripts, /Math\.max\(0, 10000 - elapsed\)/);
 codeAssertMatch(scripts, /markLaunchWatchdogComplete\(probe\);\s*scheduleFinalLaunchSummary/);
 codeAssertDoesNotMatch(scripts, /function completeLaunchWatchdog/);
 
-codeAssertMatch(spaRenderer, /routeHost\.appendChild\(destinationRoute\)/);
+// Pile d'écrans (lot Nav-2, 11/11/2026) : la page affichée est posée en tête, les écrans gardés restent branchés.
+codeAssertMatch(spaRenderer, /routeHost\.insertBefore\(destinationRoute, routeHost\.firstChild\)/);
 codeAssertMatch(spaRenderer, /return finish\("atomic_swap"\)/);
 codeAssertMatch(spaRenderer, /handoff_strategy: mode === "view_transition" \? "native_view_transition" : "connected_route_stack"/);
 codeAssertMatch(spaRenderer, /connected_home_retained:/);

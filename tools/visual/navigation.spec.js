@@ -137,3 +137,131 @@ test("bord gauche : la page suit le doigt, puis retour", async ({ page }, testIn
   expect(after.reused).toBe(before.images);
   expect(after.probeTop).toBe(before.probeTop);
 });
+
+// ---------- Lot Nav-2 (INFRA, 11/11/2026) : la pile vaut pour toutes les fiches ----------
+// Accueil → album A → album B (ouvert depuis A, comme le nom de l'album dans le grand lecteur).
+
+// Ouvre, depuis la fiche affichée, un autre album par un lien (même chemin que le lien du grand lecteur).
+async function openOtherAlbum(page, href) {
+  const before = await page.evaluate((current) => {
+    window.scrollTo(0, 250);
+    const layer = document.querySelector(current);
+    const imgs = [...layer.querySelectorAll("img")];
+    imgs.forEach((img) => (img.__navMarkA = true));
+    return { url: location.pathname, title: document.title, images: imgs.length };
+  }, CURRENT);
+  await page.waitForTimeout(200);
+  await page.evaluate(
+    ({ current, href }) => {
+      const a = document.createElement("a");
+      a.href = href;
+      a.textContent = "autre album";
+      document.querySelector(current).appendChild(a);
+      a.click();
+    },
+    { current: CURRENT, href }
+  );
+  await expect(page).not.toHaveURL(new RegExp(before.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$"));
+  await page.waitForTimeout(800);
+  return before;
+}
+
+// Un autre album que celui ouvert, pris dans l'accueil gardé.
+async function otherAlbumHref(page) {
+  return page.evaluate((retained) => {
+    const here = location.pathname.split("/").pop();
+    const a = [...document.querySelectorAll(retained + " a.album-card[href*='music/']")].find(
+      (x) => !x.getAttribute("href").endsWith(here)
+    );
+    return new URL(a.getAttribute("href"), location.origin + "/").href;
+  }, RETAINED);
+}
+
+async function stackState(page) {
+  return page.evaluate(
+    ({ current, retained }) => {
+      const layer = document.querySelector(current);
+      const imgs = layer ? [...layer.querySelectorAll("img")] : [];
+      return {
+        url: location.pathname,
+        layers: document.querySelectorAll(".spa-route-layer").length,
+        retained: [...document.querySelectorAll(retained)].map((l) => getComputedStyle(l).opacity),
+        reusedA: imgs.filter((img) => img.__navMarkA).length,
+        reusedHome: imgs.filter((img) => img.__navMark).length,
+        scrollY: Math.round(window.scrollY),
+        back: layer && layer.querySelector(".back") ? layer.querySelector(".back").textContent.trim() : ""
+      };
+    },
+    { current: CURRENT, retained: RETAINED }
+  );
+}
+
+test("Nav-2 : album ouvert depuis un album, les deux écrans du dessous restent peints", async ({ page }) => {
+  await openAlbumFromHome(page);
+  const href = await otherAlbumHref(page);
+  await openOtherAlbum(page, href);
+  const s = await stackState(page);
+  expect(s.layers).toBe(3);
+  expect(s.retained).toEqual(["1", "1"]);
+});
+
+test("Nav-2 : le retour remet l'album d'avant (même page, même place), puis l'accueil", async ({ page }) => {
+  const home = await openAlbumFromHome(page);
+  const href = await otherAlbumHref(page);
+  const a = await openOtherAlbum(page, href);
+  expect((await stackState(page)).back).toContain(a.title.split(/\s[-–|·]\s/)[0].trim());
+  await page.locator(CURRENT + " .back").first().click();
+  await expect(page).toHaveURL(new RegExp(a.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$"));
+  await page.waitForTimeout(800);
+  let s = await stackState(page);
+  expect(s.reusedA).toBe(a.images);
+  expect(s.scrollY).toBe(250);
+  expect(s.layers).toBe(2);
+  await page.locator(CURRENT + " .back").first().click();
+  const after = await homeState(page);
+  expect(after.reused).toBe(home.images);
+  expect(after.scrollY).toBe(400);
+  expect(after.layers).toBe(1);
+});
+
+test("Nav-2 : retour du navigateur, deux fois", async ({ page }) => {
+  const home = await openAlbumFromHome(page);
+  const href = await otherAlbumHref(page);
+  const a = await openOtherAlbum(page, href);
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(a.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$"));
+  await page.waitForTimeout(800);
+  expect((await stackState(page)).reusedA).toBe(a.images);
+  await page.goBack();
+  const after = await homeState(page);
+  expect(after.reused).toBe(home.images);
+});
+
+test("Nav-2 : 5 écrans gardés au plus", async ({ page }) => {
+  await openAlbumFromHome(page);
+  const hrefs = await page.evaluate((retained) => {
+    return [...document.querySelectorAll(retained + " a.album-card[href*='music/']")]
+      .map((a) => new URL(a.getAttribute("href"), location.origin + "/").href)
+      .filter((h, i, all) => all.indexOf(h) === i && !h.endsWith(location.pathname.split("/").pop()))
+      .slice(0, 6);
+  }, RETAINED);
+  for (const href of hrefs) await openOtherAlbum(page, href);
+  const s = await stackState(page);
+  expect(s.layers).toBeLessThanOrEqual(5);
+  expect(s.layers).toBeGreaterThanOrEqual(4);
+});
+
+test("Nav-2 : vignettes de l'accueil préparées au repos, sans défiler", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForLoadState("load");
+  const pending = () =>
+    page.evaluate(
+      (current) =>
+        document.querySelectorAll(
+          current + " img.album-cover[data-cover-src], " + current + " img.playlist-cover-tile[data-cover-src]"
+        ).length,
+      CURRENT
+    );
+  await expect.poll(pending, { timeout: 30000 }).toBe(0);
+  expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(0);
+});

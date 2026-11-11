@@ -335,6 +335,7 @@
         ? freezeLiveHomeResourceUrls(currentRoute, renderedUrl && renderedUrl.href)
         : 0;
       return {
+        kind: "home",
         url: getComparableSpaUrl(renderedUrl && renderedUrl.href),
         title: document.title,
         bodyClassName: sanitizeSpaBodyClassName(document.body.className),
@@ -365,12 +366,112 @@
         .slice(0, 32);
     }
 
+    // Pile d'écrans, lot Nav-2 (INFRA, 11/11/2026) : une fiche album/playlist quittée pour une autre
+    // reste peinte dessous, comme l'accueil. Le retour la réaffiche telle quelle (même page, même place).
+    const SPA_ROUTE_PAGE_PATTERN = /\/(?:music|playlists)\/[^/]+\.html$/i;
+    // 5 écrans au plus : l'écran affiché + 4 gardés dessous ; au-delà, le plus ancien est libéré.
+    const SPA_ROUTE_STACK_LIMIT = 4;
+
+    function getRouteStack() {
+      if (!Array.isArray(spaState.routeStack)) spaState.routeStack = [];
+      return spaState.routeStack;
+    }
+
+    function clearRouteStack() {
+      getRouteStack().length = 0;
+      spaState.liveHomeRoute = null;
+    }
+
+    function getRouteDisplayName(root) {
+      const heading = root && typeof root.querySelector === "function" ? root.querySelector("h1") : null;
+      if (!heading) return "";
+      return String(heading.getAttribute("aria-label") || heading.textContent || "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function capturePageRoute(targetUrl, renderedUrl) {
+      if (document.body.classList.contains("home-screen")) return null;
+      if (!SPA_ROUTE_PAGE_PATTERN.test(String((targetUrl && targetUrl.pathname) || ""))) return null;
+      if (!SPA_ROUTE_PAGE_PATTERN.test(String((renderedUrl && renderedUrl.pathname) || ""))) return null;
+      if (String(window.location.search || "").includes("edit=1")) return null;
+      const currentRoute = document.querySelector(
+        "#infraSpaRouteHost .spa-route-layer[data-spa-route-state='current']"
+      );
+      if (!currentRoute || currentRoute.classList.contains("home-screen")) return null;
+      return {
+        kind: "page",
+        url: getComparableSpaUrl(renderedUrl.href),
+        href: renderedUrl.href,
+        name: getRouteDisplayName(currentRoute),
+        title: document.title,
+        bodyClassName: sanitizeSpaBodyClassName(document.body.className),
+        scrollX: Math.max(0, Math.round(window.scrollX || window.pageXOffset || 0)),
+        scrollY: Math.max(0, Math.round(window.scrollY || window.pageYOffset || 0)),
+        anchorHref: "",
+        anchorViewportTop: null,
+        coverStates: [],
+        visibleImages: collectVisibleRouteImages(currentRoute),
+        frozenResourceCount: freezeLiveHomeResourceUrls(currentRoute, renderedUrl.href),
+        // Liste de titres de la fiche (album-player-ui.js) : remise en place au retour.
+        audioUi: audioState.ui || null,
+        layer: currentRoute,
+        fragment: null
+      };
+    }
+
+    // Bouton retour d'une fiche : au nom de l'écran du dessous (« ‹ ABRICOTS », « ‹ INFRA ☾ »),
+    // sinon « ‹ Bibliothèque » (maquette V7). Lu par album-player-ui.js (data-back-label) et
+    // par le retour de page-init.js (data-back-href).
+    function labelRouteBackLink(route, below) {
+      const back = route && route.querySelector ? route.querySelector(".page > .back, .back") : null;
+      if (!back) return;
+      const label = below && below.kind === "page" && below.name ? below.name : "";
+      if (label) {
+        back.setAttribute("data-back-label", label);
+        back.setAttribute("data-back-href", below.href);
+      } else {
+        back.removeAttribute("data-back-label");
+        back.removeAttribute("data-back-href");
+      }
+      if (back.hasAttribute("data-bib-back")) {
+        const textNode = Array.from(back.childNodes).find(function (node) {
+          return node.nodeType === 3;
+        });
+        const text = label || "Bibliothèque";
+        if (textNode) textNode.nodeValue = text;
+        else back.appendChild(document.createTextNode(text));
+      }
+    }
+
+    // Ordre des couches (lot Nav-2) : l'écran affiché est le PREMIER du document, pour que le code
+    // des fiches (document.querySelector(".tracks"), getElementById…) trouve la fiche affichée et non
+    // une fiche gardée dessous. Les écrans gardés suivent, du plus récent au plus ancien ; leur ordre
+    // d'affichage est donné par z-index (le plus récent juste sous l'écran affiché).
+    function syncRetainedLayerOrder(routeHost) {
+      if (!routeHost || typeof routeHost.querySelectorAll !== "function") return;
+      routeHost
+        .querySelectorAll(".spa-route-layer[data-spa-route-state='retained']")
+        .forEach(function (layer, index) {
+          layer.style.zIndex = String(-1 - index);
+        });
+    }
+
+    function findRetainedRouteIndex(urlLike) {
+      const target = getComparableSpaUrl(urlLike);
+      const stack = getRouteStack();
+      for (let index = stack.length - 1; index >= 0; index -= 1) {
+        const route = stack[index];
+        if (!route || route.url !== target) continue;
+        const connectedLayer = Boolean(route.layer && route.layer.isConnected);
+        const detachedFragment = Boolean(route.fragment && route.fragment.childNodes.length);
+        if (connectedLayer || detachedFragment) return index;
+      }
+      return -1;
+    }
+
     function canRestoreLiveHomeRoute(urlLike) {
-      const route = spaState.liveHomeRoute;
-      const connectedLayer = Boolean(route && route.layer && route.layer.isConnected);
-      const detachedFragment = Boolean(route && route.fragment && route.fragment.childNodes.length);
-      if (!route || (!connectedLayer && !detachedFragment)) return false;
-      return Boolean(route.url && route.url === getComparableSpaUrl(urlLike));
+      return findRetainedRouteIndex(urlLike) >= 0;
     }
 
     function freezeLiveHomeResourceUrls(root, baseUrl) {
@@ -1155,9 +1256,19 @@
       let sourceDetachedAfterPromote = false;
       let routeHostHasCurrent = false;
 
+      // L'écran quitté est gardé dessous si sa capture le décrit (accueil ou fiche).
+      const retainCapture = opts.liveHomeCapture || null;
+      const retainSource = Boolean(
+        retainCapture &&
+        sourceRoute &&
+        (retainCapture.kind === "page"
+          ? !sourceRoute.classList.contains("home-screen")
+          : sourceRoute.classList.contains("home-screen"))
+      );
+
       function freezeSourceRouteForCapture() {
         const liveHomeCapture = opts.liveHomeCapture;
-        if (!liveHomeCapture || !sourceRoute || !sourceRoute.classList.contains("home-screen")) return;
+        if (!retainSource) return;
         liveHomeCapture.frozenResourceCount = freezeLiveHomeResourceUrls(
           sourceRoute,
           liveHomeCapture.url || window.location.href
@@ -1167,13 +1278,18 @@
       function preserveSourceRoute() {
         if (!sourceRoute) return;
         const liveHomeCapture = opts.liveHomeCapture;
-        const preserveHome = Boolean(liveHomeCapture && sourceRoute.classList.contains("home-screen"));
-        if (preserveHome) {
+        if (retainSource) {
           sourceRoute.setAttribute("data-spa-route-state", "retained");
           sourceRoute.setAttribute("aria-hidden", "true");
           sourceRoute.inert = true;
           liveHomeCapture.layer = sourceRoute;
           liveHomeCapture.fragment = null;
+          const stack = getRouteStack();
+          stack.push(liveHomeCapture);
+          while (stack.length > SPA_ROUTE_STACK_LIMIT) {
+            const oldest = stack.shift();
+            if (oldest && oldest.layer && oldest.layer !== sourceRoute) oldest.layer.remove();
+          }
           spaState.liveHomeRoute = liveHomeCapture;
         } else {
           sourceRoute.remove();
@@ -1195,26 +1311,24 @@
         applied = true;
         const mutationStartedAt = getAudioTelemetryNow();
         // Position de l'accueil à l'écran, mesurée avant tout changement (classe du body, défilement).
-        const sourceTop =
-          opts.liveHomeCapture && sourceRoute ? Math.round(sourceRoute.getBoundingClientRect().top) : 0;
+        const sourceTop = retainSource ? Math.round(sourceRoute.getBoundingClientRect().top) : 0;
         freezeSourceRouteForCapture();
         document.body.className = bodyClassName;
         destinationRoute.setAttribute("data-spa-route-state", "current");
         destinationRoute.removeAttribute("aria-hidden");
         destinationRoute.inert = false;
         routeLayersBeforeCommit = routeHost.querySelectorAll(".spa-route-layer").length;
-        const retainConnectedHome = Boolean(
-          opts.liveHomeCapture && sourceRoute && sourceRoute.classList.contains("home-screen")
-        );
-        if (retainConnectedHome) {
-          // Pile d'écrans (INFRA 11/11/2026) : l'accueil reste peint dessous, figé à sa position à l'écran.
+        labelRouteBackLink(destinationRoute, retainSource ? retainCapture : null);
+        if (retainSource) {
+          // Pile d'écrans (INFRA 11/11/2026) : l'écran quitté reste peint dessous, figé à sa position.
           sourceRoute.style.transform = "translate3d(0, " + sourceTop + "px, 0)";
           sourceRoute.setAttribute("data-spa-route-state", "retained");
           sourceRoute.setAttribute("aria-hidden", "true");
           sourceRoute.inert = true;
-          routeHost.appendChild(destinationRoute);
+          routeHost.insertBefore(destinationRoute, routeHost.firstChild);
         } else {
           routeHost.replaceChildren(destinationRoute);
+          clearRouteStack();
         }
         routeLayersAfterCommit = routeHost.querySelectorAll(".spa-route-layer").length;
         routeHostHasCurrent = Boolean(
@@ -1222,6 +1336,7 @@
         );
         installSpaSupplementalNodes(preparedRoute.supplementalNodes);
         preserveSourceRoute();
+        syncRetainedLayerOrder(routeHost);
         // Reapply device/runtime classes before restoring scroll. On iPhone the
         // Home grid is one column only when `ios-device` is present; scrolling
         // against the temporary two-column geometry clamps a valid deep offset.
@@ -1364,8 +1479,10 @@
 
     async function restoreLiveHomeRoute(urlLike, options, telemetry) {
       const opts = options || {};
-      const route = spaState.liveHomeRoute;
-      if (!route || !canRestoreLiveHomeRoute(urlLike)) return null;
+      const stack = getRouteStack();
+      const routeIndex = findRetainedRouteIndex(urlLike);
+      if (routeIndex < 0) return null;
+      const route = stack[routeIndex];
 
       const startedAt = getAudioTelemetryNow();
       const requested = opts.restoreScroll
@@ -1394,6 +1511,12 @@
         const coverScrollY = Math.max(0, Number(window.scrollY) || 0);
         setSpaSwapPaintLock(true);
         try {
+          // Écrans gardés au-dessus de celui qu'on réaffiche (retour de plusieurs niveaux) : libérés.
+          stack.splice(routeIndex + 1).forEach(function (above) {
+            if (above && above.layer && above.layer !== outgoing && above.layer !== retainedHome) {
+              above.layer.remove();
+            }
+          });
           // Page déjà sortie par le geste du bord gauche : elle est hors de l'écran, on la retire.
           if (outgoing && outgoing !== retainedHome && outgoing.hasAttribute("data-spa-swiped-out")) {
             outgoing.remove();
@@ -1406,6 +1529,8 @@
           }
           retainedHome.style.transform = "";
           retainedHome.style.filter = "";
+          retainedHome.style.zIndex = "";
+          if (route.kind === "page") audioState.ui = route.audioUi || null;
           retainedHome.setAttribute("data-spa-route-state", "current");
           retainedHome.removeAttribute("aria-hidden");
           retainedHome.inert = false;
@@ -1413,7 +1538,7 @@
           runPersistentUiPrepaintSync();
           resumeLiveHomeRoute();
           window.scrollTo(requested.x, requested.y);
-          const anchor = findAlbumCardByUrl(retainedHome, route.anchorHref);
+          const anchor = route.anchorHref ? findAlbumCardByUrl(retainedHome, route.anchorHref) : null;
           if (anchor && Number.isFinite(route.anchorViewportTop)) {
             anchorCorrection = Math.round(anchor.getBoundingClientRect().top - route.anchorViewportTop);
             if (Math.abs(anchorCorrection) > 0) window.scrollBy(0, anchorCorrection);
@@ -1472,8 +1597,9 @@
         }
       }
 
-      spaState.liveHomeRoute = null;
-      const anchor = findAlbumCardByUrl(document, route.anchorHref);
+      stack.length = Math.min(stack.length, routeIndex);
+      spaState.liveHomeRoute = stack.length ? stack[stack.length - 1] : null;
+      const anchor = route.anchorHref ? findAlbumCardByUrl(document, route.anchorHref) : null;
       if (anchor && Number.isFinite(route.anchorViewportTop)) {
         const finalCorrection = Math.round(anchor.getBoundingClientRect().top - route.anchorViewportTop);
         if (Math.abs(finalCorrection) > 0) {
@@ -1636,7 +1762,7 @@
         // persistent mini-player.
         disableNowPlayingOverlayUi();
       }
-      const liveHomeCapture = captureLiveHomeRoute(url, rendered);
+      const liveHomeCapture = captureLiveHomeRoute(url, rendered) || capturePageRoute(url, rendered);
 
       const navNow = getAudioTelemetryNow();
       if (spaState.navigationActive && spaState.activeNavigationHref === url.href) {
@@ -1764,7 +1890,7 @@
             liveSpaTelemetry
           );
         } catch (_err) {
-          spaState.liveHomeRoute = null;
+          clearRouteStack();
         }
 
         if (spaState.navToken !== navToken) {

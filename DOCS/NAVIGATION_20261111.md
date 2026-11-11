@@ -1,6 +1,6 @@
 # Navigation — inventaire, cause du clignotement, pile d'écrans (11/11/2026, Claude) — **proposé**
 
-> Mise à jour 11/11 soir : INFRA a répondu « Oui, code-la » à la maquette V7 ; lot Nav-1 codé et publié (`audiofix434`). Lot Nav-2 pas commencé.
+> Mise à jour 11/11 soir : INFRA a répondu « Oui, code-la » à la maquette V7 ; lot Nav-1 publié (`audiofix434`), lot Nav-2 publié (`audiofix436`). Reste : arrivée par la droite (point 2 de la V7).
 
 Demande d'INFRA (11/11) : « je vais dans l'album, au retour les images clignotent, se réaffichent » ; voudrait un retour « presque comme une capture d'écran » ; « charger tout le site et naviguer dedans » ; « voir du point de vue interface, tous les raccourcis ». **Go** pour l'inventaire, le tableau, les propositions et la maquette ; le code après validation de la maquette.
 Maquette : `DOCS/maquettes/MAQUETTE_BIBLIOTHEQUE_V7_NAVIGATION_20261111.html` (texte : `DOCS/maquettes/MAQUETTE_V7_20261111.md`).

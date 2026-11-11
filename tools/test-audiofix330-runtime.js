@@ -9,14 +9,14 @@ const vm = require("node:vm");
 const loadScriptFile = require("./lib/load-script.js");
 
 const ROOT = path.resolve(__dirname, "..");
-const CORE_PATH = path.join(ROOT, "public/assets/js/audio-core.js");
-const RADIO_PATH = path.join(ROOT, "public/assets/js/audio-radio.js");
-const PREFETCH_PATH = path.join(ROOT, "public/assets/js/audio-prefetch.js");
-const COVERS_PATH = path.join(ROOT, "public/assets/js/covers.js");
-const ALBUM_UI_PATH = path.join(ROOT, "public/assets/js/album-player-ui.js");
-const NOW_PLAYING_PATH = path.join(ROOT, "public/assets/js/now-playing.js");
-const TRANSPORT_UI_PATH = path.join(ROOT, "public/assets/js/transport-ui.js");
-const MEDIA_SESSION_PATH = path.join(ROOT, "public/assets/js/media-session.js");
+const CORE_PATH = path.join(ROOT, "src/js/audio-core.js");
+const RADIO_PATH = path.join(ROOT, "src/js/audio-radio.js");
+const PREFETCH_PATH = path.join(ROOT, "src/js/audio-prefetch.js");
+const COVERS_PATH = path.join(ROOT, "src/js/covers.js");
+const ALBUM_UI_PATH = path.join(ROOT, "src/js/album-player-ui.js");
+const NOW_PLAYING_PATH = path.join(ROOT, "src/js/now-playing.js");
+const TRANSPORT_UI_PATH = path.join(ROOT, "src/js/transport-ui.js");
+const MEDIA_SESSION_PATH = path.join(ROOT, "src/js/media-session.js");
 const STYLES_PATH = path.join(ROOT, "public/assets/css/styles.css");
 
 function createStorage() {

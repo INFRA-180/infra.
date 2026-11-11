@@ -15,8 +15,8 @@
     "build": "vite build --config tools/build/vite.config.mjs",
     "watch": "vite build --config tools/build/vite.config.mjs --watch",
     "pretest": "npm run lint --silent && npm run build --silent",
-    "lint": "eslint --config tools/build/eslint.config.mjs \"public/assets/js/**/*.js\"",
-    "format": "prettier --config tools/build/prettier.json --ignore-path tools/build/.prettierignore --write \"public/assets/js/**/*.js\" tools/build tools/lib"
+    "lint": "eslint --config tools/build/eslint.config.mjs \"src/js/**/*.js\" \"public/assets/js/**/*.js\"",
+    "format": "prettier --config tools/build/prettier.json --ignore-path tools/build/.prettierignore --write \"src/js/**/*.js\" \"public/assets/js/**/*.js\" tools/build tools/lib"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

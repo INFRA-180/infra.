@@ -9,10 +9,10 @@ const loadScript = require("./lib/load-script.js"); // scripts construits comme 
 const vm = require("node:vm");
 
 const ROOT = path.resolve(__dirname, "..");
-const SPA_PATH = path.join(ROOT, "public/assets/js/spa-renderer.js");
-const SCRIPTS_PATH = path.join(ROOT, "public/assets/js/scripts.js");
-const TRANSPORT_PATH = path.join(ROOT, "public/assets/js/transport-ui.js");
-const HOME_CATALOG_PATH = path.join(ROOT, "public/assets/js/home-catalog.js");
+const SPA_PATH = path.join(ROOT, "src/js/spa-renderer.js");
+const SCRIPTS_PATH = path.join(ROOT, "src/js/scripts.js");
+const TRANSPORT_PATH = path.join(ROOT, "src/js/transport-ui.js");
+const HOME_CATALOG_PATH = path.join(ROOT, "src/js/home-catalog.js");
 const STYLES_PATH = path.join(ROOT, "public/assets/css/styles.css");
 const spaSource = loadScript.sourceText(SPA_PATH);
 const scriptsSource = require("./build/app-sources.js").runtimeSource();

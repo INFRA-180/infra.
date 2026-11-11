@@ -7,7 +7,7 @@ const path = require("node:path");
 
 const publicRoot = path.resolve(__dirname, "../public");
 const homePath = path.join(publicRoot, "index.html");
-const scriptPath = path.join(publicRoot, "assets/js/home-catalog.js");
+const scriptPath = path.join(publicRoot, "..", "src/js/home-catalog.js"); // lot E : source dans src/js
 const thumbnailDir = "assets/thumbnails/music";
 const coverPattern = /^assets\/music\/responsive\/([a-z0-9-]+)-cover-1200\.webp$/;
 const albumSizes = "(max-width: 639px) calc(50vw - 23px), (max-width: 959px) calc(33.33vw - 24px), (max-width: 1080px) calc(20vw - 24px), 192px";

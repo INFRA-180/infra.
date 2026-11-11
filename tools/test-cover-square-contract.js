@@ -9,7 +9,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const styles = fs.readFileSync(path.join(root, "public/assets/css/styles.css"), "utf8");
 const album = fs.readFileSync(path.join(root, "public/music/v-23pi56-infra.html"), "utf8");
-const renderer = fs.readFileSync(path.join(root, "public/assets/js/spa-renderer.js"), "utf8");
+const renderer = fs.readFileSync(path.join(root, "src/js/spa-renderer.js"), "utf8");
 
 function cssRule(selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

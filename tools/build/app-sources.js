@@ -48,7 +48,7 @@ function sourceText(entryFile) {
 
 // Texte complet du lecteur (scripts.js puis ses modules), pour les contrôles qui lisent le code.
 function runtimeSource() {
-  return sourceText(path.join(root, "public/assets/js/scripts.js"));
+  return sourceText(path.join(root, "src/js/scripts.js"));
 }
 
 function sourcesDigest() {

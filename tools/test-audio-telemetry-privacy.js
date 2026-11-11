@@ -169,7 +169,7 @@ const sandbox = {
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
-loadScript.runInContext("public/assets/js/audio-telemetry.js", sandbox);
+loadScript.runInContext("src/js/audio-telemetry.js", sandbox);
 
 function createTelemetry() {
   return sandbox.InfraAudioTelemetry.createTelemetry({

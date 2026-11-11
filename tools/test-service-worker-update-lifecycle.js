@@ -13,8 +13,8 @@ function read(relativePath) {
 
 const scripts = require("./build/app-sources.js").runtimeSource();
 const worker = read("public/sw.js");
-const audioRadio = loadScript.sourceText("public/assets/js/audio-radio.js");
-const nowPlaying = read("public/assets/js/now-playing.js");
+const audioRadio = loadScript.sourceText("src/js/audio-radio.js");
+const nowPlaying = read("src/js/now-playing.js");
 const runtime = [scripts, worker, audioRadio, nowPlaying].join("\n");
 
 // INFRA 08/11/2026 : l'iPhone ne fermait jamais la PWA, la nouvelle version attendait sans fin.

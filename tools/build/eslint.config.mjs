@@ -20,19 +20,20 @@ export default [
   {
     // Modules ES : scripts.js + runtime/ ; lot C : audio-radio.js + audio-radio/ ; lot D : transport-ui.js + transport-ui/.
     files: [
-      "public/assets/js/scripts.js",
-      "public/assets/js/runtime/**/*.js",
-      "public/assets/js/audio-radio.js",
-      "public/assets/js/audio-radio/**/*.js",
-      "public/assets/js/transport-ui.js",
-      "public/assets/js/transport-ui/**/*.js"
+      "src/js/scripts.js",
+      "src/js/runtime/**/*.js",
+      "src/js/audio-radio.js",
+      "src/js/audio-radio/**/*.js",
+      "src/js/transport-ui.js",
+      "src/js/transport-ui/**/*.js"
     ],
     languageOptions: { ecmaVersion: 2022, sourceType: "module", globals: { ...globals.browser } },
     rules
   },
   {
-    files: ["public/assets/js/*.js"],
-    ignores: ["public/assets/js/scripts.js", "public/assets/js/audio-radio.js", "public/assets/js/transport-ui.js"],
+    // Scripts classiques : sources de app.js (src/js/) et scripts servis tels quels (public/assets/js/).
+    files: ["src/js/*.js", "public/assets/js/*.js"],
+    ignores: ["src/js/scripts.js", "src/js/audio-radio.js", "src/js/transport-ui.js"],
     languageOptions: { ecmaVersion: 2022, sourceType: "script", globals: { ...globals.browser } },
     rules
   }

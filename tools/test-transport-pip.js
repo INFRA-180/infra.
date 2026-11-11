@@ -10,10 +10,10 @@ const loadScript = require("./lib/load-script.js"); // scripts construits comme 
 const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..");
-const transportPath = path.join(root, "public/assets/js/transport-ui.js");
+const transportPath = path.join(root, "src/js/transport-ui.js");
 const stylesPath = path.join(root, "public/assets/css/styles.css");
-const scriptsPath = path.join(root, "public/assets/js/scripts.js");
-const favoritesPath = path.join(root, "public/assets/js/favorites-ui.js");
+const scriptsPath = path.join(root, "src/js/scripts.js");
+const favoritesPath = path.join(root, "src/js/favorites-ui.js");
 const transportSource = loadScript.sourceText(transportPath);
 const stylesSource = fs.readFileSync(stylesPath, "utf8");
 const scriptsSource = require("./build/app-sources.js").runtimeSource();

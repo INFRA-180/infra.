@@ -8,7 +8,7 @@ const path = require("node:path");
 const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("node:vm");
 
-const SOURCE_PATH = path.resolve(__dirname, "../public/assets/js/catalog-loader.js");
+const SOURCE_PATH = path.resolve(__dirname, "../src/js/catalog-loader.js");
 const REAL_SET_TIMEOUT = setTimeout;
 const REAL_CLEAR_TIMEOUT = clearTimeout;
 

@@ -247,9 +247,9 @@ for (const contract of expected) {
   }
 }
 
-const albumUi = read("public/assets/js/album-player-ui.js");
-const audioCore = read("public/assets/js/audio-core.js");
-const audioRadio = loadScript.sourceText("public/assets/js/audio-radio.js");
+const albumUi = read("src/js/album-player-ui.js");
+const audioCore = read("src/js/audio-core.js");
+const audioRadio = loadScript.sourceText("src/js/audio-radio.js");
 const scripts = require("./build/app-sources.js").runtimeSource();
 if (!codeHas(albumUi, 'document.body.classList.contains("playlist-screen") ? "playlist" : "album"')) {
   fail("playlist pages do not declare their queue type");

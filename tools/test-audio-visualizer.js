@@ -10,7 +10,7 @@ const loadScript = require("./lib/load-script.js"); // scripts construits comme 
 const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..");
-const source = loadScript.sourceText("public/assets/js/audio-visualizer.js");
+const source = loadScript.sourceText("src/js/audio-visualizer.js");
 const mediaListeners = new Map();
 let requestedAnimationFrame = null;
 let cancelledFrames = 0;
@@ -250,7 +250,7 @@ const sandbox = {
   }
 };
 sandbox.window.window = sandbox.window;
-loadScript.runInNewContext("public/assets/js/audio-visualizer.js", sandbox);
+loadScript.runInNewContext("src/js/audio-visualizer.js", sandbox);
 
 async function main() {
   const api = sandbox.window.InfraAudioVisualizer;

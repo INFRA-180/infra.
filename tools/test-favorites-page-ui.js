@@ -8,7 +8,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(
-  path.join(root, "public/assets/js/favorites-ui.js"),
+  path.join(root, "src/js/favorites-ui.js"),
   "utf8"
 );
 const styles = fs.readFileSync(

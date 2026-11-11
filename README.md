@@ -35,9 +35,11 @@ restent des vérifications de code et ne remplacent pas ce test réel.
 ## Points d’entrée
 
 - Interface : `public/index.html`
-- Orchestration : `public/assets/js/scripts.js`
-- Moteur audio : `public/assets/js/audio-core.js`
-- Radio et prefetch : `public/assets/js/audio-radio.js`
+- JavaScript : sources dans `src/js/`, assemblées par Vite (`npm run build`, ou `npm run watch` pendant les retouches) dans `public/assets/js/app.js`, seul fichier chargé par les pages (avec `bibliotheque.js`, `sphragis.js` et `scripts.admin.js`, servis tels quels)
+- Orchestration : `src/js/scripts.js` (+ `src/js/runtime/`)
+- Moteur audio : `src/js/audio-core.js`
+- Radio et prefetch : `src/js/audio-radio.js` (+ `src/js/audio-radio/`)
+- Lecteur : `src/js/transport-ui.js` (+ `src/js/transport-ui/`)
 - Playlists : `public/data/playlists.json` et `public/playlists/`
 - Service Worker : `public/sw.js`
 - Architecture actuelle : `DOCS/CURRENT_ARCHITECTURE.md`

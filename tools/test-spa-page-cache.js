@@ -9,7 +9,7 @@ const loadScript = require("./lib/load-script.js"); // scripts construits comme 
 const vm = require("node:vm");
 
 const ROOT = path.resolve(__dirname, "..");
-const ROUTER_PATH = path.join(ROOT, "public/assets/js/spa-router.js");
+const ROUTER_PATH = path.join(ROOT, "src/js/spa-router.js");
 const routerSource = loadScript.sourceText(ROUTER_PATH);
 const SHELL_CACHE = "infra-shell-20260823-audio402-shell";
 

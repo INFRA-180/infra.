@@ -33,10 +33,16 @@ function walk(directory, files = []) {
   return files;
 }
 
-function readCurrent(publicRoot) {
-  const scripts = fs.readFileSync(path.join(publicRoot, "assets/js/scripts.js"), "utf8");
+// Lot E (11/11/2026) : les sources de app.js (dont scripts.js et home-catalog.js) sont dans src/js/,
+// à côté de public/ ; les deux dossiers sont mis à jour.
+function defaultSourceRoot(publicRoot) {
+  return path.join(publicRoot, "..", "src", "js");
+}
+
+function readCurrent(publicRoot, sourceRoot = defaultSourceRoot(publicRoot)) {
+  const scripts = fs.readFileSync(path.join(sourceRoot, "scripts.js"), "utf8");
   const sw = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
-  const homeCatalog = fs.readFileSync(path.join(publicRoot, "assets/js/home-catalog.js"), "utf8");
+  const homeCatalog = fs.readFileSync(path.join(sourceRoot, "home-catalog.js"), "utf8");
   const build = (scripts.match(/window\.INFRA_BUILD_TAG = "(audiofix(\d+)-\d{8})";/) || []);
   const shell = (sw.match(/const VERSION = "(infra-shell-\d{8}-audio\d+)";/) || []);
   const bib = (homeCatalog.match(/var VERSION = "(bibliotheque-v(\d+)-\d{8})"/) || []);
@@ -57,11 +63,13 @@ function nextVersions(current, date) {
 
 function bump(publicRoot, options = {}) {
   const date = options.date || today();
-  const current = readCurrent(publicRoot);
+  const sourceRoot = options.sourceRoot || defaultSourceRoot(publicRoot);
+  const current = readCurrent(publicRoot, sourceRoot);
   const next = nextVersions(current, date);
   const pairs = [[current.build, next.build], [current.shell, next.shell], [current.bib, next.bib]];
   const changed = [];
-  for (const filePath of walk(publicRoot)) {
+  const files = walk(publicRoot).concat(fs.existsSync(sourceRoot) ? walk(sourceRoot) : []);
+  for (const filePath of files) {
     const source = fs.readFileSync(filePath, "utf8");
     let output = source;
     for (const [from, to] of pairs) output = output.split(from).join(to);

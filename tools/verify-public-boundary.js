@@ -16,6 +16,7 @@ const allowedTrackedRoots = new Set([
   "package.json",
   "package-lock.json", // versions exactes pour npm ci au déploiement (INFRA, 11/11/2026)
   "public",
+  "src", // sources de app.js (lot E, INFRA 11/11/2026)
   "tools"
 ]);
 const binaryExtensions = new Set([

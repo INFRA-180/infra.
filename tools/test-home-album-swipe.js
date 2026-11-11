@@ -8,7 +8,7 @@ const path = require("node:path");
 const loadScript = require("./lib/load-script.js"); // scripts construits comme app.js (lot B)
 const vm = require("node:vm");
 
-const SOURCE_PATH = path.resolve(__dirname, "../public/assets/js/home-catalog.js");
+const SOURCE_PATH = path.resolve(__dirname, "../src/js/home-catalog.js");
 
 function createClassList(initial) {
   const values = new Set(initial || []);

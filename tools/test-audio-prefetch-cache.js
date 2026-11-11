@@ -45,7 +45,7 @@ const sandbox = {
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
-loadScript.runInContext("public/assets/js/audio-prefetch.js", sandbox);
+loadScript.runInContext("src/js/audio-prefetch.js", sandbox);
 
 function segmentResponse(seed) {
   const bytes = new Uint8Array(1024);

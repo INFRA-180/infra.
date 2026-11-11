@@ -1747,3 +1747,10 @@
 - Même méthode que le lot C : 110 fonctions identiques à l'original (comparaison par jetons), modules reliés par `link()`. Nouveau : les 6 variables d'état `mobilePlayerSpace…` ne servaient qu'au mini-lecteur → déplacées dans `mini-player.js` (l'outil refuse une variable modifiable partagée par plusieurs sujets).
 - Reste gros : `ensureGlobalTransportUi` (1 877 l., `transport-builder.js`) est une seule fonction ; la découper demande de toucher à son contenu (autre chantier).
 - Défaut **antérieur** repéré (non causé par le lot D, identique en `audiofix430`) : dans Safari iPhone (simulateur, pas l'app installée), la pochette du grand lecteur recouvre le titre.
+
+## 11/11/2026 — Sources JavaScript dans src/js (lot E, Claude, `audiofix432`) et npm run watch (lot F)
+- `src/js/` : les 21 sources de `app.js` + `runtime/`, `audio-radio/`, `transport-ui/` (déplacés avec `git mv`). Restent dans `public/assets/js/` les seuls fichiers servis : `app.js`, `bibliotheque.js` (chargé à la demande), `sphragis.js`, `scripts.admin.js`. Les sources ne sont plus publiées en ligne.
+- Adaptés : `app-entry.js`, Vite (`legacyDir`), ESLint/Prettier (`src/js/**`), audit (syntaxe sur src/js aussi), `bump-version.js` (versions lues et montées dans src/js), `verify-public-boundary.js` (`src` autorisé), 22 tests, README.
+- `app.js` : même code octet pour octet avant/après le déplacement (seule l'empreinte d'en-tête change).
+- Outil privé de Codex `_private/tools/sync-itunes-r2-catalog.js` (copie `…avant-src-20261111`) : écrit `scripts.js` / `catalog-fallback.js` dans `src/js` (`INFRA_SOURCE_JS_ROOT` possible) puis reconstruit `app.js` avec le Vite du projet (avant : il ne reconstruisait pas, l'audit aurait bloqué). **À signaler à Codex.**
+- Lot F : `npm run watch` (Vite `--watch`) — essayé : reconstruit à chaque enregistrement, reste actif, résultat identique à `npm run build`.

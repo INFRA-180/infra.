@@ -9,7 +9,7 @@ const loadScript = require("./lib/load-script.js"); // scripts construits comme 
 const vm = require("node:vm");
 
 const publicRoot = path.resolve(__dirname, "../public");
-const homeScriptPath = path.join(publicRoot, "assets/js/home-catalog.js");
+const homeScriptPath = path.join(publicRoot, "..", "src/js/home-catalog.js"); // lot E
 const catalog = JSON.parse(fs.readFileSync(path.join(publicRoot, "data/catalog.json"), "utf8"));
 const album = catalog.albums.find(({ thumb }) => fs.existsSync(path.join(publicRoot, thumbnailPath(thumb))));
 assert.ok(album, "at least one album must have a published Home thumbnail");

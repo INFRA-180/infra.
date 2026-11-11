@@ -13,13 +13,13 @@ function read(relativePath) {
 
 const css = read("public/assets/css/styles.css");
 const home = read("public/index.html");
-const homeCatalog = read("public/assets/js/home-catalog.js");
-const spaRenderer = read("public/assets/js/spa-renderer.js");
-const audioTelemetry = read("public/assets/js/audio-telemetry.js");
-const transport = loadScript.sourceText("public/assets/js/transport-ui.js");
+const homeCatalog = read("src/js/home-catalog.js");
+const spaRenderer = read("src/js/spa-renderer.js");
+const audioTelemetry = read("src/js/audio-telemetry.js");
+const transport = loadScript.sourceText("src/js/transport-ui.js");
 const scripts = require("./build/app-sources.js").runtimeSource(); // scripts.js + modules runtime/
-const audioRadio = loadScript.sourceText("public/assets/js/audio-radio.js");
-const albumPlayerUi = read("public/assets/js/album-player-ui.js");
+const audioRadio = loadScript.sourceText("src/js/audio-radio.js");
+const albumPlayerUi = read("src/js/album-player-ui.js");
 
 const genericMobileGridAt = codeIndexOf(css, "@media (max-width: 560px)");
 const standaloneGridAt = codeIndexOf(css, "@media (max-width: 980px) and (display-mode: standalone)");

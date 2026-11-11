@@ -205,7 +205,7 @@ function verifyCriticalStartupPath() {
 function verifyAudioVisuals() {
   const legacyVisualDataPath = path.join(publicRoot, "data/audio-visuals.json");
   const visualizerSource = fs.readFileSync(
-    path.join(publicRoot, "assets/js/audio-visualizer.js"),
+    path.join(root, "src/js/audio-visualizer.js"),
     "utf8"
   );
   if (fs.existsSync(legacyVisualDataPath)) {
@@ -293,7 +293,7 @@ function verifyNoLegacyRuntimeCovers() {
   const tracks = readJson("public/data/tracks.json");
   const scripts = require("./build/app-sources.js").runtimeSource();
   const home = fs.readFileSync(path.join(publicRoot, "index.html"), "utf8");
-  const homeCatalog = fs.readFileSync(path.join(publicRoot, "assets/js/home-catalog.js"), "utf8");
+  const homeCatalog = fs.readFileSync(path.join(root, "src/js/home-catalog.js"), "utf8");
   const sw = fs.readFileSync(path.join(publicRoot, "sw.js"), "utf8");
   const expectedCovers = new Set(
     (tracks.albums || []).map((album) => String(album.cover || "").replace(/^\/+/, ""))
@@ -369,7 +369,7 @@ function verifyNoLegacyRuntimeCovers() {
 function verifySyntax() {
   const javascript = walk(path.join(publicRoot, "assets/js"), (filePath) =>
     filePath.endsWith(".js")
-  );
+  ).concat(walk(path.join(root, "src/js"), (filePath) => filePath.endsWith(".js"))); // lot E : sources dans src/js
   javascript.push(path.join(publicRoot, "sw.js"));
   for (const filePath of javascript) {
     run(`syntax ${path.relative(root, filePath)}`, process.execPath, ["--check", filePath]);

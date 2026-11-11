@@ -14,8 +14,8 @@ const expect = (ok, msg) => { if (!ok) failures.push(msg); };
 const index = read("public/index.html");
 const css = read("public/assets/css/styles.css");
 const js = read("public/assets/js/bibliotheque.js");
-const home = read("public/assets/js/home-catalog.js");
-const fav = read("public/assets/js/favorites-ui.js");
+const home = read("src/js/home-catalog.js");
+const fav = read("src/js/favorites-ui.js");
 const styles = read("public/assets/css/styles.css");
 
 // Accueil : phrase retirée, cinq onglets dans l'ordre validé (V5 : « Apps & clips » retiré), recherche
@@ -50,8 +50,8 @@ expect(codeTest(/global-transport-btn\[data-transport-shuffle\]/, bar) && codeTe
 expect(codeTest(/is-playing \.global-transport-now-title::after/, bar), "point rouge de lecture absent");
 
 // Lot 4 : fiches existantes, commandes explicites et titre complet de playlist.
-const player = read("public/assets/js/album-player-ui.js");
-const share = read("public/assets/js/share-qr.js");
+const player = read("src/js/album-player-ui.js");
+const share = read("src/js/share-qr.js");
 expect(codeHas(player, 'heading.textContent = heading.getAttribute("aria-label")'), "titre complet de playlist absent");
 expect(codeHas(player, 'playCurrentPageCollectionShuffled()'), "commande de lecture aléatoire de la fiche absente");
 expect(codeHas(share, 'closest("[data-bib-share]")'), "partage explicite de la fiche absent");
@@ -71,7 +71,7 @@ expect(!codeHas(sw, "bibliotheque.css"), "bibliotheque.css encore dans le préca
 expect(codeHas(sw, "./assets/js/bibliotheque.js?v=" + version), "JS de la Bibliothèque absent du précache");
 
 // Maquette V4 (INFRA, 08/11/2026)
-const albumUi = read("public/assets/js/album-player-ui.js");
+const albumUi = read("src/js/album-player-ui.js");
 expect(codeTest(/\.global-transport-controls \{\s*position: absolute !important; left: 50% !important;/, css), "commandes du lecteur pas centrées");
 expect(codeTest(/\.spa-route-layer\.album-screen::before[\s\S]{0,200}background-image: none !important/, css), "fond des fiches pas blanc");
 expect(codeHas(css, ".bib-meta-row") && codeHas(albumUi, "bib-meta-row"), "boutons de la fiche pas à droite de la ligne d’infos");

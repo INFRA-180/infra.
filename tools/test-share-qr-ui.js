@@ -7,7 +7,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const script = fs.readFileSync(path.join(root, "public/assets/js/share-qr.js"), "utf8");
+const script = fs.readFileSync(path.join(root, "src/js/share-qr.js"), "utf8");
 const styles = fs.readFileSync(path.join(root, "public/assets/css/styles.css"), "utf8");
 const logoPath = path.join(root, "public/assets/branding/infra-logo-white-photoroom-title.png");
 

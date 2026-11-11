@@ -12,7 +12,8 @@ const { banner } = createRequire(import.meta.url)("./app-sources.js");
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../..");
-const legacyDir = path.join(root, "public/assets/js") + path.sep;
+// Sources de app.js : src/js/ (lot E, 11/11/2026) ; app.js est écrit dans public/assets/js/.
+const legacyDir = path.join(root, "src/js") + path.sep;
 
 // Anciens scripts (étape 4a) : chacun dans son propre bloc protégé, comme quand ils étaient
 // des fichiers séparés — une erreur au démarrage d'un fichier n'arrête pas les autres.

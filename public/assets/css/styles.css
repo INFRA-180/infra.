@@ -4347,6 +4347,10 @@ body.now-playing-open {
     width: min(84vw, 390px);
     height: auto;
     aspect-ratio: 1 / 1;
+    /* Safari iOS écrasait la ligne de la pochette quand la hauteur visible manque (barres de Safari) :
+       pochette 338 px dans une ligne de 275 px, titre recouvert. Hauteur minimale = largeur, le panneau
+       défile comme dans Chrome (Claude, 11/11/2026). */
+    min-height: min(84vw, 390px);
   }
 
   .now-playing-cover {

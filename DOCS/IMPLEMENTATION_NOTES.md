@@ -1754,3 +1754,7 @@
 - `app.js` : même code octet pour octet avant/après le déplacement (seule l'empreinte d'en-tête change).
 - Outil privé de Codex `_private/tools/sync-itunes-r2-catalog.js` (copie `…avant-src-20261111`) : écrit `scripts.js` / `catalog-fallback.js` dans `src/js` (`INFRA_SOURCE_JS_ROOT` possible) puis reconstruit `app.js` avec le Vite du projet (avant : il ne reconstruisait pas, l'audit aurait bloqué). **À signaler à Codex.**
 - Lot F : `npm run watch` (Vite `--watch`) — essayé : reconstruit à chaque enregistrement, reste actif, résultat identique à `npm run build`.
+
+## 11/11/2026 — Grand lecteur : pochette sur le titre dans Safari iPhone (Claude, `audiofix433`)
+- Mesuré dans Safari iOS (simulateur, copie du site avec script de mesure) : panneau = hauteur visible (714 px, sans défilement), ligne de la pochette écrasée à 275 px pour une pochette de 338 px → titre recouvert. Chrome et le WebKit de Playwright gardent 338 px et font défiler (pas reproduit dans les captures automatiques).
+- Correction (`styles.css`, @media max-width 640px) : `.now-playing-cover-wrap { min-height: min(84vw, 390px); }` = sa largeur. Safari : ligne 338 px, titre à 424 px (comme Chrome), le panneau défile. Géométrie validée inchangée là où elle était bonne (24 écrans identiques au pixel).

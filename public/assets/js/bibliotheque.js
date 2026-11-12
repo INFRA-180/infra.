@@ -170,13 +170,16 @@
         // L'onglet choisi reste entier dans la ligne qui défile
         var row = b.parentNode;
         if (row && row.scrollWidth > row.clientWidth) {
-          var left = b.offsetLeft - row.offsetLeft,
+          // position dans la rangée, indépendante de son positionnement (point rouge : rangée `position: relative`)
+          var left =
+              Math.round(b.getBoundingClientRect().left - row.getBoundingClientRect().left) + row.scrollLeft,
             right = left + b.offsetWidth;
           if (right > row.scrollLeft + row.clientWidth - 28) row.scrollLeft = right - row.clientWidth + 36;
           else if (left < row.scrollLeft) row.scrollLeft = Math.max(0, left - 8);
         }
       } else b.removeAttribute("aria-current");
     });
+    if (tabDot()) placeTabDot(view);
   }
   function favoritesOpen() {
     return !!(document.body && document.body.classList.contains("favorites-view-open"));
@@ -231,7 +234,10 @@
     if (!data) return;
     var n = {
       albums: data.albums.length,
-      playlists: $$(".home-screen .playlists-grid > li").length,
+      // seulement l'accueil réel, pas la copie d'écran d'un changement d'onglet (.bib-snap)
+      playlists: $$(".home-screen .playlists-grid > li").filter(function (li) {
+        return !li.closest(".bib-snap");
+      }).length,
       titres: data.tracks.length
     };
     Object.keys(n).forEach(function (k) {
@@ -668,7 +674,10 @@
       var on = api.has(t.src);
       if (String(on) === b.getAttribute("aria-pressed")) return;
       b.setAttribute("aria-pressed", String(on));
-      b.setAttribute("aria-label", (on ? "Retirer " : "Ajouter ") + t.title + (on ? " des favoris" : " aux favoris"));
+      b.setAttribute(
+        "aria-label",
+        (on ? "Retirer " : "Ajouter ") + t.title + (on ? " des favoris" : " aux favoris")
+      );
       b.title = on ? "Retirer des favoris" : "Ajouter aux favoris";
       b.innerHTML = on ? HEART : HEART_OUTLINE;
     });
@@ -1259,6 +1268,7 @@
   //    voir l'écran du dessous (accueil gardé peint, spa-renderer.js), qui s'éclaircit ; lâcher au-delà
   //    d'un tiers de l'écran (ou d'un geste vif) = retour, sinon la fiche revient.
   // 2. Barre du lecteur : glisser ← / → = titre suivant / précédent ; glisser ↑ = grand lecteur.
+  var edgeGesture = {}; // dessin du « retour » partagé avec le trackpad (maquette V11)
   (function gestures() {
     var g = null;
     function currentLayer() {
@@ -1339,6 +1349,10 @@
         reduce ? 0 : 270
       );
     }
+    edgeGesture.layer = currentLayer;
+    edgeGesture.under = underLayer;
+    edgeGesture.paint = paintEdge;
+    edgeGesture.settle = settleEdge;
     document.addEventListener(
       "touchmove",
       function (e) {
@@ -1453,38 +1467,190 @@
     update();
   })();
 
-  // ---------- Glisser entre les onglets (maquette V8, INFRA 11/11/2026) ----------
-  // Bibliothèque : glisser ← = onglet suivant, → = onglet précédent. Le contenu suit le doigt ; lâcher
-  // au-delà d'un quart de l'écran (ou d'un geste vif) = changer d'onglet, sinon tout revient ; premier et
-  // dernier onglet : élastique. Pas depuis une rangée qui défile de côté (playlists, tri, onglets), ni
-  // depuis le bord gauche, ni avec la recherche ou le grand lecteur ouverts. Remplace le glisser des
-  // pochettes qui ouvrait l'album (home-catalog.js, albumCoverSwipeOpens) : toucher une pochette l'ouvre.
+  // ---------- Point rouge des onglets : un seul point qui glisse (maquette V13, validée V19) ----------
+  // Il part de l'onglet quitté (ou de là où le geste l'a laissé) au lieu de réapparaître sous le nouvel onglet.
+  function tabDot() {
+    var row = $(".home-screen .bib-tabs-row") || $(".bib-tabs-row");
+    if (!row) return null;
+    var dot = $(".bib-tabdot", row);
+    if (!dot) {
+      dot = document.createElement("i");
+      dot.className = "bib-tabdot";
+      dot.setAttribute("aria-hidden", "true");
+      row.appendChild(dot);
+      row.classList.add("has-dot");
+      placeTabDot(state.view, true);
+    }
+    return dot;
+  }
+  function tabDotPos(view) {
+    var b = $('.bib-tabs-row [data-bib-tab="' + view + '"]');
+    if (!b || !b.offsetWidth) return null;
+    var row = b.parentNode,
+      br = b.getBoundingClientRect(),
+      rr = row.getBoundingClientRect(); // positions exactes (offsetLeft arrondit au pixel)
+    return {
+      x: br.left - rr.left + row.scrollLeft + br.width / 2 - 2.5,
+      y: br.bottom - rr.top + row.scrollTop - 5
+    };
+  }
+  function placeTabDot(view, instant, x) {
+    var dot = $(".bib-tabdot"),
+      p = tabDotPos(view);
+    if (!dot || !p) return;
+    dot.style.transition = instant || reduced() ? "none" : "";
+    dot.style.transform = "translate(" + (x == null ? p.x : x) + "px, " + p.y + "px)";
+    if (instant) void dot.offsetWidth;
+  }
+  function dotBetween(fromView, toView, ratio) {
+    var a = tabDotPos(fromView),
+      z = tabDotPos(toView);
+    if (!a || !z) return;
+    placeTabDot(fromView, true, a.x + (z.x - a.x) * Math.max(0, Math.min(1, ratio)));
+  }
+  window.addEventListener("resize", function () {
+    placeTabDot(state.view, true);
+  });
+  if (document.fonts && document.fonts.ready)
+    document.fonts.ready.then(function () {
+      placeTabDot(state.view, true);
+    });
+
+  // ---------- Changer d'onglet comme le retour (maquette V19, validée par INFRA le 12/11/2026) ----------
+  // L'onglet visé est déjà dessous, décalé de 28 % et assombri (0,78), jamais transparent ; une copie de
+  // l'écran quitté part au-dessus dans le sens des doigts. 0,26 s, même courbe que le retour.
+  var EASE = "cubic-bezier(.2,.8,.2,1)";
+  var slideEnd = null,
+    slideTimer = 0;
+  function homeMain() {
+    var layer = document.querySelector(".spa-route-layer[data-spa-route-state='current']") || document;
+    return layer.querySelector("main.one-page-layout") || layer.querySelector("main");
+  }
+  function finishTabSlide() {
+    window.clearTimeout(slideTimer);
+    var f = slideEnd;
+    slideEnd = null;
+    if (f) f();
+  }
+  function slideToTab(view, dir, main) {
+    finishTabSlide();
+    main = main || homeMain();
+    if (!main || reduced()) {
+      if (main) {
+        main.style.transition = "";
+        main.style.transform = "";
+        main.style.willChange = "";
+      }
+      selectView(view);
+      return;
+    }
+    var r = main.getBoundingClientRect(),
+      snap = main.cloneNode(true);
+    snap.removeAttribute("id");
+    snap.setAttribute("aria-hidden", "true");
+    snap.setAttribute("inert", "");
+    snap.classList.add("bib-snap");
+    $$("[id]", snap).forEach(function (n) {
+      n.removeAttribute("id");
+    });
+    $$("iframe, audio, video", snap).forEach(function (n) {
+      n.remove();
+    });
+    snap.style.cssText =
+      "position:fixed;top:" +
+      r.top +
+      "px;left:" +
+      r.left +
+      "px;width:" +
+      r.width +
+      "px;height:" +
+      Math.max(0, window.innerHeight - r.top) +
+      "px;margin:0;overflow:hidden;z-index:15;pointer-events:none;will-change:transform;transition:none;transform:none";
+    document.body.appendChild(snap);
+    // Contenu remis en place AVANT de changer d'onglet : Favoris change l'adresse (#favoris) et Safari peut
+    // reconstruire la page depuis une copie de l'écran (page blanche vue le 11/11 avec un contenu décalé).
+    main.style.transition = "none";
+    main.style.transform = "";
+    main.style.opacity = "";
+    var y = window.scrollY;
+    selectView(view, { noScroll: true });
+    var tabs = $("[data-bib-tabs]"),
+      top = tabs ? tabs.getBoundingClientRect().top + window.scrollY : 0;
+    if (y > top) window.scrollTo(0, top); // même endroit, sans défilement animé pendant le geste
+    var m = homeMain();
+    if (!m || !m.isConnected) {
+      snap.remove();
+      return;
+    }
+    m.style.transition = "none";
+    m.style.willChange = "transform, filter";
+    m.style.transform = "translate3d(" + dir * window.innerWidth * 0.28 + "px, 0, 0)";
+    m.style.filter = "brightness(.78)";
+    void m.offsetWidth;
+    m.style.transition = "transform 260ms " + EASE + ", filter 260ms " + EASE;
+    m.style.transform = "";
+    m.style.filter = "";
+    snap.style.transition = "transform 260ms " + EASE;
+    snap.style.transform = "translate3d(" + -dir * window.innerWidth + "px, 0, 0)";
+    slideEnd = function () {
+      snap.remove();
+      m.style.transition = "";
+      m.style.transform = "";
+      m.style.filter = "";
+      m.style.willChange = "";
+    };
+    slideTimer = window.setTimeout(finishTabSlide, 270);
+  }
+  function slideBackInPlace(main, view) {
+    finishTabSlide();
+    main.style.transition = reduced() ? "none" : "transform 260ms " + EASE;
+    main.style.transform = "";
+    placeTabDot(view || state.view);
+    slideEnd = function () {
+      main.style.transition = "";
+      main.style.willChange = "";
+    };
+    slideTimer = window.setTimeout(finishTabSlide, 270);
+  }
+
+  // ---------- Réglages du glisser d'onglet (maquette V14, valeurs documentées d'Android) ----------
+  //   zone morte 16 px ; geste franchement de côté (|x| > 2 × |y|) ; changement si plus de la moitié de
+  //   l'écran, ou geste vif (≥ 25 px et ≥ 500 px/s, vitesse des 80 dernières ms) ; LANCER (≥ 2 500 px/s et
+  //   ≥ 120 px) = jusqu'au premier / dernier onglet.
+  var SWIPE = { slop: 16, ratio: 2, half: 0.5, flingDist: 25, flingV: 0.5, throwV: 2.5, throwDist: 120 };
+  function swipeTarget(i, dir, dist, v, count) {
+    var next = i + dir;
+    if (next < 0 || next >= count) return null;
+    if (v >= SWIPE.throwV && dist >= SWIPE.throwDist) return dir > 0 ? count - 1 : 0;
+    if (dist > window.innerWidth * SWIPE.half || (dist >= SWIPE.flingDist && v >= SWIPE.flingV)) return next;
+    return null;
+  }
+  function tabOrder() {
+    return $$("[data-bib-tab]")
+      .filter(function (b) {
+        return b.offsetParent !== null;
+      })
+      .map(function (b) {
+        return b.getAttribute("data-bib-tab");
+      });
+  }
+  function scrollsSideways(el, stop) {
+    for (var n = el; n && n !== stop && n !== document.body; n = n.parentElement) {
+      if (n.scrollWidth > n.clientWidth + 2) {
+        var ox = window.getComputedStyle(n).overflowX;
+        if (ox === "auto" || ox === "scroll") return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------- Glisser entre les onglets au doigt (maquette V8 → V19) ----------
+  // Bibliothèque : glisser ← = onglet suivant, → = onglet précédent. Le contenu suit le doigt, le point rouge
+  // glisse ; premier et dernier onglet : élastique. Capté sur toute la page (sauf barre d'onglets, lecteur,
+  // bord gauche), pas depuis une rangée qui défile de côté, ni avec la recherche ou le grand lecteur ouverts.
   (function tabSwipe() {
     var g = null,
       swallowUntil = 0;
-    var EASE = "cubic-bezier(.2,.8,.2,1)";
-    function homeMain() {
-      var layer = document.querySelector(".spa-route-layer[data-spa-route-state='current']") || document;
-      return layer.querySelector("main.one-page-layout") || layer.querySelector("main");
-    }
-    function tabOrder() {
-      return $$("[data-bib-tab]")
-        .filter(function (b) {
-          return b.offsetParent !== null;
-        })
-        .map(function (b) {
-          return b.getAttribute("data-bib-tab");
-        });
-    }
-    function scrollsSideways(el, stop) {
-      for (var n = el; n && n !== stop && n !== document.body; n = n.parentElement) {
-        if (n.scrollWidth > n.clientWidth + 2) {
-          var ox = window.getComputedStyle(n).overflowX;
-          if (ox === "auto" || ox === "scroll") return true;
-        }
-      }
-      return false;
-    }
     function canStart(e, main) {
       if (!isHome() || !main || !e.touches || e.touches.length !== 1) return false;
       var bar = $("[data-bib-tabs]");
@@ -1492,16 +1658,14 @@
       if (document.body.classList.contains("now-playing-open")) return false;
       var t = e.touches[0],
         target = e.target && e.target.closest ? e.target : null;
-      if (!target || !main.contains(target) || t.clientX < 24) return false;
-      if (target.closest("input, textarea, select, .bib-sortrow, [data-bib-tabs]")) return false;
-      return !scrollsSideways(target, main);
-    }
-    function settle(main, ms) {
-      window.setTimeout(function () {
-        main.style.transition = "";
-        main.style.willChange = "";
-        main.style.opacity = "";
-      }, ms);
+      if (!target || t.clientX < 24) return false;
+      if (
+        target.closest(
+          "input, textarea, select, .bib-sortrow, [data-bib-tabs], .global-transport, .now-playing-overlay"
+        )
+      )
+        return false;
+      return !scrollsSideways(target, document.body);
     }
     document.addEventListener(
       "touchstart",
@@ -1511,16 +1675,18 @@
           g = null;
           return;
         }
-        var order = tabOrder();
+        finishTabSlide();
+        var order = tabOrder(),
+          t0 = Date.now();
         g = {
           main: main,
           x: e.touches[0].clientX,
           y: e.touches[0].clientY,
-          t: Date.now(),
           dx: 0,
           horiz: null,
           order: order,
-          i: order.indexOf(state.view)
+          i: order.indexOf(state.view),
+          pts: [[t0, e.touches[0].clientX]]
         };
         if (g.i < 0) g = null;
       },
@@ -1530,14 +1696,20 @@
       "touchmove",
       function (e) {
         if (!g || !e.touches || !e.touches[0]) return;
-        var mx = e.touches[0].clientX - g.x,
-          my = e.touches[0].clientY - g.y;
-        if (g.horiz === null && Math.abs(mx) + Math.abs(my) > 10) {
-          g.horiz = Math.abs(mx) > Math.abs(my) * 1.2;
+        var cx = e.touches[0].clientX,
+          mx = cx - g.x,
+          my = e.touches[0].clientY - g.y,
+          now = Date.now();
+        g.pts.push([now, cx]);
+        while (g.pts.length > 2 && now - g.pts[0][0] > 80) g.pts.shift();
+        if (g.horiz === null && Math.sqrt(mx * mx + my * my) > SWIPE.slop) {
+          g.horiz = Math.abs(mx) > Math.abs(my) * SWIPE.ratio;
           if (!g.horiz) {
             g = null;
             return;
           }
+          g.x = cx; // le geste part d'ici (pas de saut de la zone morte)
+          mx = 0;
           g.main.style.transition = "none";
           g.main.style.willChange = "transform";
         }
@@ -1547,6 +1719,7 @@
           atEdge = next < 0 || next >= g.order.length;
         g.dx = atEdge ? mx / 3 : mx; // élastique au premier et au dernier onglet
         g.main.style.transform = "translate3d(" + g.dx + "px, 0, 0)";
+        if (!atEdge) dotBetween(g.order[g.i], g.order[next], Math.abs(mx) / (window.innerWidth * SWIPE.half));
       },
       { passive: false, capture: true }
     );
@@ -1557,50 +1730,22 @@
       }
       var main = g.main,
         dx = g.dx,
-        order = g.order,
-        next = g.i + (dx < 0 ? 1 : -1),
-        fast = Math.abs(dx) / Math.max(1, Date.now() - g.t) > 0.5;
+        // vitesse au moment de lever le doigt, sur les 80 dernières ms (comme le VelocityTracker d'Android) :
+        // un doigt resté posé immobile avant de se lever = vitesse nulle (pas un lancé)
+        liftAt = Date.now(),
+        pts = g.pts.concat([[liftAt, g.pts[g.pts.length - 1][1]]]).filter(function (p) {
+          return liftAt - p[0] <= 80;
+        }),
+        first = pts[0],
+        last = pts[pts.length - 1],
+        v = pts.length < 2 ? 0 : Math.abs(last[1] - first[1]) / Math.max(1, last[0] - first[0]),
+        dir = dx < 0 ? 1 : -1,
+        target = swipeTarget(g.i, dir, Math.abs(dx), v, g.order.length),
+        order = g.order;
       g = null;
       swallowUntil = Date.now() + 450; // le toucher qui suit le glisser n'ouvre pas la pochette
-      var go =
-        next >= 0 &&
-        next < order.length &&
-        (Math.abs(dx) > window.innerWidth / 4 || (fast && Math.abs(dx) > 40));
-      if (!go) {
-        main.style.transition = "transform 260ms " + EASE;
-        main.style.transform = "";
-        settle(main, 270);
-        return;
-      }
-      if (reduced()) {
-        main.style.transform = "";
-        settle(main, 0);
-        selectView(order[next]);
-        return;
-      }
-      var out = dx < 0 ? -window.innerWidth : window.innerWidth;
-      main.style.transition = "transform 180ms " + EASE + ", opacity 180ms";
-      main.style.transform = "translate3d(" + out + "px, 0, 0)";
-      main.style.opacity = "0";
-      window.setTimeout(function () {
-        // Contenu remis en place AVANT de changer d'onglet : Favoris change l'adresse (#favoris) et Safari
-        // reconstruit alors la page depuis une copie de l'écran ; une copie prise transparente et décalée
-        // donnait une page blanche (vu dans le simulateur, 11/11/2026).
-        main.style.transition = "none";
-        main.style.transform = "";
-        main.style.opacity = "";
-        main.style.willChange = "";
-        selectView(order[next]);
-        if (homeMain() !== main || !main.isConnected) return; // page reconstruite : pas d'arrivée animée
-        main.style.transform = "translate3d(" + -out * 0.3 + "px, 0, 0)";
-        main.style.opacity = "0";
-        // Sans attendre une image du navigateur : position de départ appliquée tout de suite, puis l'arrivée.
-        void main.offsetWidth;
-        main.style.transition = "transform 260ms " + EASE + ", opacity 200ms";
-        main.style.transform = "";
-        main.style.opacity = "";
-        settle(main, 270);
-      }, 180);
+      if (target == null) slideBackInPlace(main);
+      else slideToTab(order[target], dir, main);
     }
     document.addEventListener("touchend", end, true);
     document.addEventListener("touchcancel", end, true);
@@ -1614,6 +1759,256 @@
         e.stopImmediatePropagation();
       },
       true
+    );
+  })();
+
+  // ---------- Gestes à deux doigts au trackpad (maquette V11 → V19) ----------
+  // Un seul moteur : l'écran suit les doigts et l'action part dès que le geste est assez long (sans attendre
+  // la fin de l'élan) ; un geste trop court revient en place après 80 ms sans événement ; l'élan qui suit est
+  // absorbé tant qu'il décroît (de nouveaux doigts = nouveau geste tout de suite).
+  //   Grand lecteur : doigts vers le bas (page du lecteur en haut) ou vers la droite = fermer.
+  //   Album / playlist : doigts vers la droite = retour.  Bibliothèque : ← onglet suivant, → précédent.
+  // Souris : rien (une molette ne fait pas de geste de côté).
+  (function trackpadGestures() {
+    var s = null,
+      timer = 0,
+      quietUntil = 0,
+      quietAxis = "",
+      lastNpScroll = 0;
+    var lastAbs = 0,
+      rising = 0,
+      peak = 0,
+      fading = false,
+      lastEvt = 0;
+    function now() {
+      return window.performance && performance.now ? performance.now() : Date.now();
+    }
+    function horiz(e) {
+      return Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.5;
+    }
+    function leansX(e) {
+      return Math.abs(e.deltaX) > 0 && Math.abs(e.deltaX) >= Math.abs(e.deltaY);
+    }
+    function vert(e) {
+      return Math.abs(e.deltaY) > Math.abs(e.deltaX) * 1.5;
+    }
+    document.addEventListener(
+      "scroll",
+      function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains("now-playing-panel"))
+          lastNpScroll = now();
+      },
+      true
+    );
+    function npPanel() {
+      return $(".now-playing-overlay:not([hidden]) .now-playing-panel");
+    }
+    function npSession(axis) {
+      var panel = npPanel();
+      panel.style.transition = "none";
+      return {
+        axis: axis,
+        limit: 150,
+        delta: function (e) {
+          return axis === "y" ? -e.deltaY : -e.deltaX;
+        },
+        move: function (d) {
+          panel.style.transform =
+            axis === "y" ? "translate3d(0, " + d + "px, 0)" : "translate3d(" + d + "px, 0, 0)";
+        },
+        commit: function () {
+          var close = $("[data-now-playing-close]");
+          if (axis === "x" && !reduced()) {
+            panel.style.transition = "transform 260ms " + EASE;
+            panel.style.transform = "translate3d(100vw, 0, 0)";
+            window.setTimeout(function () {
+              panel.style.transition = "";
+              panel.style.transform = "";
+              if (close) close.click();
+            }, 260);
+            return;
+          }
+          panel.style.transition = "";
+          panel.style.transform = "";
+          if (close) close.click();
+        },
+        cancel: function () {
+          panel.style.transition = reduced() ? "none" : "transform 260ms " + EASE;
+          panel.style.transform = "";
+          window.setTimeout(function () {
+            panel.style.transition = "";
+          }, 270);
+        }
+      };
+    }
+    function sheetSession() {
+      var layer = edgeGesture.layer();
+      layer.style.transition = "none";
+      layer.style.willChange = "transform";
+      return {
+        axis: "x",
+        limit: 150,
+        delta: function (e) {
+          return -e.deltaX;
+        },
+        move: function (d) {
+          edgeGesture.paint(layer, d);
+        },
+        commit: function () {
+          edgeGesture.settle(layer, window.innerWidth, function () {
+            layer.setAttribute("data-spa-swiped-out", "");
+            var back = layer.querySelector(".back");
+            if (back) back.click();
+          });
+        },
+        cancel: function () {
+          edgeGesture.settle(layer, 0, function () {
+            layer.style.transform = "";
+            layer.style.transition = "";
+            layer.style.willChange = "";
+          });
+        }
+      };
+    }
+    function tabSession(dir) {
+      finishTabSlide();
+      var main = homeMain(),
+        order = tabOrder(),
+        i = order.indexOf(state.view),
+        next = i + dir,
+        atEdge = next < 0 || next >= order.length;
+      if (!main || i < 0) return null;
+      main.style.transition = "none";
+      main.style.willChange = "transform";
+      return {
+        axis: "x",
+        limit: atEdge ? Infinity : 160,
+        delta: function (e) {
+          return dir * e.deltaX;
+        },
+        move: function (d) {
+          main.style.transform = "translate3d(" + -dir * (atEdge ? d / 3 : d) + "px, 0, 0)";
+          if (!atEdge) dotBetween(order[i], order[next], d / 110);
+        },
+        // lancé (≈ 2 500 px/s au seuil : > 40 px par événement) = jusqu'au premier / dernier onglet
+        commit: function (fast) {
+          slideToTab(order[fast > 40 ? (dir > 0 ? order.length - 1 : 0) : next], dir, main);
+        },
+        cancel: function () {
+          slideBackInPlace(main);
+        }
+      };
+    }
+    function start(e) {
+      if (document.body.classList.contains("now-playing-open")) {
+        var panel = npPanel();
+        if (!panel) return null;
+        if (vert(e) && e.deltaY < 0 && panel.scrollTop <= 0 && now() - lastNpScroll > 250)
+          return npSession("y");
+        if (horiz(e) && e.deltaX < 0) return npSession("x");
+        return null;
+      }
+      if (!leansX(e)) return null;
+      if ($(".is-open[aria-hidden='false']")) return null; // fenêtre ouverte (partage, installation…)
+      if (!isHome()) {
+        var layer = edgeGesture.layer();
+        return e.deltaX < 0 && layer && layer.querySelector(".back") ? sheetSession() : null;
+      }
+      var bar = $("[data-bib-tabs]");
+      if (state.q || (bar && bar.classList.contains("searching"))) return null;
+      var target = e.target && e.target.closest ? e.target : null;
+      if (target && (target.closest("input, textarea, select") || scrollsSideways(target, document.body)))
+        return null;
+      return tabSession(e.deltaX > 0 ? 1 : -1);
+    }
+    function end(how) {
+      var x = s;
+      s = null;
+      window.clearTimeout(timer);
+      if (!x) return;
+      quietAxis = x.axis;
+      quietUntil = now() + 180;
+      lastAbs = Infinity;
+      rising = 0;
+      peak = 0;
+      fading = false;
+      if (how === "commit")
+        x.commit(
+          x.fast
+            ? x.fast.reduce(function (a, b) {
+                return a + b;
+              }, 0) / x.fast.length
+            : 0
+        );
+      else x.cancel();
+    }
+    window.addEventListener(
+      "wheel",
+      function (e) {
+        if (e.ctrlKey) return; // pincer = zoom
+        var t = now(),
+          gap = t - lastEvt;
+        lastEvt = t;
+        if (!s && t < quietUntil && gap > 60) quietUntil = 0; // un blanc = les doigts se sont levés
+        if (!s && t < quietUntil) {
+          // élan du geste précédent : absorbé tant qu'il décroît ; des valeurs qui remontent deux fois de suite
+          // (une fois l'élan bien entamé) = de nouveaux doigts → nouveau geste tout de suite.
+          var abs = Math.abs(quietAxis === "x" ? e.deltaX : e.deltaY);
+          peak = Math.max(peak, abs);
+          if (abs < peak * 0.5) fading = true;
+          rising = fading && abs > lastAbs + 0.5 ? rising + 1 : 0;
+          lastAbs = abs;
+          if (rising < 2 && (quietAxis === "x" ? leansX(e) : vert(e))) {
+            e.preventDefault();
+            quietUntil = t + 120;
+            return;
+          }
+          quietUntil = 0;
+        }
+        if (!s) {
+          s = start(e);
+          if (!s) return;
+          s.d = 0;
+          s.dy = 0;
+          s.dx = 0;
+        }
+        e.preventDefault();
+        // geste de côté qui tourne au vertical dans ses premiers px : rendu au défilement
+        if (s.axis === "x" && s.d < 60) {
+          s.dx += Math.abs(e.deltaX);
+          s.dy += Math.abs(e.deltaY);
+          if (s.dy * SWIPE.ratio > s.dx && s.dy > 8) {
+            var x = s;
+            s = null;
+            window.clearTimeout(timer);
+            x.cancel();
+            return;
+          }
+        }
+        var step = s.delta(e);
+        s.d = Math.max(0, s.d + step);
+        s.fast = (s.fast || []).concat(step).slice(-3);
+        s.move(s.d);
+        if (s.d >= s.limit) {
+          end("commit");
+          return;
+        }
+        // geste vif mais court (pichenette)
+        var flick =
+          s.limit !== Infinity &&
+          s.d > 90 &&
+          s.fast.length === 3 &&
+          s.fast.reduce(function (a, b) {
+            return a + b;
+          }, 0) /
+            3 >
+            25;
+        window.clearTimeout(timer);
+        timer = window.setTimeout(function () {
+          end(flick ? "commit" : "cancel");
+        }, 80);
+      },
+      { passive: false }
     );
   })();
 })();

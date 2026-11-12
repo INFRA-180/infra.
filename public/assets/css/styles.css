@@ -6031,3 +6031,18 @@ body[data-bib-view="playlists"] .home-screen [data-module-id="playlists"] .bib-s
   }
   .now-playing-overlay.is-queue-inline .now-playing-up-next-list { max-height: none; height: auto; overflow: visible; padding: 0; }
 }
+
+/* Lot 2 (maquette V11-V19) : gestes. Un seul point rouge qui glisse d'un onglet à l'autre (il part de l'onglet
+   quitté) ; Chrome ne fait jamais « page précédente » au glisser de côté ; sur la bibliothèque, toute la page
+   laisse le glisser de côté à la page (sinon Safari iPhone annule un 2e glisser rapide posé hors du contenu),
+   défilement vertical et zoom à deux doigts gardés. */
+.bib-tabs-row { position: relative; }
+.bib-tabs-row.has-dot .bib-tab[aria-current="true"]::after { content: none; display: none; }
+.bib-tabdot {
+  position: absolute; left: 0; top: 0; width: 5px; height: 5px; border-radius: 50%; background: #e0353b;
+  pointer-events: none; transition: transform 0.34s cubic-bezier(0.3, 1.25, 0.5, 1);
+}
+html, body { overscroll-behavior-x: none; }
+body.home-screen { touch-action: pan-y pinch-zoom; }
+.bib-snap { background: var(--bg, #fff); }
+@media (prefers-reduced-motion: reduce) { .bib-tabdot { transition: none; } }

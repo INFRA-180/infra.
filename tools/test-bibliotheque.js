@@ -104,6 +104,13 @@ expect(codeHas(builder, 'class="now-playing-side" data-now-playing-side') && cod
 expect(codeHas(nowPlaying, "function placeNowPlayingQueueSheet") && codeHas(nowPlaying, '"(min-width: 981px)"'), "« À suivre » dans la page (ordinateur) absent");
 expect(codeHas(builder, 'overlay.classList.contains("is-queue-inline")'), "« À suivre » ne descend pas jusqu'à la file");
 expect(codeTest(/\.now-playing-visual \{ display: none !important; \}/, css), "animation fréquentielle encore affichée sur ordinateur");
+// Lot 2 (maquette V11-V19) : gestes.
+expect(codeHas(js, "var SWIPE = { slop: 16, ratio: 2, half: 0.5, flingDist: 25, flingV: 0.5, throwV: 2.5, throwDist: 120 }"), "réglages Android du glisser d'onglet absents");
+expect(codeHas(js, "liftAt - p[0] <= 80"), "vitesse au lever du doigt (80 ms) absente");
+expect(codeHas(js, 'm.style.filter = "brightness(.78)"') && codeHas(js, 'snap.classList.add("bib-snap")'), "changement d'onglet façon retour (V19) absent");
+expect(codeHas(js, '"wheel"') && codeHas(js, "function npSession") && codeHas(js, "function sheetSession") && codeHas(js, "function tabSession"), "gestes trackpad absents");
+expect(codeHas(js, 'dot.className = "bib-tabdot"') && codeTest(/\.bib-tabs-row\.has-dot \.bib-tab\[aria-current="true"\]::after \{ content: none/, css), "point rouge unique absent");
+expect(codeTest(/html, body \{ overscroll-behavior-x: none; \}/, css), "« page précédente » de Chrome au glisser de côté non bloquée");
 expect(codeTest(/\.bib-li > \.bib-row \{ grid-template-columns: 30px 40px minmax\(0, 1\.3fr\) minmax\(0, 1fr\) 52px/, css), "colonnes ordinateur des titres absentes");
 expect(codeTest(/\.album-screen \.track-player \.track-favorite-btn\[aria-pressed="false"\] \{ visibility: hidden/, css), "cœur au survol des fiches absent");
 expect(codeTest(/data-clip-shell/, index) && codeTest(/data-clip-close/, index) && !codeTest(/clips-menu/, index), "lecteur de clip sur place absent");

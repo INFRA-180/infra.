@@ -269,9 +269,9 @@ test("Nav-2 : vignettes de l'accueil préparées au repos, sans défiler", async
 // ---------- Maquette V8 (INFRA, 11/11/2026) : glisser entre les onglets ----------
 // Glisser ← = onglet suivant, → = précédent ; pas depuis une rangée qui défile de côté ; un glisser
 // sur une pochette ne l'ouvre plus. Gestes tactiles Chromium (projet téléphone).
-async function swipeHome(page, { from, xs, y, slow }) {
+async function swipeHome(page, { from, xs, y, slow, step }) {
   return page.evaluate(
-    async ({ current, from, xs, y, slow }) => {
+    async ({ current, from, xs, y, slow, step }) => {
       const root = document.querySelector(current);
       const target =
         from === "playlists"
@@ -298,7 +298,7 @@ async function swipeHome(page, { from, xs, y, slow }) {
       let mid = "";
       for (const x of xs.slice(1)) {
         fire("touchmove", x);
-        await new Promise((res) => setTimeout(res, 16));
+        await new Promise((res) => setTimeout(res, step || 16));
       }
       mid = root.querySelector("main").style.transform;
       if (slow) await new Promise((res) => setTimeout(res, 400));
@@ -307,7 +307,7 @@ async function swipeHome(page, { from, xs, y, slow }) {
       await new Promise((res) => setTimeout(res, 700));
       return { mid, view: document.body.getAttribute("data-bib-view"), path: location.pathname };
     },
-    { current: CURRENT, from, xs, y, slow }
+    { current: CURRENT, from, xs, y, slow, step }
   );
 }
 
@@ -343,8 +343,9 @@ test("V8 : petit glisser, bord du premier onglet, rangée des playlists : rien n
 test("V8 : quatre glissers jusqu'à Favoris, le contenu reste visible", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "telephone", "geste tactile : téléphone");
   await openHomeTop(page);
+  // glissers ordinaires (≈ 1 000 px/s) : un onglet à la fois (maquette V14 : lancé seulement au-delà de 2 500 px/s)
   for (const view of ["albums", "playlists", "titres", "favoris"]) {
-    const s = await swipeHome(page, { from: "main", xs: [320, 290, 230, 150, 80], y: 520 });
+    const s = await swipeHome(page, { from: "main", xs: [320, 290, 230, 150, 80], y: 520, step: 60 });
     expect(s.view).toBe(view);
   }
   await page.waitForTimeout(500);
@@ -354,6 +355,17 @@ test("V8 : quatre glissers jusqu'à Favoris, le contenu reste visible", async ({
   }, CURRENT);
   expect(main).toEqual({ opacity: "1", transform: "" });
   await expect(page.locator(".favorites-view")).toBeVisible();
+});
+
+test("V19 : lancé jusqu'au dernier onglet puis jusqu'au premier, sans copie restante", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "telephone", "geste tactile : téléphone");
+  await openHomeTop(page);
+  let s = await swipeHome(page, { from: "main", xs: [330, 300, 230, 150, 70], y: 520 }); // ≈ 4 000 px/s
+  expect(s.view).toBe("favoris");
+  s = await swipeHome(page, { from: "main", xs: [40, 70, 140, 220, 300], y: 520 });
+  expect(s.view).toBe("accueil");
+  await page.waitForTimeout(400);
+  expect(await page.locator(".bib-snap").count()).toBe(0);
 });
 
 // ---------- Maquette V7, point 2 (INFRA, 11/11/2026) : fiche ouverte depuis une fiche ----------

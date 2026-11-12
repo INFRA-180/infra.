@@ -97,6 +97,13 @@ expect(codeHas(js, "<h2>Favoris</h2>") && codeHas(fav, "window.InfraHomeFavorite
 expect(codeHas(js, "data-bib-trackheart") && codeHas(fav, "has: function (src)") && codeHas(fav, "pathOf: function (src)"), "cœur des lignes de titres absent");
 expect(codeHas(js, 'class="hp hp-play"') && codeHas(js, 'class="hp hp-pause"') && codeHas(js, "syncNowRows"), "▶ / ❚❚ / titre en cours des lignes absents");
 expect(codeHas(js, 'row.classList.contains("now") && toggle'), "titre en cours : pause / reprise au clic absente");
+// Maquette V19 : grand lecteur ordinateur — bloc de lecture d'un seul tenant, « À suivre » dans la page.
+const builder = read("src/js/transport-ui/transport-builder.js");
+const nowPlaying = read("src/js/now-playing.js");
+expect(codeHas(builder, 'class="now-playing-side" data-now-playing-side') && codeTest(/\.now-playing-side \{ display: contents; \}/, css), "bloc de lecture du grand lecteur absent (ou visible sur téléphone)");
+expect(codeHas(nowPlaying, "function placeNowPlayingQueueSheet") && codeHas(nowPlaying, '"(min-width: 981px)"'), "« À suivre » dans la page (ordinateur) absent");
+expect(codeHas(builder, 'overlay.classList.contains("is-queue-inline")'), "« À suivre » ne descend pas jusqu'à la file");
+expect(codeTest(/\.now-playing-visual \{ display: none !important; \}/, css), "animation fréquentielle encore affichée sur ordinateur");
 expect(codeTest(/\.bib-li > \.bib-row \{ grid-template-columns: 30px 40px minmax\(0, 1\.3fr\) minmax\(0, 1fr\) 52px/, css), "colonnes ordinateur des titres absentes");
 expect(codeTest(/\.album-screen \.track-player \.track-favorite-btn\[aria-pressed="false"\] \{ visibility: hidden/, css), "cœur au survol des fiches absent");
 expect(codeTest(/data-clip-shell/, index) && codeTest(/data-clip-close/, index) && !codeTest(/clips-menu/, index), "lecteur de clip sur place absent");

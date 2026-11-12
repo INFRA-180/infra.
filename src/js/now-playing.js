@@ -533,6 +533,7 @@
         overlayEl.style.pointerEvents = "none";
       }
 
+      placeNowPlayingQueueSheet(false);
       document.body.classList.remove("now-playing-open");
       document.documentElement.classList.remove("now-playing-open");
       document.body.style.removeProperty("position");
@@ -581,7 +582,9 @@
       document.body.style.left = "0";
       document.body.style.right = "0";
       document.body.style.width = "100%";
+      placeNowPlayingQueueSheet(isNowPlayingQueueInline());
       syncNowPlayingOverlay();
+      if (isNowPlayingQueueInline()) setNowPlayingQueueOpen(true);
       // The cold desktop open must publish nowPlayingOpen immediately. Waiting
       // for a later audio/UI event leaves the analyser ready but its canvas at
       // opacity 0 for the whole first fullscreen visit.
@@ -601,6 +604,21 @@
       animateNowPlayingClose(function () {
         disableNowPlayingOverlayUi();
       });
+    }
+
+    // Maquette V19 (INFRA, 12/11/2026) : sur ordinateur, « À suivre » est dans la même page, sous la pochette
+    // et le bloc de lecture (la file est rangée dans le panneau qui défile) ; ailleurs, fenêtre « À suivre ».
+    function isNowPlayingQueueInline() {
+      return Boolean(window.matchMedia && window.matchMedia("(min-width: 981px)").matches);
+    }
+
+    function placeNowPlayingQueueSheet(inline) {
+      const transport = audioState.transport;
+      if (!transport || !transport.overlay || !transport.overlayQueueSheet || !transport.overlayPanel) return;
+      const home = inline ? transport.overlayPanel : transport.overlay;
+      if (transport.overlayQueueSheet.parentNode !== home) home.appendChild(transport.overlayQueueSheet);
+      transport.overlay.classList.toggle("is-queue-inline", Boolean(inline));
+      if (!inline) transport.overlay.classList.remove("is-at-queue", "is-scrolled");
     }
 
     function setNowPlayingQueueOpen(open) {

@@ -128,7 +128,8 @@ export function createTransportBuilder(R) {
       !overlay.querySelector("[data-now-playing-visual]") ||
       !root.querySelector("[data-transport-favorite]") ||
       !overlay.querySelector("[data-now-playing-volume-toggle]") ||
-      !overlay.querySelector("[data-now-playing-volume]");
+      !overlay.querySelector("[data-now-playing-volume]") ||
+      !overlay.querySelector("[data-now-playing-side]");
     if (overlayNeedsRefresh) {
       if (overlay) overlay.remove();
       overlay = document.createElement("div");
@@ -147,6 +148,9 @@ export function createTransportBuilder(R) {
         '  <div class="now-playing-cover-wrap">',
         `    <img class="now-playing-cover" data-now-playing-cover src="${getMediaSessionFallbackArtwork()}" alt="Pochette" loading="eager" decoding="async" fetchpriority="high" />`,
         "  </div>",
+        // Maquette V19 (INFRA, 12/11/2026) : titre, barre et commandes d'un seul tenant, centrés sur la pochette
+        // (ordinateur) ; sur téléphone ce bloc est neutre (display: contents).
+        '  <div class="now-playing-side" data-now-playing-side>',
         '  <div class="now-playing-meta">',
         '    <div class="now-playing-meta-text">',
         '      <div class="now-playing-title" data-now-playing-title></div>',
@@ -188,6 +192,7 @@ export function createTransportBuilder(R) {
         "        " + RADIO_ICON.replace('class="radio-icon"', 'class="radio-icon now-playing-radio-icon"'),
         "      </button>",
         "    </div>",
+        "  </div>",
         "  </div>",
         '  <section class="now-playing-up-next" data-now-playing-queue aria-label="Titres suivants">',
         '    <button class="now-playing-up-next-toggle" type="button" data-now-playing-queue-toggle aria-expanded="false">',
@@ -614,8 +619,32 @@ export function createTransportBuilder(R) {
         overlayQueueToggle.addEventListener("click", function (event) {
           event.preventDefault();
           event.stopPropagation();
+          // Ordinateur (maquette V19) : « À suivre » est sous le lecteur ; le bouton y descend, un 2e clic remonte.
+          if (overlay.classList.contains("is-queue-inline") && overlayPanel && overlayQueueSheet) {
+            const target = Math.max(0, overlayQueueSheet.offsetTop - 66);
+            const there = overlayPanel.scrollTop >= target - 4;
+            const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            overlayPanel.scrollTo({ top: there ? 0 : target, behavior: reduce ? "auto" : "smooth" });
+            return;
+          }
           setNowPlayingQueueOpen(!audioState.nowPlayingQueueOpen);
         });
+        if (overlayPanel) {
+          overlayPanel.addEventListener(
+            "scroll",
+            function () {
+              if (!overlay.classList.contains("is-queue-inline")) return;
+              const target = overlayQueueSheet ? Math.max(0, overlayQueueSheet.offsetTop - 66) : Infinity;
+              overlay.classList.toggle("is-scrolled", overlayPanel.scrollTop > 2);
+              overlay.style.setProperty("--np-bar-shift", Math.min(45, overlayPanel.scrollTop) + "px");
+              overlay.style.setProperty("--np-scroll", overlayPanel.scrollTop + "px");
+              const atQueue = overlayPanel.scrollTop >= target - 4;
+              overlay.classList.toggle("is-at-queue", atQueue);
+              overlayQueueToggle.setAttribute("aria-pressed", atQueue ? "true" : "false");
+            },
+            { passive: true }
+          );
+        }
       }
       if (overlayQueueCloseButtons && overlayQueueCloseButtons.length) {
         overlayQueueCloseButtons.forEach(function (button) {

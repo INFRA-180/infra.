@@ -4,6 +4,7 @@ Point demandé par INFRA (« un point MD de mes idées, avant de lancer »). À 
 Maquettes du jour : V10 → V17 dans `DOCS/maquettes/` (chacune avec son `MAQUETTE_Vxx_20261112.md`). **Référence : V17** (`MAQUETTE_BIBLIOTHEQUE_V17_20261112.html`, sources `sources_V17/`) ; V18 et V19 (changement d'onglet sans écran vide) essayées et refusées par INFRA le 12/11. Site **non modifié** ; notes du jour commitées le 12/11 (maquettes locales, hors Git).
 
 ## Validé par INFRA
+- **Maquette validée dans son ensemble (12/11 soir), référence V17** : « je valide la maquette, c'est bon ».
 - Mise en page ordinateur **alignée à gauche, pleine largeur** ; le **logo INFRA au milieu**.
 - Grand lecteur ordinateur : pochette + bloc de lecture (titre, barre, commandes) d'un seul tenant ; **« À suivre » en dessous, dans la même page** (toucher « À suivre » descend jusqu'à la file).
 - **Toute la ligne** d'un titre de section ouvre / déplie (Clips, Applications, Playlists, Albums, Favoris).

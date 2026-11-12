@@ -230,6 +230,21 @@
         layer.removeAttribute("aria-hidden");
         layer.removeAttribute("inert");
         layer.style.removeProperty("--spa-route-offset-y");
+        // Animations en cours (arrivée d'une fiche, geste du bord, glisser entre onglets) : la copie
+        // repart toujours d'un écran en place, opaque, non assombri (12/11/2026).
+        ["transform", "filter", "opacity", "z-index", "will-change", "transition"].forEach(function (name) {
+          layer.style.removeProperty(name);
+        });
+        ["data-spa-receded", "data-spa-retained-top", "data-spa-push-exit", "data-spa-swiped-out"].forEach(
+          function (name) {
+            layer.removeAttribute(name);
+          }
+        );
+        layer.querySelectorAll("main").forEach(function (main) {
+          ["transform", "opacity", "will-change", "transition"].forEach(function (name) {
+            main.style.removeProperty(name);
+          });
+        });
         layer.setAttribute("data-spa-route-state", "current");
       });
       const routeHost = clone.querySelector("#infraSpaRouteHost");
@@ -448,6 +463,71 @@
     // des fiches (document.querySelector(".tracks"), getElementById…) trouve la fiche affichée et non
     // une fiche gardée dessous. Les écrans gardés suivent, du plus récent au plus ancien ; leur ordre
     // d'affichage est donné par z-index (le plus récent juste sous l'écran affiché).
+    // Maquette V7, point 2 (INFRA, 11/11/2026) : une fiche ouverte depuis une autre fiche arrive par la
+    // droite ; celle du dessous recule de 28 % et s'assombrit (luminosité 0,78). Le retour fait l'inverse.
+    // Animations du navigateur (element.animate) : les transitions CSS de ces couches sont coupées
+    // (styles.css, pwa-swap-active et état « retained »).
+    const SPA_PUSH_MS = 320;
+    const SPA_PUSH_EASE = "cubic-bezier(.2,.8,.2,1)";
+    const SPA_RECEDED_FILTER = "brightness(0.78)";
+
+    function spaReducedMotion() {
+      return Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    }
+
+    function recededTransform(layer, ratio) {
+      const top = Number(layer && layer.getAttribute("data-spa-retained-top")) || 0;
+      return "translate3d(" + -28 * ratio + "%, " + top + "px, 0)";
+    }
+
+    // La fiche est posée hors écran à droite tout de suite ; l'animation ne part qu'après la première
+    // image affichée. Sinon (vu dans l'app installée, simulateur 12/11/2026) le téléphone, occupé à
+    // préparer la fiche, finissait l'animation avant d'afficher quoi que ce soit : arrivée d'un coup.
+    function animatePushArrival(destination, under) {
+      if (!destination || !under || spaReducedMotion() || typeof destination.animate !== "function") return;
+      under.setAttribute("data-spa-receded", "");
+      destination.style.transform = "translate3d(100%, 0, 0)";
+      let started = false;
+      let settleArrival = null;
+      // Attendu par hydrateSpaRoute : la fiche n'est préparée qu'une fois arrivée (au plus ~1,2 s).
+      spaState.pushArrivalDone = new Promise(function (resolve) {
+        settleArrival = resolve;
+        window.setTimeout(resolve, 700 + SPA_PUSH_MS + 200);
+      });
+      const start = function () {
+        if (started) return;
+        started = true;
+        if (!destination.isConnected) {
+          settleArrival();
+          return;
+        }
+        const arrival = destination.animate(
+          [{ transform: "translate3d(100%, 0, 0)" }, { transform: "translate3d(0, 0, 0)" }],
+          {
+            duration: SPA_PUSH_MS,
+            easing: SPA_PUSH_EASE
+          }
+        );
+        arrival.onfinish = settleArrival;
+        arrival.oncancel = settleArrival;
+        destination.style.transform = "";
+        if (!under.isConnected || !under.hasAttribute("data-spa-receded")) return;
+        under.animate(
+          [
+            { transform: recededTransform(under, 0), filter: "brightness(1)" },
+            { transform: recededTransform(under, 1), filter: SPA_RECEDED_FILTER }
+          ],
+          { duration: SPA_PUSH_MS, easing: SPA_PUSH_EASE }
+        );
+        under.style.transform = recededTransform(under, 1);
+        under.style.filter = SPA_RECEDED_FILTER;
+      };
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(start);
+      });
+      window.setTimeout(start, 700); // filet : images du navigateur suspendues (onglet caché)
+    }
+
     function syncRetainedLayerOrder(routeHost) {
       if (!routeHost || typeof routeHost.querySelectorAll !== "function") return;
       routeHost
@@ -1322,6 +1402,7 @@
         if (retainSource) {
           // Pile d'écrans (INFRA 11/11/2026) : l'écran quitté reste peint dessous, figé à sa position.
           sourceRoute.style.transform = "translate3d(0, " + sourceTop + "px, 0)";
+          sourceRoute.setAttribute("data-spa-retained-top", String(sourceTop));
           sourceRoute.setAttribute("data-spa-route-state", "retained");
           sourceRoute.setAttribute("aria-hidden", "true");
           sourceRoute.inert = true;
@@ -1337,6 +1418,7 @@
         installSpaSupplementalNodes(preparedRoute.supplementalNodes);
         preserveSourceRoute();
         syncRetainedLayerOrder(routeHost);
+        if (retainSource && retainCapture.kind === "page") animatePushArrival(destinationRoute, sourceRoute);
         // Reapply device/runtime classes before restoring scroll. On iPhone the
         // Home grid is one column only when `ios-device` is present; scrolling
         // against the temporary two-column geometry clamps a valid deep offset.
@@ -1527,6 +1609,25 @@
             outgoing.inert = true;
             coveringOutgoing = outgoing;
           }
+          // Fiche qui avait reculé sous une autre (V7, point 2) : elle revient en place, la fiche quittée
+          // sort par la droite au lieu de s'effacer.
+          const wasReceded = retainedHome.hasAttribute("data-spa-receded");
+          retainedHome.removeAttribute("data-spa-receded");
+          if (
+            wasReceded &&
+            coveringOutgoing &&
+            !spaReducedMotion() &&
+            typeof retainedHome.animate === "function"
+          ) {
+            coveringOutgoing.setAttribute("data-spa-push-exit", "");
+            retainedHome.animate(
+              [
+                { transform: "translate3d(-28%, 0, 0)", filter: SPA_RECEDED_FILTER },
+                { transform: "translate3d(0, 0, 0)", filter: "brightness(1)" }
+              ],
+              { duration: SPA_PUSH_MS, easing: SPA_PUSH_EASE }
+            );
+          }
           retainedHome.style.transform = "";
           retainedHome.style.filter = "";
           retainedHome.style.zIndex = "";
@@ -1557,7 +1658,24 @@
         } finally {
           setSpaSwapPaintLock(false);
         }
-        if (coveringOutgoing) {
+        if (coveringOutgoing && coveringOutgoing.hasAttribute("data-spa-push-exit")) {
+          const outgoing = coveringOutgoing;
+          const from = outgoing.style.transform || "translate3d(0, 0, 0)";
+          const to = from.replace(/^translate3d\(\s*[^,]+,/, "translate3d(100%,");
+          const exit = outgoing.animate([{ transform: from }, { transform: to }], {
+            duration: SPA_PUSH_MS,
+            easing: SPA_PUSH_EASE,
+            fill: "forwards"
+          });
+          let removed = false;
+          const removeOutgoing = function () {
+            if (removed) return;
+            removed = true;
+            outgoing.remove();
+          };
+          exit.onfinish = removeOutgoing;
+          window.setTimeout(removeOutgoing, SPA_PUSH_MS + 200); // filet si l'animation ne se termine pas
+        } else if (coveringOutgoing) {
           const outgoing = coveringOutgoing;
           const reduceMotion = Boolean(
             window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -1718,6 +1836,12 @@
 
     async function hydrateSpaRoute(telemetry) {
       const startedAt = getAudioTelemetryNow();
+      // Fiche qui arrive par la droite (V7, point 2) : la préparer seulement une fois l'arrivée finie.
+      // Sinon le téléphone, occupé, ne dessine pas l'animation (vu dans Safari iPhone, 12/11/2026).
+      if (spaState.pushArrivalDone) {
+        await spaState.pushArrivalDone;
+        spaState.pushArrivalDone = null;
+      }
       await initPage();
       trackAudioRuntimeEvent(
         "spa_hydration_done",

@@ -355,3 +355,123 @@ test("V8 : quatre glissers jusqu'à Favoris, le contenu reste visible", async ({
   expect(main).toEqual({ opacity: "1", transform: "" });
   await expect(page.locator(".favorites-view")).toBeVisible();
 });
+
+// ---------- Maquette V7, point 2 (INFRA, 11/11/2026) : fiche ouverte depuis une fiche ----------
+// Elle arrive par la droite ; la fiche du dessous recule (−28 %) et s'assombrit (luminosité 0,78).
+// Le retour fait l'inverse. Le premier niveau (accueil → fiche) ne change pas.
+test("V7-2 : album ouvert depuis un album arrive par la droite, celui du dessous recule", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" }); // la config coupe les animations
+  await openAlbumFromHome(page);
+  const firstLevel = await page.evaluate((retained) => {
+    const home = document.querySelector(retained);
+    return { receded: home.hasAttribute("data-spa-receded"), filter: home.style.filter };
+  }, RETAINED);
+  expect(firstLevel).toEqual({ receded: false, filter: "" });
+  const href = await otherAlbumHref(page);
+  await page.evaluate(
+    ({ current, href }) => {
+      window.__pushAnims = [];
+      const a = document.createElement("a");
+      a.href = href;
+      document.querySelector(current).appendChild(a);
+      a.click();
+      const seen = () => {
+        document.getAnimations().forEach((anim) => {
+          const el = anim.effect && anim.effect.target;
+          if (el && el.classList && el.classList.contains("spa-route-layer")) window.__pushAnims.push(el.getAttribute("data-spa-route-state"));
+        });
+        if (window.__pushAnims.length < 2) requestAnimationFrame(seen);
+      };
+      requestAnimationFrame(seen);
+    },
+    { current: CURRENT, href }
+  );
+  await page.waitForTimeout(900);
+  const s = await page.evaluate((retained) => {
+    const under = document.querySelector(retained); // le plus récent gardé = l'album A
+    const all = [...document.querySelectorAll(retained)];
+    return {
+      anims: [...new Set(window.__pushAnims)].sort(),
+      receded: under.hasAttribute("data-spa-receded"),
+      transform: under.style.transform,
+      filter: under.style.filter,
+      homeReceded: all[all.length - 1].hasAttribute("data-spa-receded")
+    };
+  }, RETAINED);
+  expect(s.anims).toEqual(["current", "retained"]);
+  expect(s.receded).toBe(true);
+  expect(s.transform).toContain("-28%");
+  expect(s.filter).toBe("brightness(0.78)");
+  expect(s.homeReceded).toBe(false);
+
+  await page.locator(CURRENT + " .back").first().click();
+  await page.waitForTimeout(900);
+  const back = await page.evaluate(
+    ({ current }) => {
+      const a = document.querySelector(current);
+      return {
+        receded: a.hasAttribute("data-spa-receded"),
+        transform: a.style.transform,
+        filter: a.style.filter,
+        layers: document.querySelectorAll(".spa-route-layer").length
+      };
+    },
+    { current: CURRENT }
+  );
+  expect(back).toEqual({ receded: false, transform: "", filter: "", layers: 2 });
+});
+
+test("V7-2 : « Réduire les animations » : pas de recul, pas d'animation", async ({ page }) => {
+  await openAlbumFromHome(page);
+  const href = await otherAlbumHref(page);
+  await openOtherAlbum(page, href);
+  const s = await page.evaluate((retained) => {
+    const under = document.querySelector(retained);
+    return { receded: under.hasAttribute("data-spa-receded"), filter: under.style.filter };
+  }, RETAINED);
+  expect(s).toEqual({ receded: false, filter: "" });
+});
+
+test("V7-2 : bord gauche au 2e niveau, la fiche du dessous revient avec le doigt", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "telephone", "geste tactile : téléphone");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openAlbumFromHome(page);
+  const href = await otherAlbumHref(page);
+  const a = await openOtherAlbum(page, href);
+  await page.waitForTimeout(500);
+  const mid = await page.evaluate(
+    async ({ current, retained }) => {
+      const layer = document.querySelector(current);
+      const touch = (x) => new Touch({ identifier: 9, target: layer, clientX: x, clientY: 400 });
+      const fire = (type, x) =>
+        layer.dispatchEvent(
+          new TouchEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            touches: type === "touchend" ? [] : [touch(x)],
+            changedTouches: [touch(x)]
+          })
+        );
+      fire("touchstart", 6);
+      for (const x of [20, 60, 120, 190]) fire("touchmove", x);
+      const under = document.querySelector(retained);
+      const t = under.style.transform;
+      await new Promise((r) => setTimeout(r, 300));
+      fire("touchend", 190);
+      return t;
+    },
+    { current: CURRENT, retained: RETAINED }
+  );
+  const pct = Number((mid.match(/translate3d\((-?[\d.]+)%/) || [])[1]);
+  expect(pct).toBeGreaterThan(-28);
+  expect(pct).toBeLessThan(0);
+  await expect(page).toHaveURL(new RegExp(a.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$"));
+  await page.waitForTimeout(600);
+  const s = await stackState(page);
+  expect(s.reusedA).toBe(a.images);
+  const st = await page.evaluate((current) => {
+    const l = document.querySelector(current);
+    return { transform: l.style.transform, filter: l.style.filter, receded: l.hasAttribute("data-spa-receded") };
+  }, CURRENT);
+  expect(st).toEqual({ transform: "", filter: "", receded: false });
+});

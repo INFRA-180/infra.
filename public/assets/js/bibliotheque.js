@@ -1125,25 +1125,49 @@
       // Pile d'écrans : l'écran juste dessous est la première couche gardée (la plus récente).
       return document.querySelector(".spa-route-layer[data-spa-route-state='retained']");
     }
+    // Fiche du dessous qui avait reculé de 28 % (fiche ouverte depuis une fiche, V7 point 2,
+    // spa-renderer.js) : elle revient avec le doigt. ratio 1 = reculée, 0 = en place.
+    function underTransform(under, ratio) {
+      var top = Number(under.getAttribute("data-spa-retained-top")) || 0;
+      return "translate3d(" + -28 * ratio + "%, " + top + "px, 0)";
+    }
     function paintEdge(layer, dx) {
       var p = Math.min(1, Math.max(0, dx / Math.max(1, window.innerWidth)));
       layer.style.transform = "translate3d(" + dx + "px, 0, 0)";
       var under = underLayer();
-      if (under) under.style.filter = "brightness(" + (0.78 + 0.22 * p).toFixed(3) + ")";
+      if (!under) return;
+      under.style.filter = "brightness(" + (0.78 + 0.22 * p).toFixed(3) + ")";
+      if (under.hasAttribute("data-spa-receded")) under.style.transform = underTransform(under, 1 - p);
     }
     function settleEdge(layer, toX, done) {
       var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       var under = underLayer();
       layer.style.transition = reduce ? "none" : "transform 260ms cubic-bezier(.2,.8,.2,1)";
-      if (under) under.style.transition = reduce ? "none" : "filter 260ms cubic-bezier(.2,.8,.2,1)";
       layer.style.transform = "translate3d(" + toX + "px, 0, 0)";
-      if (under) under.style.filter = toX > 0 ? "brightness(1)" : "brightness(.78)";
+      if (under) {
+        // Les transitions CSS de la couche gardée sont coupées : animation du navigateur.
+        var receded = under.hasAttribute("data-spa-receded");
+        var fromT = under.style.transform,
+          fromF = under.style.filter || "brightness(1)";
+        var toT = receded ? underTransform(under, toX > 0 ? 0 : 1) : fromT;
+        var toF = toX > 0 ? "brightness(1)" : receded ? "brightness(0.78)" : "brightness(.78)";
+        if (!reduce && typeof under.animate === "function") {
+          under.animate(
+            [
+              { transform: fromT || "none", filter: fromF },
+              { transform: toT || "none", filter: toF }
+            ],
+            { duration: 260, easing: "cubic-bezier(.2,.8,.2,1)" }
+          );
+        }
+        under.style.transform = toT;
+        under.style.filter = toF;
+        // Retour confirmé : la fiche du dessous est déjà en place, pas de deuxième animation au retour.
+        if (toX > 0) under.removeAttribute("data-spa-receded");
+      }
       window.setTimeout(
         function () {
-          if (under) {
-            under.style.transition = "";
-            if (toX <= 0) under.style.filter = "";
-          }
+          if (under && toX <= 0 && !under.hasAttribute("data-spa-receded")) under.style.filter = "";
           done();
         },
         reduce ? 0 : 270

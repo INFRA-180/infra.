@@ -1787,3 +1787,7 @@
 - Rangée d'onglets au bout : plus de fondu à droite (`.bib-tabs-row.at-end`, `styles.css`) — « Favoris » n'est plus coupé.
 - **Défaut trouvé dans le simulateur et corrigé** : arriver sur Favoris par un glisser donnait une page blanche. Favoris change l'adresse (`#favoris`) et Safari reconstruit la page depuis une copie de l'écran, prise pendant l'animation (transparente, décalée). Le contenu est maintenant remis en place avant de changer d'onglet ; sans arrivée animée si la page a été reconstruite. Ne se voyait pas dans Chromium (test ajouté quand même).
 - Tests : 3 tests V8 (`navigation.spec.js`) + 1 dans `test-home-album-swipe.js` (geste des pochettes débranché par défaut).
+
+## 12/11/2026 — Fiche ouverte depuis une fiche : arrivée par la droite (V7 point 2, Claude, `audiofix441`)
+- `spa-renderer.js` : la fiche arrive par la droite, celle du dessous recule de 28 % et s'assombrit (0,78) ; le retour fait l'inverse ; geste du bord : la fiche du dessous revient avec le doigt (`bibliotheque.js`). Rien si « Réduire les animations ». Préparation de la fiche (`initPage`) attendue jusqu'à la fin de l'arrivée. Copies de page (snapshot) nettoyées des styles d'animation.
+- Tests : 3 tests V7-2. **Non vérifié** : dans le simulateur, l'arrivée n'était pas visible avant le dernier correctif (attente de `initPage`) ; correctif publié sans nouvel essai, à la demande d'INFRA (crédits).

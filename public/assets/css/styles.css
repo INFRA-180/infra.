@@ -5844,3 +5844,86 @@ body[data-bib-view="playlists"] .home-screen [data-module-id="playlists"] .bib-s
 @media (min-width: 1500px) {
   .home-screen .albums-grid:not(.playlists-grid) { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
+
+/* Lot 1c (maquette V9-V19) : lignes de titres (onglet Titres, recherche). Téléphone : pochette (onde dessus si
+   en cours), titre / album, durée, cœur. Ordinateur : n° (▶ au survol, ❚❚ sur le titre en cours) · pochette ·
+   titre · album · durée · cœur au survol (toujours visible s'il est plein). */
+.bib-list-rows > li.bib-li { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; }
+.bib-li > .bib-row { grid-template-columns: 44px minmax(0, 1fr) auto; }
+.bib-li .bib-lead, .bib-li .al { display: none; }
+.bib-li .bib-thumb { position: relative; width: 44px; height: 44px; }
+.bib-li .bib-thumb img { display: block; }
+.bib-li .bib-thumb .bib-eq {
+  position: absolute; inset: 0; width: auto; height: auto; padding: 16px 14px; box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.42); border-radius: 6px;
+}
+.bib-li .bib-thumb .bib-eq i { background: #fff; }
+.bib-li:not(.now) .bib-eq { display: none; }
+.bib-li.now .bib-row .t { color: #e0353b; }
+.bib-li .bib-row .d { padding-left: 6px; }
+.bib-trackheart { margin-right: 0; color: rgba(17, 17, 17, 0.4); }
+.bib-trackheart[aria-pressed="true"] { color: #e0353b; }
+.bib-eq { display: inline-flex; align-items: flex-end; gap: 2px; width: 14px; height: 12px; }
+.bib-eq i { flex: 1; height: 35%; border-radius: 1px; background: #e0353b; }
+.bib-li.playing-now .bib-eq i { animation: bibEq 0.9s ease-in-out infinite; }
+.bib-li.playing-now .bib-eq i:nth-child(2) { animation-delay: -0.3s; animation-duration: 0.7s; }
+.bib-li.playing-now .bib-eq i:nth-child(3) { animation-delay: -0.55s; animation-duration: 1.05s; }
+@keyframes bibEq { 0%, 100% { height: 30%; } 50% { height: 100%; } }
+@media (prefers-reduced-motion: reduce) { .bib-li.playing-now .bib-eq i { animation: none; height: 70%; } }
+@media (min-width: 960px) {
+  .bib-list-rows > li.bib-li { margin: 0 -12px; padding-left: 12px; border-radius: 8px; }
+  .bib-list-rows > li.bib-li + li.bib-li { box-shadow: none; }
+  .bib-li > .bib-row { grid-template-columns: 30px 40px minmax(0, 1.3fr) minmax(0, 1fr) 52px; gap: 14px; min-height: 52px; }
+  .bib-li .bib-lead {
+    position: relative; display: grid; place-items: center; justify-items: start;
+    font-size: 13px; color: rgba(17, 17, 17, 0.4); font-variant-numeric: tabular-nums;
+  }
+  .bib-li .bib-lead > * { grid-area: 1 / 1; }
+  .bib-li .bib-lead .hp { display: none; }
+  .bib-li .bib-lead .hp svg { display: block; width: 13px; height: 13px; }
+  .bib-li.now .bib-lead .n { visibility: hidden; }
+  .bib-li .bib-thumb, .bib-li .bib-thumb img { width: 40px; height: 40px; }
+  .bib-li .bib-thumb .bib-eq { display: none; }
+  .bib-li .bib-row .tx .a { display: none; }
+  .bib-li .al { display: block; min-width: 0; font-size: 13px; color: rgba(17, 17, 17, 0.62); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bib-li .bib-row .d { padding-left: 0; text-align: right; font-size: 13px; }
+  .bib-trackheart[aria-pressed="false"] { visibility: hidden; }
+  .bib-li:hover .bib-trackheart, .bib-trackheart:focus-visible { visibility: visible; }
+}
+@media (min-width: 960px) and (hover: hover) {
+  .bib-li:hover { background: rgba(17, 17, 17, 0.04); }
+  .bib-li:hover .bib-lead .n, .bib-li:hover .bib-lead .bib-eq,
+  .bib-li .bib-row:focus-visible .bib-lead .n, .bib-li .bib-row:focus-visible .bib-lead .bib-eq { visibility: hidden; }
+  .bib-li:not(.playing-now):hover .bib-lead .hp-play,
+  .bib-li:not(.playing-now) .bib-row:focus-visible .bib-lead .hp-play { display: block; color: var(--ink, #111); }
+  .bib-li.playing-now:hover .bib-lead .hp-pause,
+  .bib-li.playing-now .bib-row:focus-visible .bib-lead .hp-pause { display: block; color: #e0353b; }
+}
+
+/* Lot 1d (maquette V9) : fiches album / playlist sur ordinateur — le numéro devient ▶ au survol (❚❚ rouge sur le
+   titre en cours) ; cœur au survol, toujours visible s'il est plein. */
+@media (min-width: 960px) and (hover: hover) and (pointer: fine) {
+  .album-screen .track-player .play-btn { position: relative; }
+  .album-screen .track-player:hover .play-btn:not(.is-current),
+  .album-screen .track-player .play-btn:not(.is-current):focus-visible { color: transparent !important; }
+  .album-screen .track-player:hover .play-btn.is-playing .track-eq,
+  .album-screen .track-player .play-btn.is-playing:focus-visible .track-eq { visibility: hidden; }
+  .album-screen .track-player:hover .play-btn:not(.is-current)::after,
+  .album-screen .track-player .play-btn:not(.is-current):focus-visible::after,
+  .album-screen .track-player:hover .play-btn.is-playing::after,
+  .album-screen .track-player .play-btn.is-playing:focus-visible::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px;
+    background-color: var(--ink, #111);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5.75 4.5v15l12.5-7.5z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5.75 4.5v15l12.5-7.5z'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .album-screen .track-player:hover .play-btn.is-playing::after,
+  .album-screen .track-player .play-btn.is-playing:focus-visible::after {
+    background-color: #e0353b;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='6' y='4.5' width='4' height='15' rx='1'/%3E%3Crect x='14' y='4.5' width='4' height='15' rx='1'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='6' y='4.5' width='4' height='15' rx='1'/%3E%3Crect x='14' y='4.5' width='4' height='15' rx='1'/%3E%3C/svg%3E");
+  }
+  .album-screen .track-player .track-favorite-btn[aria-pressed="false"] { visibility: hidden; }
+  .album-screen .track-player:hover .track-favorite-btn,
+  .album-screen .track-player:focus-within .track-favorite-btn { visibility: visible; }
+}

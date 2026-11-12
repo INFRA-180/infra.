@@ -1219,6 +1219,21 @@
         },
         toggle: function (path) {
           return toggleFavoriteAndSync(path, "home_favorites");
+        },
+        // Maquette V19 (INFRA, 12/11/2026) : liste des titres de la bibliothèque — cœur plein si favori,
+        // titre en cours (onde) et ❚❚ au survol.
+        pathOf: function (src) {
+          return normalizeFavoritePath(src || "");
+        },
+        has: function (src) {
+          return isFavoritePath(normalizeFavoritePath(src || ""));
+        },
+        current: function () {
+          const src = getCurrentLogicalAudioSrc() || audioState.activeLogicalSrc || "";
+          return src ? normalizeFavoritePath(src) : "";
+        },
+        playing: function () {
+          return Boolean(audioState.audio && !audioState.audio.paused);
         }
       };
     }

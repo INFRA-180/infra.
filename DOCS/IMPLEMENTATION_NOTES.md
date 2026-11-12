@@ -1806,3 +1806,9 @@
 - En-têtes d'onglet sans redire le nombre de l'onglet : Albums « 291 titres · 14 h 54 », Playlists « 234 titres · 12 h 02 » (secondes exactes de `data/playlists.json`), Titres « 14 h 54 ».
 - Ordinateur (≥ 960 px) : marge 40, pleine largeur (plus de plafond 1440), logo au milieu ; 5 albums par rangée, 6 dès 1500 px (12 sur l'accueil) ; playlists de l'accueil en rangée fixe de 4 (plus de boîte qui défile) ; fiches album / playlist alignées sur 40 (retour à 20 du haut, pochette à 64, comme la maquette).
 - Vérifié : mesures au navigateur (1440, 1920, 375) ; 12 captures de référence mises à jour après contrôle (téléphone : seul le texte retiré change).
+
+## 12/11/2026 — Maquette V19, lot 1 (2e partie) : lignes de titres (Claude, `audiofix443`)
+- Onglet Titres et recherche (`bibliotheque.js`, `trackRow`) : ordinateur = n° · pochette · titre · album · durée · cœur ; au survol le n° devient ▶ (❚❚ rouge sur le titre en cours), ligne teintée ; onde rouge à la place du n° du titre en cours ; cliquer sur le titre en cours = pause / reprise ; cœur au survol, toujours visible s'il est plein. Téléphone : pochette (onde dessus si en cours), titre / album, durée, cœur. Mesuré : mêmes colonnes que la maquette au pixel (1440 : 40 / 84 / 138 / 802 / 1316 ; 375 : 16 / 72 / 284,5 / cœur 315).
+- `favorites-ui.js` : `InfraHomeFavorites` gagne `pathOf`, `has`, `current`, `playing` (lecture seule, aucun changement du moteur audio). Les classes « en cours » suivent les événements `play` / `pause` des balises audio (écoutés à la descente).
+- Fiches album / playlist (ordinateur, souris) : n° → ▶ au survol (❚❚ sur le titre en cours) ; cœur vide caché hors survol.
+- Piège évité : une variable locale `favApi` du gestionnaire de clics masquait la nouvelle fonction (« favApi is not a function ») → fonction renommée `libFavApi`.

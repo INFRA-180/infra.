@@ -93,6 +93,12 @@ expect(codeHas(js, 'store.get("clipsOpen", false)') && codeHas(js, 'store.get("a
 expect(codeTest(/not\(\.bib-clips-open\)[^{]*\.bib-clips/, css) && codeTest(/not\(\.bib-apps-open\)[^{]*\.apps-grid/, css), "repli CSS des Clips / Applications absent");
 expect(codeHas(js, "headButton('data-bib-fold=\"' + id + '\"'"), "ligne Clips / Applications qui déplie absente");
 expect(codeHas(js, "<h2>Favoris</h2>") && codeHas(fav, "window.InfraHomeFavorites"), "section « Favoris » absente");
+// Maquette V9-V19 : lignes de titres (n° → ▶ au survol, onde du titre en cours, colonne album, cœur).
+expect(codeHas(js, "data-bib-trackheart") && codeHas(fav, "has: function (src)") && codeHas(fav, "pathOf: function (src)"), "cœur des lignes de titres absent");
+expect(codeHas(js, 'class="hp hp-play"') && codeHas(js, 'class="hp hp-pause"') && codeHas(js, "syncNowRows"), "▶ / ❚❚ / titre en cours des lignes absents");
+expect(codeHas(js, 'row.classList.contains("now") && toggle'), "titre en cours : pause / reprise au clic absente");
+expect(codeTest(/\.bib-li > \.bib-row \{ grid-template-columns: 30px 40px minmax\(0, 1\.3fr\) minmax\(0, 1fr\) 52px/, css), "colonnes ordinateur des titres absentes");
+expect(codeTest(/\.album-screen \.track-player \.track-favorite-btn\[aria-pressed="false"\] \{ visibility: hidden/, css), "cœur au survol des fiches absent");
 expect(codeTest(/data-clip-shell/, index) && codeTest(/data-clip-close/, index) && !codeTest(/clips-menu/, index), "lecteur de clip sur place absent");
 const cat = JSON.parse(read("public/data/catalog.json"));
 expect(codeTest(/VOLDEMORT/, cat.clips[0].title), "VOLDEMORT doit être le premier clip");

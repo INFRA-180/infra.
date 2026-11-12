@@ -574,26 +574,104 @@
     if (p) p.innerHTML = "";
   }
 
-  function trackRow(t, i) {
+  // Ligne de titre (maquette V9-V19, validée par INFRA le 12/11/2026) : sur ordinateur, numéro · pochette ·
+  // titre · album · durée · cœur ; le numéro devient ▶ au survol (❚❚ sur le titre en cours), l'onde rouge
+  // remplace le numéro du titre en cours ; cœur au survol, sauf s'il est plein. Téléphone : pochette (onde
+  // dessus si en cours), titre et album, durée, cœur.
+  var EQ = '<span class="bib-eq" aria-hidden="true"><i></i><i></i><i></i></span>';
+  var PAUSE =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></g></svg>';
+  var HEART_OUTLINE =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" d="M19.5 12.572 12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.566Z"/></svg>';
+  function libFavApi() {
+    var api = window.InfraHomeFavorites;
+    return api && typeof api.has === "function" ? api : null;
+  }
+  function nowState() {
+    var api = libFavApi();
+    return api ? { path: api.current(), playing: api.playing() } : { path: "", playing: false };
+  }
+  function trackRow(t, i, now) {
     var label = t.title + ", " + t.album.title + ", " + fmt(t.seconds);
+    var api = libFavApi(),
+      path = api ? api.pathOf(t.src) : "",
+      isNow = !!(now && path && now.path === path),
+      fav = !!(api && api.has(t.src));
     return (
-      '<li><button type="button" class="bib-row" data-bib-play="' +
+      '<li class="bib-li' +
+      (isNow ? " now" + (now.playing ? " playing-now" : "") : "") +
+      '" data-bib-path="' +
+      esc(path) +
+      '"><button type="button" class="bib-row" data-bib-play="' +
       i +
       '" aria-label="' +
       esc(label) +
       '">' +
-      '<img src="' +
+      '<span class="bib-lead" aria-hidden="true"><span class="n">' +
+      (i + 1) +
+      "</span>" +
+      EQ +
+      '<span class="hp hp-play">' +
+      ICON.play +
+      '</span><span class="hp hp-pause">' +
+      PAUSE +
+      "</span></span>" +
+      '<span class="bib-thumb"><img src="' +
       esc(t.album.cover) +
       '" alt="" loading="lazy" decoding="async">' +
+      EQ +
+      "</span>" +
       '<span class="tx"><span class="t">' +
       esc(t.title) +
       '</span><span class="a">' +
       esc(t.album.title) +
       "</span></span>" +
+      '<span class="al" aria-hidden="true">' +
+      esc(t.album.title) +
+      "</span>" +
       '<span class="d">' +
       fmt(t.seconds) +
-      "</span></button></li>"
+      "</span></button>" +
+      '<button type="button" class="bib-heart bib-trackheart" data-bib-trackheart="' +
+      i +
+      '" aria-pressed="' +
+      fav +
+      '" aria-label="' +
+      (fav ? "Retirer " : "Ajouter ") +
+      esc(t.title) +
+      (fav ? " des favoris" : " aux favoris") +
+      '" title="' +
+      (fav ? "Retirer des favoris" : "Ajouter aux favoris") +
+      '">' +
+      (fav ? HEART : HEART_OUTLINE) +
+      "</button></li>"
     );
+  }
+  // Titre en cours et lecture / pause : seules les classes changent (pas de nouveau rendu de la liste).
+  function syncNowRows() {
+    var p = $("[data-bib-panel]");
+    if (!p) return;
+    var now = nowState();
+    $$("li.bib-li", p).forEach(function (li) {
+      var isNow = !!now.path && li.getAttribute("data-bib-path") === now.path;
+      li.classList.toggle("now", isNow);
+      li.classList.toggle("playing-now", isNow && now.playing);
+    });
+  }
+  function syncTrackHearts() {
+    var p = $("[data-bib-panel]"),
+      api = libFavApi();
+    if (!p || !api) return;
+    $$("[data-bib-trackheart]", p).forEach(function (b) {
+      var t = shownTracks[Number(b.getAttribute("data-bib-trackheart"))];
+      if (!t) return;
+      var on = api.has(t.src);
+      if (String(on) === b.getAttribute("aria-pressed")) return;
+      b.setAttribute("aria-pressed", String(on));
+      b.setAttribute("aria-label", (on ? "Retirer " : "Ajouter ") + t.title + (on ? " des favoris" : " aux favoris"));
+      b.title = on ? "Retirer des favoris" : "Ajouter aux favoris";
+      b.innerHTML = on ? HEART : HEART_OUTLINE;
+    });
   }
 
   var shownTracks = [];
@@ -606,6 +684,7 @@
     }
     var q = norm(state.q.trim());
     var html = "";
+    var now = nowState();
     if (q) {
       var albums = data.albums.filter(function (a) {
         return norm(a.title).indexOf(q) >= 0;
@@ -671,7 +750,11 @@
           '<h2 class="bib-h">Titres <span>' +
           shownTracks.length +
           '</span></h2><ul class="bib-list-rows">' +
-          shownTracks.map(trackRow).join("") +
+          shownTracks
+            .map(function (t, i) {
+              return trackRow(t, i, now);
+            })
+            .join("") +
           "</ul>";
       p.innerHTML = html;
       return;
@@ -699,7 +782,7 @@
           last = k;
         }
       }
-      rows += trackRow(t, i);
+      rows += trackRow(t, i, now);
     });
     html =
       '<div class="module-head bib-panel-head"><h2>' +
@@ -746,7 +829,7 @@
     var el =
       event.target && event.target.closest
         ? event.target.closest(
-            "[data-bib-tab],[data-bib-goto],[data-bib-sortbtn],[data-bib-sort],[data-bib-layout],[data-bib-play],[data-bib-playall],[data-bib-albumplay],[data-bib-searchbtn],[data-bib-cancel],[data-bib-fold],[data-bib-favplay],[data-bib-favheart]"
+            "[data-bib-tab],[data-bib-goto],[data-bib-sortbtn],[data-bib-sort],[data-bib-layout],[data-bib-play],[data-bib-playall],[data-bib-albumplay],[data-bib-searchbtn],[data-bib-cancel],[data-bib-fold],[data-bib-favplay],[data-bib-favheart],[data-bib-trackheart]"
           )
         : null;
     if (!el) return;
@@ -793,6 +876,21 @@
       state.layout = el.getAttribute("data-bib-layout");
       store.set("layout", state.layout);
       render();
+      return;
+    }
+    if (el.hasAttribute("data-bib-play")) {
+      // Titre en cours : pause / reprise (convention Apple Music, Spotify ; maquette V9)
+      var row = el.closest("li.bib-li"),
+        toggle = $(".global-transport [data-transport-toggle]");
+      if (row && row.classList.contains("now") && toggle) {
+        toggle.click();
+        return;
+      }
+    }
+    if (el.hasAttribute("data-bib-trackheart")) {
+      var hApi = libFavApi(),
+        ht = shownTracks[Number(el.getAttribute("data-bib-trackheart"))];
+      if (hApi && ht && typeof hApi.toggle === "function") hApi.toggle(hApi.pathOf(ht.src));
       return;
     }
     if (el.hasAttribute("data-bib-play") || el.hasAttribute("data-bib-playall")) {
@@ -928,7 +1026,19 @@
   });
 
   document.addEventListener("infra:favorites-sync", function () {
-    if (isHome()) renderHomeFavorites();
+    if (!isHome()) return;
+    renderHomeFavorites();
+    syncTrackHearts();
+  });
+  // Les événements des balises audio ne remontent pas : on les écoute à la descente.
+  ["play", "playing", "pause", "ended", "emptied"].forEach(function (type) {
+    document.addEventListener(
+      type,
+      function (event) {
+        if (event.target && event.target.tagName === "AUDIO" && isHome()) syncNowRows();
+      },
+      true
+    );
   });
 
   // La vue Favoris du site se ferme par son propre bouton retour : on remet l'onglet Accueil.

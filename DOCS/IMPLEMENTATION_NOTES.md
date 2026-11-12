@@ -1791,3 +1791,12 @@
 ## 12/11/2026 — Fiche ouverte depuis une fiche : arrivée par la droite (V7 point 2, Claude, `audiofix441`)
 - `spa-renderer.js` : la fiche arrive par la droite, celle du dessous recule de 28 % et s'assombrit (0,78) ; le retour fait l'inverse ; geste du bord : la fiche du dessous revient avec le doigt (`bibliotheque.js`). Rien si « Réduire les animations ». Préparation de la fiche (`initPage`) attendue jusqu'à la fin de l'arrivée. Copies de page (snapshot) nettoyées des styles d'animation.
 - Tests : 3 tests V7-2. **Non vérifié** : dans le simulateur, l'arrivée n'était pas visible avant le dernier correctif (attente de `initPage`) ; correctif publié sans nouvel essai, à la demande d'INFRA (crédits).
+
+## 12/11/2026 — Maquette V9 ordinateur proposée (Claude, lecture seule sur le code)
+- Demande d'INFRA : playlists de l'accueil qui défilent de côté (on perd le défilement), liste des titres avec ▶ sur le numéro, grand lecteur sans animation fréquentielle avec lecture et commandes remontées.
+- Maquette : `DOCS/maquettes/MAQUETTE_BIBLIOTHEQUE_V9_ORDINATEUR_20261112.html`, détail et mesures dans `DOCS/maquettes/MAQUETTE_V9_20261112.md`. Constat mesuré sur le site : `.playlists-grid` est une boîte qui défile (`overflow: auto` + aimantation) alors que tout tient ; commandes du grand lecteur 53 px sous la pochette.
+- État : **proposée**, site non modifié, rien commité.
+
+## 12/11/2026 — Maquettes V10 → V19 de la bibliothèque (Claude, code du site inchangé)
+- Décisions et retours d'INFRA : `DOCS/IDEES_INFRA_20261112.md` ; déroulé : `DOCS/POINT_V9_20261112.md` ; PWA : `DOCS/PWA_SUPPORTS_20261112.md`.
+- Référence pour le code : **V17**. V18-V19 (changement d'onglet sans écran vide) refusées par INFRA ; animation V17 gardée.

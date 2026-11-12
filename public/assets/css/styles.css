@@ -5790,3 +5790,57 @@ body.home-screen:not(.bib-clips-open) [data-module-id="clips"].is-playing .bib-c
   opacity: 0;
   transition: opacity 160ms ease-out;
 }
+
+/* ==========================================================================
+   Maquette V19 — validée par INFRA le 12/11/2026 (DOCS/IDEES_INFRA_20261112.md)
+   Lot 1a : titres de section = boutons sur toute la ligne, sans « Tout voir » ni flèche ;
+   « Favoris » ; en-têtes d'onglet sans redire le nombre de l'onglet.
+   ========================================================================== */
+.home-screen .module-head { position: relative; }
+.bib-headbtn {
+  position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; margin: 0; padding: 0;
+  border: 0; background: none; cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent;
+}
+.bib-sectools:has(> .bib-headbtn) { min-height: 44px; } /* même hauteur de ligne qu'avec l'ancien « Tout voir » */
+.bib-headbtn:focus { outline: none; }
+.bib-headbtn:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; border-radius: 6px; }
+.home-screen .module-head h2 { transition: color 0.15s ease; }
+@media (hover: hover) {
+  .home-screen .module-head:has(.bib-headbtn:hover) h2 { color: var(--ink, #111) !important; }
+}
+.bib-sum {
+  margin-right: auto; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: rgba(17, 17, 17, 0.4); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+body[data-bib-view="albums"] .home-screen [data-module-id="albums"] .module-head h2,
+body[data-bib-view="playlists"] .home-screen [data-module-id="playlists"] .module-head h2 { display: none; }
+body[data-bib-view="albums"] .home-screen [data-module-id="albums"] .bib-sectools,
+body[data-bib-view="playlists"] .home-screen [data-module-id="playlists"] .bib-sectools { flex: 1 1 auto; margin-left: 0; }
+body[data-bib-view="playlists"] .home-screen [data-module-id="playlists"] .bib-sectools { min-height: 44px; }
+
+/* Lot 1b (maquette V19) : ordinateur aligné à gauche, pleine largeur, marge 40 px (logo au milieu) ;
+   5 albums par rangée, 6 au-delà de 1500 px (12 sur l'accueil) ; playlists de l'accueil en rangée fixe
+   (plus de boîte qui défile de côté : la molette et le trackpad font défiler la page). */
+@media (max-width: 1499px) {
+  body.home-screen[data-bib-view="accueil"] .albums-grid:not(.playlists-grid) > li:nth-child(n + 11) { display: none; }
+}
+@media (min-width: 960px) {
+  .home-screen .bib-tabs { max-width: none; padding-left: 40px; padding-right: 40px; }
+  .home-screen main.container.one-page-layout { max-width: none; padding-left: 40px; padding-right: 40px; }
+  .home-screen .albums-grid:not(.playlists-grid) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .home-screen .playlists-grid {
+    grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow: visible; scroll-snap-type: none; margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; gap: 22px 20px;
+  }
+  html body.home-screen:not([data-bib-view="playlists"]) .playlists-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+  .global-transport,
+  #infraSpaPersist .global-transport { padding-left: 40px !important; padding-right: 40px !important; }
+  .global-transport-now { max-width: calc(50% - 66px - 40px - 12px) !important; }
+  html body .global-transport .global-transport-now-mini { padding: 0 40px !important; }
+  /* Fiches album et playlist : même ligne de départ que l'accueil (40), pleine largeur */
+  .album-screen main.page, .spa-route-layer.album-screen main.page { max-width: none; margin-left: 0; margin-right: 0; padding-left: 40px; padding-right: 40px; }
+  .album-screen main.page > .back { margin-top: 8px; } /* retour à 20 px du haut, pochette à 64 (maquette V19) */
+}
+@media (min-width: 1500px) {
+  .home-screen .albums-grid:not(.playlists-grid) { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}

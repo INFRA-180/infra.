@@ -3,7 +3,7 @@
 // recherche, tri, grille ou liste, nombres, titres écrits tels quels.
 // Maquette V5 (validée par INFRA le 09/11/2026, DOCS/maquettes/MAQUETTE_V5_20261109.md) : onglet
 // « Apps & clips » retiré ; accueil Playlists, Albums, Vos favoris, Clips, Applications ; Clips et
-// Applications repliés par défaut, « Tout voir » / « Masquer » (choix retenu).
+// Applications repliés par défaut. Maquette V19 (12/11/2026) : titres de section cliquables sur toute la ligne.
 // Rien ici ne touche au moteur audio : la lecture d'une liste passe par
 // window.InfraLibraryPlayback (favorites-ui.js), le même chemin que les favoris.
 (function () {
@@ -17,7 +17,7 @@
 
   var VIEWS = ["accueil", "albums", "playlists", "titres", "favoris"];
   var SORTS = { site: "Ordre du site", az: "A → Z", duree: "Durée", titres: "Nombre de titres" };
-  var HOME_ALBUMS = 10;
+  var HOME_ALBUMS = 12; // 12 sur un écran très large (6 par rangée) ; 10 ailleurs (CSS, maquette V19)
   var store = {
     get: function (k, d) {
       try {
@@ -300,7 +300,7 @@
     });
   }
 
-  // Titre de la section Albums : « Voir les 32 » (accueil) ou tri + grille/liste (onglet Albums).
+  // Titre de la section Albums : toute la ligne ouvre l'onglet (accueil) ; somme + tri + grille/liste (onglet).
   function renderAlbumTools() {
     var head = $('.home-screen [data-module-id="albums"] .module-head');
     if (!head) return;
@@ -312,10 +312,21 @@
     }
     var count = data ? data.albums.length : $$("li", albumsGrid() || document.createElement("ul")).length;
     if (state.view === "accueil") {
-      tools.innerHTML =
-        '<button type="button" class="bib-link" data-bib-goto="albums">Voir les ' + count + "</button>";
+      tools.innerHTML = headButton('data-bib-goto="albums"', "Tous les albums (" + count + ")");
     } else if (state.view === "albums") {
+      var all = data ? data.tracks : [];
       tools.innerHTML =
+        (data
+          ? headSum(
+              all.length +
+                " titres · " +
+                fmtLong(
+                  all.reduce(function (s, t) {
+                    return s + t.seconds;
+                  }, 0)
+                )
+            )
+          : "") +
         sortButton(state.albumSort) +
         '<button type="button" class="bib-ico" data-bib-layout="grid" aria-pressed="' +
         (state.layout === "grid") +
@@ -342,7 +353,39 @@
       row.remove();
     }
   }
-  // Maquette V4 : « Tout voir » à droite du titre Playlists (accueil) ; durées « 5 h 14 ».
+  // Somme exacte des playlists (secondes de data/playlists.json, pas les durées arrondies des cartes).
+  var plSum = null,
+    plSumLoading = false;
+  function playlistSum() {
+    if (plSum || plSumLoading) return plSum;
+    plSumLoading = true;
+    var url = scriptUrl
+      ? new URL("../../data/playlists.json", scriptUrl)
+      : new URL("data/playlists.json", document.baseURI);
+    if (window.INFRA_BUILD_TAG) url.searchParams.set("v", window.INFRA_BUILD_TAG);
+    fetch(url, { credentials: "same-origin" })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (json) {
+        var list = json && Array.isArray(json.playlists) ? json.playlists : [];
+        if (!list.length) return;
+        plSum = list.reduce(
+          function (acc, pl) {
+            acc.n += Array.isArray(pl.tracks) ? pl.tracks.length : 0;
+            acc.secs += Number(pl.seconds) || 0;
+            return acc;
+          },
+          { n: 0, secs: 0 }
+        );
+        if (isHome() && state.view === "playlists") renderPlaylistTools();
+      })
+      .catch(function () {
+        plSumLoading = false;
+      });
+    return null;
+  }
+  // Accueil : toute la ligne « Playlists » ouvre l'onglet ; onglet Playlists : somme ; durées « 5 h 14 ».
   function renderPlaylistTools() {
     var head = $('.home-screen [data-module-id="playlists"] .module-head');
     if (!head) return;
@@ -352,10 +395,12 @@
       tools.className = "bib-sectools";
       head.appendChild(tools);
     }
-    var html =
-      state.view === "accueil"
-        ? '<button type="button" class="bib-link" data-bib-goto="playlists">Tout voir</button>'
-        : "";
+    var html = "";
+    if (state.view === "accueil") html = headButton('data-bib-goto="playlists"', "Toutes les playlists");
+    else if (state.view === "playlists") {
+      var sum = playlistSum();
+      if (sum) html = headSum(sum.n + " titres · " + fmtLong(sum.secs));
+    }
     if (tools.innerHTML !== html) tools.innerHTML = html;
     $$(".home-screen .playlist-card-meta").forEach(function (m) {
       var t = String(m.textContent || ""),
@@ -365,7 +410,7 @@
       if (f !== t) m.textContent = f;
     });
   }
-  // Clips et Applications : repliés par défaut, « Tout voir » / « Masquer » dans le titre de section.
+  // Clips et Applications : repliés par défaut ; toute la ligne du titre déplie / replie.
   function renderFoldTools() {
     ["clips", "apps"].forEach(function (id) {
       var open = !!state.open[id];
@@ -378,14 +423,7 @@
         tools.className = "bib-sectools";
         head.appendChild(tools);
       }
-      var html =
-        '<button type="button" class="bib-link" data-bib-fold="' +
-        id +
-        '" aria-expanded="' +
-        open +
-        '">' +
-        (open ? "Masquer" : "Tout voir") +
-        "</button>";
+      var html = headButton('data-bib-fold="' + id + '"', id === "clips" ? "Clips" : "Applications", open);
       if (tools.innerHTML !== html) tools.innerHTML = html;
     });
   }
@@ -402,7 +440,7 @@
     if (again) again.focus({ preventScroll: true });
   }
 
-  // « Vos favoris » : les 4 premiers favoris, « Tout voir » ouvre l'onglet Favoris ; absente sans favori.
+  // « Favoris » : les 4 premiers favoris, toute la ligne ouvre l'onglet Favoris ; absente sans favori.
   var HOME_FAVS = 4;
   var HEART =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 20s-7.5-4.4-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.6-7.5 10-7.5 10z"/></svg>';
@@ -426,7 +464,9 @@
     }
     section.hidden = false;
     var html =
-      '<div class="module-head bib-head"><h2>Vos favoris</h2><span class="bib-sectools"><button type="button" class="bib-link" data-bib-goto="favoris">Tout voir</button></span></div>' +
+      '<div class="module-head bib-head"><h2>Favoris</h2><span class="bib-sectools">' +
+      headButton('data-bib-goto="favoris"', "Tous les favoris") +
+      "</span></div>" +
       '<ul class="bib-list-rows">' +
       homeFavs
         .map(function (t, i) {
@@ -458,6 +498,24 @@
         .join("") +
       "</ul>";
     if (section.innerHTML !== html) section.innerHTML = html;
+  }
+
+  // Maquette V14-V15 (validée par INFRA le 12/11/2026) : le titre de section est le bouton, toute la ligne
+  // est cliquable, sans « Tout voir » ni flèche. Bouton invisible étendu sur la ligne (le titre <h2> reste
+  // tel quel pour l'éditeur) ; VoiceOver lit son nom (« Tous les albums »).
+  function headButton(attr, label, expanded) {
+    return (
+      '<button type="button" class="bib-headbtn" ' +
+      attr +
+      (expanded == null ? "" : ' aria-expanded="' + expanded + '"') +
+      ' aria-label="' +
+      esc(label) +
+      '"></button>'
+    );
+  }
+  // En-tête d'un onglet : la somme sans redire le nombre déjà affiché dans l'onglet (maquette V14).
+  function headSum(text) {
+    return '<span class="bib-sum">' + esc(text) + "</span>";
   }
 
   function sortButton(current) {
@@ -645,8 +703,6 @@
     });
     html =
       '<div class="module-head bib-panel-head"><h2>' +
-      shownTracks.length +
-      " titres · " +
       fmtLong(total) +
       '</h2><span class="bib-sectools">' +
       '<button type="button" class="bib-link" data-bib-playall>Tout lire</button>' +

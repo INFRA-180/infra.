@@ -1800,3 +1800,9 @@
 ## 12/11/2026 — Maquettes V10 → V19 de la bibliothèque (Claude, code du site inchangé)
 - Décisions et retours d'INFRA : `DOCS/IDEES_INFRA_20261112.md` ; déroulé : `DOCS/POINT_V9_20261112.md` ; PWA : `DOCS/PWA_SUPPORTS_20261112.md`.
 - Référence pour le code : **V19, validée par INFRA le 12/11** (« la 19, elle est validée »). V18 refusée.
+
+## 12/11/2026 — Maquette V19, lot 1 (1re partie) : titres de section et mise en page ordinateur (Claude, `audiofix442`)
+- Titres de section de l'accueil (Playlists, Albums, Favoris, Clips, Applications) : toute la ligne est le bouton (`.bib-headbtn`, bouton invisible étendu sur la ligne ; `<h2>` laissé tel quel pour l'éditeur), plus de « Tout voir », « Voir les 32 », « Masquer » ; « Vos favoris » → « Favoris » ; ligne gardée à 44 px.
+- En-têtes d'onglet sans redire le nombre de l'onglet : Albums « 291 titres · 14 h 54 », Playlists « 234 titres · 12 h 02 » (secondes exactes de `data/playlists.json`), Titres « 14 h 54 ».
+- Ordinateur (≥ 960 px) : marge 40, pleine largeur (plus de plafond 1440), logo au milieu ; 5 albums par rangée, 6 dès 1500 px (12 sur l'accueil) ; playlists de l'accueil en rangée fixe de 4 (plus de boîte qui défile) ; fiches album / playlist alignées sur 40 (retour à 20 du haut, pochette à 64, comme la maquette).
+- Vérifié : mesures au navigateur (1440, 1920, 375) ; 12 captures de référence mises à jour après contrôle (téléphone : seul le texte retiré change).

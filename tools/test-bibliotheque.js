@@ -78,7 +78,11 @@ expect(codeHas(css, ".bib-meta-row") && codeHas(albumUi, "bib-meta-row"), "bouto
 expect(!codeHas(albumUi, "bibliotheque.css") && !codeHas(home, "bibliotheque.css"), "ajout dynamique de bibliotheque.css encore présent");
 expect(codeHas(js, "bib-idle") && codeHas(js, "[data-transport-toggle]"), "lecteur au repos absent");
 expect(codeHas(js, "data-bib-albumplay"), "▶ sur les pochettes absent");
-expect(codeHas(js, 'data-bib-goto="playlists">Tout voir'), "« Tout voir » des playlists absent");
+// Maquette V19 (INFRA, 12/11/2026) : le titre de section est le bouton (toute la ligne), plus de « Tout voir ».
+expect(codeHas(js, "headButton('data-bib-goto=\"playlists\"'"), "ligne « Playlists » cliquable absente");
+expect(codeHas(js, "headButton('data-bib-goto=\"albums\"'"), "ligne « Albums » cliquable absente");
+expect(!codeHas(js, ">Tout voir<") && !codeHas(js, '"Voir les "') && !codeHas(js, '"Masquer"'), "« Tout voir » / « Voir les » / « Masquer » encore présents");
+expect(codeTest(/\.bib-headbtn \{[^}]*position: absolute; inset: 0/, css), "bouton de ligne de section pas étendu sur toute la ligne");
 
 // Maquette V5 (INFRA, 09/11/2026) : Playlists, Albums, Vos favoris, Clips, Applications ;
 // Clips et Applications repliés par défaut ; clip lu sur place.
@@ -87,8 +91,8 @@ expect(order("playlists") < order("albums") && order("albums") < order("favoris"
 expect(!codeTest(/data-bib-view="accueil"\] \.one-page-layout > \[data-module-id="clips"\] \{ display: none/, css), "les clips sont encore cachés de l'accueil");
 expect(codeHas(js, 'store.get("clipsOpen", false)') && codeHas(js, 'store.get("appsOpen", false)'), "Clips / Applications pas repliés par défaut");
 expect(codeTest(/not\(\.bib-clips-open\)[^{]*\.bib-clips/, css) && codeTest(/not\(\.bib-apps-open\)[^{]*\.apps-grid/, css), "repli CSS des Clips / Applications absent");
-expect(codeHas(js, '"Masquer" : "Tout voir"'), "« Tout voir » / « Masquer » absent");
-expect(codeHas(js, "Vos favoris") && codeHas(fav, "window.InfraHomeFavorites"), "section « Vos favoris » absente");
+expect(codeHas(js, "headButton('data-bib-fold=\"' + id + '\"'"), "ligne Clips / Applications qui déplie absente");
+expect(codeHas(js, "<h2>Favoris</h2>") && codeHas(fav, "window.InfraHomeFavorites"), "section « Favoris » absente");
 expect(codeTest(/data-clip-shell/, index) && codeTest(/data-clip-close/, index) && !codeTest(/clips-menu/, index), "lecteur de clip sur place absent");
 const cat = JSON.parse(read("public/data/catalog.json"));
 expect(codeTest(/VOLDEMORT/, cat.clips[0].title), "VOLDEMORT doit être le premier clip");

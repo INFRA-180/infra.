@@ -1,10 +1,10 @@
 # Idées et décisions d'INFRA — bibliothèque ordinateur / téléphone (12/11/2026)
 
 Point demandé par INFRA (« un point MD de mes idées, avant de lancer »). À lire avec `DOCS/POINT_V9_20261112.md` et `DOCS/SUIVI_BIBLIOTHEQUE.md`.
-Maquettes du jour : V10 → V17 dans `DOCS/maquettes/` (chacune avec son `MAQUETTE_Vxx_20261112.md`). **Référence : V17** (`MAQUETTE_BIBLIOTHEQUE_V17_20261112.html`, sources `sources_V17/`) ; V18 et V19 (changement d'onglet sans écran vide) essayées et refusées par INFRA le 12/11. Site **non modifié** ; notes du jour commitées le 12/11 (maquettes locales, hors Git).
+Maquettes du jour : V10 → V17 dans `DOCS/maquettes/` (chacune avec son `MAQUETTE_Vxx_20261112.md`). **Référence validée : V19** (`MAQUETTE_BIBLIOTHEQUE_V19_20261112.html`, sources `sources_V19/` ; V19 = V17 + changement d'onglet où le nouvel onglet est déjà dessous). V18 refusée. Site **non modifié** ; notes du jour commitées le 12/11 (maquettes locales, hors Git).
 
 ## Validé par INFRA
-- **Maquette validée dans son ensemble (12/11 soir), référence V17** : « je valide la maquette, c'est bon ».
+- **Maquette validée dans son ensemble (12/11 soir), référence V19** : « je valide la maquette, c'est bon » ; « la 19, elle est validée ».
 - Mise en page ordinateur **alignée à gauche, pleine largeur** ; le **logo INFRA au milieu**.
 - Grand lecteur ordinateur : pochette + bloc de lecture (titre, barre, commandes) d'un seul tenant ; **« À suivre » en dessous, dans la même page** (toucher « À suivre » descend jusqu'à la file).
 - **Toute la ligne** d'un titre de section ouvre / déplie (Clips, Applications, Playlists, Albums, Favoris).

@@ -1799,4 +1799,4 @@
 
 ## 12/11/2026 — Maquettes V10 → V19 de la bibliothèque (Claude, code du site inchangé)
 - Décisions et retours d'INFRA : `DOCS/IDEES_INFRA_20261112.md` ; déroulé : `DOCS/POINT_V9_20261112.md` ; PWA : `DOCS/PWA_SUPPORTS_20261112.md`.
-- Référence pour le code : **V17**. V18-V19 (changement d'onglet sans écran vide) refusées par INFRA ; animation V17 gardée.
+- Référence pour le code : **V19, validée par INFRA le 12/11** (« la 19, elle est validée »). V18 refusée.

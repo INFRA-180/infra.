@@ -1874,3 +1874,18 @@
   Dock. Pictogramme centré sur la hauteur du logo, bord droit aligné sur la loupe (téléphone).
 - Vérifié : `npm test` (24 contrôles), 62 tests visuels (8 références refaites : bandeau retiré, pictogramme ajouté),
   site local 1024 et 375 px. Non vérifié : iPhone réel, vraie fenêtre d'installation Chrome (simulée par événement).
+
+## 13/11 — Carte de partage : elle reste affichée, on la quitte par la croix
+
+Demande d'INFRA : « quand je reste appuyé, il faut qu'elle reste affichée ; on la quitte en allant sur la croix ».
+
+- `src/js/share-qr.js` : la carte (`<dialog id="infraShareDialog">`) ne se ferme plus par le fond. Les écouteurs
+  `pointerdown` / `pointerup` / `pointercancel` / `click` posés sur le fond sont retirés, et `closedby="any"` devient
+  `closedby="closerequest"` (plus de fermeture « légère » du navigateur).
+- Garde sur le doigt qui ouvre (`openingPointerId`, libérée 600 ms après le relâchement) : l'appui long fait apparaître
+  la carte sous le doigt, et le relâchement tombe souvent pile sur la croix. Tant que c'est le même doigt, l'événement
+  est avalé — relâcher ne ferme jamais, même après un appui de 3 secondes.
+- Échap reste (convention clavier sur ordinateur). La croix reste le seul geste de fermeture au doigt.
+- Vérifié (navigateur, 375×812, gestes simulés) : ouverture par appui long ; reste ouverte au relâchement sur la croix,
+  à l'appui sur le fond, au glissement, après un appui de 3 s ; se ferme par la croix et par Échap. `npm test` vert.
+  Non vérifié : iPhone réel.

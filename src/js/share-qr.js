@@ -8,6 +8,7 @@
   const MOVE_TOLERANCE_PX = 12;
   const CLICK_SUPPRESSION_MS = 1200;
   const CLOSE_CLICK_SUPPRESSION_MS = 650;
+  const OPENING_POINTER_RELEASE_MS = 600;
   const SHARE_BRAND_RED = "#e52c31";
   const QR_FILL = "#000000";
   const moduleScript = document.currentScript;
@@ -29,7 +30,7 @@
   let openToken = 0;
   let copyStateTimer = 0;
   let closeClickSuppressionUntil = 0;
-  let backdropPointer = null;
+  let openingPointerId = null;
   let shareSelectionElement = null;
 
   function cleanUrl(urlLike) {
@@ -101,7 +102,21 @@
     handleDialogClosed();
   }
 
+  function isOpeningPointerEvent(event) {
+    if (openingPointerId === null) return false;
+    if (!event || typeof event.pointerId !== "number") return true;
+    return event.pointerId === openingPointerId;
+  }
+
   function closeFromPointer(event) {
+    // Le relachement de l'appui long tombe souvent sur la croix : on l'avale.
+    if (isOpeningPointerEvent(event)) {
+      if (event && typeof event.preventDefault === "function") event.preventDefault();
+      if (event && typeof event.stopImmediatePropagation === "function") {
+        event.stopImmediatePropagation();
+      }
+      return;
+    }
     closeClickSuppressionUntil = Date.now() + CLOSE_CLICK_SUPPRESSION_MS;
     if (event && typeof event.preventDefault === "function") event.preventDefault();
     if (event && typeof event.stopImmediatePropagation === "function") {
@@ -170,7 +185,7 @@
 
   function handleDialogClosed() {
     window.clearTimeout(copyStateTimer);
-    backdropPointer = null;
+    openingPointerId = null;
     clearShareSelection();
     resetCopyFeedback();
     restoreDialogFocus();
@@ -183,7 +198,7 @@
     dialog.id = "infraShareDialog";
     dialog.className = "share-dialog";
     dialog.style.setProperty("--share-brand-red", SHARE_BRAND_RED);
-    dialog.setAttribute("closedby", "any");
+    dialog.setAttribute("closedby", "closerequest");
     dialog.setAttribute("aria-labelledby", "infraShareTitle");
     dialog.innerHTML = [
       '<div class="share-dialog-panel" data-share-dialog-panel>',
@@ -205,7 +220,6 @@
     const closeButton = dialog.querySelector(".share-dialog-close");
     const copyButton = dialog.querySelector(".share-copy");
     const copyToast = dialog.querySelector("[data-share-copy-toast]");
-    const panel = dialog.querySelector("[data-share-dialog-panel]");
     const title = dialog.querySelector("#infraShareTitle");
     const qr = dialog.querySelector("[data-share-qr]");
     const brandLogo = dialog.querySelector("[data-share-brand-logo]");
@@ -215,36 +229,11 @@
 
     closeButton.addEventListener("click", closeFromPointer);
     closeButton.addEventListener("pointerup", closeFromPointer);
-    dialog.addEventListener(
-      "pointerdown",
-      function (event) {
-        if (event.target !== dialog) return;
-        backdropPointer = {
-          pointerId: event.pointerId,
-          startX: event.clientX,
-          startY: event.clientY
-        };
-      },
-      { passive: true }
-    );
-    dialog.addEventListener("pointerup", function (event) {
-      if (!backdropPointer || event.pointerId !== backdropPointer.pointerId || event.target !== dialog)
-        return;
-      const dx = event.clientX - backdropPointer.startX;
-      const dy = event.clientY - backdropPointer.startY;
-      backdropPointer = null;
-      if (Math.hypot(dx, dy) > MOVE_TOLERANCE_PX) return;
-      closeFromPointer(event);
-    });
-    dialog.addEventListener("pointercancel", function () {
-      backdropPointer = null;
-    });
-    dialog.addEventListener("click", function (event) {
-      if (event.target === dialog || (panel && !panel.contains(event.target))) closeFromPointer(event);
-    });
+    // La carte reste affichee tant qu'INFRA n'a pas touche la croix : aucun
+    // relachement, aucun appui sur le fond et aucun glissement ne la ferme.
+    // Seule la touche Echap reste (convention clavier sur ordinateur).
     dialog.addEventListener("close", handleDialogClosed);
     dialog.addEventListener("cancel", function () {
-      backdropPointer = null;
       window.clearTimeout(copyStateTimer);
     });
     copyButton.addEventListener("click", async function () {
@@ -499,7 +488,8 @@
     return legacyCopy(text, scope);
   }
 
-  async function openShare(intent, invoker) {
+  async function openShare(intent, invoker, pointerId) {
+    openingPointerId = typeof pointerId === "number" ? pointerId : null;
     const parts = ensureDialog();
     const token = ++openToken;
     currentShareUrl = intent.url;
@@ -553,7 +543,7 @@
         element: intent.element,
         until: Date.now() + CLICK_SUPPRESSION_MS
       };
-      openShare(intent, intent.element);
+      openShare(intent, intent.element, gesture.pointerId);
     }, LONG_PRESS_MS);
   }
 
@@ -571,6 +561,12 @@
     if (activated) {
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (openingPointerId === event.pointerId) {
+        const releasedId = openingPointerId;
+        window.setTimeout(function () {
+          if (openingPointerId === releasedId) openingPointerId = null;
+        }, OPENING_POINTER_RELEASE_MS);
+      }
     }
   }
 

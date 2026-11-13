@@ -14,9 +14,15 @@ const logoPath = path.join(root, "public/assets/branding/infra-logo-white-photor
 assert.ok(fs.existsSync(logoPath), "official INFRA wordmark is missing");
 assert.ok(codeHas(script, 'const SHARE_BRAND_RED = "#e52c31"'), "QR modal does not use the official logo red");
 assert.ok(codeHas(script, 'const QR_FILL = "#000000"'), "QR modules are not black");
-assert.ok(codeHas(script, 'background: SHARE_BRAND_RED'), "QR background is not the official INFRA red");
+assert.ok(codeHas(script, "context.fillStyle = SHARE_BRAND_RED"), "QR background is not the official INFRA red");
 assert.ok(codeHas(script, 'ecLevel: "H"'), "inverted-color QR does not use high error correction");
-assert.ok(codeHas(script, "quiet: 4"), "QR does not preserve a four-module quiet zone");
+// QR rond validé par INFRA (13/11/2026) : 2 modules vides autour du code, puis le disque rempli de pastilles ;
+// repères en cercles de 20 pastilles. Lu par le lecteur QR de macOS.
+assert.ok(codeHas(script, "const QR_RING = 2"), "QR code lost its empty ring around the data");
+assert.ok(codeHas(script, "const QR_EYE_DOTS = 20"), "QR finder patterns are not dotted circles");
+assert.ok(codeHas(script, "if (isFinderModule(r, q, n)) continue;"), "square finder modules are still drawn");
+assert.ok(codeHas(script, "drawRoundQr(QrCreator, url)"), "share dialog does not draw the round QR");
+assert.ok(!codeHas(script, "data-share-install"), "install entry is back in the share card (refused by INFRA, 13/11/2026)");
 assert.ok(
   codeHas(script, "../branding/infra-logo-white-photoroom-title.png"),
   "QR modal does not reuse the official site logo"
@@ -66,5 +72,7 @@ assert.ok(
 );
 assert.ok(codeHas(styles, ".share-copy-toast.is-visible"), "copy notification has no visible state");
 assert.ok(codeHas(styles, ".share-brand-logo"), "official logo has no modal layout");
+assert.ok(codeHas(styles, "background: rgba(20, 22, 28, 0.48)"), "share card is not smoked glass");
+assert.ok(codeHas(styles, "padding: 18px 20px 30px"), "share card lost its measured bottom margin");
 
 console.log("INFRA QR modal controls and branding: ok");

@@ -1855,3 +1855,22 @@
   à 16). Décalage 15,05 px sur téléphone, 3,2 px sur ordinateur. Vérifié : Chrome Android (émulateur Android 15),
   Safari iPhone (simulateur) et ordinateur 1440 px : plus aucun écart (hors faux positifs : liens masqués pour les
   moteurs de recherche, onglets qui défilent, fin naturelle d'un titre).
+
+## 2026-11-13 — QR rond, carte verre fumé, installation discrète (audiofix449, Claude)
+
+- Demande d'INFRA : QR rond, yeux qui s'intègrent mieux ; validé le 13/11 : **yeux en cercles pointillés** + **carte
+  verre fumé** (maquette `DOCS/maquettes/MAQUETTE_PARTAGE_INSTALL_DEF_20261113.html`, locale).
+- QR (`src/js/share-qr.js`) : la matrice vient toujours de qr-creator (correction H), lue sur un rendu brut ; le code
+  reste au centre, 2 modules vides autour, puis des pastilles décoratives (tirage fixe) remplissent le disque rouge ;
+  repères = 20 pastilles en cercle + pupille pleine. Lu par le lecteur QR de macOS (CIDetector) sur capture du site,
+  même réduit à 200 px. Le test `test-share-qr-ui.js` vérifie ce dessin au lieu de l'ancienne marge de 4 modules.
+- Carte : noir 48 %, flou 28 px ; logo officiel recoloré au chargement (noir → blanc, point rouge identique) ;
+  voile derrière 40 %. Géométrie mesurée : marges haut/bas 32,3 / 32,7 px, icônes→rond 29,3, rond→logo 29,5,
+  croix et copier à 34,3 px des bords (copier décalé de −1,2 px), tout centré.
+- Installation (`src/js/pwa-install.js`), choix d'INFRA : plus de bandeau automatique ni d'entrée dans la carte de partage.
+  Petit pictogramme gris en haut à droite de l'accueil pendant les **deux premières visites** (une visite = une session),
+  retiré dès la troisième et une fois installé. Un geste : fenêtre du navigateur (`beforeinstallprompt`, Chrome/Edge/
+  Android), sinon le petit bandeau existant avec les étapes, seulement à la demande. Mac Safari : Fichier › Ajouter au
+  Dock. Pictogramme centré sur la hauteur du logo, bord droit aligné sur la loupe (téléphone).
+- Vérifié : `npm test` (24 contrôles), 62 tests visuels (8 références refaites : bandeau retiré, pictogramme ajouté),
+  site local 1024 et 375 px. Non vérifié : iPhone réel, vraie fenêtre d'installation Chrome (simulée par événement).

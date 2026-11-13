@@ -1262,7 +1262,7 @@
   "use strict";
   if (typeof document === "undefined" || typeof window === "undefined") return;
   if (typeof document.createElement !== "function" || !document.head) return;
-  var VERSION = "bibliotheque-v37-20261113";
+  var VERSION = "bibliotheque-v38-20261113";
   try {
     var script = document.currentScript;
     if (!script || !script.src) return;

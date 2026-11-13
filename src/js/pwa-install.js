@@ -55,7 +55,17 @@
       const androidKind = getAndroidBrowserKind();
       if (androidKind !== "other") return `android-${androidKind}`;
       if (isAndroidDevice()) return "android-other";
+      if (isMacSafari()) return "mac-safari";
       return "other";
+    }
+
+    // Safari sur Mac (pas l'iPad, qui se dit aussi « Macintosh » mais a un écran tactile) :
+    // Fichier › Ajouter au Dock.
+    function isMacSafari() {
+      const ua = String(navigator.userAgent || "");
+      const vendor = String(navigator.vendor || "");
+      if (!/Macintosh/i.test(ua) || Number(navigator.maxTouchPoints || 0) > 1) return false;
+      return /Safari/i.test(ua) && /Apple/i.test(vendor) && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox/i.test(ua);
     }
 
     function isSafariOnIos() {
@@ -213,6 +223,10 @@
       '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/></svg>';
     const ICON_MENU =
       '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><circle cx="12" cy="5.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="18.5" r="1.7"/></g></svg>';
+    const ICON_FILE =
+      '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h6.5L18 8v12.5H7z"/><path d="M13.5 3.5V8H18"/></svg>';
+    const ICON_DOCK =
+      '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="14" width="17" height="6" rx="2"/><rect x="9" y="6" width="6" height="6" rx="1.6"/></svg>';
     const ICON_CLOSE =
       '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 
@@ -227,6 +241,12 @@
         return [
           [ICON_SHARE, "Partager"],
           [ICON_ADD, "Ajouter à l’écran d’accueil"]
+        ];
+      }
+      if (browserKind === "mac-safari") {
+        return [
+          [ICON_FILE, "Fichier"],
+          [ICON_DOCK, "Ajouter au Dock"]
         ];
       }
       if (String(browserKind).indexOf("android-") === 0) {
@@ -267,50 +287,162 @@
 
       const closeBtn = root.querySelector("[data-pwa-browser]");
       if (closeBtn) {
-        closeBtn.addEventListener("click", function () {
-          root.classList.remove("is-open");
-          root.setAttribute("aria-hidden", "true");
-          pwaState.sessionDismissed = true;
-          persistPwaChoice("browser");
-        });
+        closeBtn.addEventListener("click", hideBanner);
       }
       return root;
     }
 
-    function initPwaInstallPrompt(adminMode) {
-      const existing = document.getElementById("infraPwaInstallModal");
-      const browserKind = getInstallBrowserKind();
-      const savedChoice = readPwaChoice();
-      const canShow =
-        !adminMode &&
-        document.body.classList.contains("home-screen") &&
-        (isIosDevice() || isAndroidDevice()) &&
-        !isStandaloneDisplayMode() &&
-        !pwaState.sessionDismissed &&
-        !savedChoice;
+    // Installation discrète (INFRA, 13/11/2026) : pas de bandeau automatique, pas d'entrée dans la carte
+    // de partage. Un petit pictogramme en haut à droite de l'accueil pendant les deux premières visites,
+    // retiré dès la troisième ; jamais une fois installé. Un geste : fenêtre d'installation du navigateur
+    // quand il en a une, sinon le petit bandeau avec les étapes en pictogrammes (seulement à la demande).
+    const INSTALL_STATE_KEY = "infra_pwa_install_v2";
+    const VISIT_SESSION_KEY = "infra_pwa_visit_v2";
+    const ICON_VISITS = 2;
+    const ICON_INSTALL =
+      '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v11m-4.2-4.2L12 14.5l4.2-4.2"/><path d="M5 15.5v2.2A2.3 2.3 0 0 0 7.3 20h9.4a2.3 2.3 0 0 0 2.3-2.3v-2.2"/></svg>';
+    let deferredPrompt = null;
+    let lastAdminMode = false;
 
-      if (!canShow) {
-        if (existing && (!pwaState.shownThisSession || !document.body.classList.contains("home-screen"))) {
-          existing.classList.remove("is-open");
-          existing.setAttribute("aria-hidden", "true");
-        }
+    function readInstallState() {
+      let state = {};
+      try {
+        state = JSON.parse(localStorage.getItem(INSTALL_STATE_KEY) || "{}") || {};
+      } catch (_err) {
+        state = {};
+      }
+      return { visits: Number(state.visits) || 0, installed: Boolean(state.installed) };
+    }
+
+    function writeInstallState(state) {
+      try {
+        localStorage.setItem(INSTALL_STATE_KEY, JSON.stringify(state));
+      } catch (_err) {
+        // Ignore storage errors.
+      }
+    }
+
+    // Une visite = une session du navigateur.
+    (function countVisit() {
+      try {
+        if (sessionStorage.getItem(VISIT_SESSION_KEY)) return;
+        sessionStorage.setItem(VISIT_SESSION_KEY, "1");
+      } catch (_err) {
         return;
       }
+      const state = readInstallState();
+      state.visits += 1;
+      writeInstallState(state);
+    })();
 
+    function isInstalled() {
+      return isStandaloneDisplayMode() || readInstallState().installed;
+    }
+
+    function markInstalled() {
+      const state = readInstallState();
+      state.installed = true;
+      writeInstallState(state);
+      hideBanner();
+      initPwaInstallPrompt(lastAdminMode);
+    }
+
+    window.addEventListener("beforeinstallprompt", function (event) {
+      // Le site propose lui-même l'installation (pictogramme discret).
+      event.preventDefault();
+      deferredPrompt = event;
+      initPwaInstallPrompt(lastAdminMode);
+    });
+    window.addEventListener("appinstalled", function () {
+      deferredPrompt = null;
+      markInstalled();
+    });
+
+    function promptNative() {
+      const prompt = deferredPrompt;
+      if (!prompt) return Promise.resolve(false);
+      deferredPrompt = null;
+      return Promise.resolve(prompt.prompt())
+        .then(function () {
+          return prompt.userChoice;
+        })
+        .then(function (choice) {
+          const accepted = Boolean(choice && choice.outcome === "accepted");
+          if (accepted) markInstalled();
+          return accepted;
+        })
+        .catch(function () {
+          return false;
+        });
+    }
+
+    function stepsHtml(browserKind) {
+      return getInstallSteps(browserKind)
+        .map(function (step) {
+          return '<span class="bib-install-step">' + step[0] + "<span>" + step[1] + "</span></span>";
+        })
+        .join('<span class="bib-install-sep" aria-hidden="true">›</span>');
+    }
+
+    function hideBanner() {
+      const root = document.getElementById("infraPwaInstallModal");
+      if (!root) return;
+      root.classList.remove("is-open");
+      root.setAttribute("aria-hidden", "true");
+    }
+
+    function openStepsBanner() {
       const root = ensurePwaInstallPromptUi();
-      const steps = root.querySelector("[data-pwa-steps]");
-      if (steps) {
-        steps.innerHTML = getInstallSteps(browserKind)
-          .map(function (step) {
-            return '<span class="bib-install-step">' + step[0] + "<span>" + step[1] + "</span></span>";
-          })
-          .join('<span class="bib-install-sep" aria-hidden="true">›</span>');
+      if (root.classList.contains("is-open")) {
+        hideBanner();
+        return;
       }
+      const steps = root.querySelector("[data-pwa-steps]");
+      if (steps) steps.innerHTML = stepsHtml(getInstallBrowserKind());
       root.classList.add("is-open");
       root.setAttribute("aria-hidden", "false");
-      // Une seule fois : le choix est retenu dès l'affichage (la fenêtre reste ouverte pour cette visite).
-      pwaState.shownThisSession = true;
-      persistPwaChoice("seen");
+    }
+
+    function ensureInstallIcon(hero) {
+      let button = hero.querySelector("[data-pwa-icon]");
+      if (button) return button;
+      button = document.createElement("button");
+      button.type = "button";
+      button.className = "bib-install-icon";
+      button.dataset.pwaIcon = "";
+      button.setAttribute("aria-label", "Installer INFRA.");
+      button.title = "Installer INFRA.";
+      button.innerHTML = ICON_INSTALL;
+      button.addEventListener("click", function () {
+        if (deferredPrompt) {
+          promptNative();
+          return;
+        }
+        openStepsBanner();
+      });
+      hero.appendChild(button);
+      return button;
+    }
+
+    function initPwaInstallPrompt(adminMode) {
+      lastAdminMode = Boolean(adminMode);
+      const kind = getInstallBrowserKind();
+      const hero = document.querySelector("body.home-screen header.hero");
+      const show =
+        !adminMode &&
+        Boolean(hero) &&
+        !isInstalled() &&
+        readInstallState().visits <= ICON_VISITS &&
+        (Boolean(deferredPrompt) || kind !== "other");
+
+      document.querySelectorAll("[data-pwa-icon]").forEach(function (icon) {
+        if (!show || icon.parentElement !== hero) icon.hidden = true;
+      });
+      if (!show) {
+        hideBanner();
+        return;
+      }
+      ensureInstallIcon(hero).hidden = false;
     }
 
     return {

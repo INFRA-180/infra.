@@ -210,6 +210,8 @@
     const qr = dialog.querySelector("[data-share-qr]");
     const brandLogo = dialog.querySelector("[data-share-brand-logo]");
     brandLogo.src = brandLogoUrl;
+    whiteLogo(brandLogo);
+
 
     closeButton.addEventListener("click", closeFromPointer);
     closeButton.addEventListener("pointerup", closeFromPointer);
@@ -264,6 +266,142 @@
     return dialogParts;
   }
 
+  // Verre fumé (INFRA, 13/11/2026) : le logo noir devient blanc, le point rouge reste exactement le même.
+  let whiteLogoUrl = "";
+  function whiteLogo(img) {
+    if (whiteLogoUrl) {
+      img.src = whiteLogoUrl;
+      return;
+    }
+    const source = new Image();
+    source.addEventListener(
+      "load",
+      function () {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = source.naturalWidth;
+          canvas.height = source.naturalHeight;
+          const context = canvas.getContext("2d");
+          context.drawImage(source, 0, 0);
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+          const data = pixels.data;
+          for (let i = 0; i < data.length; i += 4) {
+            const max = Math.max(data[i], data[i + 1], data[i + 2]);
+            const min = Math.min(data[i], data[i + 1], data[i + 2]);
+            if (max - min < 40) data[i] = data[i + 1] = data[i + 2] = 255;
+          }
+          context.putImageData(pixels, 0, 0);
+          whiteLogoUrl = canvas.toDataURL("image/png");
+          img.src = whiteLogoUrl;
+        } catch (_error) {
+          // Logo d'origine gardé si le navigateur refuse de lire l'image.
+        }
+      },
+      { once: true }
+    );
+    source.src = brandLogoUrl;
+  }
+
+
+  // QR rond (maquette validée par INFRA, 13/11/2026) : le code reste au centre, entouré de
+  // 2 modules vides, puis des pastilles décoratives (toujours le même dessin) remplissent le disque ;
+  // les trois repères sont des cercles de 20 pastilles autour d'une pupille pleine.
+  // Lu par le lecteur QR de macOS (CIDetector), même réduit à 200 px.
+  const QR_RING = 2;
+  const QR_CANVAS = 640;
+  const QR_DOT = 0.42;
+  const QR_EYE_DOTS = 20;
+
+  // Matrice réelle du code, lue sur un rendu brut de la librairie (un repère = 7 modules).
+  function qrMatrix(QrCreator, text) {
+    const holder = document.createElement("div");
+    QrCreator.render(
+      { text: text, radius: 0, ecLevel: "H", fill: QR_FILL, background: "#ffffff", quiet: 0, size: 740 },
+      holder
+    );
+    const canvas = holder.querySelector("canvas");
+    const width = canvas.width;
+    const data = canvas.getContext("2d").getImageData(0, 0, width, width).data;
+    const dark = function (x, y) {
+      return data[(y * width + x) * 4] < 128;
+    };
+    let run = 0;
+    while (run < width && dark(run, 0)) run++;
+    const moduleSize = run / 7;
+    const count = Math.round(width / moduleSize);
+    const matrix = [];
+    for (let r = 0; r < count; r++) {
+      const row = [];
+      for (let q = 0; q < count; q++) {
+        row.push(dark(Math.floor((q + 0.5) * moduleSize), Math.floor((r + 0.5) * moduleSize)));
+      }
+      matrix.push(row);
+    }
+    return matrix;
+  }
+
+  function isFinderModule(r, q, n) {
+    return (r < 7 && q < 7) || (r < 7 && q >= n - 7) || (r >= n - 7 && q < 7);
+  }
+
+  function fillerNoise(r, q) {
+    let h = (r * 374761393 + q * 668265263) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+
+  function drawRoundQr(QrCreator, text) {
+    const matrix = qrMatrix(QrCreator, text);
+    const n = matrix.length;
+    const size = QR_CANVAS;
+    const radius = size / 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    const context = canvas.getContext("2d");
+    const unit = (2 * radius) / ((n + 2 * QR_RING) * Math.SQRT2 + 2);
+    const origin = radius - (n * unit) / 2;
+    const span = Math.ceil(radius / unit) + 1;
+    const dot = function (x, y, r) {
+      context.beginPath();
+      context.arc(x, y, r, 0, Math.PI * 2);
+      context.fill();
+    };
+
+    context.fillStyle = SHARE_BRAND_RED;
+    context.fillRect(0, 0, size, size);
+    context.fillStyle = QR_FILL;
+    for (let r = -span; r < n + span; r++) {
+      for (let q = -span; q < n + span; q++) {
+        const x = origin + (q + 0.5) * unit;
+        const y = origin + (r + 0.5) * unit;
+        let on;
+        if (r >= 0 && r < n && q >= 0 && q < n) {
+          if (isFinderModule(r, q, n)) continue;
+          on = matrix[r][q];
+        } else {
+          if (r >= -QR_RING && r < n + QR_RING && q >= -QR_RING && q < n + QR_RING) continue;
+          if (Math.hypot(x - radius, y - radius) > radius - unit * 0.9) continue;
+          on = fillerNoise(r, q) < 0.48;
+        }
+        if (on) dot(x, y, unit * QR_DOT);
+      }
+    }
+    [
+      [origin, origin],
+      [origin + (n - 7) * unit, origin],
+      [origin, origin + (n - 7) * unit]
+    ].forEach(function (corner) {
+      const cx = corner[0] + 3.5 * unit;
+      const cy = corner[1] + 3.5 * unit;
+      for (let k = 0; k < QR_EYE_DOTS; k++) {
+        const angle = (k / QR_EYE_DOTS) * Math.PI * 2;
+        dot(cx + Math.cos(angle) * 3 * unit, cy + Math.sin(angle) * 3 * unit, unit * QR_DOT);
+      }
+      dot(cx, cy, 1.5 * unit);
+    });
+    return canvas;
+  }
+
   function loadQrLibrary() {
     if (window.QrCreator && typeof window.QrCreator.render === "function") {
       return Promise.resolve(window.QrCreator);
@@ -308,24 +446,10 @@
     try {
       const QrCreator = await loadQrLibrary();
       if (token !== openToken || currentShareUrl !== url) return;
-      parts.qr.replaceChildren();
-      QrCreator.render(
-        {
-          text: url,
-          radius: 0.5,
-          ecLevel: "H",
-          fill: QR_FILL,
-          background: SHARE_BRAND_RED,
-          quiet: 4,
-          size: 280
-        },
-        parts.qr
-      );
-      const canvas = parts.qr.querySelector("canvas");
-      if (canvas) {
-        canvas.setAttribute("role", "img");
-        canvas.setAttribute("aria-label", "QR code du lien");
-      }
+      const canvas = drawRoundQr(QrCreator, url);
+      canvas.setAttribute("role", "img");
+      canvas.setAttribute("aria-label", "QR code du lien");
+      parts.qr.replaceChildren(canvas);
       parts.qr.classList.remove("is-loading");
       parts.qr.removeAttribute("aria-busy");
     } catch (_error) {

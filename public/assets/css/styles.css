@@ -6048,3 +6048,41 @@ html, body { overscroll-behavior-x: none; }
 body.home-screen { touch-action: pan-y pinch-zoom; }
 .bib-snap { background: var(--bg, #fff); }
 @media (prefers-reduced-motion: reduce) { .bib-tabdot { transition: none; } }
+
+/* 13/11/2026 (INFRA : « vérifie la géométrie de chaque chose… il faut que ce soit propre » ; maquette V20) :
+   chaque DESSIN posé sur son bord ou son axe. Décalages mesurés entre l'encre du pictogramme et le bord voulu
+   (outil DOCS/maquettes/sources_V17/audit-geometrie.js), identiques sur téléphone et ordinateur. */
+.bib-sectools { margin-right: -15.2px; }                                   /* tri, grille / liste : était 4,0–4,4 px avant le bord */
+/* décalages par `translate` : ne change ni la mise en page ni les `transform` déjà posés (le cœur d'une fiche en a un) */
+.bib-search { translate: 0 -2.4px; }                                       /* loupe sur l'axe du texte des onglets (était 2,4 px plus bas) */
+.bib-searchbtn { translate: 3.6px -2.4px; }                                /* loupe (téléphone) : bord droit et axe des onglets */
+.bib-trackheart, .track-favorite-btn { translate: 3.2px 0; }               /* cœurs des lignes sur le bord droit */
+.bib-install-close { translate: 4.5px 0; }                                 /* croix du bandeau « écran d'accueil » sur le bord */
+.album-screen .back { translate: -5.7px 0; }                               /* « ‹ Bibliothèque » sur le bord gauche */
+.album-screen .bib-meta-row .album-header-actions { translate: 5.9px 0; }  /* « Partager » sur le bord droit */
+/* numéros des titres d'une fiche : à gauche de leur colonne (étaient centrés : 11,7 px du bord), ▶ du survol aussi */
+.album-screen .track-player { padding-left: 0; }
+.album-screen .track-player .play-btn { justify-content: flex-start; text-align: left; padding-left: 0; }
+@media (min-width: 960px) and (hover: hover) and (pointer: fine) {
+  .album-screen .track-player:hover .play-btn:not(.is-current)::after,
+  .album-screen .track-player .play-btn:not(.is-current):focus-visible::after,
+  .album-screen .track-player:hover .play-btn.is-playing::after,
+  .album-screen .track-player .play-btn.is-playing:focus-visible::after { left: 0; margin-left: -3.1px; }
+}
+/* Grand lecteur (ordinateur) : écarts ÉGAUX entre les dessins des 5 commandes (étaient 113 / 127 / 118 / 108 px) ;
+   chaque bouton = largeur de son dessin + 19,5 px de chaque côté ; dessins décentrés recentrés (⏮ 1,4 px, ⏭ 0,7 px,
+   ▶ 4,5 px) */
+@media (min-width: 981px) {
+  .now-playing-side .now-playing-main-controls { width: calc(100% + 39px); margin: 0 -19.5px; }
+  .now-playing-side .now-playing-main-controls .now-playing-btn,
+  .now-playing-side .now-playing-main-controls .now-playing-btn-main { width: calc(var(--np-ink) + 39px); }
+  .now-playing-side [data-now-playing-shuffle] { --np-ink: 25.5px; }
+  .now-playing-side [data-now-playing-prev] { --np-ink: 19.8px; }
+  .now-playing-side [data-now-playing-toggle] { --np-ink: 36px; }
+  .now-playing-side [data-now-playing-next] { --np-ink: 24.1px; }
+  .now-playing-side [data-now-playing-radio] { --np-ink: 27.3px; }
+  .now-playing-side [data-now-playing-prev] svg { transform: translateX(-1.4px); }
+  .now-playing-side [data-now-playing-next] svg { transform: translateX(-0.7px); }
+  .now-playing-side [data-now-playing-toggle] svg { transform: translateX(-6.5px); }          /* ❚❚ (le dessin n'est pas centré dans ce bouton) */
+  .now-playing-side [data-now-playing-toggle]:not(.is-on) svg { transform: translateX(-11px); } /* ▶ : en plus, triangle dessiné 4,5 px à droite */
+}

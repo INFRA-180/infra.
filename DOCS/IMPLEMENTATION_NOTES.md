@@ -1836,3 +1836,17 @@
 - Vérifié : test `grand lecteur : la barre de lecture a toute la largeur du bloc` (rouge avant, vert après, 3 appareils),
   clic à 75 % → 121 s / 160, glisser au quart → 41 s ; écarts identiques à V19 (37 / 16, ▶ à 526) ; capture
   de référence « grand-lecteur » ordinateur refaite (seul changement : la barre visible, bloc remis au centre).
+
+## 2026-11-13 — Géométrie au pixel (maquette V20, audiofix447)
+- Demande d'INFRA : « vérifie la géométrie de chaque chose dans chacun des supports… il faut que ce soit propre ».
+- Mesure automatique (`DOCS/maquettes/sources_V17/audit-geometrie.js`, privé) : bords dessinés presque alignés (0,6 – 12 px)
+  et axes d'une même rangée. Rapport : `DOCS/GEOMETRIE_V19_20261113.md` (local).
+- Corrigé (téléphone et ordinateur) : tri / grille-liste (4 px avant le bord), loupe (2,4 px trop bas ; 3,6 px avant le
+  bord sur téléphone), cœurs des lignes (3,2 px), croix du bandeau « écran d'accueil » (4,5 px), « ‹ Bibliothèque »
+  (5,7 px), « Partager » (5,9 px), numéros des fiches (centrés → à gauche, 11,7 px), commandes du grand lecteur à
+  écarts égaux (113/127/118/108 → 115,3 partout en lecture ; ⏮ ⏭ ▶ recentrés dans leurs boutons).
+- Piège : un décalage par `position: relative` a sorti le cœur des fiches de sa position absolue (lignes 54 → 64 px,
+  vu dans les captures) → décalages faits avec la propriété `translate`, qui ne touche ni la mise en page ni les
+  `transform` existants.
+- Vérifié : plus aucun écart à 1440 et 375 px (site local), Safari iPhone (simulateur) ; 19 captures de référence refaites
+  après contrôle des zones changées ; `npm test`, 62 tests visuels verts.

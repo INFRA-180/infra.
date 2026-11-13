@@ -487,3 +487,23 @@ test("V7-2 : bord gauche au 2e niveau, la fiche du dessous revient avec le doigt
   }, CURRENT);
   expect(st).toEqual({ transform: "", filter: "", receded: false });
 });
+
+// 13/11/2026 (INFRA : « la barre de lecture en plein écran sur desktop… je ne peux pas avancer ou reculer ») :
+// la barre du grand lecteur doit occuper toute la largeur du bloc de lecture (elle faisait 0 px sur ordinateur).
+test("grand lecteur : la barre de lecture a toute la largeur du bloc", async ({ page }, testInfo) => {
+  await page.goto("/");
+  await page.waitForLoadState("load");
+  await page.waitForTimeout(800);
+  await page.evaluate(() => document.querySelector("button[aria-label^='Lire ']").click());
+  await page.waitForTimeout(800);
+  await page.evaluate(() => document.querySelector("[data-transport-now]").click());
+  await page.waitForTimeout(800);
+  const m = await page.evaluate(() => {
+    const bar = document.querySelector("[data-now-playing-progress]").getBoundingClientRect();
+    const wrap = document.querySelector(".now-playing-progress-wrap").getBoundingClientRect();
+    return { bar: Math.round(bar.width), wrap: Math.round(wrap.width), h: Math.round(bar.height) };
+  });
+  expect(m.wrap, testInfo.project.name).toBeGreaterThan(200);
+  expect(m.bar, testInfo.project.name).toBe(m.wrap);
+  expect(m.h).toBeGreaterThanOrEqual(26);
+});

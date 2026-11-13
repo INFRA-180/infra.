@@ -5963,7 +5963,9 @@ body[data-bib-view="playlists"] .home-screen [data-module-id="playlists"] .bib-s
   .now-playing-album { display: inline-block; margin-top: 6px; font-size: 21px; line-height: 29px; }
   .now-playing-side > .now-playing-progress-wrap { margin-top: 19px; } /* trait de la barre 34 px sous l'album */
   .now-playing-side > .now-playing-progress-wrap { display: block; }
-  .now-playing-side .now-playing-times { margin-top: -7px; } /* temps 14 px sous le trait (bouton de barre de 34 px) */
+  /* 13/11 (INFRA : « je ne peux pas avancer ou reculer ») : la barre est un bouton ; dans un bloc, il se réduisait à 0 px */
+  .now-playing-side .now-playing-progress { display: block; width: 100%; }
+  .now-playing-side .now-playing-times { margin-top: -2px; } /* temps 16 px sous le trait, comme la maquette V19 (13/11 : -7 compensait le vide sous la barre réduite à 0 px) */
   .now-playing-time { font-size: 16px; line-height: 23px; }
   .now-playing-side > .now-playing-controls { display: block; margin-top: 26px; }
   .now-playing-side .now-playing-main-controls {

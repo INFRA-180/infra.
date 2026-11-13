@@ -1826,3 +1826,13 @@
 - Trackpad deux doigts (`wheel`) : ← / → onglets, → retour d'album / playlist (même dessin que le bord gauche, aussi sans écran gardé dessous), grand lecteur fermé vers le bas (page du lecteur en haut) ou vers la droite ; élan absorbé tant qu'il décroît ; lancé jusqu'au bout. Souris : rien. `overscroll-behavior-x: none` : pas de « page précédente » de Chrome.
 - Pièges : rangée d'onglets devenue `position: relative` → calcul de défilement de l'onglet visible faussé de 16 px (attrapé par les captures) → positions par rectangles, arrondies comme avant ; compteur « Playlists » doublé par la copie d'écran → copie exclue.
 - Vérifié : trackpad simulé (1 geste, 2 enchaînés, retour, petit, vertical, lancés), doigt simulé (lent, moitié, vif, diagonale, lancés), retour d'album et fermeture du lecteur au trackpad, **Safari iPhone (simulateur)** : glisser → Albums, rangée de playlists qui défile sans changer d'onglet, lancé → Favoris (contenu visible), lancé inverse → Accueil. Tests : `npm test`, 59 captures identiques, nouveau test « lancé ». **Non vérifié** : vrai trackpad, Safari Mac (son propre retour à deux doigts), vrai Android.
+
+## 2026-11-13 — Barre de lecture du grand lecteur sur ordinateur (audiofix446)
+- Signalé par INFRA : en plein écran sur ordinateur, pas de barre visible, impossible d'avancer ou de reculer.
+- Cause prouvée : depuis le lot 1 (`audiofix444`), le conteneur `.now-playing-progress-wrap` est un bloc ; la barre
+  est un `<button>` (inline-block) qui se réduisait à 0 px de large (mesuré : 0 × 34 à 1440 px). Téléphone non touché.
+- Correction : `.now-playing-side .now-playing-progress { display: block; width: 100%; }` ; écart barre → temps
+  remis à 16 px comme la maquette V19 (`margin-top` −7 → −2, le −7 compensait l'ancien vide).
+- Vérifié : test `grand lecteur : la barre de lecture a toute la largeur du bloc` (rouge avant, vert après, 3 appareils),
+  clic à 75 % → 121 s / 160, glisser au quart → 41 s ; écarts identiques à V19 (37 / 16, ▶ à 526) ; capture
+  de référence « grand-lecteur » ordinateur refaite (seul changement : la barre visible, bloc remis au centre).

@@ -6056,7 +6056,9 @@ body.home-screen { touch-action: pan-y pinch-zoom; }
 /* décalages par `translate` : ne change ni la mise en page ni les `transform` déjà posés (le cœur d'une fiche en a un) */
 .bib-search { translate: 0 -2.4px; }                                       /* loupe sur l'axe du texte des onglets (était 2,4 px plus bas) */
 .bib-searchbtn { translate: 3.6px -2.4px; }                                /* loupe (téléphone) : bord droit et axe des onglets */
-.bib-trackheart, .track-favorite-btn { translate: 3.2px 0; }               /* cœurs des lignes sur le bord droit */
+.track-favorite-btn { translate: 3.2px 0; }                               /* cœurs des fiches sur le bord droit */
+.bib-li .bib-heart { translate: 15.05px 0; }                               /* cœurs des listes (téléphone : la ligne ne déborde pas) */
+@media (min-width: 960px) { .bib-li .bib-heart { translate: 3.2px 0; } }   /* ordinateur : la ligne déborde déjà de 12 px pour le survol */
 .bib-install-close { translate: 4.5px 0; }                                 /* croix du bandeau « écran d'accueil » sur le bord */
 .album-screen .back { translate: -5.7px 0; }                               /* « ‹ Bibliothèque » sur le bord gauche */
 .album-screen .bib-meta-row .album-header-actions { translate: 5.9px 0; }  /* « Partager » sur le bord droit */

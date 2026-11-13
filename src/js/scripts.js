@@ -41,7 +41,7 @@ import {
   reportLaunchSummary
 } from "./runtime/page-init.js";
 
-window.INFRA_BUILD_TAG = "audiofix447-20261113";
+window.INFRA_BUILD_TAG = "audiofix448-20261113";
 
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
@@ -568,7 +568,7 @@ const PREFETCH_MAX_ATTEMPTS = 2;
 
 const WORKER_URL = "https://infra180-api.pages.dev";
 
-const SPA_SHELL_VERSION = "infra-shell-20261113-audio447";
+const SPA_SHELL_VERSION = "infra-shell-20261113-audio448";
 
 const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
 
@@ -585,7 +585,7 @@ const LIVE_CATALOG_CACHE_NAME = `${SPA_SHELL_VERSION}-catalog`;
 
 const LIVE_CATALOG_TIMEOUT_MS = 3500;
 
-const LOCAL_CATALOG_VERSION = "audiofix447-20261113";
+const LOCAL_CATALOG_VERSION = "audiofix448-20261113";
 
 const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
@@ -613,7 +613,7 @@ const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
 
 const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
 
-const runtimeVersion = "audiofix447-20261113";
+const runtimeVersion = "audiofix448-20261113";
 
 const runtime = (function () {
   const scriptEl =

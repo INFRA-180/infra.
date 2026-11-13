@@ -1850,3 +1850,8 @@
   `transform` existants.
 - Vérifié : plus aucun écart à 1440 et 375 px (site local), Safari iPhone (simulateur) ; 19 captures de référence refaites
   après contrôle des zones changées ; `npm test`, 62 tests visuels verts.
+- Suite (audiofix448) : cœurs des listes de la bibliothèque sur téléphone 11,85 px avant le bord (la ligne ne déborde
+  pas comme sur ordinateur) ; vu sur Chrome Android (émulateur), passé au travers de la 1re mesure (fenêtre 12 px, élargie
+  à 16). Décalage 15,05 px sur téléphone, 3,2 px sur ordinateur. Vérifié : Chrome Android (émulateur Android 15),
+  Safari iPhone (simulateur) et ordinateur 1440 px : plus aucun écart (hors faux positifs : liens masqués pour les
+  moteurs de recherche, onglets qui défilent, fin naturelle d'un titre).

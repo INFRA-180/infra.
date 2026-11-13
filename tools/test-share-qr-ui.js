@@ -15,12 +15,22 @@ assert.ok(fs.existsSync(logoPath), "official INFRA wordmark is missing");
 assert.ok(codeHas(script, 'const SHARE_BRAND_RED = "#e52c31"'), "QR modal does not use the official logo red");
 assert.ok(codeHas(script, 'const QR_FILL = "#000000"'), "QR modules are not black");
 assert.ok(codeHas(script, "context.fillStyle = SHARE_BRAND_RED"), "QR background is not the official INFRA red");
-assert.ok(codeHas(script, 'ecLevel: "H"'), "inverted-color QR does not use high error correction");
-// QR rond validé par INFRA (13/11/2026) : 2 modules vides autour du code, puis le disque rempli de pastilles ;
-// repères en cercles de 20 pastilles. Lu par le lecteur QR de macOS.
-assert.ok(codeHas(script, "const QR_RING = 2"), "QR code lost its empty ring around the data");
-assert.ok(codeHas(script, "const QR_EYE_DOTS = 20"), "QR finder patterns are not dotted circles");
-assert.ok(codeHas(script, "if (isFinderModule(r, q, n)) continue;"), "square finder modules are still drawn");
+// Vrai QR lisible par un appareil photo (INFRA, 13/11/2026) : repères normalisés, marge de
+// silence de 4 modules sans décor, correction M (29 modules au lieu de 37).
+assert.ok(codeHas(script, 'const QR_EC_LEVEL = "M"'), "QR no longer uses the readable error-correction level");
+assert.ok(codeHas(script, "ecLevel: QR_EC_LEVEL"), "QR matrix ignores the error-correction level");
+assert.ok(codeHas(script, "const QR_RING = 2"), "QR code lost its quiet zone");
+// Rond, dedans compris (INFRA, 13/11/2026) : disque rouge, modules et repères ronds.
+assert.ok(codeHas(styles, "border-radius: 50%;\n}"), "QR field is no longer round");
+assert.ok(codeHas(script, "dot(cx, cy, 3.5 * unit)"), "QR finder patterns are not round");
+assert.ok(codeHas(script, "dot(cx, cy, 2.5 * unit)"), "QR finder patterns lost their light ring");
+assert.ok(codeHas(script, "dot(cx, cy, 1.5 * unit)"), "QR finder patterns lost their centre");
+assert.ok(codeHas(script, "fillerNoise"), "decorative dots around the code are gone");
+assert.ok(!codeHas(script, "QR_EYE_DOTS"), "QR finder patterns are dotted circles again (unreadable by a camera)");
+assert.ok(codeHas(script, "if (isFinderModule(r, q, n)) continue;"), "finder modules are drawn twice");
+// Verre adapté au thème (INFRA, 13/11/2026) : fumé sur fond sombre, clair sinon.
+assert.ok(codeHas(script, 'parts.dialog.dataset.glass = dark ? "fume" : "clair"'), "share card glass no longer follows the theme");
+assert.ok(codeHas(styles, '.share-dialog[data-glass="clair"] .share-dialog-panel'), "light glass is missing from the stylesheet");
 assert.ok(codeHas(script, "drawRoundQr(QrCreator, url)"), "share dialog does not draw the round QR");
 assert.ok(!codeHas(script, "data-share-install"), "install entry is back in the share card (refused by INFRA, 13/11/2026)");
 assert.ok(

@@ -1716,6 +1716,22 @@ body.transport-pip-document .transport-pip-player.is-narrow .global-transport-bt
   -webkit-backdrop-filter: blur(12px) saturate(128%);
 }
 
+/* Verre adapté au thème (INFRA, 13/11/2026) : fumé sur un thème sombre, clair sur un thème clair,
+   où le fumé grisait le blanc du fond. Le voile derrière suit la même logique. */
+.share-dialog[data-glass="clair"]::backdrop {
+  background: rgba(17, 17, 17, 0.16);
+}
+
+.share-dialog[data-glass="clair"].is-fallback-open {
+  background: rgba(17, 17, 17, 0.16);
+}
+
+.share-dialog[data-glass="clair"] .share-dialog-panel {
+  background: rgba(255, 255, 255, 0.34);
+  border-color: rgba(17, 17, 17, 0.1);
+  box-shadow: 0 18px 50px rgba(17, 17, 17, 0.14);
+}
+
 .share-dialog.is-fallback-open {
   position: fixed;
   inset: 0;
@@ -1864,9 +1880,11 @@ body.transport-pip-document .transport-pip-player.is-narrow .global-transport-bt
   background: rgba(122, 16, 16, 0.96);
 }
 
+/* Rond, comme INFRA le veut (13/11/2026) ; il est seulement plus large qu'avant (292 → 320),
+   pour que les modules du code soient assez gros pour un appareil photo. */
 .share-qr {
   display: grid;
-  width: min(292px, calc(100vw - 88px));
+  width: min(320px, calc(100vw - 76px));
   aspect-ratio: 1;
   margin: 0 auto;
   padding: 0;

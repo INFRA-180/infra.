@@ -1889,3 +1889,61 @@ Demande d'INFRA : « quand je reste appuyé, il faut qu'elle reste affichée ; o
 - Vérifié (navigateur, 375×812, gestes simulés) : ouverture par appui long ; reste ouverte au relâchement sur la croix,
   à l'appui sur le fond, au glissement, après un appui de 3 s ; se ferme par la croix et par Échap. `npm test` vert.
   Non vérifié : iPhone réel.
+
+## 13/11 — Carte de partage : verre selon le thème, et un vrai QR
+
+Demande d'INFRA : « la carte, mets-la vraiment transparente — le verre fumé déteint avec le blanc
+derrière ; fumé quand c'est noir, pas fumé sinon » et « le QR ne donne pas le lien, je veux un vrai
+QR code ».
+
+**Ce que le QR avait de faux.** Le lien encodé était bon (vérifié sur le site en ligne : le décodeur
+du navigateur lit `https://infra-180.github.io/infra./`). Ce qui n'allait pas, c'est la lisibilité
+par un appareil photo : repères des coins dessinés en cercles de pastilles (pas la forme normalisée
+que cherche un lecteur), marge de silence de 2 modules seulement, et 37 modules (correction H) dans
+un carré inscrit dans le disque, soit 4,9 px par module à l'écran.
+
+- `src/js/share-qr.js` : repères normalisés (carré plein 7 modules, anneau rouge 5, centre 3,
+  coins très légèrement arrondis), marge de silence portée à 4 modules sans décor, correction
+  d'erreur M (29 modules au lieu de 37), pastilles un peu plus grosses (0,46 au lieu de 0,42).
+  Le décor de pastilles reste au-delà de la marge, le disque rouge et le logo ne changent pas.
+- Mesures (décodeur du navigateur, image dégradée exprès) : avant, lisible jusqu'à un flou de 2 et
+  une réduction à 120 px ; après, flou 3 et réduction à 70 px. Soit environ 1,7× de marge en plus.
+
+**Verre selon le thème.** `isDarkTheme()` lit l'encre du thème (`--ink`) : encre claire = fond
+sombre. La carte reçoit `data-glass="fume"` ou `"clair"`.
+
+- `public/assets/css/styles.css` : `[data-glass="clair"]` → verre blanc très transparent
+  (`rgba(255,255,255,0.34)`), bordure et ombre encre, voile derrière allégé (`rgba(17,17,17,0.16)`
+  au lieu du noir à 40 %). Le fumé d'origine reste pour les thèmes sombres.
+- Le logo suit : version blanche sur le fumé, logo d'origine (noir, point rouge) sur le clair —
+  avant, le logo blanc disparaissait sur un verre clair.
+- Vérifié : thème blanc et thème bleu-fluo, écran 375×812, QR relu à chaque fois. `npm test` vert
+  (`tools/test-share-qr-ui.js` mis à jour : il gardait l'ancien dessin validé). Non vérifié :
+  iPhone réel, lecture par l'appareil photo.
+
+## 13/11 — Carte de partage : rond gardé, QR lisible, verre système, fermeture hors du cadre
+
+Trois retours d'INFRA dans la foulée : « ça ne s'est pas actualisé sur le site », « clair/sombre,
+c'était le système, pas le thème », « on doit pouvoir quitter en appuyant hors du cadre », puis
+« je veux que le QR reste rond, et même l'intérieur rond ».
+
+- **Pas actualisé** : rien n'avait été publié (travail non commité), et la version des fichiers
+  n'avait pas bougé — sans `npm run bump`, l'iPhone garde l'ancien `app.js` par le Service Worker.
+  Versions montées : `audiofix450-20261113`, `infra-shell-20261113-audio450`,
+  `bibliotheque-v39-20261113`.
+- **Verre** : `isDarkTheme()` lit désormais `prefers-color-scheme` (mode clair/sombre du système) et
+  non plus l'encre du thème du site.
+- **Fermeture** : la croix, un appui hors du cadre et Échap ferment. Ne ferment pas : le relâchement
+  de l'appui long (garde `openingPointerId`, même si le doigt retombe sur la croix) et un glissement
+  sur le fond (`backdropDragUntil` avale aussi le clic qui suit le glissement).
+- **QR rond gardé**, dedans compris. Ce qui le rendait illisible n'était pas la forme mais la taille
+  des modules et les repères : correction H (37 modules) et repères en cercles de pastilles. Depuis :
+  correction M (29 modules), **repères en cercles pleins** (noir 7 modules, rouge 5, noir 3) — la
+  taille normalisée, en rond —, marge de silence de 2 modules, disque élargi (292 → 320 px, 299 sur
+  un écran de 375), pastilles un peu plus grosses. Le décor de pastilles autour du code reste.
+- Mesures (décodeur du navigateur sur image dégradée, lien du site) : avant, lu jusqu'à un flou de 2
+  et réduit à 120 px ; après, flou 3 et réduit à 70 px. Le carré arrondi faisait un peu mieux
+  (flou 4, 60 px) mais INFRA veut le rond : écart assumé.
+- Vérifié : écran 375×812, mode clair et mode sombre du système, QR relu à chaque ouverture, les
+  quatre gestes de fermeture. `npm test` vert. Non vérifié : lecture par l'appareil photo d'un
+  vrai iPhone.

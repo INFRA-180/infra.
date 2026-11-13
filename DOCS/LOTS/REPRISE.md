@@ -42,7 +42,15 @@ type: REPRISE
 - Code concerné : `src/js/share-qr.js` (`closeFromPointer` sur le fond : `pointerup` / `click` sur `dialog`, `closedby="any"`, `cancel`). À vérifier : la touche Échap sur ordinateur (proposé : la garder, convention clavier).
 - INFRA fait la suite dans une autre session. → repris ici le 13/11 par Claude.
 
-**Ensuite** : INFRA teste sur iPhone réel.
+**13/11 (Claude) — carte transparente selon le thème + vrai QR** (code modifié, non commité, non publié) :
+- Verre **clair** sur thème clair (blanc très transparent, voile allégé, logo d'origine) et **fumé** sur thème sombre (logo blanc). Détecté par l'encre du thème (`--ink`), pas par une liste de thèmes.
+- QR : le lien encodé était déjà bon ; c'est la **lisibilité** qui pêchait. Repères normalisés (carrés pleins) au lieu des cercles de pastilles, marge de silence 4 modules, correction M (29 modules au lieu de 37), pastilles plus grosses. Marge de lecture ×1,7 (flou 3 au lieu de 2, réduction à 70 px au lieu de 120).
+- `npm test` vert ; `tools/test-share-qr-ui.js` mis à jour (il figeait l'ancien dessin). Détail : `DOCS/IMPLEMENTATION_NOTES.md`.
+- **Proposé, en attente d'INFRA** : passer le QR d'un disque à un **carré arrondi rouge**. Mesuré : 7,9 px par module au lieu de 5,6, lisible jusqu'à un flou de 4 et une réduction à 70 px sur le lien du site — c'est le plus gros gain possible, mais ça change la forme ronde validée le 13/11.
+
+**13/11 (Claude) — patch publié** : QR **rond gardé** (repères en cercles pleins, correction M, 29 modules, disque élargi, marge 2) — lu jusqu'à un flou de 3 et réduit à 70 px, contre flou 2 / 120 px avant ; verre selon le **mode du système** (et non le thème du site) ; fermeture par la croix, **hors du cadre** et Échap, jamais au relâchement ni au glissement ; **versions montées** (`audiofix450`) — sans ça l'iPhone gardait l'ancien code.
+
+**Ensuite** : INFRA teste sur iPhone réel (scanner le QR avec un autre appareil).
 
 ---
 

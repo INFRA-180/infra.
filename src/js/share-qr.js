@@ -31,6 +31,8 @@
   let copyStateTimer = 0;
   let closeClickSuppressionUntil = 0;
   let openingPointerId = null;
+  let backdropPointer = null;
+  let backdropDragUntil = 0;
   let shareSelectionElement = null;
 
   function cleanUrl(urlLike) {
@@ -186,6 +188,7 @@
   function handleDialogClosed() {
     window.clearTimeout(copyStateTimer);
     openingPointerId = null;
+    backdropPointer = null;
     clearShareSelection();
     resetCopyFeedback();
     restoreDialogFocus();
@@ -224,16 +227,49 @@
     const qr = dialog.querySelector("[data-share-qr]");
     const brandLogo = dialog.querySelector("[data-share-brand-logo]");
     brandLogo.src = brandLogoUrl;
-    whiteLogo(brandLogo);
 
 
     closeButton.addEventListener("click", closeFromPointer);
     closeButton.addEventListener("pointerup", closeFromPointer);
-    // La carte reste affichee tant qu'INFRA n'a pas touche la croix : aucun
-    // relachement, aucun appui sur le fond et aucun glissement ne la ferme.
-    // Seule la touche Echap reste (convention clavier sur ordinateur).
+    // La carte se ferme par la croix ou en touchant hors du cadre (INFRA, 13/11/2026).
+    // Le relâchement de l'appui long ne ferme jamais : il n'a pas commencé sur le fond, et la
+    // garde `openingPointerId` avale de toute façon son clic. Un glissement ne ferme pas non plus.
+    dialog.addEventListener(
+      "pointerdown",
+      function (event) {
+        if (event.target !== dialog) return;
+        backdropPointer = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY
+        };
+      },
+      { passive: true }
+    );
+    dialog.addEventListener("pointerup", function (event) {
+      if (!backdropPointer || event.pointerId !== backdropPointer.pointerId || event.target !== dialog)
+        return;
+      const dx = event.clientX - backdropPointer.startX;
+      const dy = event.clientY - backdropPointer.startY;
+      backdropPointer = null;
+      if (Math.hypot(dx, dy) > MOVE_TOLERANCE_PX) {
+        // Glissement : la carte reste, et le clic qui suit ne doit pas la fermer non plus.
+        backdropDragUntil = Date.now() + CLOSE_CLICK_SUPPRESSION_MS;
+        return;
+      }
+      closeFromPointer(event);
+    });
+    dialog.addEventListener("pointercancel", function () {
+      backdropPointer = null;
+    });
+    dialog.addEventListener("click", function (event) {
+      if (event.target !== dialog) return;
+      if (Date.now() < backdropDragUntil) return;
+      closeFromPointer(event);
+    });
     dialog.addEventListener("close", handleDialogClosed);
     dialog.addEventListener("cancel", function () {
+      backdropPointer = null;
       window.clearTimeout(copyStateTimer);
     });
     copyButton.addEventListener("click", async function () {
@@ -255,7 +291,24 @@
     return dialogParts;
   }
 
-  // Verre fumé (INFRA, 13/11/2026) : le logo noir devient blanc, le point rouge reste exactement le même.
+  // Verre adapté au mode du système (INFRA, 13/11/2026) : fumé en mode sombre, clair en mode
+  // clair, où le fumé grisait tout. Le logo suit : blanc sur le fumé, d'origine sur le clair.
+  // C'est le mode du système qui décide, pas le thème du site (précision d'INFRA).
+  function isDarkTheme() {
+    return Boolean(
+      window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+    );
+  }
+
+  function applyBrandLogo(img, dark) {
+    if (!img) return;
+    if (dark) {
+      whiteLogo(img);
+      return;
+    }
+    img.src = brandLogoUrl;
+  }
+
   let whiteLogoUrl = "";
   function whiteLogo(img) {
     if (whiteLogoUrl) {
@@ -292,20 +345,30 @@
   }
 
 
-  // QR rond (maquette validée par INFRA, 13/11/2026) : le code reste au centre, entouré de
-  // 2 modules vides, puis des pastilles décoratives (toujours le même dessin) remplissent le disque ;
-  // les trois repères sont des cercles de 20 pastilles autour d'une pupille pleine.
-  // Lu par le lecteur QR de macOS (CIDetector), même réduit à 200 px.
+  // QR rond — INFRA y tient, et le dedans aussi est rond (13/11/2026). Ce qui le rendait illisible
+  // n'était pas le rond mais la taille des modules : correction H (37 modules), repères en cercles
+  // de pastilles (pas la forme qu'un lecteur cherche) et un code trop petit dans le disque.
+  // Maintenant : correction M (29 modules), repères en cercles pleins (noir, rouge, noir),
+  // marge de silence de 2 modules, disque plus large. Mesuré au décodeur sur image dégradée :
+  // lu jusqu'à un flou de 3 et réduit à 70 px, contre un flou de 2 et 120 px avant.
   const QR_RING = 2;
+  const QR_EC_LEVEL = "M";
   const QR_CANVAS = 640;
-  const QR_DOT = 0.42;
-  const QR_EYE_DOTS = 20;
+  const QR_DOT = 0.46;
 
   // Matrice réelle du code, lue sur un rendu brut de la librairie (un repère = 7 modules).
   function qrMatrix(QrCreator, text) {
     const holder = document.createElement("div");
     QrCreator.render(
-      { text: text, radius: 0, ecLevel: "H", fill: QR_FILL, background: "#ffffff", quiet: 0, size: 740 },
+      {
+        text: text,
+        radius: 0,
+        ecLevel: QR_EC_LEVEL,
+        fill: QR_FILL,
+        background: "#ffffff",
+        quiet: 0,
+        size: 740
+      },
       holder
     );
     const canvas = holder.querySelector("canvas");
@@ -347,7 +410,7 @@
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = size;
     const context = canvas.getContext("2d");
-    const unit = (2 * radius) / ((n + 2 * QR_RING) * Math.SQRT2 + 2);
+    const unit = (2 * radius) / ((n + 2 * QR_RING) * Math.SQRT2);
     const origin = radius - (n * unit) / 2;
     const span = Math.ceil(radius / unit) + 1;
     const dot = function (x, y, r) {
@@ -382,10 +445,13 @@
     ].forEach(function (corner) {
       const cx = corner[0] + 3.5 * unit;
       const cy = corner[1] + 3.5 * unit;
-      for (let k = 0; k < QR_EYE_DOTS; k++) {
-        const angle = (k / QR_EYE_DOTS) * Math.PI * 2;
-        dot(cx + Math.cos(angle) * 3 * unit, cy + Math.sin(angle) * 3 * unit, unit * QR_DOT);
-      }
+      // Repère rond et plein : 7 modules noirs, 5 rouges, 3 noirs. C'est la taille normalisée,
+      // en rond — un lecteur le retrouve, contrairement à l'ancien cercle de pastilles.
+      context.fillStyle = QR_FILL;
+      dot(cx, cy, 3.5 * unit);
+      context.fillStyle = SHARE_BRAND_RED;
+      dot(cx, cy, 2.5 * unit);
+      context.fillStyle = QR_FILL;
       dot(cx, cy, 1.5 * unit);
     });
     return canvas;
@@ -495,6 +561,9 @@
     currentShareUrl = intent.url;
     dialogInvoker = invoker || intent.element || document.activeElement;
     markShareSelected(intent.element);
+    const dark = isDarkTheme();
+    parts.dialog.dataset.glass = dark ? "fume" : "clair";
+    applyBrandLogo(parts.brandLogo, dark);
     parts.title.textContent = intent.title;
     parts.qr.classList.remove("is-error");
     resetCopyFeedback();

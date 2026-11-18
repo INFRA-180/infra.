@@ -8,6 +8,11 @@ type: REPRISE
 
 État courant et tâches en attente.
 
+## Lot 9 — résilience (18/11, Claude) : FAIT en partie
+- **Moteur (privé)** : `etat.json` (dernier succès, erreur, échecs à la suite, publication en attente) + **notification macOS** si rien ne réussit depuis 12 h, même erreur 3 fois, ou publication en attente 12 h (1 fois/jour au plus) ; **délais maximum** sur toutes les commandes ; statut git limité à `public/` + `src/js/` (une note ne bloque plus la publication) ; push repris si « HEAD a changé » ; contrat moteur ↔ site vérifié à chaque passage ; ménage R2 **1 fois/jour**, **plafond 25 %**, essai à blanc, **3 versions du catalogue gardées** ; 3 essais réseau ; **verrou partagé** pour les lancements manuels. Tests : `test-auto-sync-state.js`, `test-r2-prune-safety.js` + les 5 anciens, verts. Synchro relancée 21:52, 1er passage OK.
+- **Site (`9597103`, audiofix452, en ligne)** : erreurs JavaScript notées dans la télémétrie (`script_error`, sans contenu privé) ; démarrage protégé étape par étape ; `tools/check-data-schemas.js` (forme des JSON, une version, une adresse du Worker) dans `npm test`. Vérifié en ligne : version 452, aucune erreur console.
+- **Reste du lot 9** (proposé) : Worker (`try` catalogue, ancienne télémétrie hors budget) → **déploiement à autoriser** ; installation du Service Worker plus sûre (`cache: reload`, pages d'album optionnelles) ; un seul manifeste qui génère les copies ; interrupteurs par fonction ; test du site en ligne après publication (CI).
+
 ## Registre du 18/11 (Claude) — lots 0 et 1 faits, lots 2 à 4 attendent « go »
 
 **Plan complet : `DOCS/PLAN_GRAND_LOT_20261118.md`** (local, `PLAN_*` ignoré par Git). INFRA 18/11 : « cover » = pochette visible dans l'aperçu du morceau ; zip par album choisi.

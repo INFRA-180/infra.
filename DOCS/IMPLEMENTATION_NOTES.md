@@ -1,5 +1,18 @@
 # Implementation Notes
 
+## 2026-11-18 — lot 9 résilience, audiofix452 (Claude)
+
+- Erreurs JavaScript remontées : `src/js/runtime/script-errors.js` (écouteurs `error` / `unhandledrejection`,
+  et les blocs protégés du build via `window.__infraReportScriptError`). Événement télémétrie `script_error` :
+  type d'erreur, fichier sans chemin, ligne ; jamais le message. 10 au plus par session. Test de comportement
+  `tools/test-script-errors.js`.
+- Démarrage : `initAlbumSwipeNavigation`, `consumePendingEarlyAlbumSwipeNavigation`, `initSpaNavigation`,
+  `registerServiceWorker` chacun dans son `try` (une panne n'arrête plus les suivantes).
+- `tools/check-data-schemas.js` (dans `npm test`) : forme de catalog/tracks/track-durations/playlists, pages et
+  vignettes présentes, une seule version, une seule adresse du Worker. Un JSON cassé exprès est bien refusé.
+- Moteur privé (hors Git) : état + alerte macOS, délais, publication non bloquée par des notes, ménage R2
+  plafonné. Détail : `_private/docs/AUDIT_RESILIENCE_MOTEURS_20261118.md`.
+
 ## 2026-11-18 — publication automatique réparée, Musique n'est plus lancée (Claude)
 
 - La publication automatique du catalogue était arrêtée depuis le 11/11 : le watcher lisait

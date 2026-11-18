@@ -7,12 +7,12 @@
       : "";
 
   // BEGIN GENERATED HOME THUMBNAILS (tools/generate-bibliotheque-thumbnails.js)
-  const HOME_ALBUM_COVER_SIZES =
-    "(max-width: 639px) calc(50vw - 23px), (max-width: 959px) calc(33.33vw - 24px), (max-width: 1080px) calc(20vw - 24px), 192px";
+  const HOME_ALBUM_COVER_SIZES = "(max-width: 639px) calc(50vw - 23px), (max-width: 959px) calc(33.33vw - 24px), (max-width: 1080px) calc(20vw - 24px), 192px";
   const HOME_MOSAIC_COVER_SIZES = "(max-width: 639px) 25vw, 130px";
   const HOME_THUMBNAILS = new Set([
     "abricot",
     "adc-13-6e983f31",
+    "alexandria",
     "anunnaki",
     "anunnaki-instru-6a799ef0",
     "asase-yaa",
@@ -1262,7 +1262,7 @@
   "use strict";
   if (typeof document === "undefined" || typeof window === "undefined") return;
   if (typeof document.createElement !== "function" || !document.head) return;
-  var VERSION = "bibliotheque-v45-20261119";
+  var VERSION = "bibliotheque-v46-20261119";
   try {
     var script = document.currentScript;
     if (!script || !script.src) return;

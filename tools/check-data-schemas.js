@@ -44,6 +44,9 @@ if (catalog) {
   for (const a of catalog.albums || []) {
     if (str(a.page) && !fs.existsSync(path.join(pub, a.page))) fail(`catalog.json : page absente ${a.page}`);
     if (str(a.thumb) && !fs.existsSync(path.join(pub, a.thumb))) fail(`catalog.json : vignette absente ${a.thumb}`);
+    // 19/11 : ALEXANDRIA était publié sans sa miniature 400 px → pas de pochette sur l'accueil et dans la Bibliothèque
+    const stem = (String(a.thumb || "").match(/responsive\/([a-z0-9-]+)-cover-1200\.webp$/) || [])[1];
+    if (stem && !fs.existsSync(path.join(pub, `assets/thumbnails/music/${stem}-400.webp`))) fail(`miniature 400 px absente pour ${a.id} (node tools/generate-bibliotheque-thumbnails.js)`);
   }
 }
 let trackCount = 0;

@@ -46,7 +46,7 @@
   var TRACK = 60,
     OVERLAP = 5,
     LEAD = 3,
-    SORTS = ["bpm", "shuffle", "album"],
+    SORTS = ["bpm", "bpmdown", "shuffle", "album"],
     ticker = 0;
   var pref = { sec: "samples", voix: false, sort: {} };
   try {
@@ -71,8 +71,15 @@
     pref.sort[(mix ? "mix-" : "smp-") + scope] = v;
     save();
   }
-  // Toucher l'ordre actif le relâche : retour à l'ordre des morceaux.
+  // BPM : 1er toucher du plus lent au plus rapide, 2e du plus rapide au plus lent, 3e ordre des morceaux.
+  // Aléatoire : toucher l'actif le relâche (ordre des morceaux).
   function pickSort(current, v) {
+    if (v === "bpm")
+      return current === "bpm"
+        ? "bpmdown"
+        : current === "bpmdown"
+          ? "album"
+          : "bpm";
     return current === v ? "album" : v;
   }
 
@@ -176,21 +183,20 @@
       return mix ? duoOk(i) : voix || !i.v;
     };
   }
-  // Tempo ressenti : 140 et 70 BPM se mixent ensemble (demi-tempo), tout est ramené entre 70 et 140.
-  function feel(i) {
-    var b = i.tb || 0;
-    if (!b) return 999;
-    while (b < 70) b *= 2;
-    while (b >= 140) b /= 2;
-    return Math.round(b);
+  // Tri sur le vrai tempo du morceau (affiché partout, INFRA 19/11) ; tempo inconnu en dernier.
+  function bpmOf(i) {
+    return i && i.tb ? Math.round(i.tb) : 0;
   }
-  function byTempo(list) {
+  function byTempo(list, desc) {
     return list
       .map(function (i, k) {
         return { i: i, k: k };
       })
       .sort(function (a, b) {
-        return feel(a.i) - feel(b.i) || a.k - b.k;
+        var x = bpmOf(a.i),
+          y = bpmOf(b.i);
+        if (!x !== !y) return x ? -1 : 1;
+        return (desc ? y - x : x - y) || a.k - b.k;
       })
       .map(function (x) {
         return x.i;
@@ -268,17 +274,30 @@
   // le relâche → ordre des morceaux. Le mot « BPM » plutôt qu'un métronome ; aléatoire = deux flèches
   // qui se croisent (forme de la lecture aléatoire d'Apple Musique).
   var SORT_ICON = {
-    bpm: '<span class="sx-word" aria-hidden="true">BPM</span>',
     shuffle: svg(
       '<path d="M3 17.5h2.6c1.6 0 2.6-.6 3.5-1.9l5.8-8.2c.9-1.3 1.9-1.9 3.5-1.9H21"/><path d="M18 2.5 21 5.5 18 8.5"/><path d="M3 6.5h2.6c1.6 0 2.6.6 3.5 1.9l.6.9M21 17.5h-2.6c-1.6 0-2.6-.6-3.5-1.9l-.6-.9"/><path d="M18 14.5 21 17.5 18 20.5"/>',
       LINE,
     ),
   };
   var SORT_LABEL = { bpm: "Par BPM", shuffle: "Aléatoire" };
-  function sortBtns(sort, scope) {
-    return ["bpm", "shuffle"]
+  function sortBtns(sort, scope, only) {
+    return (only ? [only] : ["bpm", "shuffle"])
       .map(function (v) {
-        var on = sort === v;
+        var on = sort === v || (v === "bpm" && sort === "bpmdown");
+        var label =
+          v === "bpm" && on
+            ? sort === "bpm"
+              ? "Du plus lent au plus rapide (toucher : l'inverse)"
+              : "Du plus rapide au plus lent (toucher : ordre des morceaux)"
+            : SORT_LABEL[v] + (on ? " (toucher : ordre des morceaux)" : "");
+        var icon =
+          v === "bpm"
+            ? '<span class="sx-word" aria-hidden="true">BPM' +
+              (on
+                ? '<i class="sx-arrow">' + (sort === "bpm" ? "↑" : "↓") + "</i>"
+                : "") +
+              "</span>"
+            : SORT_ICON[v];
         return (
           '<button type="button" class="sx-ic' +
           (on ? " on" : "") +
@@ -289,12 +308,11 @@
           '" aria-pressed="' +
           on +
           '" title="' +
-          SORT_LABEL[v] +
-          (on ? " (toucher : ordre des morceaux)" : "") +
+          label +
           '" aria-label="' +
-          SORT_LABEL[v] +
+          label +
           '">' +
-          SORT_ICON[v] +
+          icon +
           "</button>"
         );
       })
@@ -327,39 +345,72 @@
       ".sx-ic+.sx-ic{margin-left:-6px}",
       ".smp-al .smp-play{background:none;color:#fff;width:auto;height:auto;filter:drop-shadow(0 1px 4px rgba(0,0,0,.7))}",
       ".smp-al .smp-play svg{width:24px;height:24px;margin:0}",
-      ".sx-card{max-width:440px}",
-      ".sx-art{position:relative;aspect-ratio:1;border-radius:14px;overflow:hidden;background:#000;margin-top:4px}",
+      ".sx-word{display:inline-flex;align-items:baseline;gap:1px}",
+      ".sx-arrow{font-style:normal;font-size:12px;font-weight:800}",
+      // Lecteur plein écran (INFRA, 19/11 : « réutiliser la lecture en plein écran ») : mêmes valeurs que
+      // le grand lecteur du site (fond flou de la pochette, titre Antique Olive, blanc sur sombre).
+      ".smp-sheet.sx-fs{display:block;background:#0a0b0e;color:#fff;opacity:0;transition:opacity .25s ease}",
+      ".smp-sheet.sx-fs.on{opacity:1;background:#0a0b0e}",
+      ".sx-fs{--w:min(540px,calc(100vw - 32px))}",
+      ".sx-bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.08);filter:blur(42px) saturate(1.18);opacity:.72}",
+      ".sx-fs::before{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(90% 80% at 50% 0%,rgba(255,255,255,.15),rgba(255,255,255,0) 58%),linear-gradient(180deg,rgba(5,6,9,.18),rgba(5,6,9,.78))}",
+      ".sx-panel{position:relative;z-index:2;height:100%;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:calc(8px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));outline:none}",
+      ".sx-top{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:var(--w);margin:0 auto 8px}",
+      ".sx-kick{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+      ".sx-tools{display:flex;align-items:center;flex:none}",
+      ".sx-fs .smp-ytic{color:rgba(255,255,255,.5)}",
+      ".sx-fs .smp-ytic:hover{color:#fff}",
+      ".sx-fs .smp-ytic [fill='#fff']{fill:#16181d}",
+      ".sx-fs .smp-ytic [stroke='#fff']{stroke:#16181d}",
+      ".sx-x{width:40px;height:40px;border:0;background:none;padding:0;color:#fff;display:grid;place-items:center;cursor:pointer;margin-right:-10px}",
+      ".sx-x svg{width:22px;height:22px}",
+      ".sx-main{max-width:var(--w);margin:0 auto}",
+      ".sx-art{position:relative;width:100%;aspect-ratio:1;border-radius:24px;overflow:hidden;background:#000}",
       ".sx-vid{position:absolute;inset:0;overflow:hidden}",
       ".sx-vid iframe{position:absolute;top:0;left:50%;height:100%;width:177.78%;transform:translateX(-50%);border:0;display:block}",
       ".sx-cov{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;pointer-events:none;transition:opacity 1.4s ease}",
       ".sx-cov.on{opacity:1;pointer-events:auto}",
-      ".sx-now{margin-top:16px}",
-      ".sx-tr{display:flex;align-items:center;gap:8px}",
-      ".sx-tr b{flex:1;min-width:0;font-size:22px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-      "[data-smp-sortslot]{display:flex;flex:none}",
-      ".sx-tr .sx-ic:last-child{margin-right:-9px}",
-      ".sx-now small{display:block;font-size:14px;color:rgba(17,17,17,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-      ".sx-bar{position:relative;height:28px;margin-top:10px;cursor:pointer;touch-action:none}",
+      ".sx-meta{display:flex;align-items:flex-end;gap:16px;margin-top:20px}",
+      ".sx-mt{flex:1;min-width:0}",
+      ".sx-title{display:block;font-family:'Antique Olive','Helvetica Neue',Arial,sans-serif;font-weight:400;font-size:clamp(1.7rem,6.2vw,2.35rem);line-height:1.04;overflow-wrap:anywhere;color:#fff}",
+      ".sx-mt small{display:block;margin-top:8px;color:rgba(255,255,255,.55);font-size:clamp(.95rem,3.4vw,1.1rem);line-height:1.15;letter-spacing:.02em}",
+      ".sx-bpm{flex:none;text-align:right;line-height:1}",
+      ".sx-bpm[hidden]{display:none}",
+      ".sx-bpm b{display:block;font-family:'Antique Olive','Helvetica Neue',Arial,sans-serif;font-weight:400;font-size:clamp(2.2rem,9vw,3.1rem);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:#fff}",
+      ".sx-bpm small{display:block;margin-top:5px;font-size:11px;font-weight:700;letter-spacing:.2em;color:rgba(255,255,255,.55)}",
+      ".sx-bar{position:relative;height:28px;margin-top:18px;cursor:pointer;touch-action:none}",
       ".sx-trk{position:absolute;left:0;right:0;top:12px;height:4px;display:flex;gap:3px}",
-      ".sx-seg{position:relative;height:100%;background:rgba(17,17,17,.1);overflow:hidden}",
-      ".sx-seg i{position:absolute;left:0;top:0;bottom:0;width:0;background:#111}",
+      ".sx-seg{position:relative;height:100%;background:rgba(255,255,255,.22);overflow:hidden}",
+      ".sx-seg i{position:absolute;left:0;top:0;bottom:0;width:0;background:#fff}",
       ".sx-seg.s i{background:#e0353b}",
-      ".sx-knob{position:absolute;top:6px;left:0;width:3px;height:16px;margin-left:-1.5px;background:#111;pointer-events:none}",
-      ".sx-times{display:flex;justify-content:space-between;font-size:12px;color:rgba(17,17,17,.5);font-variant-numeric:tabular-nums}",
-      ".sx-leg{display:flex;gap:3px;margin-top:4px;font-size:12px}",
-      ".sx-leg button{min-width:0;border:0;background:none;padding:6px 0;margin:-6px 0;font:inherit;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:rgba(17,17,17,.35)}",
-      ".sx-leg button:hover{color:rgba(17,17,17,.6)}",
-      ".sx-leg button.on{color:#111;font-weight:700}",
+      ".sx-knob{position:absolute;top:6px;left:0;width:3px;height:16px;margin-left:-1.5px;background:#fff;pointer-events:none}",
+      ".sx-times{display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums}",
+      ".sx-leg{display:flex;gap:3px;margin-top:6px;font-size:13px}",
+      ".sx-leg button{min-width:0;border:0;background:none;padding:6px 0;margin:-6px 0;font:inherit;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:rgba(255,255,255,.4)}",
+      ".sx-leg button:hover{color:rgba(255,255,255,.75)}",
+      ".sx-leg button.on{color:#fff;font-weight:700}",
       ".sx-leg button.s.on{color:#e0353b}",
-      ".sx-ctr{display:flex;justify-content:center;align-items:center;gap:44px;margin:10px 0 6px}",
-      ".sx-ctr button{width:56px;height:56px;border:0;background:none;padding:0;color:#111;cursor:pointer;display:grid;place-items:center;transition:transform .12s}",
-      ".sx-ctr button svg{width:28px;height:28px}",
-      ".sx-ctr .sx-pp svg{width:46px;height:46px}",
-      ".sx-ctr button:active{transform:scale(.9)}",
-      ".sx-h{font-size:12px;font-weight:600;color:rgba(17,17,17,.45);margin:14px 0 2px}",
-      ".sx-card .smp-row img{width:40px;height:40px;border-radius:6px}",
-      ".sx-card .smp-row em{font-style:normal;font-size:12px;color:rgba(17,17,17,.45);font-variant-numeric:tabular-nums;flex:none}",
-      "@media (prefers-reduced-motion:reduce){.sx-cov,.sx-allic,.sx-ctr button{transition:none}}",
+      ".sx-ctr{display:grid;grid-template-columns:minmax(44px,1fr) auto auto auto minmax(44px,1fr);align-items:center;justify-items:center;column-gap:clamp(8px,4vw,28px);margin:12px 0 4px}",
+      ".sx-ctr>button{width:56px;height:56px;border:0;background:none;padding:0;color:#fff;cursor:pointer;display:grid;place-items:center;transition:transform .12s}",
+      ".sx-ctr>button svg{width:30px;height:30px}",
+      ".sx-ctr>.sx-pp{width:72px;height:72px}",
+      ".sx-ctr>.sx-pp svg{width:50px;height:50px}",
+      ".sx-ctr>button:active{transform:scale(.9)}",
+      ".sx-fs .sx-ic{color:rgba(255,255,255,.4)}",
+      ".sx-fs .sx-ic:hover,.sx-fs .sx-ic:focus-visible{color:rgba(255,255,255,.75)}",
+      ".sx-fs .sx-ic.on{color:#fff}",
+      ".sx-queue{max-width:var(--w);margin:28px auto 0}",
+      ".sx-h{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);margin:0 0 4px}",
+      ".sx-fs .smp-row{color:#fff;border-bottom-color:rgba(255,255,255,.1)}",
+      ".sx-fs .smp-row img{width:44px;height:44px;border-radius:6px;background:rgba(255,255,255,.08)}",
+      ".sx-fs .smp-row small{color:rgba(255,255,255,.5)}",
+      ".sx-fs .smp-row.on b{color:#e0353b}",
+      ".sx-fs .smp-grp{color:rgba(255,255,255,.5)}",
+      ".sx-rb{flex:none;min-width:34px;text-align:right;font-family:'Antique Olive','Helvetica Neue',Arial,sans-serif;font-size:15px;color:rgba(255,255,255,.85);font-variant-numeric:tabular-nums}",
+      ".sx-fs .smp-row em{font-style:normal;font-size:12px;color:rgba(255,255,255,.45);font-variant-numeric:tabular-nums;flex:none;min-width:30px;text-align:right}",
+      // Ordinateur : image et commandes au centre, « À suivre » à droite (comme la file du grand lecteur).
+      "@media (min-width:980px){.sx-fs{--w:min(440px,54vh,calc(50vw - 120px))}.sx-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);grid-template-rows:auto minmax(0,1fr);column-gap:clamp(32px,5vw,80px);overflow:hidden;padding:20px clamp(28px,4vw,72px) 24px}.sx-top{grid-column:1/-1;max-width:none;margin:0}.sx-main{align-self:center;justify-self:center;width:var(--w)}.sx-queue{max-width:none;margin:0;overflow:auto;overscroll-behavior:contain;min-height:0;align-self:stretch;padding-right:4px}.sx-title{font-size:clamp(1.4rem,1.2vw + .8rem,2rem)}}",
+      "@media (prefers-reduced-motion:reduce){.sx-cov,.sx-allic,.sx-ctr>button,.smp-sheet.sx-fs{transition:none}}",
     ].join("\n");
     document.head.appendChild(s);
   }
@@ -464,7 +515,8 @@
   }
   function shownList() {
     var l = shown();
-    if (st.sort === "bpm") return byTempo(l);
+    if (st.sort === "bpm" || st.sort === "bpmdown")
+      return byTempo(l, st.sort === "bpmdown");
     if (st.sort === "shuffle")
       return st.shuf.filter(function (i) {
         return l.indexOf(i) >= 0;
@@ -485,40 +537,45 @@
     if (sheet) return sheet;
     injectCss();
     sheet = document.createElement("div");
-    sheet.className = "smp-sheet";
+    sheet.className = "smp-sheet sx-fs";
     sheet.hidden = true;
     sheet.setAttribute("role", "dialog");
     sheet.setAttribute("aria-modal", "true");
     sheet.setAttribute("aria-label", "Lecteur de samples");
     sheet.innerHTML =
-      '<div class="smp-card sx-card" tabindex="-1">' +
-      '<div class="smp-top"><span class="smp-kicker" data-smp-kicker></span>' +
-      '<span class="smp-tools">' +
+      '<div class="sx-bg" data-smp-bg aria-hidden="true"></div>' +
+      '<div class="sx-panel" tabindex="-1">' +
+      '<div class="sx-top"><span class="sx-kick" data-smp-kicker></span>' +
+      '<span class="sx-tools">' +
       '<a class="smp-ytic" data-smp-sp target="_blank" rel="noopener" aria-label="Chercher dans Spotify" title="Chercher ce sample dans Spotify">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="currentColor"/><path d="M7 9.6c3.4-1 7.2-.7 10.2 1M7.6 12.6c2.8-.8 5.8-.5 8.3.9M8.3 15.4c2.2-.6 4.4-.3 6.4.7" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg></a>' +
       '<a class="smp-ytic" data-smp-am target="_blank" rel="noopener" aria-label="Chercher dans Apple Music" title="Chercher ce sample dans Apple Music">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="currentColor"/><path d="M10 16.3V8.2l6-1.4v7.9" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><circle cx="8.6" cy="16.4" r="1.6" fill="#fff"/><circle cx="14.6" cy="14.8" r="1.6" fill="#fff"/></svg></a>' +
       '<a class="smp-ytic" data-smp-yt target="_blank" rel="noopener" aria-label="Ouvrir dans YouTube" title="Ouvrir dans YouTube">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4" fill="currentColor"/><path d="M10 9.2v5.6l4.8-2.8z" fill="#fff"/></svg></a>' +
-      '<button type="button" class="smp-x" data-smp-close aria-label="Fermer">✕</button></span></div>' +
-      '<div class="smp-scroll">' +
+      '<button type="button" class="sx-x" data-smp-close aria-label="Fermer" title="Fermer (Échap)">' +
+      svg('<path d="M6 6l12 12M18 6L6 18"/>', LINE) +
+      "</button></span></div>" +
+      '<div class="sx-main">' +
       '<div class="sx-art"><div class="sx-vid"><iframe data-smp-frame title="Sample" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>' +
       '<img class="sx-cov" data-smp-cov alt=""></div>' +
-      '<div class="sx-now"><div class="sx-tr"><b data-smp-t dir="auto"></b><span data-smp-sortslot></span></div>' +
+      '<div class="sx-meta"><div class="sx-mt"><b class="sx-title" data-smp-t dir="auto"></b>' +
       '<small data-smp-a dir="auto"></small></div>' +
+      '<div class="sx-bpm" data-smp-bpm title="Tempo du morceau"><b></b><small>BPM</small></div></div>' +
       '<div class="sx-bar" data-smp-bar role="slider" aria-label="Position" tabindex="0"><div class="sx-trk" data-smp-trk></div><i class="sx-knob" data-smp-knob></i></div>' +
       '<div class="sx-times"><span data-smp-t0>0:00</span><span data-smp-t1></span></div>' +
       '<div class="sx-leg" data-smp-leg></div>' +
-      '<div class="sx-ctr"><button type="button" data-smp-prev aria-label="Précédent">' +
+      '<div class="sx-ctr"><span data-smp-sortl></span><button type="button" data-smp-prev aria-label="Précédent">' +
       PREV +
       '</button><button type="button" class="sx-pp" data-smp-pp aria-label="Lecture">' +
       PLAY +
       '</button><button type="button" data-smp-next aria-label="Suivant">' +
       NEXT +
-      "</button></div>" +
-      '<h4 class="sx-h">À suivre</h4>' +
-      '<ol class="smp-list" data-smp-list></ol>' +
-      "</div></div>";
+      "</button><span data-smp-sortr></span></div>" +
+      "</div>" +
+      '<section class="sx-queue" aria-label="À suivre"><h4 class="sx-h">À suivre</h4>' +
+      '<ol class="smp-list" data-smp-list></ol></section>' +
+      "</div>";
     document.body.appendChild(sheet);
     sheet.addEventListener("click", onSheetClick);
     bindBar($("[data-smp-bar]", sheet));
@@ -583,8 +640,8 @@
       sort: st.sort,
       n: shown().length,
     });
-    var card = $(".smp-card", sheet);
-    if (card) card.focus({ preventScroll: true });
+    var panel = $(".sx-panel", sheet);
+    if (panel) panel.focus({ preventScroll: true });
   }
   function close() {
     if (!sheet || sheet.hidden) return;
@@ -668,7 +725,15 @@
     if (!cur) return;
     $("[data-smp-kicker]", sheet).textContent =
       (st.mix ? "Mix · " : "Samples · ") + st.title;
-    $("[data-smp-sortslot]", sheet).innerHTML = sortBtns(st.sort, "here");
+    $("[data-smp-sortl]", sheet).innerHTML = sortBtns(st.sort, "here", "bpm");
+    $("[data-smp-sortr]", sheet).innerHTML = sortBtns(
+      st.sort,
+      "here",
+      "shuffle",
+    );
+    var bpmBox = $("[data-smp-bpm]", sheet);
+    bpmBox.hidden = !bpmOf(cur);
+    bpmBox.firstChild.textContent = bpmOf(cur) || "";
     $("[data-smp-cov]", sheet).src = assetUrl(cur.cover);
     // barre : un segment (Samples) ou deux (Mix : sample | morceau)
     var S = Math.max(1, cur.s1 - cur.s0);
@@ -703,11 +768,7 @@
           "</li>";
       }
       var sub = st.mix
-        ? [
-            feel(i) < 999 ? feel(i) + " BPM" : "",
-            st.scope === "album" ? "" : i.album,
-            transfo(i),
-          ]
+        ? [st.scope === "album" ? "" : i.album, transfo(i)]
         : [
             st.scope === "album" ? who(i) : i.a,
             st.scope === "album" ? "" : "samplé dans " + i.track,
@@ -729,6 +790,9 @@
         '</b><small dir="auto">' +
         esc(sub.filter(Boolean).join(" · ") + (i.v ? " · voix" : "")) +
         "</small></span>" +
+        '<span class="sx-rb" title="BPM">' +
+        (bpmOf(i) || "") +
+        "</span>" +
         (st.mix ? "<em>" + mmss(i.s1 - i.s0 + TRACK) + "</em>" : "") +
         "</button></li>";
     });
@@ -752,10 +816,13 @@
     $("[data-smp-sp]", sheet).href = "https://open.spotify.com/search/" + q;
     $("[data-smp-am]", sheet).href = "https://music.apple.com/search?term=" + q;
     paintNow();
-    var scroller = $(".smp-scroll", sheet),
+    var scroller = $(".sx-panel", sheet),
       on = $(".smp-row.on", sheet);
-    if (top) scroller.scrollTop = 0;
-    else if (on && typeof on.scrollIntoView === "function")
+    if (top) {
+      scroller.scrollTop = 0;
+      var queue = $(".sx-queue", sheet);
+      if (queue) queue.scrollTop = 0;
+    } else if (on && typeof on.scrollIntoView === "function")
       on.scrollIntoView({ block: "nearest" });
   }
   // En haut : ce qu'on entend (le sample, puis ton morceau).
@@ -773,6 +840,14 @@
           .filter(Boolean)
           .join(" · ");
     $("[data-smp-cov]", sheet).classList.toggle("on", inTrack);
+    $("[data-smp-bg]", sheet).style.backgroundImage =
+      'url("' +
+      (inTrack
+        ? assetUrl(cur.cover)
+        : "https://i.ytimg.com/vi/" +
+          encodeURIComponent(cur.y) +
+          "/hqdefault.jpg") +
+      '")';
     var leg = $("[data-smp-leg]", sheet).children;
     if (leg.length === 2) {
       leg[0].classList.toggle("on", !inTrack);
@@ -1294,7 +1369,7 @@
       wait + (fade ? OVERLAP * 1000 : 0) + 200,
     );
     scheduleOut(TRACK + wait / 1000);
-    track("samples_mix_in", { bpm: feel(i), pre: pre, fade: fade });
+    track("samples_mix_in", { bpm: bpmOf(i), pre: pre, fade: fade });
   }
   // Fin de la minute : le sample suivant entre pendant que le morceau sort.
   function mixOut() {

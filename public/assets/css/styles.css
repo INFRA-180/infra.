@@ -6131,16 +6131,18 @@ body.home-screen { touch-action: pan-y pinch-zoom; }
 }
 
 /* Section Samples (maquette Samples v2, validée par INFRA le 18/11/2026) */
-.smp-mix { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.smp-duobtn { background: #e0353b !important; color: #fff !important; }
-.smp-mixbtn { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 14px; border: 0; border-radius: 14px; background: rgba(17, 17, 17, 0.05); color: var(--ink, #111); font: inherit; text-align: left; cursor: pointer; }
-.smp-mixbtn:first-child { background: var(--ink, #111); color: #fff; }
-.smp-mixbtn svg { width: 22px; height: 22px; flex: none; }
-.smp-mixbtn b { display: block; font-size: 15px; }
-.smp-mixbtn small { display: block; font-size: 12px; opacity: 0.62; }
+.smp-mix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 28px; margin-bottom: 6px; }
+.smp-mixbtn { display: flex; align-items: center; gap: 14px; min-height: 58px; padding: 6px 0; border: 0; background: none; color: var(--ink, #111); font: inherit; text-align: left; cursor: pointer; }
+.smp-mixbtn svg { width: 26px; height: 26px; flex: none; color: rgba(17, 17, 17, 0.55); transition: transform 0.2s ease, color 0.2s ease; }
+.smp-mixbtn.smp-red svg { color: #e0353b; }
+.smp-mixbtn b { display: block; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+.smp-mixbtn small { display: block; font-size: 12px; color: rgba(17, 17, 17, 0.45); }
+.smp-mixbtn:hover svg, .smp-mixbtn:focus-visible svg { transform: scale(1.12); color: #e0353b; }
+.smp-mixbtn:hover b { color: #e0353b; }
+@media (max-width: 639px) { .smp-mix { grid-template-columns: 1fr; } }
 .smp-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 22px 14px; }
 @media (max-width: 1099px) { .smp-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (max-width: 639px) { .smp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; } .smp-mix { grid-template-columns: 1fr; } }
+@media (max-width: 639px) { .smp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; } }
 .smp-al { display: block; width: 100%; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .smp-cover { position: relative; display: block; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: #222; }
 .smp-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -6160,7 +6162,6 @@ body.home-screen { touch-action: pan-y pinch-zoom; }
 .smp-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 6px 18px; }
 .smp-kicker { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(17, 17, 17, 0.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .smp-x { width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; font-size: 18px; color: #111; cursor: pointer; flex: none; }
-.smp-x:hover { background: rgba(17, 17, 17, 0.06); }
 .smp-scroll { flex: 1; overflow: auto; overscroll-behavior: contain; padding: 0 18px 18px; }
 .smp-video { aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000; }
 .smp-video iframe { width: 100%; height: 100%; border: 0; display: block; }
@@ -6170,7 +6171,6 @@ body.home-screen { touch-action: pan-y pinch-zoom; }
 .smp-now .smp-from b { display: inline; font-size: inherit; font-weight: 600; color: #111; }
 .smp-ctr { display: flex; justify-content: center; gap: 40px; margin: 6px 0 2px; }
 .smp-ctr button { width: 48px; height: 48px; border: 0; border-radius: 50%; background: none; color: #111; cursor: pointer; display: grid; place-items: center; }
-.smp-ctr button:hover { background: rgba(17, 17, 17, 0.06); }
 .smp-ctr svg { width: 24px; height: 24px; }
 .smp-switch { display: flex; background: rgba(17, 17, 17, 0.06); border-radius: 10px; padding: 3px; margin: 8px 0 4px; }
 .smp-switch button { flex: 1; border: 0; background: none; padding: 8px 4px; border-radius: 8px; font: inherit; font-size: 13px; color: rgba(17, 17, 17, 0.62); cursor: pointer; }
@@ -6185,8 +6185,9 @@ body.home-screen { touch-action: pan-y pinch-zoom; }
 .smp-row.on b { color: #e0353b; }
 .smp-tools { display: flex; align-items: center; flex: none; }
 .smp-ytic { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: rgba(17, 17, 17, 0.38); }
-.smp-ytic:hover { color: #e0353b; background: rgba(17, 17, 17, 0.06); }
-.smp-ytic svg { width: 22px; height: 22px; }
+.smp-ytic:hover { color: #e0353b; }
+.smp-ytic svg { width: 20px; height: 20px; }
+.smp-ytic { width: 36px; }
 html.smp-open, html.smp-open body { overflow: hidden; }
 
 /* Sample → morceau (INFRA, 19/11/2026) : transition par-dessus la vidéo */
@@ -6209,3 +6210,11 @@ html.smp-open, html.smp-open body { overflow: hidden; }
 @keyframes smp-prog { to { transform: scaleX(1); } }
 @media (max-width: 639px) { .smp-bt b { font-size: 18px; } }
 @media (prefers-reduced-motion: reduce) { .smp-bg, .smp-dot, .smp-bridge { transition: none; animation: none !important; } }
+.smp-bridge.slow { transition: opacity 5s ease; }
+.smp-bridge.slow .smp-dot { transition-duration: 4.5s; }
+.smp-switch button { white-space: nowrap; }
+.smp-card:focus { outline: none; }
+.smp-x, .smp-ctr button, .smp-ytic, .smp-mixbtn { -webkit-tap-highlight-color: transparent; }
+.smp-x:focus:not(:focus-visible), .smp-ctr button:focus:not(:focus-visible), .smp-mixbtn:focus:not(:focus-visible) { outline: none; }
+.smp-x:hover, .smp-ctr button:hover { color: #e0353b; }
+.smp-mixbtn svg { color: #e0353b !important; }

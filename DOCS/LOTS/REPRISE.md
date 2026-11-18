@@ -8,6 +8,11 @@ type: REPRISE
 
 État courant et tâches en attente.
 
+## 18-19/11 (Claude) — sauvegarde, télémétrie, synchro Musique
+- **Sauvegarde** : `SITE_INFRA./BACKUPS/SITE_20261118_apres-lot9.zip` (195 Mo, testée ; site, moteurs, base de synchro, notes ; sans `.git` ni `node_modules`). Git : GitHub à jour ; dépôt local `APP_NETWORK/GIT/remotes/SITE.git` → branche **`site-actuel`** (sa branche `codex/beta-site` contient une ancienne histoire d'avril, non écrasée). **Ancienne sauvegarde à supprimer : choix d'INFRA en attente** (11 éléments dans `BACKUPS/`, ~1,5 Go).
+- **Télémétrie 7 jours** : 41 sessions, 0 erreur, 7 lectures (départ p95 0,8 s), navigation p95 0,17 s, aucun lecteur caché à tort, 13 lancements. **Gestes de la Bibliothèque non mesurés** (`bibliotheque.js` n'envoie rien) → à ajouter (glisser d'onglet, retour par le bord, appui long, ⋯).
+- **Synchro Musique** : l'album **ALEXANDRIA** (ajouté le 18/11 au soir) était bloqué en silence : seuls les `.aif` étaient lus, « 02 AKIRA » est un `.mp3`. Corrigé (aif, aiff, wav, mp3, m4a, flac) ; la vraie raison d'un échec est maintenant gardée ; un album bloqué déclenche une alerte macOS. ALEXANDRIA publié tout seul (`498bee4`, 11 titres, page en ligne).
+
 ## Lot 9 — résilience (18/11, Claude) : FAIT en partie
 - **Moteur (privé)** : `etat.json` (dernier succès, erreur, échecs à la suite, publication en attente) + **notification macOS** si rien ne réussit depuis 12 h, même erreur 3 fois, ou publication en attente 12 h (1 fois/jour au plus) ; **délais maximum** sur toutes les commandes ; statut git limité à `public/` + `src/js/` (une note ne bloque plus la publication) ; push repris si « HEAD a changé » ; contrat moteur ↔ site vérifié à chaque passage ; ménage R2 **1 fois/jour**, **plafond 25 %**, essai à blanc, **3 versions du catalogue gardées** ; 3 essais réseau ; **verrou partagé** pour les lancements manuels. Tests : `test-auto-sync-state.js`, `test-r2-prune-safety.js` + les 5 anciens, verts. Synchro relancée 21:52, 1er passage OK.
 - **Site (`9597103`, audiofix452, en ligne)** : erreurs JavaScript notées dans la télémétrie (`script_error`, sans contenu privé) ; démarrage protégé étape par étape ; `tools/check-data-schemas.js` (forme des JSON, une version, une adresse du Worker) dans `npm test`. Vérifié en ligne : version 452, aucune erreur console.

@@ -401,6 +401,8 @@ function runRegressionSuite() {
     "tools/test-transport-pip.js",
     "tools/test-bump-version.js",
     "tools/test-code-text.js",
+    "tools/test-script-errors.js", // lot 9 : erreurs JavaScript remontées
+    "tools/check-data-schemas.js", // lot 9 : forme des données, une seule version, une seule adresse du Worker
     "tools/verify-audio-stability.js",
     "tools/verify-public-boundary.js"
   ];

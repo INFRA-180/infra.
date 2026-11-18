@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20261118-audio451";
+const VERSION = "infra-shell-20261118-audio452";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const LIVE_CATALOG_CACHE = `${VERSION}-catalog`;
@@ -46,14 +46,14 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix451-20261118",
-  "./assets/js/bibliotheque.js?v=bibliotheque-v39-20261113",
-  "./assets/js/app.js?v=audiofix451-20261118",
+  "./assets/css/styles.css?v=audiofix452-20261118",
+  "./assets/js/bibliotheque.js?v=bibliotheque-v40-20261118",
+  "./assets/js/app.js?v=audiofix452-20261118",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix451-20261118",
-  "./data/track-durations.json?v=audiofix451-20261118",
-  "./data/tracks.json?v=audiofix451-20261118",
+  "./data/catalog.json?v=audiofix452-20261118",
+  "./data/track-durations.json?v=audiofix452-20261118",
+  "./data/tracks.json?v=audiofix452-20261118",
   "./data/playlists.json?v=playlist-collage-20260802",
   "./assets/css/playlists.css?v=playlist-collage-20260802",
   "./assets/branding/infra-logo-white-photoroom-title.png",
@@ -73,7 +73,7 @@ const SHELL_ASSETS = [
 // audio. A missing admin/QR/Sphragis file must therefore never invalidate the
 // complete shell installation.
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/scripts.admin.js?v=audiofix451-20261118",
+  "./assets/js/scripts.admin.js?v=audiofix452-20261118",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./sphragis/",
   "./sphragis/index.html",

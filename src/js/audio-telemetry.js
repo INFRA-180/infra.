@@ -4,6 +4,7 @@
   // Call sites remain verbose for local diagnostics. Only the compact
   // transitions assembled below are written to the session journal.
   const RAW_EVENTS = new Set([
+    "script_error",
     "album_switch",
     "audio_network_result",
     "audio_pause",
@@ -3053,6 +3054,7 @@
         eventType === "play_rejected" ||
         eventType === "error" ||
         eventType === "prefetch_error" ||
+        eventType === "script_error" ||
         (eventType === "media_command" &&
           ["rejected", "no_progress", "recovery_failed", "incomplete"].includes(
             String(source.outcome || "")

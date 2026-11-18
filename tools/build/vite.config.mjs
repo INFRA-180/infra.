@@ -34,7 +34,8 @@ function isolateLegacyScripts() {
       const head = imports ? imports[0] : "";
       const rest = code.slice(head.length);
       return {
-        code: `${head}try {\n${rest}\n} catch (error) {\n  console.error("[INFRA] ${name} :", error);\n}\n`,
+        // Lot 9 : l'erreur d'un bloc protégé est aussi notée dans la télémétrie (runtime/script-errors.js).
+        code: `${head}try {\n${rest}\n} catch (error) {\n  console.error("[INFRA] ${name} :", error);\n  try { if (window.__infraReportScriptError) window.__infraReportScriptError(error, "${name}"); else (window.__infraEarlyErrors = window.__infraEarlyErrors || []).push({ error, module: "${name}" }); } catch (_e) {}\n}\n`,
         map: null
       };
     }

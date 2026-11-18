@@ -33,6 +33,7 @@ import {
 import { getCurrentPlaylistTrack, normalizeAudioSourceUrl } from "./runtime/audio-sources.js";
 import { buildAudioMonitorPayload } from "./runtime/audio-monitor.js";
 import { trackAudioRuntimeEvent } from "./runtime/playback.js";
+import { installScriptErrorReporting, reportScriptError } from "./runtime/script-errors.js";
 import {
   disconnectLaunchPerformanceObservers,
   initPage,
@@ -41,7 +42,9 @@ import {
   reportLaunchSummary
 } from "./runtime/page-init.js";
 
-window.INFRA_BUILD_TAG = "audiofix451-20261118";
+window.INFRA_BUILD_TAG = "audiofix452-20261118";
+
+installScriptErrorReporting(trackAudioRuntimeEvent);
 
 try {
   document.documentElement.dataset.build = window.INFRA_BUILD_TAG;
@@ -568,7 +571,7 @@ const PREFETCH_MAX_ATTEMPTS = 2;
 
 const WORKER_URL = "https://infra180-api.pages.dev";
 
-const SPA_SHELL_VERSION = "infra-shell-20261118-audio451";
+const SPA_SHELL_VERSION = "infra-shell-20261118-audio452";
 
 const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
 
@@ -585,7 +588,7 @@ const LIVE_CATALOG_CACHE_NAME = `${SPA_SHELL_VERSION}-catalog`;
 
 const LIVE_CATALOG_TIMEOUT_MS = 3500;
 
-const LOCAL_CATALOG_VERSION = "audiofix451-20261118";
+const LOCAL_CATALOG_VERSION = "audiofix452-20261118";
 
 const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
@@ -613,7 +616,7 @@ const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
 
 const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
 
-const runtimeVersion = "audiofix451-20261118";
+const runtimeVersion = "audiofix452-20261118";
 
 const runtime = (function () {
   const scriptEl =
@@ -777,10 +780,16 @@ audioTelemetryApi.initLifecycle();
 document.addEventListener("DOMContentLoaded", function () {
   const initStartedAt =
     typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : 0;
-  initAlbumSwipeNavigation();
-  consumePendingEarlyAlbumSwipeNavigation();
-  initSpaNavigation();
-  registerServiceWorker();
+  // Lot 9 : chaque étape du démarrage est protégée ; une panne n'empêche plus l'enregistrement du
+  // Service Worker ni le chargement de la page, et elle est notée dans la télémétrie.
+  [initAlbumSwipeNavigation, consumePendingEarlyAlbumSwipeNavigation, initSpaNavigation, registerServiceWorker].forEach(function (step) {
+    try {
+      step();
+    } catch (error) {
+      console.error("[INFRA] démarrage :", error);
+      reportScriptError(error, step.name || "demarrage", "startup", "", 0);
+    }
+  });
   void initPage()
     .then(function () {
       return reportLaunchSummary(initStartedAt);

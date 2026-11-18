@@ -55,7 +55,9 @@ assert.ok(
   codeHas(dialogMarkup, 'data-share-copy-toast role="status" aria-live="polite"'),
   "copy result is not exposed as a temporary live toast"
 );
-assert.ok(!codeHas(dialogMarkup, "share-link"), "legacy visible URL field is still rendered");
+// INFRA 19/11/2026 : le lien est de nouveau visible et se copie d'un toucher (remplace la règle du 13/11).
+assert.ok(codeHas(dialogMarkup, 'class="share-link" type="button" data-share-link'), "visible link to copy is missing");
+assert.ok(codeHas(script, 'linkButton.addEventListener("click", function () { copyButton.click(); });'), "visible link does not copy");
 assert.ok(!codeHas(dialogMarkup, "Copier le lien</button>"), "legacy text copy button is still rendered");
 
 const copyHandlerStart = codeIndexOf(script, 'copyButton.addEventListener("click"');
@@ -82,7 +84,9 @@ assert.ok(
 );
 assert.ok(codeHas(styles, ".share-copy-toast.is-visible"), "copy notification has no visible state");
 assert.ok(codeHas(styles, ".share-brand-logo"), "official logo has no modal layout");
-assert.ok(codeHas(styles, "background: rgba(20, 22, 28, 0.48)"), "share card is not smoked glass");
+// INFRA 19/11/2026 : la carte a la couleur du fond du site, sans cadre ni verre (remplace le verre fumé du 13/11).
+assert.ok(codeHas(styles, "background: var(--share-site-bg, #ffffff);"), "share card does not use the site background");
+assert.ok(codeHas(script, 'parts.dialog.style.setProperty("--share-site-bg", siteBg);'), "site background is not passed to the card");
 assert.ok(codeHas(styles, "padding: 18px 20px 30px"), "share card lost its measured bottom margin");
 
 console.log("INFRA QR modal controls and branding: ok");

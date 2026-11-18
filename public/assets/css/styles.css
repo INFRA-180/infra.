@@ -1919,6 +1919,42 @@ body.transport-pip-document .transport-pip-player.is-narrow .global-transport-bt
   margin: 12px auto 0;
 }
 
+/* INFRA 19/11/2026 : carte de la couleur du fond du site, sans cadre ni verre ; le lien est visible et se copie. */
+.share-dialog .share-dialog-panel,
+.share-dialog[data-glass="clair"] .share-dialog-panel {
+  color: var(--share-site-ink, #111111);
+  background: var(--share-site-bg, #ffffff);
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.share-link {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 6px 4px;
+  overflow: hidden;
+  color: inherit;
+  font: 400 0.85rem/1.3 "Avenir Next", "Avenir", Arial, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  opacity: 0.6;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.share-link:hover,
+.share-link:focus-visible {
+  opacity: 1;
+  outline: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .share-copy-source {
   position: fixed;
   top: 0;

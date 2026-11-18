@@ -22,4 +22,5 @@ import "../../src/js/home-catalog.js";
 import "../../src/js/audio-core.js";
 import "../../src/js/pwa-install.js";
 import "../../src/js/share-qr.js";
+import "../../src/js/track-actions.js"; // menu discret d'un morceau (19/11/2026)
 import "../../src/js/scripts.js";

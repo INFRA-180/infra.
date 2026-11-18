@@ -217,6 +217,8 @@
       "  </header>",
       '  <div class="share-qr" data-share-qr aria-live="off"></div>',
       '  <img class="share-brand-logo" data-share-brand-logo alt="" aria-hidden="true" decoding="async" />',
+      // INFRA 19/11/2026 : le lien est visible et se copie d'un toucher (petit « Lien copié »).
+      '  <button class="share-link" type="button" data-share-link aria-label="Copier le lien"></button>',
       "</div>"
     ].join("");
 
@@ -272,6 +274,8 @@
       backdropPointer = null;
       window.clearTimeout(copyStateTimer);
     });
+    const linkButton = dialog.querySelector("[data-share-link]");
+    linkButton.addEventListener("click", function () { copyButton.click(); });
     copyButton.addEventListener("click", async function () {
       const copyToken = openToken;
       const copyUrl = currentShareUrl;
@@ -287,7 +291,7 @@
     });
 
     getPersistRoot().appendChild(dialog);
-    dialogParts = { dialog, closeButton, copyButton, copyToast, title, qr, brandLogo };
+    dialogParts = { dialog, closeButton, copyButton, copyToast, title, qr, brandLogo, linkButton };
     return dialogParts;
   }
 
@@ -561,8 +565,18 @@
     currentShareUrl = intent.url;
     dialogInvoker = invoker || intent.element || document.activeElement;
     markShareSelected(intent.element);
-    const dark = isDarkTheme();
+    // INFRA 19/11/2026 : la carte prend la couleur du fond du site (plus de verre fumé), sans cadre ;
+    // le logo suit la clarté de ce fond (le mode du système donnait un logo blanc sur fond blanc).
+    const body = getComputedStyle(document.body);
+    const rgb = (String(body.backgroundColor || "").match(/\d+(\.\d+)?/g) || []).map(Number);
+    const dark = rgb.length >= 3 && (rgb[3] === undefined || rgb[3] > 0)
+      ? (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255 < 0.5
+      : isDarkTheme();
     parts.dialog.dataset.glass = dark ? "fume" : "clair";
+    const siteBg = body.backgroundColor && body.backgroundColor !== "rgba(0, 0, 0, 0)" ? body.backgroundColor : dark ? "#101010" : "#ffffff";
+    parts.dialog.style.setProperty("--share-site-bg", siteBg);
+    parts.dialog.style.setProperty("--share-site-ink", body.color || (dark ? "#f2f2f2" : "#111111"));
+    parts.linkButton.textContent = String(intent.url || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
     applyBrandLogo(parts.brandLogo, dark);
     parts.title.textContent = intent.title;
     parts.qr.classList.remove("is-error");
@@ -660,6 +674,12 @@
       suppressedClick = null;
     }
   }
+
+  // Utilisé par le menu des morceaux (track-actions.js) : même carte, même copie.
+  window.InfraShare = {
+    open: function (intent) { return openShare(intent, intent.element); },
+    copy: function (text) { return copyText(text, document.body); }
+  };
 
   document.addEventListener("pointerdown", beginLongPress, { capture: true, passive: true });
   document.addEventListener("pointermove", moveLongPress, { capture: true, passive: true });

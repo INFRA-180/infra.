@@ -247,17 +247,10 @@
       }).length,
       titres: data.tracks.length
     };
-    Object.keys(n).forEach(function (k) {
-      var b = $('[data-bib-tab="' + k + '"]');
-      if (!b || !n[k]) return;
-      var span = $(".n", b);
-      if (!span) {
-        span = document.createElement("span");
-        span.className = "n";
-        span.setAttribute("aria-hidden", "true");
-        b.appendChild(span);
-      }
-      span.textContent = String(n[k]);
+    // INFRA 19/11/2026 : plus de nombres à côté des onglets (« on garde ça neutre »).
+    void n;
+    $$("[data-bib-tab] .n").forEach(function (span) {
+      span.parentNode.removeChild(span);
     });
   }
 

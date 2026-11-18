@@ -6131,7 +6131,8 @@ body.home-screen { touch-action: pan-y pinch-zoom; }
 }
 
 /* Section Samples (maquette Samples v2, validée par INFRA le 18/11/2026) */
-.smp-mix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.smp-mix { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.smp-duobtn { background: #e0353b !important; color: #fff !important; }
 .smp-mixbtn { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 14px; border: 0; border-radius: 14px; background: rgba(17, 17, 17, 0.05); color: var(--ink, #111); font: inherit; text-align: left; cursor: pointer; }
 .smp-mixbtn:first-child { background: var(--ink, #111); color: #fff; }
 .smp-mixbtn svg { width: 22px; height: 22px; flex: none; }
@@ -6187,3 +6188,24 @@ body.home-screen { touch-action: pan-y pinch-zoom; }
 .smp-ytic:hover { color: #e0353b; background: rgba(17, 17, 17, 0.06); }
 .smp-ytic svg { width: 22px; height: 22px; }
 html.smp-open, html.smp-open body { overflow: hidden; }
+
+/* Sample → morceau (INFRA, 19/11/2026) : transition par-dessus la vidéo */
+.smp-video { position: relative; }
+.smp-bridge { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; background: #000; color: #fff; display: flex; align-items: flex-end; opacity: 0; transition: opacity 0.35s ease; }
+.smp-bridge[hidden] { display: none; }
+.smp-bridge.in { opacity: 1; }
+.smp-bg { position: absolute; inset: -10%; width: 120%; height: 120%; object-fit: cover; filter: blur(14px) brightness(0.55); transform: scale(1.15); transition: transform 1.2s cubic-bezier(0.2, 0.7, 0.2, 1), filter 1.2s ease; }
+.smp-bridge.track .smp-bg { transform: scale(1); filter: blur(0) brightness(0.62); animation: smp-drift 36s linear forwards; }
+@keyframes smp-drift { to { transform: scale(1.08); } }
+.smp-dot { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: #e0353b; transform: scale(0.2); transition: transform 0.9s cubic-bezier(0.6, 0, 0.2, 1), opacity 0.5s ease 0.7s; }
+.smp-bridge.in .smp-dot { transform: scale(60); opacity: 0; }
+.smp-bt { position: relative; padding: 14px 16px; width: 100%; background: linear-gradient(transparent, rgba(0, 0, 0, 0.7)); }
+.smp-bt small { display: block; font-size: 12px; opacity: 0.8; }
+.smp-bt b { display: block; font-size: 22px; font-weight: 800; line-height: 1.15; margin: 2px 0; }
+.smp-full { margin-top: 8px; border: 0; border-radius: 999px; padding: 7px 12px; background: rgba(255, 255, 255, 0.9); color: #111; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; display: none; }
+.smp-bridge.track:not(.full) .smp-full { display: inline-block; }
+.smp-prog { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: #e0353b; transform-origin: left; transform: scaleX(0); }
+.smp-bridge.track:not(.full) .smp-prog { animation: smp-prog linear forwards; }
+@keyframes smp-prog { to { transform: scaleX(1); } }
+@media (max-width: 639px) { .smp-bt b { font-size: 18px; } }
+@media (prefers-reduced-motion: reduce) { .smp-bg, .smp-dot, .smp-bridge { transition: none; animation: none !important; } }

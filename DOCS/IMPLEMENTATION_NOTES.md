@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-11-18 — lot 9 résilience, suite, audiofix453 (Claude)
+
+- `tools/check-live-site.js` en dernière étape du workflow : le site en ligne doit porter la version envoyée
+  (page, app.js minifié, sw.js, données) et le Worker doit répondre ; 10 essais à 20 s. Vu vert en CI.
+- `sw.js` : `installShellCache` relit les fichiers de base avec `cache: "reload"` (comme les pages d'albums).
+- Worker privé redéployé (`7e76542d`) : `handleCatalogRequest` protégé (503 + Retry-After), ancien format
+  `/log` (liste ou événement seul) accepté sans écriture KV.
+
 ## 2026-11-18 — lot 9 résilience, audiofix452 (Claude)
 
 - Erreurs JavaScript remontées : `src/js/runtime/script-errors.js` (écouteurs `error` / `unhandledrejection`,

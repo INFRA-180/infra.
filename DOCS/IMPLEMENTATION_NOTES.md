@@ -1,5 +1,17 @@
 # Implementation Notes
 
+## 2026-11-18 — publication automatique réparée, Musique n'est plus lancée (Claude)
+
+- La publication automatique du catalogue était arrêtée depuis le 11/11 : le watcher lisait
+  encore `public/assets/js/scripts.js`, déplacé dans `src/js/` au lot E (app.js construit par Vite),
+  et la génération réécrivait `src/js/` directement dans le dépôt. Le dossier d'étape contient
+  maintenant `public/` et `src/js/` ; les deux sont planifiés, appliqués et commités ensemble,
+  et `app.js` reconstruit par `npm test` est ajouté à la publication (reprise après coupure exacte).
+  Preuve : publication de D 2.0141 (`9c434af`), déploiement GitHub réussi.
+- Le watcher n'interroge plus Musique (ce qui lançait l'app toutes les 5 min) si le dossier source
+  et la bibliothèque Musique n'ont pas changé, sauf reprise prévue ou Musique déjà ouverte.
+  Test : `_private/tools/test-music-quiet-gate.js`.
+
 ## 2026-11-05 — rétablissement de l’automatique contrôlé, audiofix412
 
 - INFRA confirme : « Oui, rétablir l’automatique contrôlé ». Cette validation remplace

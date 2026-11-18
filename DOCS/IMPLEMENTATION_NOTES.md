@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## 2026-11-19 — téléchargements Cloudflare (lot 2, Claude)
+
+- Boutons « Télécharger l'album » : `https://infra180-api.pages.dev/download/<slug>` sur les 33 albums (catalogue,
+  copie de secours, pages). Le Worker assemble le zip (méthode « stocké », drapeau UTF-8, Content-Length exact) à
+  partir de fichiers préparés sur R2 (morceaux avec pochette intégrée + `cover.jpg` + manifeste CRC32).
+- Les 3 apps gardent leur lien Drive tant que leurs `.dmg` ne sont pas fournis.
+- Miniatures 400 px : vérifiées par `tools/check-data-schemas.js` (un album sans miniature est refusé).
+
 ## 2026-11-18 — lot 9 résilience, suite, audiofix453 (Claude)
 
 - `tools/check-live-site.js` en dernière étape du workflow : le site en ligne doit porter la version envoyée

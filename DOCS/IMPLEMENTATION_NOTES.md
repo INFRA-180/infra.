@@ -1994,3 +1994,9 @@ c'était le système, pas le thème », « on doit pouvoir quitter en appuyant h
 - Lecteur : iframe `youtube-nocookie` avec `enablejsapi`, pilotée par messages (`listening`, `loadVideoById`, `pauseVideo`) sans charger le script externe de YouTube. Fin d'un son → suivant ; erreur → suivant.
 - Données publiques `data/samples.json` : titre, artiste, année, identifiant YouTube, `v: 1` pour une voix. Aucun chemin ni nom de fichier. Fabriqué hors dépôt (`INVENTAIRE_SAMPLES/_outils/`), seulement les liens connus ou « sûrs ».
 - Les gestes de la bibliothèque (molette, glisser d'onglet, retour au bord) ignorent `.smp-sheet`.
+
+## 19/11/2026 — Samples : deux sections et lecteur simple (Claude)
+- INFRA ne trouvait pas le Mix (4e choix caché, la playlist s'ouvrait sur la vidéo YouTube entière) et le lecteur n'avait ni lecture/pause ni barre. Maquette « Samples et Mix » V1 validée.
+- `samples.js` réécrit : sections Samples / Mix (choix retenu, `localStorage` `infra-samples`) ; « → morceau » retiré (le Mix le remplace) ; ordre BPM / aléatoire / morceaux retenu par écran ; lecteur avec titre de ce qu'on entend, barre sample | morceau (position lue dans les messages YouTube puis dans `<audio>`), lecture/pause, pictos sans rond.
+- Styles injectés par `samples.js` (`#sx-style`) : `styles.css` est figé par empreinte et sa version n'a pas été changée (montée de version d'une autre session en cours, non commitée). Le service worker sert `samples.js` en « périmé puis rafraîchi » : la nouvelle version s'affiche au 2e chargement.
+- Limite connue : iPhone ne laisse pas régler le volume d'un `<audio>` ni de YouTube depuis la page ; les fondus de 5 s y sont des coupures franches au même volume.

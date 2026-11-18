@@ -1,6 +1,6 @@
 {
-  "version": "audiofix454-20261119",
-  "generatedAt": "2026-11-18",
+  "version": "audiofix455-20261119",
+  "generatedAt": "2026-11-19",
   "source": "Music macOS masters AAC 320 R2",
   "audioPrefix": "mixed",
   "audioPrefixes": [
@@ -22,9 +22,95 @@
     "assets/music/streams/v20261104T221522Z-184ea076a0",
     "assets/music/streams/v20261104T222428Z-ce60d2fdb9",
     "assets/music/streams/v20261105T214910Z-32b24f8477",
-    "assets/music/streams/v20261111T211331Z-722e73c3af"
+    "assets/music/streams/v20261111T211331Z-722e73c3af",
+    "assets/music/streams/v20261118T225731Z-2f53a49691"
   ],
   "albums": [
+    {
+      "slug": "alexandria",
+      "title": "ALEXANDRIA",
+      "page": "music/alexandria-infra.html",
+      "cover": "assets/music/responsive/alexandria-cover-1200.webp",
+      "tracks": [
+        {
+          "index": 1,
+          "title": "335I",
+          "src": "assets/music/streams/v20261118T225731Z-2f53a49691/alexandria/01-335i.m4a",
+          "duration": "1:27",
+          "seconds": 86.635
+        },
+        {
+          "index": 2,
+          "title": "AKIRA",
+          "src": "assets/music/streams/v20261118T225731Z-2f53a49691/alexandria/02-akira.m4a",
+          "duration": "2:45",
+          "seconds": 165.376
+        },
+        {
+          "index": 3,
+          "title": "LIME",
+          "src": "assets/music/streams/v20261118T225731Z-2f53a49691/alexandria/03-lime.m4a",
+          "duration": "1:23",
+          "seconds": 82.774
+        },
+        {
+          "index": 4,
+          "title": "ENSEMBLE",
+          "src": "assets/music/streams/v20261118T225731Z-2f53a49691/alexandria/04-ensemble.m4a",
+          "duration": "1:57",
+          "seconds": 116.758
+        },
+        {
+          "index": 5,
+          "title": "BARACUDA",
+          "src": "assets/music/streams/v20261118T225731Z-2f53a49691/alexandria/05-baracuda.m4a",
+          "duration": "2:27",
+          "seconds": 146.667
+        },
+        {
+          "index": 6,
+          "title": "FACILE",
+          "src": "assets/music/streams/v20261118T225731Z-2f53a49691/alexandria/06-facile.m4a",
+          "duration": "3:46",
+          "seconds": 225.558
+        },
+        {
+          "index": 7,
+          "title": "QUE DES MOTS",
+          "src": "assets/music/streams/v20261118T225731Z-2f53a49691/alexandria/07-que-des-mots.m4a",
+          "duration": "3:33",
+          "seconds": 213.334
+        },
+        {
+          "index": 8,
+          "title": "DEGUN",
+          "src": "assets/music/streams/v20261118T225731Z-2f53a49691/alexandria/08-degun.m4a",
+          "duration": "3:53",
+          "seconds": 233.43
+        },
+        {
+          "index": 9,
+          "title": "POUR L'AMOUR",
+          "src": "assets/music/streams/v20261118T225731Z-2f53a49691/alexandria/09-pour-lamour.m4a",
+          "duration": "2:11",
+          "seconds": 130.923
+        },
+        {
+          "index": 10,
+          "title": "GLASS",
+          "src": "assets/music/streams/v20261118T225731Z-2f53a49691/alexandria/10-glass.m4a",
+          "duration": "2:08",
+          "seconds": 128
+        },
+        {
+          "index": 11,
+          "title": "BANDIDO",
+          "src": "assets/music/streams/v20261118T225731Z-2f53a49691/alexandria/11-bandido.m4a",
+          "duration": "3:18",
+          "seconds": 198.059
+        }
+      ]
+    },
     {
       "slug": "d-2-0141",
       "title": "D 2.0141",

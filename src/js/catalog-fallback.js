@@ -54,6 +54,16 @@
   ],
   "albums": [
     {
+      "id": "alexandria",
+      "title": "ALEXANDRIA",
+      "editKey": "album_alexandria",
+      "page": "music/alexandria-infra.html",
+      "thumb": "assets/music/responsive/alexandria-cover-1200.webp",
+      "thumbAlt": "Cover INFRA. - ALEXANDRIA",
+      "width": 800,
+      "height": 800
+    },
+    {
       "id": "d-2-0141",
       "title": "D 2.0141",
       "editKey": "album_d_2_0141",

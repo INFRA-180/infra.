@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20261118-audio452";
+const VERSION = "infra-shell-20261118-audio453";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const LIVE_CATALOG_CACHE = `${VERSION}-catalog`;
@@ -46,14 +46,14 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix452-20261118",
-  "./assets/js/bibliotheque.js?v=bibliotheque-v40-20261118",
-  "./assets/js/app.js?v=audiofix452-20261118",
+  "./assets/css/styles.css?v=audiofix453-20261118",
+  "./assets/js/bibliotheque.js?v=bibliotheque-v41-20261118",
+  "./assets/js/app.js?v=audiofix453-20261118",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix452-20261118",
-  "./data/track-durations.json?v=audiofix452-20261118",
-  "./data/tracks.json?v=audiofix452-20261118",
+  "./data/catalog.json?v=audiofix453-20261118",
+  "./data/track-durations.json?v=audiofix453-20261118",
+  "./data/tracks.json?v=audiofix453-20261118",
   "./data/playlists.json?v=playlist-collage-20260802",
   "./assets/css/playlists.css?v=playlist-collage-20260802",
   "./assets/branding/infra-logo-white-photoroom-title.png",
@@ -73,7 +73,7 @@ const SHELL_ASSETS = [
 // audio. A missing admin/QR/Sphragis file must therefore never invalidate the
 // complete shell installation.
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/scripts.admin.js?v=audiofix452-20261118",
+  "./assets/js/scripts.admin.js?v=audiofix453-20261118",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./sphragis/",
   "./sphragis/index.html",
@@ -145,7 +145,13 @@ async function precacheAlbumDocuments(cache) {
 
 async function installShellCache() {
   const cache = await caches.open(SHELL_CACHE);
-  await cache.addAll(SHELL_ASSETS);
+  // Lot 9 (18/11/2026) : comme les pages d'albums, les fichiers de base sont relus sur le réseau (pas dans le
+  // cache HTTP du navigateur) : une nouvelle version ne s'installe plus avec une ancienne page d'accueil.
+  await cache.addAll(
+    SHELL_ASSETS.map(function (asset) {
+      return new Request(new URL(asset, self.location.href).href, { cache: "reload", credentials: "same-origin" });
+    })
+  );
   await precacheAlbumDocuments(cache);
   await Promise.allSettled(
     OPTIONAL_SHELL_ASSETS.map(function (asset) {

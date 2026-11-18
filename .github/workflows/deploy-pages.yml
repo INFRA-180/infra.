@@ -44,3 +44,7 @@ jobs:
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      # Lot 9 (18/11/2026) : « poussé » ≠ « en ligne ». Vérifie que le site publié porte la nouvelle version
+      # (page, app.js, sw.js, données) et que le Worker répond. Sans npm : node seul.
+      - name: Check live site
+        run: node tools/check-live-site.js "${{ steps.deployment.outputs.page_url }}"

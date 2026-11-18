@@ -36,7 +36,7 @@ const installedOptionalShellAssets = [];
 
 const shellCache = {
   addAll: (assets) => {
-    installedShellAssets = Array.from(assets || []);
+    installedShellAssets = Array.from(assets || []).map((asset) => (typeof asset === "string" ? asset : `${asset.cache}:${asset.url}`)); // lot 9 : requêtes « reload »
     return Promise.resolve();
   },
   add: (asset) => {
@@ -263,7 +263,8 @@ async function dispatchSiteFetch(request) {
   assert.strictEqual(installedAlbumPages.length, catalogAlbumCount, "all album documents must be installed with the PWA shell");
   assert(codeHas(installedAlbumPages, "https://site.test/music/salam-infra.html"));
   assert(codeHas(installedAlbumPages, "https://site.test/music/trou-noir-infra.html"));
-  assert(codeHas(installedShellAssets, `./assets/js/app.js?v=${runtimeRelease}`)); // un seul fichier construit par Vite (10/11/2026)
+  assert(installedShellAssets.some((asset) => asset.endsWith(`/assets/js/app.js?v=${runtimeRelease}`)), "app.js installé");
+  assert(installedShellAssets.every((asset) => String(asset).startsWith("reload:")), "fichiers de base relus sur le réseau (lot 9)"); // un seul fichier construit par Vite (10/11/2026)
   assert(
     codeHas(installedOptionalShellAssets, "./assets/vendor/qr-creator.min.js?v=1.0.0"),
     "optional shell resources must still be attempted"

@@ -35,3 +35,8 @@ Maquettes du jour : V10 → V17 dans `DOCS/maquettes/` (chacune avec son `MAQUET
 3. PWA : icône Android « maskable » rognée ; bouton retour Android qui ferme le lecteur (fait en maquette V14, à coder) ; accents de la description (`DOCS/PWA_SUPPORTS_20261112.md`).
 4. Puis **code en 3 lots** (après validation) : 1) mise en page ordinateur, 2) gestes, 3) PWA.
 5. Proposé, non tranché : raccourcis clavier (Espace, ⌘1…⌘5) ; en rouge, centrer le mot INFRA seul ; contraste blanc / rouge 4,4 (juste sous 4,5).
+
+## 13/11
+- INFRA : la barre de lecture du grand lecteur sur ordinateur ne se voit pas et ne permet pas d'avancer / reculer (« pas très pratique ») ; vérifier aussi la PWA. Cause prouvée, correction proposée : `DOCS/GEOMETRIE_V19_20261113.md`.
+
+- 13/11 · Carte QR (appui long sur le logo) : doit rester ouverte après le relâchement et ne se fermer **que par la croix** (sinon impossible de faire scanner le QR). Noté dans `LOTS/REPRISE.md`, à faire.

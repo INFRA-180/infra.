@@ -8,6 +8,17 @@ type: REPRISE
 
 État courant et tâches en attente.
 
+## Registre du 18/11 (Claude, lecture seule faite, rien codé — attend « go »)
+
+**Plan complet : `DOCS/PLAN_GRAND_LOT_20261118.md`** (lots 0 à 4). INFRA 18/11 : « cover » = pochette visible dans l'aperçu du morceau ; zip par album choisi.
+
+1. **App Musique qui s'ouvre** — cause prouvée : la synchro (`com.infra.audio-auto-sync`) lance Musique toutes les 5 min via `_private/tools/read-music-library.jxa` (`Music.launch()`) et `read-music-artworks.applescript`, même sans changement. Proposé : n'interroger Musique que si le dossier a changé, ou si Musique est déjà ouverte.
+2. **Publication bloquée depuis le 11/11** (album D 2.0141) : dépôt non propre (`IDEES_INFRA`, `GEOMETRIE_V19` non commités).
+3. **Chaufferie** (sections lentes à froid) : la page attend la pochette 1200 sans délai max (`spa-renderer.js:891`) ; 2 pochettes préparées seulement (`scripts.js:535`) ; vignettes 400 effacées à chaque mise en ligne ; Titres charge la 1200. Gestes : `touchmove` non passif (`bibliotheque.js`).
+4. **Statistiques d'écoute à rendre propres** : `audio-telemetry.js` 3 267 lignes, 144 appels `trackAudioRuntimeEvent` dans `src/js`, mêlés au démarrage d'un titre (`audio-core.js:762-815`). Garder le tableau de bord et les incidents.
+5. **Téléchargements Cloudflare au lieu de Drive** : faisable (worker `infra180-audio` + bucket R2 `infra-audio` déjà en place). 18 albums + 3 apps sur Drive. **Bug** : le lien de l'album Gaia = celui de l'app REVERB.
+   - 18/11 INFRA : supprimer tous les liens Drive, **tous les albums** (32) téléchargeables depuis l'app. Proposé : un zip par album (AAC 320 + pochette), préparé d'avance sur R2 (~2 Go en plus, sous les 10 Go gratuits) ; pas de zip « tout » (trop lourd pour un téléphone). Questions ouvertes : zip seul ou + titre à l'unité ; apps (3) aussi sur R2.
+
 ## QR Code rond — maquette prête (13/11, Claude)
 
 **Demande d'INFRA** : « je veux que le QR code soit rond ».

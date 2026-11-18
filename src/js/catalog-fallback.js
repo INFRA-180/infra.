@@ -58,10 +58,15 @@
       "title": "ALEXANDRIA",
       "editKey": "album_alexandria",
       "page": "music/alexandria-infra.html",
-      "thumb": "assets/music/responsive/alexandria-cover-1200.webp",
+      "thumb": "assets/music/responsive/alexandria-25f43a8a-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - ALEXANDRIA",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download ALEXANDRIA",
+        "url": "https://infra180-api.pages.dev/download/alexandria"
+      }
     },
     {
       "id": "d-2-0141",
@@ -71,7 +76,12 @@
       "thumb": "assets/music/responsive/d-2-0141-9947b3d6-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - D 2.0141",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download D 2.0141",
+        "url": "https://infra180-api.pages.dev/download/d-2-0141"
+      }
     },
     {
       "id": "v-23pi56",
@@ -81,7 +91,12 @@
       "thumb": "assets/music/responsive/v-23pi56-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - V-23π56",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download V-23π56",
+        "url": "https://infra180-api.pages.dev/download/v-23pi56"
+      }
     },
     {
       "id": "he-4-0026",
@@ -91,7 +106,12 @@
       "thumb": "assets/music/responsive/he-4-0026-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - He 4.0026",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download He 4.0026",
+        "url": "https://infra180-api.pages.dev/download/he-4-0026"
+      }
     },
     {
       "id": "h-1-008",
@@ -105,7 +125,7 @@
       "download": {
         "type": "download",
         "label": "Download H 1.008",
-        "url": "https://drive.google.com/uc?export=download&id=1tf1FBj3LsaNtq-dgftM-PjXdbon4y-V7"
+        "url": "https://infra180-api.pages.dev/download/h-1-008"
       }
     },
     {
@@ -120,7 +140,7 @@
       "download": {
         "type": "download",
         "label": "Download KALI",
-        "url": "https://drive.google.com/uc?export=download&id=1q9WXnRi1Inp0AeU7a6FMW4Dxj4tAKwZa"
+        "url": "https://infra180-api.pages.dev/download/kali"
       }
     },
     {
@@ -135,7 +155,7 @@
       "download": {
         "type": "download",
         "label": "Download ASASE YAA",
-        "url": "https://drive.google.com/uc?export=download&id=124ttLRZkovE9l5roAps7WGU678BLIgmR"
+        "url": "https://infra180-api.pages.dev/download/asase-yaa"
       }
     },
     {
@@ -150,7 +170,7 @@
       "download": {
         "type": "download",
         "label": "Download 𒀭𒉣𒆠",
-        "url": "https://drive.google.com/uc?export=download&id=165BIWQnMCEJA7nP8W_mtbYYRyhKgHUai"
+        "url": "https://infra180-api.pages.dev/download/anunnaki"
       }
     },
     {
@@ -161,7 +181,12 @@
       "thumb": "assets/music/responsive/anunnaki-instru-6a799ef0-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - 𒁀𒆷𒂵 𒈜",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download 𒁀𒆷𒂵 𒈜",
+        "url": "https://infra180-api.pages.dev/download/anunnaki-instru"
+      }
     },
     {
       "id": "impression",
@@ -174,8 +199,8 @@
       "height": 800,
       "download": {
         "type": "download",
-        "label": "Download Impression",
-        "url": "https://drive.google.com/uc?export=download&id=1QHQz22R0d8e3WoR3MlEFA9_-R_7T16_w"
+        "label": "Download IMPRESSION",
+        "url": "https://infra180-api.pages.dev/download/impression"
       }
     },
     {
@@ -190,7 +215,7 @@
       "download": {
         "type": "download",
         "label": "Download نهضة",
-        "url": "https://drive.google.com/uc?export=download&id=14TL52jrxRAH3OCQsJs8eyld8-cWUkBAv"
+        "url": "https://infra180-api.pages.dev/download/nahda"
       }
     },
     {
@@ -205,7 +230,7 @@
       "download": {
         "type": "download",
         "label": "Download ETOILES",
-        "url": "https://drive.google.com/uc?export=download&id=1YQw0zOsOMEYw6pszJc6BuBDsxPNFYeVK"
+        "url": "https://infra180-api.pages.dev/download/etoiles"
       }
     },
     {
@@ -220,7 +245,7 @@
       "download": {
         "type": "download",
         "label": "Download سَلام",
-        "url": "https://drive.google.com/uc?export=download&id=1NjMyfAx6jKInnLJN4bnGIGyS4BRXQG3H"
+        "url": "https://infra180-api.pages.dev/download/salam"
       }
     },
     {
@@ -234,8 +259,8 @@
       "height": 800,
       "download": {
         "type": "download",
-        "label": "Download Fond Diffus",
-        "url": "https://drive.google.com/uc?export=download&id=16b9lJD5gCC-M49FxEM56sbEO2DGKEinV"
+        "label": "Download FOND DIFFUS",
+        "url": "https://infra180-api.pages.dev/download/fond-diffus"
       }
     },
     {
@@ -249,8 +274,8 @@
       "height": 800,
       "download": {
         "type": "download",
-        "label": "Download Ballades",
-        "url": "https://drive.google.com/uc?export=download&id=1eXlFHETITEWvj6artl-JJUxELwuZ8Egu"
+        "label": "Download BALLADES",
+        "url": "https://infra180-api.pages.dev/download/ballades"
       }
     },
     {
@@ -264,8 +289,8 @@
       "height": 800,
       "download": {
         "type": "download",
-        "label": "Download Trou Noir",
-        "url": "https://drive.google.com/uc?export=download&id=1agshYrhNFZaj00fw-fDaxtvGLUjdjhmO"
+        "label": "Download TROU NOIR",
+        "url": "https://infra180-api.pages.dev/download/trou-noir"
       }
     },
     {
@@ -279,8 +304,8 @@
       "height": 800,
       "download": {
         "type": "download",
-        "label": "Download Voyager",
-        "url": "https://drive.google.com/uc?export=download&id=1X69enZ8oS-cvicQsZw309jEESUfSvk4T"
+        "label": "Download VOYAGER",
+        "url": "https://infra180-api.pages.dev/download/voyager"
       }
     },
     {
@@ -291,7 +316,12 @@
       "thumb": "assets/music/responsive/sanguin-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - SANGUIN",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download SANGUIN",
+        "url": "https://infra180-api.pages.dev/download/sanguin"
+      }
     },
     {
       "id": "naviguer",
@@ -304,8 +334,8 @@
       "height": 800,
       "download": {
         "type": "download",
-        "label": "Download Naviguer",
-        "url": "https://drive.google.com/uc?export=download&id=1FlxhF_vEDBJpwRnA2LvPYIGKxVup53dS"
+        "label": "Download NAVIGUER",
+        "url": "https://infra180-api.pages.dev/download/naviguer"
       }
     },
     {
@@ -316,7 +346,12 @@
       "thumb": "assets/music/responsive/pbb-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - PBB",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download PBB",
+        "url": "https://infra180-api.pages.dev/download/pbb"
+      }
     },
     {
       "id": "rue-de-paris",
@@ -326,7 +361,12 @@
       "thumb": "assets/music/responsive/rue-de-paris-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - RUE DE PARIS",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download RUE DE PARIS",
+        "url": "https://infra180-api.pages.dev/download/rue-de-paris"
+      }
     },
     {
       "id": "black-stallion",
@@ -336,7 +376,12 @@
       "thumb": "assets/music/responsive/black-stallion-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - BLACK STALLION",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download BLACK STALLION",
+        "url": "https://infra180-api.pages.dev/download/black-stallion"
+      }
     },
     {
       "id": "osiris",
@@ -346,7 +391,12 @@
       "thumb": "assets/music/responsive/osiris-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - OSIRIS",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download OSIRIS",
+        "url": "https://infra180-api.pages.dev/download/osiris"
+      }
     },
     {
       "id": "cyberpunk",
@@ -356,7 +406,12 @@
       "thumb": "assets/music/responsive/cyberpunk-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - CYBERPUNK",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download CYBERPUNK",
+        "url": "https://infra180-api.pages.dev/download/cyberpunk"
+      }
     },
     {
       "id": "aspasie",
@@ -369,8 +424,8 @@
       "height": 800,
       "download": {
         "type": "download",
-        "label": "Download Aspasie",
-        "url": "https://drive.google.com/uc?export=download&id=1yDr4qC5CsJSSOGsl3JV1k93-Wn8fHWIH"
+        "label": "Download ASPASIE",
+        "url": "https://infra180-api.pages.dev/download/aspasie"
       }
     },
     {
@@ -381,7 +436,12 @@
       "thumb": "assets/music/responsive/cerises-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - CERISES",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download CERISES",
+        "url": "https://infra180-api.pages.dev/download/cerises"
+      }
     },
     {
       "id": "ldc13",
@@ -391,7 +451,12 @@
       "thumb": "assets/music/responsive/ldc13-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - LDC13",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download LDC13",
+        "url": "https://infra180-api.pages.dev/download/ldc13"
+      }
     },
     {
       "id": "moremi-ajasoro",
@@ -401,7 +466,12 @@
       "thumb": "assets/music/responsive/moremi-ajasoro-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - MOREMI AJASORO",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download MOREMI AJASORO",
+        "url": "https://infra180-api.pages.dev/download/moremi-ajasoro"
+      }
     },
     {
       "id": "gaia",
@@ -414,8 +484,8 @@
       "height": 800,
       "download": {
         "type": "download",
-        "label": "Download Gaia",
-        "url": "https://drive.google.com/uc?export=download&id=18EGtIO_-bwDri6yX_VKl_XFBbYC8Qm2I"
+        "label": "Download GAIA",
+        "url": "https://infra180-api.pages.dev/download/gaia"
       }
     },
     {
@@ -429,8 +499,8 @@
       "height": 800,
       "download": {
         "type": "download",
-        "label": "Download Mami Wata",
-        "url": "https://drive.google.com/uc?export=download&id=18vMDtTb_h0dcpvEsUZZ4Q27kfoz6AJEh"
+        "label": "Download MAMI WATA",
+        "url": "https://infra180-api.pages.dev/download/mami-wata"
       }
     },
     {
@@ -444,8 +514,8 @@
       "height": 800,
       "download": {
         "type": "download",
-        "label": "Download ADC 13",
-        "url": "https://drive.google.com/uc?export=download&id=1j9AZDjm090tLcgrqRJ5skPEkKywhDu_e"
+        "label": "Download ADC13",
+        "url": "https://infra180-api.pages.dev/download/adc-13"
       }
     },
     {
@@ -459,8 +529,8 @@
       "height": 800,
       "download": {
         "type": "download",
-        "label": "Download Abricot",
-        "url": "https://drive.google.com/uc?export=download&id=1jnaysfOtLXW-xtkvSemsoOuf6ImYYdq1"
+        "label": "Download ABRICOTS",
+        "url": "https://infra180-api.pages.dev/download/abricot"
       }
     },
     {
@@ -471,7 +541,12 @@
       "thumb": "assets/music/responsive/peches-cover-1200.webp",
       "thumbAlt": "Cover INFRA. - PECHES",
       "width": 800,
-      "height": 800
+      "height": 800,
+      "download": {
+        "type": "download",
+        "label": "Download PECHES",
+        "url": "https://infra180-api.pages.dev/download/peches"
+      }
     }
   ],
   "clips": [

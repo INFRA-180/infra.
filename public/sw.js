@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20261119-audio459";
+const VERSION = "infra-shell-20261119-audio460";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const LIVE_CATALOG_CACHE = `${VERSION}-catalog`;
@@ -8,7 +8,7 @@ const MAX_COVER_CACHE_ENTRIES = 33;
 const CANONICAL_COVER_PATHS = new Set([
   "assets/music/responsive/abricot-cover-1200.webp",
   "assets/music/responsive/adc-13-6e983f31-cover-1200.webp",
-  "assets/music/responsive/alexandria-cover-1200.webp",
+  "assets/music/responsive/alexandria-25f43a8a-cover-1200.webp",
   "assets/music/responsive/anunnaki-cover-1200.webp",
   "assets/music/responsive/anunnaki-instru-6a799ef0-cover-1200.webp",
   "assets/music/responsive/asase-yaa-cover-1200.webp",
@@ -47,14 +47,14 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix459-20261119",
+  "./assets/css/styles.css?v=audiofix460-20261119",
   "./assets/js/bibliotheque.js?v=bibliotheque-v46-20261119",
-  "./assets/js/app.js?v=audiofix459-20261119",
+  "./assets/js/app.js?v=audiofix460-20261119",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix459-20261119",
-  "./data/track-durations.json?v=audiofix459-20261119",
-  "./data/tracks.json?v=audiofix459-20261119",
+  "./data/catalog.json?v=audiofix460-20261119",
+  "./data/track-durations.json?v=audiofix460-20261119",
+  "./data/tracks.json?v=audiofix460-20261119",
   "./data/playlists.json?v=playlist-collage-20260802",
   "./assets/css/playlists.css?v=playlist-collage-20260802",
   "./assets/branding/infra-logo-white-photoroom-title.png",
@@ -74,7 +74,7 @@ const SHELL_ASSETS = [
 // audio. A missing admin/QR/Sphragis file must therefore never invalidate the
 // complete shell installation.
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/scripts.admin.js?v=audiofix459-20261119",
+  "./assets/js/scripts.admin.js?v=audiofix460-20261119",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./sphragis/",
   "./sphragis/index.html",

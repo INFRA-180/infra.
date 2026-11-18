@@ -1,5 +1,5 @@
 {
-  "version": "audiofix459-20261119",
+  "version": "audiofix460-20261119",
   "generatedAt": "2026-11-19",
   "source": "Music macOS masters AAC 320 R2",
   "audioPrefix": "mixed",
@@ -30,7 +30,7 @@
       "slug": "alexandria",
       "title": "ALEXANDRIA",
       "page": "music/alexandria-infra.html",
-      "cover": "assets/music/responsive/alexandria-cover-1200.webp",
+      "cover": "assets/music/responsive/alexandria-25f43a8a-cover-1200.webp",
       "tracks": [
         {
           "index": 1,

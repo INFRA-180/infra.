@@ -12,7 +12,7 @@
   const HOME_THUMBNAILS = new Set([
     "abricot",
     "adc-13-6e983f31",
-    "alexandria",
+    "alexandria-25f43a8a",
     "anunnaki",
     "anunnaki-instru-6a799ef0",
     "asase-yaa",

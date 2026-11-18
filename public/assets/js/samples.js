@@ -45,6 +45,7 @@
   };
   var TRACK = 60,
     OVERLAP = 5,
+    LEAD = 3,
     SORTS = ["bpm", "shuffle", "album"],
     ticker = 0;
   var pref = { sec: "samples", voix: false, sort: {} };
@@ -70,8 +71,9 @@
     pref.sort[(mix ? "mix-" : "smp-") + scope] = v;
     save();
   }
-  function nextSort(v) {
-    return SORTS[(SORTS.indexOf(v) + 1) % SORTS.length];
+  // Toucher l'ordre actif le relâche : retour à l'ordre des morceaux.
+  function pickSort(current, v) {
+    return current === v ? "album" : v;
   }
 
   function $(sel, root) {
@@ -262,37 +264,41 @@
     '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>',
     LINE,
   );
+  // Ordre (INFRA, 19/11) : « BPM » et « aléatoire » côte à côte, l'actif en foncé ; toucher l'actif
+  // le relâche → ordre des morceaux. Le mot « BPM » plutôt qu'un métronome ; aléatoire = deux flèches
+  // qui se croisent (forme de la lecture aléatoire d'Apple Musique).
   var SORT_ICON = {
-    bpm: svg(
-      '<path d="M9.2 3.5h5.6L19 20.5H5z"/><path d="M12 15.5l5-9M8 15.5h8"/>',
-      LINE,
-    ),
+    bpm: '<span class="sx-word" aria-hidden="true">BPM</span>',
     shuffle: svg(
-      '<path d="M3 7h3.2c1.9 0 3 .9 4.2 2.8l2.4 4.4c1.2 1.9 2.3 2.8 4.2 2.8H21M18 14l3 3-3 3M3 17h3.2c1.4 0 2.4-.5 3.3-1.5M14.5 8.5c.9-1 1.9-1.5 3.3-1.5H21M18 4l3 3-3 3"/>',
-      LINE,
-    ),
-    album: svg(
-      '<path d="M9 6h12M9 12h12M9 18h12M3 6h2.5M3 12h2.5M3 18h2.5"/>',
+      '<path d="M3 17.5h2.6c1.6 0 2.6-.6 3.5-1.9l5.8-8.2c.9-1.3 1.9-1.9 3.5-1.9H21"/><path d="M18 2.5 21 5.5 18 8.5"/><path d="M3 6.5h2.6c1.6 0 2.6.6 3.5 1.9l.6.9M21 17.5h-2.6c-1.6 0-2.6-.6-3.5-1.9l-.6-.9"/><path d="M18 14.5 21 17.5 18 20.5"/>',
       LINE,
     ),
   };
-  var SORT_LABEL = {
-    bpm: "Par BPM",
-    shuffle: "Aléatoire",
-    album: "Dans l'ordre des morceaux",
-  };
-  function sortBtn(sort, attr) {
-    return (
-      '<button type="button" class="sx-ic" ' +
-      attr +
-      ' title="Ordre : ' +
-      SORT_LABEL[sort] +
-      ' (toucher pour changer)" aria-label="Ordre : ' +
-      SORT_LABEL[sort] +
-      '">' +
-      SORT_ICON[sort] +
-      "</button>"
-    );
+  var SORT_LABEL = { bpm: "Par BPM", shuffle: "Aléatoire" };
+  function sortBtns(sort, scope) {
+    return ["bpm", "shuffle"]
+      .map(function (v) {
+        var on = sort === v;
+        return (
+          '<button type="button" class="sx-ic' +
+          (on ? " on" : "") +
+          '" data-smp-sortv="' +
+          v +
+          '" data-smp-sortscope="' +
+          scope +
+          '" aria-pressed="' +
+          on +
+          '" title="' +
+          SORT_LABEL[v] +
+          (on ? " (toucher : ordre des morceaux)" : "") +
+          '" aria-label="' +
+          SORT_LABEL[v] +
+          '">' +
+          SORT_ICON[v] +
+          "</button>"
+        );
+      })
+      .join("");
   }
 
   // ---------- Styles (dans ce fichier : styles.css est figé par empreinte) ----------
@@ -313,9 +319,12 @@
       ".sx-all:hover .sx-allic,.sx-all:focus-visible .sx-allic{transform:scale(1.12)}",
       ".sx-all b{display:block;font-size:17px;font-weight:800;letter-spacing:-.01em}",
       ".sx-all small{display:block;font-size:12px;color:rgba(17,17,17,.45)}",
-      ".sx-ic{width:40px;height:40px;border:0;background:none;padding:0;display:grid;place-items:center;color:rgba(17,17,17,.42);cursor:pointer;flex:none}",
+      ".sx-ic{width:40px;height:40px;border:0;background:none;padding:0;display:grid;place-items:center;color:rgba(17,17,17,.3);cursor:pointer;flex:none;transition:color .15s}",
       ".sx-ic svg{width:22px;height:22px}",
-      ".sx-ic:hover,.sx-ic:focus-visible,.sx-ic.on{color:#e0353b}",
+      ".sx-word{font-size:12px;font-weight:800;letter-spacing:.04em;line-height:1}",
+      ".sx-ic:hover,.sx-ic:focus-visible{color:rgba(17,17,17,.6)}",
+      ".sx-ic.on{color:#111}",
+      ".sx-ic+.sx-ic{margin-left:-6px}",
       ".smp-al .smp-play{background:none;color:#fff;width:auto;height:auto;filter:drop-shadow(0 1px 4px rgba(0,0,0,.7))}",
       ".smp-al .smp-play svg{width:24px;height:24px;margin:0}",
       ".sx-card{max-width:440px}",
@@ -327,7 +336,8 @@
       ".sx-now{margin-top:16px}",
       ".sx-tr{display:flex;align-items:center;gap:8px}",
       ".sx-tr b{flex:1;min-width:0;font-size:22px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-      ".sx-tr .sx-ic{margin-right:-9px}",
+      "[data-smp-sortslot]{display:flex;flex:none}",
+      ".sx-tr .sx-ic:last-child{margin-right:-9px}",
       ".sx-now small{display:block;font-size:14px;color:rgba(17,17,17,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
       ".sx-bar{position:relative;height:28px;margin-top:10px;cursor:pointer;touch-action:none}",
       ".sx-trk{position:absolute;left:0;right:0;top:12px;height:4px;display:flex;gap:3px}",
@@ -337,9 +347,10 @@
       ".sx-knob{position:absolute;top:6px;left:0;width:3px;height:16px;margin-left:-1.5px;background:#111;pointer-events:none}",
       ".sx-times{display:flex;justify-content:space-between;font-size:12px;color:rgba(17,17,17,.5);font-variant-numeric:tabular-nums}",
       ".sx-leg{display:flex;gap:3px;margin-top:4px;font-size:12px}",
-      ".sx-leg span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:rgba(17,17,17,.35)}",
-      ".sx-leg span.on{color:#111;font-weight:700}",
-      ".sx-leg span.s.on{color:#e0353b}",
+      ".sx-leg button{min-width:0;border:0;background:none;padding:6px 0;margin:-6px 0;font:inherit;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:rgba(17,17,17,.35)}",
+      ".sx-leg button:hover{color:rgba(17,17,17,.6)}",
+      ".sx-leg button.on{color:#111;font-weight:700}",
+      ".sx-leg button.s.on{color:#e0353b}",
       ".sx-ctr{display:flex;justify-content:center;align-items:center;gap:44px;margin:10px 0 6px}",
       ".sx-ctr button{width:56px;height:56px;border:0;background:none;padding:0;color:#111;cursor:pointer;display:grid;place-items:center;transition:transform .12s}",
       ".sx-ctr button svg{width:28px;height:28px}",
@@ -398,7 +409,7 @@
           ? " sons, avec les voix"
           : " samples") +
       "</small></span></button>" +
-      sortBtn(sortFor(mix, "all"), "data-smp-allsort") +
+      sortBtns(sortFor(mix, "all"), "all") +
       (mix
         ? ""
         : '<button type="button" class="sx-ic' +
@@ -594,16 +605,24 @@
     var f = frame();
     if (!f || !item) return;
     stopDuo(!fadeIn && trackPhase());
+    var fade = fadeIn && canFade();
     if (fadeIn) {
-      // fondu croisé : le morceau descend pendant que le sample monte, puis s'arrête
+      // fondu croisé : le morceau sort pendant que le sample entre (iPhone : coupe nette)
       duo.outroUntil = Date.now() + OVERLAP * 1000 + 1500;
-      ramp(setAudioVolume, 1, 0.05, OVERLAP * 1000);
+      if (fade)
+        xfade(
+          function (v) {
+            setVideoVolume(v * 100);
+          },
+          setAudioVolume,
+          OVERLAP * 1000,
+        );
       later(
         function () {
           pauseMusic();
           setAudioVolume(1);
         },
-        OVERLAP * 1000 + 100,
+        fade ? OVERLAP * 1000 + 100 : 900,
       );
     }
     st.pos = st.list.indexOf(item);
@@ -620,11 +639,10 @@
       st.ready = false;
       f.src = embed(item.y, item, start);
     } else if (st.mix) {
-      setVideoVolume(fadeIn ? 0 : 100);
+      setVideoVolume(fade ? 0 : 100);
       send("loadVideoById", [
         { videoId: item.y, startSeconds: start, endSeconds: item.s1 },
       ]);
-      if (fadeIn) ramp(setVideoVolume, 0, 100, OVERLAP * 1000);
     } else if (offset)
       send("loadVideoById", [{ videoId: item.y, startSeconds: start }]);
     else send("loadVideoById", [item.y]);
@@ -650,10 +668,7 @@
     if (!cur) return;
     $("[data-smp-kicker]", sheet).textContent =
       (st.mix ? "Mix · " : "Samples · ") + st.title;
-    $("[data-smp-sortslot]", sheet).innerHTML = sortBtn(
-      st.sort,
-      "data-smp-sort",
-    );
+    $("[data-smp-sortslot]", sheet).innerHTML = sortBtns(st.sort, "here");
     $("[data-smp-cov]", sheet).src = assetUrl(cur.cover);
     // barre : un segment (Samples) ou deux (Mix : sample | morceau)
     var S = Math.max(1, cur.s1 - cur.s0);
@@ -665,13 +680,13 @@
         '"><i></i></div>'
       : '<div class="sx-seg s" style="flex:1"><i></i></div>';
     $("[data-smp-leg]", sheet).innerHTML = st.mix
-      ? '<span class="s" style="flex:' +
+      ? '<button type="button" class="s" data-smp-jump="0" title="Revenir au début du sample" style="flex:' +
         S +
-        '">Sample</span><span style="flex:' +
+        '">Sample</button><button type="button" data-smp-jump="1" title="Aller à ton morceau" style="flex:' +
         TRACK +
         '" dir="auto">' +
         esc(cur.track) +
-        "</span>"
+        "</button>"
       : "";
     var list = shownList(),
       html = "",
@@ -887,6 +902,7 @@
       }
       return paintBar();
     }
+    if (duo.phase === "pre") cancelPre();
     var S = Math.max(1, cur.s1 - cur.s0);
     if (t < S) {
       if (duo.phase === "sample") {
@@ -927,8 +943,10 @@
         clearTimeout(duo.out);
         pauseMusic();
       }
-    } else if (isPlaying()) send("pauseVideo");
-    else send("playVideo");
+    } else if (isPlaying()) {
+      if (duo.phase === "pre") cancelPre();
+      send("pauseVideo");
+    } else send("playVideo");
     track("samples_toggle", { mode: st.mix ? "mix" : "samples" });
     setTimeout(paintBar, 120);
   }
@@ -968,9 +986,17 @@
     if (state != null && isFinite(state)) yt.state = Number(state);
     var inTrack = trackPhase();
     var inOutro = Date.now() < duo.outroUntil;
-    if (state === 1 && !inTrack && !inOutro) pauseMusic();
-    if (st.mix && duo.phase === "sample") {
+    var inPre = duo.phase === "pre";
+    if (state === 1 && !inTrack && !inOutro && !inPre) pauseMusic();
+    if (st.mix && (duo.phase === "sample" || inPre)) {
       var tm = yt.time;
+      if (
+        duo.phase === "sample" &&
+        isFinite(tm) &&
+        tm >= duo.end - OVERLAP - LEAD &&
+        tm < duo.end - OVERLAP
+      )
+        preroll();
       if (isFinite(tm) && tm >= duo.end - OVERLAP) mixIn();
       else if (state === 0 || (state === 2 && tm >= duo.end - 0.6)) mixIn();
     } else if (!st.mix && state === 0) step(1);
@@ -1030,7 +1056,8 @@
         e.target.tagName === "AUDIO" &&
         sheet &&
         !sheet.hidden &&
-        duo.phase !== "mixin"
+        duo.phase !== "mixin" &&
+        duo.phase !== "pre"
       )
         send("pauseVideo");
     },
@@ -1077,34 +1104,65 @@
     duo.phase = "";
     duo.outroUntil = 0;
     var c = sheet && $("[data-smp-cov]", sheet);
-    if (c) c.classList.remove("on");
+    if (c) {
+      c.classList.remove("on");
+      c.style.transitionDuration = "";
+    }
     var a = audioEl();
-    if (a && a.volume < 1) a.volume = 1;
+    if (a) {
+      a.muted = false;
+      if (a.volume < 1) a.volume = 1;
+    }
   }
   function startTrack(i, from, offset, phase, seconds) {
     var lib = window.InfraLibraryPlayback;
-    if (!lib || typeof lib.playPaths !== "function" || !i.src) return step(1);
+    if (!lib || typeof lib.playPaths !== "function" || !i.src) {
+      if (phase !== "pre") step(1);
+      return false;
+    }
     duo.phase = phase;
     duo.from = from;
-    var target = from + (offset || 0);
+    var target = Math.max(0, from + (offset || 0));
     var a = audioEl();
     var seek = function () {
       var el = audioEl();
-      if (el && trackPhase() && Math.abs(el.currentTime - target) > 2) {
+      if (
+        el &&
+        (trackPhase() || duo.phase === "pre") &&
+        Math.abs(el.currentTime - target) > 0.4
+      ) {
         try {
           el.currentTime = target;
         } catch (_e) {}
       }
     };
+    // Saut direct (« track ») : muet le temps de se caler, pour ne pas entendre le début du morceau.
+    var hush = phase === "track";
+    var unhush = function () {
+      var el = audioEl();
+      if (hush && el && duo.phase === "track") el.muted = false;
+      hush = false;
+    };
     var onPlaying = function () {
       seek();
       if (a) a.removeEventListener("playing", onPlaying);
+      setTimeout(unhush, 150);
     };
-    if (a) a.addEventListener("playing", onPlaying);
-    if (!lib.playPaths([i.src], 0)) return step(1);
-    later(seek, 1200);
+    if (a) {
+      if (hush) a.muted = true;
+      a.addEventListener("playing", onPlaying);
+    }
+    if (!lib.playPaths([i.src], 0)) {
+      if (phase !== "pre") step(1);
+      return false;
+    }
+    later(function () {
+      seek();
+      setTimeout(unhush, 150);
+    }, 1200);
     paintNow();
-    scheduleOut(seconds);
+    if (seconds != null) scheduleOut(seconds);
+    return true;
   }
   function ramp(set, from, to, ms) {
     var n = 10;
@@ -1129,25 +1187,116 @@
   function setVideoVolume(v) {
     send("setVolume", [Math.round(v)]);
   }
-  // Le morceau INFRA entre pendant que le sample sort (5 s), calé pour que le sample y arrive pile.
-  function mixIn() {
+  // Transition (retouchée le 19/11, INFRA : « pas très bien ») :
+  // - avant, le morceau était lancé au moment du fondu : il chargeait, démarrait au début puis sautait
+  //   ~1 s plus tard à la bonne seconde → un raté audible en plein fondu ;
+  // - maintenant il est lancé MUET LEAD s plus tôt, déjà calé ; au fondu on le recale au dixième puis
+  //   on ouvre le son en fondu à puissance égale (pas de creux au milieu) ;
+  // - iPhone : le volume ne se règle pas depuis une page → pas de chevauchement à plein volume, mais
+  //   une coupe nette et calée (le morceau prend la place du sample).
+  var fadeOk = null;
+  function canFade() {
+    if (fadeOk !== null) return fadeOk;
+    var a = audioEl();
+    if (!a) return true;
+    var v = a.volume;
+    try {
+      a.volume = v > 0.5 ? 0.3 : 0.7;
+    } catch (_e) {}
+    fadeOk = Math.abs(a.volume - v) > 0.1;
+    try {
+      a.volume = v;
+    } catch (_e) {}
+    return fadeOk;
+  }
+  // Fondu croisé à puissance égale : ce qui entre suit un sinus, ce qui sort un cosinus.
+  function xfade(setIn, setOut, ms) {
+    var n = 24;
+    for (var k = 1; k <= n; k++) {
+      (function (k) {
+        later(
+          function () {
+            var x = (k / n) * (Math.PI / 2);
+            setIn(Math.sin(x));
+            setOut(Math.cos(x));
+          },
+          (ms * k) / n,
+        );
+      })(k);
+    }
+  }
+  function preroll() {
     if (duo.phase !== "sample") return;
     var i = duo.item;
-    setAudioVolume(0.15);
-    startTrack(i, Math.max(0, i.at - OVERLAP), 0, "mixin", TRACK);
-    ramp(setAudioVolume, 0.15, 1, OVERLAP * 1000);
-    ramp(setVideoVolume, 100, 0, OVERLAP * 1000);
+    var a = audioEl();
+    if (a) a.muted = true;
+    if (!startTrack(i, Math.max(0, i.at - OVERLAP), -LEAD, "pre", null)) {
+      if (a) a.muted = false;
+      duo.phase = "sample";
+    }
+  }
+  function cancelPre() {
+    duo.timers.forEach(clearTimeout);
+    duo.timers = [];
+    pauseMusic();
+    var a = audioEl();
+    if (a) a.muted = false;
+    duo.phase = "sample";
+  }
+  function mixIn() {
+    if (duo.phase !== "sample" && duo.phase !== "pre") return;
+    var i = duo.item,
+      pre = duo.phase === "pre",
+      fade = canFade(),
+      base = Math.max(0, i.at - OVERLAP);
+    if (!pre) {
+      // pas eu le temps de pré-charger (saut, sample court) : lancé muet, son ouvert une fois calé
+      var a0 = audioEl();
+      if (a0) a0.muted = true;
+      if (!startTrack(i, base, 0, "mixin", null)) return;
+    }
+    duo.phase = "mixin";
+    var c = $("[data-smp-cov]", sheet);
+    if (c) c.style.transitionDuration = (fade ? OVERLAP : 0.6) + "s";
+    var open = function () {
+      var el = audioEl();
+      if (!el) return;
+      if (Math.abs(el.currentTime - base) > 0.1)
+        try {
+          el.currentTime = base;
+        } catch (_e) {}
+      if (fade) {
+        setAudioVolume(0);
+        el.muted = false;
+        xfade(
+          setAudioVolume,
+          function (v) {
+            setVideoVolume(v * 100);
+          },
+          OVERLAP * 1000,
+        );
+      } else {
+        el.muted = false;
+        send("pauseVideo");
+      }
+      paintNow();
+    };
+    var wait = pre ? 0 : 1300;
+    if (wait) later(open, wait);
+    else open();
     later(
       function () {
         send("pauseVideo");
         setVideoVolume(100);
+        setAudioVolume(1);
         if (duo.phase === "mixin") duo.phase = "track";
       },
-      OVERLAP * 1000 + 200,
+      wait + (fade ? OVERLAP * 1000 : 0) + 200,
     );
-    track("samples_mix_in", { bpm: feel(i) });
+    scheduleOut(TRACK + wait / 1000);
+    track("samples_mix_in", { bpm: feel(i), pre: pre, fade: fade });
   }
-  // Fin de la minute : le sample suivant monte pendant que le morceau descend, puis s'arrête.
+  // Fin de la minute : le sample suivant entre pendant que le morceau sort.
   function mixOut() {
     var list = shownList();
     var next = list[list.indexOf(st.list[st.pos]) + 1];
@@ -1192,7 +1341,23 @@
     if (t.closest("[data-smp-prev]")) return prev();
     if (t.closest("[data-smp-next]")) return step(1);
     if (t.closest("[data-smp-pp]")) return toggle();
-    if (t.closest("[data-smp-sort]")) return setSortHere(nextSort(st.sort));
+    // « Sample » : le sample reprend au début ; nom du morceau : saut à ton morceau (INFRA, 19/11).
+    var jump = t.closest("[data-smp-jump]");
+    if (jump) {
+      var cj = st.list[st.pos];
+      if (!cj) return;
+      track("samples_jump", {
+        to: jump.getAttribute("data-smp-jump") === "1" ? "track" : "sample",
+      });
+      return seekTo(
+        jump.getAttribute("data-smp-jump") === "1"
+          ? Math.max(1, cj.s1 - cj.s0)
+          : 0,
+      );
+    }
+    var sb = t.closest("[data-smp-sortv]");
+    if (sb)
+      return setSortHere(pickSort(st.sort, sb.getAttribute("data-smp-sortv")));
   }
 
   // Clics dans l'onglet Samples
@@ -1206,9 +1371,13 @@
       track("samples_section", { sec: pref.sec });
       return rerender();
     }
-    if (t.closest("[data-smp-allsort]")) {
+    var sb = t.closest("[data-smp-sortv]");
+    if (sb && sb.getAttribute("data-smp-sortscope") === "all") {
       var mixNow = pref.sec === "mix";
-      var v = nextSort(sortFor(mixNow, "all"));
+      var v = pickSort(
+        sortFor(mixNow, "all"),
+        sb.getAttribute("data-smp-sortv"),
+      );
       setSort(mixNow, "all", v);
       track("samples_sort", { sort: v, scope: "all", mode: pref.sec });
       return rerender();

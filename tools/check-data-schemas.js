@@ -91,6 +91,22 @@ for (const [file, text] of [["src/js/scripts.js", scripts], ["public/sw.js", sw]
 }
 if (hosts.size !== 1) fail(`adresse du Worker différente selon les fichiers : ${[...hosts].join(", ")}`);
 
+// Section Samples (18/11/2026) : chaque album existe dans tracks.json, chaque son a un identifiant YouTube valide.
+const samples = read("data/samples.json");
+if (samples) {
+  if (!Array.isArray(samples.albums)) fail("samples.json.albums : doit être une liste");
+  const known = new Set(((tracks && tracks.albums) || []).map((a) => a.title));
+  (samples.albums || []).forEach((a, i) => {
+    need(a, `samples.albums[${i}]`, { title: str });
+    if (tracks && !known.has(a.title)) fail(`samples.albums[${i}].title : album inconnu de tracks.json (${a.title})`);
+    (a.tracks || []).forEach((t, j) =>
+      (t.items || []).forEach((it, k) => {
+        if (!/^[\w-]{11}$/.test(String(it && it.y))) fail(`samples.albums[${i}].tracks[${j}].items[${k}].y : identifiant YouTube invalide`);
+      })
+    );
+  });
+}
+
 if (errors.length) {
   console.error(`Data schema checks FAILED (${errors.length}) :\n- ${errors.slice(0, 30).join("\n- ")}`);
   process.exit(1);

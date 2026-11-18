@@ -15,7 +15,7 @@
   window.__infraBibliotheque = true;
   var scriptUrl = document.currentScript && document.currentScript.src;
 
-  var VIEWS = ["accueil", "albums", "playlists", "titres", "favoris"];
+  var VIEWS = ["accueil", "albums", "playlists", "samples", "titres", "favoris"];
   var SORTS = { site: "Ordre du site", az: "A → Z", duree: "Durée", titres: "Nombre de titres" };
   var HOME_ALBUMS = 12; // 12 sur un écran très large (6 par rangée) ; 10 ailleurs (CSS, maquette V19)
   var store = {
@@ -162,6 +162,11 @@
     return dataPromise;
   }
 
+  // Lecteur de samples ouvert (samples.js) : aucun geste de la bibliothèque à l'intérieur.
+  function inSamples(e) {
+    return !!(e && e.target && e.target.closest && e.target.closest(".smp-sheet"));
+  }
+
   // ---------- Onglets ----------
   function setCurrent(view) {
     $$("[data-bib-tab]").forEach(function (b) {
@@ -226,7 +231,9 @@
     renderPlaylistTools();
     renderFoldTools();
     renderHomeFavorites();
-    if (state.view === "titres" || state.q) renderTracksView();
+    if (state.q) renderTracksView();
+    else if (state.view === "titres") renderTracksView();
+    else if (state.view === "samples") renderSamplesView();
     else clearPanel();
   }
 
@@ -559,6 +566,43 @@
         })
         .join("")
     );
+  }
+
+  // Onglet Samples (maquette Samples v2, validée par INFRA le 18/11/2026) : samples.js, chargé au premier besoin.
+  var samplesJs = null;
+  function loadSamplesJs() {
+    if (window.InfraSamples) return Promise.resolve(window.InfraSamples);
+    if (samplesJs) return samplesJs;
+    samplesJs = new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = scriptUrl
+        ? new URL("samples.js?v=" + (window.INFRA_BUILD_TAG || ""), scriptUrl).href
+        : "assets/js/samples.js";
+      s.async = true;
+      s.onload = function () {
+        if (window.InfraSamples) resolve(window.InfraSamples);
+        else reject(new Error("samples"));
+      };
+      s.onerror = function () {
+        samplesJs = null;
+        reject(new Error("samples"));
+      };
+      document.head.appendChild(s);
+    });
+    return samplesJs;
+  }
+  function renderSamplesView() {
+    var p = panel();
+    if (!p) return;
+    if (window.InfraSamples) return window.InfraSamples.render(p);
+    p.innerHTML = '<p class="bib-empty">Chargement…</p>';
+    loadSamplesJs()
+      .then(function (api) {
+        if (state.view === "samples" && !state.q) api.render(panel());
+      })
+      .catch(function () {
+        p.innerHTML = '<p class="bib-empty">Les samples n\'ont pas pu être chargés.</p>';
+      });
   }
 
   // Panneau des titres (onglet Titres et résultats de recherche)
@@ -1277,7 +1321,7 @@
     document.addEventListener(
       "touchstart",
       function (e) {
-        if (!e.touches || e.touches.length !== 1) {
+        if (!e.touches || e.touches.length !== 1 || inSamples(e)) {
           g = null;
           return;
         }
@@ -1671,7 +1715,7 @@
       "touchstart",
       function (e) {
         var main = homeMain();
-        if (!canStart(e, main)) {
+        if (inSamples(e) || !canStart(e, main)) {
           g = null;
           return;
         }
@@ -1946,6 +1990,7 @@
       "wheel",
       function (e) {
         if (e.ctrlKey) return; // pincer = zoom
+        if (inSamples(e)) return; // lecteur de samples ouvert : défilement normal de sa liste
         var t = now(),
           gap = t - lastEvt;
         lastEvt = t;

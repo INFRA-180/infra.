@@ -1980,3 +1980,9 @@ c'était le système, pas le thème », « on doit pouvoir quitter en appuyant h
 - Vérifié : écran 375×812, mode clair et mode sombre du système, QR relu à chaque ouverture, les
   quatre gestes de fermeture. `npm test` vert. Non vérifié : lecture par l'appareil photo d'un
   vrai iPhone.
+
+## 19/11/2026 — Section Samples (Claude)
+- Maquette Samples v2 validée par INFRA (18/11). Onglet `samples` ajouté à `VIEWS` de `bibliotheque.js` ; rendu dans le panneau `.bib-panel` par `assets/js/samples.js`, chargé au premier besoin.
+- Lecteur : iframe `youtube-nocookie` avec `enablejsapi`, pilotée par messages (`listening`, `loadVideoById`, `pauseVideo`) sans charger le script externe de YouTube. Fin d'un son → suivant ; erreur → suivant.
+- Données publiques `data/samples.json` : titre, artiste, année, identifiant YouTube, `v: 1` pour une voix. Aucun chemin ni nom de fichier. Fabriqué hors dépôt (`INVENTAIRE_SAMPLES/_outils/`), seulement les liens connus ou « sûrs ».
+- Les gestes de la bibliothèque (molette, glisser d'onglet, retour au bord) ignorent `.smp-sheet`.

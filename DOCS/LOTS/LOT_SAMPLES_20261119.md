@@ -177,3 +177,13 @@ Statuts possibles : ouvert · maquette · validé · fait · reporté.
 - Calage : sur 342 originaux dont le passage est lu dans Ableton, 297 commencent au même endroit que `s0` (à 1,5 s près). Les temps du site correspondent donc déjà aux fichiers locaux. Les ~45 autres sont à vérifier (plusieurs clips, version différente).
 - Fichiers de travail (temporaires) : `manifest.json` (1 fichier par original), `weak.json`, `missing.json`, dans le dossier temporaire de la session. Copiés dans `_private/samples-extraits/` (non publié).
 - Les .als : ~6 800, dont 5 739 sauvegardes automatiques d'Ableton ; ~700 vrais projets. Plus ancien projet repéré : « Ballade en forêt », 12/11/2020, Live 10.1.4.
+
+## O. Demande d'INFRA (19/11) : remettre dans les projets Ableton les fichiers manquants, identiques
+
+- Fait : les 3 manquants ont été téléchargés depuis la vidéo YouTube d'origine (`_private/samples-extraits/sources/`).
+- Demande : remettre dans les projets Ableton les fichiers qui manquent, **exactement les mêmes** (même début, même calage).
+- Faisable : chaque projet garde le chemin, la taille et la durée exacte (en échantillons) du fichier. On peut donc prouver qu'un fichier est identique.
+  - Cas 1 : fichier présent ailleurs sur le Mac, même nom et même taille. C'est le même fichier, le calage est parfait.
+  - Cas 2 : fichier absent, re-téléchargé. On contrôle la durée exacte ; si elle diffère, le calage peut être décalé de quelques millisecondes, à signaler projet par projet.
+  - Les anciens chemins visent `iTunes/Music/...`, la bibliothèque Music, qui est en lecture seule. Proposition : un dossier « Fichiers retrouvés » ; Ableton les retrouve seul via « Rechercher », sans modifier les .als.
+- **Statut : à faire après le oui d'INFRA, car on écrit dans les dossiers Ableton.**

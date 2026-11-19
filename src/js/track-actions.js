@@ -113,7 +113,9 @@
         transform: translate(-50%, 6px); transition: opacity .15s, transform .15s; pointer-events: none; }
       .ta-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
       .bib-li.ta-held, .track-player.ta-held { opacity: .7; transition: opacity .15s; }
-      .bib-li, .track-player { -webkit-touch-callout: none; }
+      /* Finition 19/11 (INFRA : « j'appuie sur le morceau, ça sélectionne et ça me dit copier ») : aucune
+         ligne de morceau ni de liste ne se sélectionne ; posé dès le chargement, pas au 1er menu. */
+      .bib-li, .bib-row, .track-player, .bib-list-rows a { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
       @media (prefers-reduced-motion: reduce) { .ta-toast { transition: none; } }`;
     document.head.appendChild(style);
   }
@@ -166,7 +168,7 @@
     }
     row.classList.add("ta-held");
     menu = { scrim, box, row, invoker: row.querySelector("button") || row };
-    scrim.addEventListener("pointerdown", function (e) { e.preventDefault(); closeMenu(); });
+    scrim.addEventListener("pointerdown", function (e) { e.preventDefault(); swallowClickUntil = Date.now() + 500; closeMenu(); });
     scrim.addEventListener("contextmenu", function (e) { e.preventDefault(); closeMenu(); });
     box.addEventListener("click", function (e) {
       const b = e.target.closest("[data-ta]");
@@ -214,7 +216,7 @@
   window.addEventListener("scroll", cancelPress, { capture: true, passive: true });
   // Le relâchement de l'appui long ne lance pas le morceau
   document.addEventListener("click", function (e) {
-    if (Date.now() < swallowClickUntil && rowFrom(e.target)) { e.preventDefault(); e.stopImmediatePropagation(); swallowClickUntil = 0; }
+    if (Date.now() < swallowClickUntil && (rowFrom(e.target) || (menu && menu.box.contains(e.target)))) { e.preventDefault(); e.stopImmediatePropagation(); swallowClickUntil = 0; }
   }, true);
 
   // Clavier : Maj+F10 ou touche Menu sur une ligne ; ↑ ↓ dans le menu ; Échap ferme
@@ -225,7 +227,16 @@
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeMenu(); }
       else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
+        e.stopPropagation();
         items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+      } else if ((e.key === " " || e.key === "Enter") && i >= 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        items[i].click();
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        items[(i + (e.shiftKey ? items.length - 1 : 1)) % items.length].focus();
       }
       return;
     }
@@ -235,5 +246,32 @@
     }
   }, true);
   window.addEventListener("resize", closeMenu);
+  injectStyle();
+  // Lien partagé d'un morceau (…-infra.html#titre-N, finition 19/11) : la page de l'album s'ouvre sur ce
+  // morceau (défilement jusqu'à lui, ligne brièvement marquée) ; on attend que les lignes soient là (3 s au plus).
+  function revealSharedTrack() {
+    const m = /^#titre-(\d+)$/.exec(window.location.hash || "");
+    if (!m) return;
+    const n = Number(m[1]);
+    let tries = 0;
+    (function look() {
+      const rows = document.querySelectorAll(".track-player");
+      const row = rows[n - 1];
+      if (!row) { if (++tries < 30) window.setTimeout(look, 100); return; }
+      // défilement direct, un peu après l'ouverture (le site remet la page en haut au chargement)
+      window.setTimeout(function () {
+        row.scrollIntoView({ block: "center" });
+        row.classList.add("ta-held");
+        window.setTimeout(function () { row.classList.remove("ta-held"); }, 1600);
+      }, 300);
+    })();
+  }
+  if (document.readyState === "complete") revealSharedTrack();
+  else window.addEventListener("load", revealSharedTrack, { once: true });
+  window.addEventListener("hashchange", revealSharedTrack);
+  document.addEventListener("selectstart", function (e) {
+    const el = e.target && e.target.nodeType === 3 ? e.target.parentElement : e.target;
+    if (rowFrom(el)) e.preventDefault();
+  }, true);
   window.addEventListener("scroll", function () { if (menu && !menu.box.classList.contains("is-sheet")) closeMenu(); }, { capture: true, passive: true });
 })();

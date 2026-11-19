@@ -375,7 +375,10 @@
       })
       .then(function (json) {
         var list = json && Array.isArray(json.playlists) ? json.playlists : [];
-        if (!list.length) return;
+        if (!list.length) {
+          plSumLoading = false; // liste vide : on réessaiera au prochain affichage
+          return;
+        }
         plSum = list.reduce(
           function (acc, pl) {
             acc.n += Array.isArray(pl.tracks) ? pl.tracks.length : 0;
@@ -1015,6 +1018,7 @@
     "keydown",
     function (event) {
       if (event.defaultPrevented) return;
+      if (document.querySelector(".ta-menu")) return; // menu d'un morceau ouvert : Échap le ferme, sans quitter la page
       var target = event.target,
         typing =
           target &&

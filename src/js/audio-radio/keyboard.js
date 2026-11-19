@@ -11,6 +11,7 @@ export function createKeyboardShortcuts(R) {
   function bindGlobalKeyboardShortcuts() {
     if (audioState.keyboardBound) return;
     document.addEventListener("keydown", function (event) {
+      if (event.defaultPrevented) return; // déjà traité (menu d'un morceau, lecteur samples…)
       const tag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : "";
       const isTyping =
         tag === "input" ||

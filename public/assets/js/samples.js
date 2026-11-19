@@ -997,7 +997,7 @@
     paintBar();
   }
   function audioEl() {
-    return document.querySelector("audio");
+    return document.getElementById("infraGlobalAudio") || document.querySelector("audio");
   }
   // Position dans la barre : t (secondes depuis le début du sample) sur T (durée totale).
   function barState() {
@@ -1429,6 +1429,7 @@
       a.addEventListener("playing", onPlaying);
     }
     if (!lib.playPaths([i.src], 0)) {
+      if (a) a.removeEventListener("playing", onPlaying);
       if (phase !== "pre") step(1);
       return false;
     }

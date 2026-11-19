@@ -153,6 +153,7 @@
                 s1: Number(it.s1),
                 at: Number(it.at),
                 go: it.go == null ? NaN : Number(it.go),
+                p: Array.isArray(it.p) ? it.p : null,
                 dt: Number(it.dt) || 0,
                 bpm: Array.isArray(it.bpm) ? it.bpm : null,
                 tb: Number(it.tb) || 0,
@@ -179,6 +180,100 @@
       i.s1 > i.s0 &&
       isFinite(i.at)
     );
+  }
+  // Mix (INFRA, 19/11) : les samples d'un même morceau sont joués à la suite, dans l'ordre où ils y
+  // entrent, chacun en une ou plusieurs parties (vraie durée lue dans le projet Ableton), puis ton morceau
+  // entre pile à l'entrée du premier. Un enchaînement = le 1er sample + { chain, segs, S }.
+  function chainOf(list) {
+    var groups = [],
+      byKey = {};
+    list.filter(duoOk).forEach(function (i) {
+      var k = i.album + "|" + i.track;
+      if (!byKey[k]) {
+        byKey[k] = [];
+        groups.push(byKey[k]);
+      }
+      byKey[k].push(i);
+    });
+    return groups.map(function (chain) {
+      chain = chain.slice().sort(function (a, b) {
+        return a.at - b.at;
+      });
+      var segs = [],
+        S = 0;
+      chain.forEach(function (c, ci) {
+        (c.p || [[c.s0, c.s1]]).forEach(function (q) {
+          if (!(q[1] > q[0])) return;
+          segs.push({ y: c.y, s0: q[0], s1: q[1], ci: ci, from: S });
+          S += q[1] - q[0];
+        });
+      });
+      return Object.assign({}, chain[0], {
+        chain: chain,
+        segs: segs,
+        S: Math.max(1, S),
+        t: chain
+          .map(function (c) {
+            return c.t;
+          })
+          .join(" + "),
+      });
+    });
+  }
+  // position t (s depuis le début du sample) → partie k et décalage dans la partie
+  function locate(item, t) {
+    var segs = item.segs || [{ s0: item.s0, s1: item.s1, from: 0 }];
+    for (var k = 0; k < segs.length; k++) {
+      var len = segs[k].s1 - segs[k].s0;
+      if (t < segs[k].from + len || k === segs.length - 1)
+        return { k: k, local: clamp(t - segs[k].from, 0, len) };
+    }
+    return { k: 0, local: 0 };
+  }
+  // fin de chargement YouTube : la partie, ou la dernière partie suivante de la même vidéo (sauts par seekTo)
+  function endFor(item, k) {
+    var segs = item.segs,
+      e = segs[k].s1;
+    for (
+      var j = k + 1;
+      j < segs.length &&
+      segs[j].y === segs[k].y &&
+      segs[j].s0 >= segs[j - 1].s1;
+      j++
+    )
+      e = segs[j].s1;
+    return e;
+  }
+  function curSample() {
+    var c = st.list[st.pos];
+    if (!c || !st.mix || !c.chain) return c;
+    var sg = c.segs[duo.k || 0];
+    return c.chain[sg ? sg.ci : 0];
+  }
+  function isLastSeg() {
+    var c = duo.item;
+    return !c || !c.segs || duo.k >= c.segs.length - 1;
+  }
+  // partie suivante : même vidéo → saut ; autre sample → chargement
+  function nextSeg() {
+    var item = duo.item;
+    if (!item || !item.segs || duo.phase !== "sample") return;
+    var k = duo.k + 1,
+      sg = item.segs[k],
+      before = item.segs[duo.k];
+    if (!sg) return;
+    duo.k = k;
+    duo.end = sg.s1;
+    duo.armed = false;
+    duo.segAt = Date.now();
+    yt.time = sg.s0;
+    if (sg.y === before.y && sg.s0 >= before.s1) send("seekTo", [sg.s0, true]);
+    else
+      send("loadVideoById", [
+        { videoId: sg.y, startSeconds: sg.s0, endSeconds: endFor(item, k) },
+      ]);
+    paintNow();
+    track("samples_part", { k: k, n: item.segs.length });
   }
   function keep(mix, voix) {
     return function (i) {
@@ -441,7 +536,7 @@
       return;
     }
     var mix = pref.sec === "mix";
-    var pool = all().filter(keep(mix, pref.voix));
+    var pool = mix ? chainOf(all()) : all().filter(keep(mix, pref.voix));
     var html =
       '<div class="sx-sec" role="tablist" aria-label="Samples ou Mix">' +
       '<button type="button" role="tab" data-smp-sec="samples" aria-selected="' +
@@ -483,7 +578,9 @@
       '<ul class="smp-grid">' +
       data.albums
         .map(function (a, i) {
-          var n = a.items.filter(keep(mix, pref.voix)).length;
+          var n = mix
+            ? chainOf(a.items).length
+            : a.items.filter(keep(mix, pref.voix)).length;
           if (mix && !n) return "";
           var label = mix
             ? n + (n > 1 ? " enchaînements" : " enchaînement")
@@ -601,7 +698,7 @@
       );
     } catch (_e) {}
   }
-  function embed(id, item, start) {
+  function embed(id, start, end) {
     var p = new URLSearchParams({
       autoplay: "1",
       playsinline: "1",
@@ -610,9 +707,9 @@
       enablejsapi: "1",
       origin: window.location.origin,
     });
-    if (st.mix && item) {
+    if (end != null) {
       p.set("start", String(Math.floor(start)));
-      p.set("end", String(Math.ceil(item.s1)));
+      p.set("end", String(Math.ceil(end)));
     } else if (start) p.set("start", String(Math.floor(start)));
     return ORIGIN + "/embed/" + encodeURIComponent(id) + "?" + p.toString();
   }
@@ -623,6 +720,7 @@
     st.scope = scope;
     st.album = album || null;
     st.mix = pref.sec === "mix";
+    if (st.mix) st.list = list = chainOf(list);
     st.voix = voix == null ? pref.voix : voix;
     st.sort = sortFor(st.mix, scope);
     reshuffle(null);
@@ -690,22 +788,32 @@
       );
     }
     st.pos = st.list.indexOf(item);
-    var start = (st.mix ? item.s0 : 0) + (offset || 0);
+    var start = offset || 0,
+      vid = item.y,
+      endS = null;
     if (st.mix) {
+      var loc = locate(item, offset || 0),
+        sg = item.segs[loc.k];
       duo.phase = "sample";
       duo.item = item;
-      duo.end = item.s1;
+      duo.k = loc.k;
+      duo.end = sg.s1;
+      duo.armed = false;
+      duo.segAt = Date.now();
+      start = sg.s0 + loc.local;
+      vid = sg.y;
+      endS = endFor(item, loc.k);
     }
     yt.time = start;
     yt.dur = 0;
     yt.state = -1;
     if (fresh || !st.ready) {
       st.ready = false;
-      f.src = embed(item.y, item, start);
+      f.src = embed(vid, start, endS);
     } else if (st.mix) {
       setVideoVolume(fade ? 0 : 100);
       send("loadVideoById", [
-        { videoId: item.y, startSeconds: start, endSeconds: item.s1 },
+        { videoId: vid, startSeconds: start, endSeconds: endS },
       ]);
     } else if (offset)
       send("loadVideoById", [{ videoId: item.y, startSeconds: start }]);
@@ -743,18 +851,45 @@
     bpmBox.firstChild.textContent = bpmOf(cur) || "";
     $("[data-smp-cov]", sheet).src = assetUrl(cur.cover);
     // barre : un segment (Samples) ou deux (Mix : sample | morceau)
-    var S = Math.max(1, cur.s1 - cur.s0);
+    // barre : Samples = un morceau ; Mix = chaque partie du (des) sample(s), puis ton morceau
+    var segsM = cur.segs || [{ s0: cur.s0, s1: cur.s1, ci: 0, from: 0 }],
+      chain = cur.chain || [cur];
     $("[data-smp-trk]", sheet).innerHTML = st.mix
-      ? '<div class="sx-seg s" style="flex:' +
-        S +
-        '"><i></i></div><div class="sx-seg" style="flex:' +
+      ? segsM
+          .map(function (sg) {
+            return (
+              '<div class="sx-seg s" style="flex:' +
+              (sg.s1 - sg.s0) +
+              '"><i></i></div>'
+            );
+          })
+          .join("") +
+        '<div class="sx-seg" style="flex:' +
         TRACK +
         '"><i></i></div>'
       : '<div class="sx-seg s" style="flex:1"><i></i></div>';
+    // légende : un bouton par sample (début de ce sample), puis ton morceau
     $("[data-smp-leg]", sheet).innerHTML = st.mix
-      ? '<button type="button" class="s" data-smp-jump="0" title="Revenir au début du sample" style="flex:' +
-        S +
-        '">Sample</button><button type="button" data-smp-jump="1" title="Aller à ton morceau" style="flex:' +
+      ? chain
+          .map(function (c, ci) {
+            var mine = segsM.filter(function (sg) {
+                return sg.ci === ci;
+              }),
+              len = mine.reduce(function (a, sg) {
+                return a + sg.s1 - sg.s0;
+              }, 0);
+            return (
+              '<button type="button" class="s" data-smp-jump="s' +
+              ci +
+              '" title="Revenir au début de ce sample" style="flex:' +
+              len +
+              '" dir="auto">' +
+              esc(chain.length > 1 ? c.t : "Sample") +
+              "</button>"
+            );
+          })
+          .join("") +
+        '<button type="button" data-smp-jump="1" title="Aller à ton morceau" style="flex:' +
         TRACK +
         '" dir="auto">' +
         esc(cur.track) +
@@ -800,16 +935,16 @@
         '<span class="sx-rb" title="BPM">' +
         (bpmOf(i) || "") +
         "</span>" +
-        (st.mix ? "<em>" + mmss(i.s1 - i.s0 + TRACK) + "</em>" : "") +
+        (st.mix ? "<em>" + mmss((i.S || i.s1 - i.s0) + TRACK) + "</em>" : "") +
         "</button></li>";
     });
     $("[data-smp-list]", sheet).innerHTML = html;
     var from = Math.max(0, list.indexOf(cur));
     $("[data-smp-yt]", sheet).href = st.mix
       ? "https://www.youtube.com/watch?v=" +
-        encodeURIComponent(cur.y) +
+        encodeURIComponent(segsM[0].y || cur.y) +
         "&t=" +
-        Math.floor(cur.s0) +
+        Math.floor(segsM[0].s0) +
         "s"
       : "https://www.youtube.com/watch_videos?video_ids=" +
         list
@@ -818,10 +953,6 @@
             return i.y;
           })
           .join(",");
-    // Spotify et Apple Music : recherche du sample en cours.
-    var q = encodeURIComponent([cur.a, cur.t].filter(Boolean).join(" "));
-    $("[data-smp-sp]", sheet).href = "https://open.spotify.com/search/" + q;
-    $("[data-smp-am]", sheet).href = "https://music.apple.com/search?term=" + q;
     paintNow();
     var scroller = $(".sx-panel", sheet),
       on = $(".smp-row.on", sheet);
@@ -836,12 +967,17 @@
   function paintNow() {
     var cur = st.list[st.pos];
     if (!sheet || !cur) return;
-    var inTrack = trackPhase();
-    $("[data-smp-t]", sheet).textContent = inTrack ? cur.track : cur.t;
+    var inTrack = trackPhase(),
+      smp = curSample() || cur;
+    $("[data-smp-t]", sheet).textContent = inTrack ? cur.track : smp.t;
+    // Spotify et Apple Music : recherche du sample entendu
+    var q = encodeURIComponent([smp.a, smp.t].filter(Boolean).join(" "));
+    $("[data-smp-sp]", sheet).href = "https://open.spotify.com/search/" + q;
+    $("[data-smp-am]", sheet).href = "https://music.apple.com/search?term=" + q;
     $("[data-smp-a]", sheet).textContent = inTrack
-      ? ["INFRA", cur.album, transfo(cur)].filter(Boolean).join(" · ")
+      ? ["INFRA", cur.album, transfo(smp)].filter(Boolean).join(" · ")
       : [
-          who(cur) + (cur.v ? (who(cur) ? " · " : "") + "voix" : ""),
+          who(smp) + (smp.v ? (who(smp) ? " · " : "") + "voix" : ""),
           "samplé dans " + cur.track,
         ]
           .filter(Boolean)
@@ -850,11 +986,14 @@
     // même asset que le grand lecteur : la pochette de l'album (sample comme morceau)
     $("[data-smp-bg]", sheet).style.backgroundImage =
       'url("' + assetUrl(cur.cover) + '")';
-    var leg = $("[data-smp-leg]", sheet).children;
-    if (leg.length === 2) {
-      leg[0].classList.toggle("on", !inTrack);
-      leg[1].classList.toggle("on", inTrack);
-    }
+    var leg = $("[data-smp-leg]", sheet).children,
+      sgNow = cur.segs ? cur.segs[duo.k || 0] : null,
+      ciNow = sgNow ? sgNow.ci : 0;
+    for (var li = 0; li < leg.length; li++)
+      leg[li].classList.toggle(
+        "on",
+        li === leg.length - 1 ? inTrack : !inTrack && li === ciNow,
+      );
     paintBar();
   }
   function audioEl() {
@@ -870,12 +1009,17 @@
         T: yt.dur || 0,
         t: yt.dur ? clamp(yt.time, 0, yt.dur) : 0,
       };
-    var S = Math.max(1, cur.s1 - cur.s0),
+    var S = cur.S || Math.max(1, cur.s1 - cur.s0),
       t;
     if (trackPhase()) {
       var a = audioEl();
       t = S + clamp(a ? a.currentTime - duo.from : 0, 0, TRACK);
-    } else t = clamp(yt.time - cur.s0, 0, S);
+    } else {
+      var sg = cur.segs
+        ? cur.segs[duo.k || 0]
+        : { s0: cur.s0, s1: cur.s1, from: 0 };
+      t = clamp(sg.from + clamp(yt.time - sg.s0, 0, sg.s1 - sg.s0), 0, S);
+    }
     return { S: S, T: S + TRACK, t: t };
   }
   function isPlaying() {
@@ -894,13 +1038,15 @@
       trk = $("[data-smp-trk]", sheet),
       w = trk.clientWidth,
       x = 0;
-    if (st.mix && segs.length === 2) {
-      segs[0].style.width = (clamp(t / b.S, 0, 1) * 100).toFixed(2) + "%";
-      segs[1].style.width =
-        (clamp((t - b.S) / TRACK, 0, 1) * 100).toFixed(2) + "%";
-      var w1 = ((w - 3) * b.S) / b.T;
-      x =
-        t <= b.S ? (w1 * t) / b.S : w1 + 3 + ((w - 3 - w1) * (t - b.S)) / TRACK;
+    var L = st.mix ? barLens() : null;
+    if (L && segs.length === L.length) {
+      var acc = 0;
+      L.forEach(function (len, k) {
+        segs[k].style.width =
+          (clamp((t - acc) / len, 0, 1) * 100).toFixed(2) + "%";
+        acc += len;
+      });
+      x = tToX(L, t, w);
     } else if (segs.length) {
       segs[0].style.width = b.T ? ((t / b.T) * 100).toFixed(2) + "%" : "0";
       x = b.T ? (w * t) / b.T : 0;
@@ -921,6 +1067,49 @@
       pp.setAttribute("aria-label", on ? "Pause" : "Lecture");
     }
   }
+  // Mix : longueurs des morceaux de barre (parties du sample, puis ton morceau), 3 px entre eux.
+  function barLens() {
+    var cur = st.list[st.pos];
+    if (!cur) return [TRACK];
+    var L = (cur.segs || [{ s0: cur.s0, s1: cur.s1 }]).map(function (sg) {
+      return Math.max(0.1, sg.s1 - sg.s0);
+    });
+    L.push(TRACK);
+    return L;
+  }
+  function tToX(L, t, w) {
+    var T = L.reduce(function (a, b) {
+        return a + b;
+      }, 0),
+      avail = w - 3 * (L.length - 1),
+      x = 0,
+      acc = 0;
+    for (var k = 0; k < L.length; k++) {
+      var wk = (avail * L[k]) / T;
+      if (t <= acc + L[k] || k === L.length - 1)
+        return x + wk * clamp((t - acc) / L[k], 0, 1);
+      x += wk + 3;
+      acc += L[k];
+    }
+    return x;
+  }
+  function xToT(L, x, w) {
+    var T = L.reduce(function (a, b) {
+        return a + b;
+      }, 0),
+      avail = w - 3 * (L.length - 1),
+      pos = 0,
+      acc = 0;
+    for (var k = 0; k < L.length; k++) {
+      var wk = (avail * L[k]) / T;
+      if (x <= pos + wk || k === L.length - 1)
+        return acc + L[k] * clamp((x - pos) / wk, 0, 1);
+      pos += wk + 3;
+      acc += L[k];
+      if (x < pos) return acc; // dans l'espace entre deux morceaux : début du suivant
+    }
+    return acc;
+  }
   // Barre : toucher ou glisser n'importe où.
   function bindBar(bar) {
     function at(e) {
@@ -929,10 +1118,7 @@
       var r = $("[data-smp-trk]", sheet).getBoundingClientRect(),
         x = clamp(e.clientX - r.left, 0, r.width);
       if (!st.mix) return (x / r.width) * b.T;
-      var w1 = ((r.width - 3) * b.S) / b.T;
-      return x <= w1
-        ? (b.S * x) / w1
-        : b.S + TRACK * clamp((x - w1 - 3) / (r.width - 3 - w1), 0, 1);
+      return xToT(barLens(), x, r.width);
     }
     bar.addEventListener("pointerdown", function (e) {
       var t = at(e);
@@ -980,11 +1166,14 @@
       return paintBar();
     }
     if (duo.phase === "pre") cancelPre();
-    var S = Math.max(1, cur.s1 - cur.s0);
+    var S = cur.S || Math.max(1, cur.s1 - cur.s0);
     if (t < S) {
-      if (duo.phase === "sample") {
-        send("seekTo", [cur.s0 + t, true]);
-        yt.time = cur.s0 + t;
+      var loc = locate(cur, t);
+      if (duo.phase === "sample" && loc.k === (duo.k || 0)) {
+        var sg = cur.segs ? cur.segs[loc.k] : { s0: cur.s0 };
+        send("seekTo", [sg.s0 + loc.local, true]);
+        yt.time = sg.s0 + loc.local;
+        duo.armed = false;
       } else play(cur, false, false, t); // retour dans le sample : ton morceau s'arrête, le sample reprend
     } else {
       var off = clamp(t - S, 0, TRACK - 1);
@@ -1059,7 +1248,23 @@
     var inOutro = Date.now() < duo.outroUntil;
     var inPre = duo.phase === "pre";
     if (state === 1 && !inTrack && !inOutro && !inPre) pauseMusic();
-    if (st.mix && (duo.phase === "sample" || inPre)) {
+    var settling = Date.now() - (duo.segAt || 0) < 1200;
+    if (st.mix && duo.phase === "sample" && !isLastSeg()) {
+      // fin d'une partie : partie suivante (minuterie précise, ou fin de vidéo)
+      var tp = yt.time,
+        kk = duo.k;
+      if (!settling && isFinite(tp) && !duo.armed && duo.end - tp < 1.5) {
+        duo.armed = true;
+        later(
+          function () {
+            if (duo.k === kk) nextSeg();
+          },
+          Math.max(0, (duo.end - tp) * 1000),
+        );
+      }
+      if (!settling && (state === 0 || state === 2) && tp >= duo.end - 0.6)
+        nextSeg();
+    } else if (st.mix && (duo.phase === "sample" || inPre) && !settling) {
       var tm = yt.time;
       if (
         duo.phase === "sample" &&
@@ -1428,14 +1633,14 @@
     if (jump) {
       var cj = st.list[st.pos];
       if (!cj) return;
-      track("samples_jump", {
-        to: jump.getAttribute("data-smp-jump") === "1" ? "track" : "sample",
-      });
-      return seekTo(
-        jump.getAttribute("data-smp-jump") === "1"
-          ? Math.max(1, cj.s1 - cj.s0)
-          : 0,
-      );
+      var to = jump.getAttribute("data-smp-jump");
+      track("samples_jump", { to: to === "1" ? "track" : "sample" });
+      if (to === "1") return seekTo(cj.S || Math.max(1, cj.s1 - cj.s0));
+      var ci = Number(to.slice(1)) || 0,
+        first = (cj.segs || []).filter(function (sg) {
+          return sg.ci === ci;
+        })[0];
+      return seekTo(first ? first.from : 0);
     }
     var sb = t.closest("[data-smp-sortv]");
     if (sb)
@@ -1472,7 +1677,7 @@
     if (t.closest("[data-smp-all]")) {
       var mix = pref.sec === "mix";
       return open(
-        all().filter(keep(mix, pref.voix)),
+        mix ? all() : all().filter(keep(mix, pref.voix)),
         mix ? "Tout le Mix" : "Tous les samples",
         "all",
       );

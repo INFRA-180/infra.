@@ -2120,3 +2120,13 @@ c'était le système, pas le thème », « on doit pouvoir quitter en appuyant h
 - Plus de barre de défilement dans le lecteur Samples : on fait défiler sans barre.
 - NASCAR (PBB) : le son venait bien du fichier des projets NASCAR (Bleach OST 2, « 20 - Torn Apart.flac », 2 min 44, référencé par les 6 versions du projet). Le lien YouTube pointait vers « Torn Apart - heavy metal » (4 min 27, autre version), remplacé par `6s-wjQ7hx_0` (CD 2006, 2 min 44).
   - 94 extraits viennent d'un fichier dont la durée diffère de la vidéo YouTube liée (liste `_private/samples-extraits/versions_differentes.json`). Le son reste celui des projets ; les liens YouTube de ces samples sont à revoir.
+
+## 19/11/2026 · Télémétrie réparée (Worker 170036bc) et événements Samples (v472, Claude)
+
+- Depuis le déploiement du Worker de ce matin (a4e4b7f5), chaque envoi `/log` plantait (1101), comme `/telemetry/status` et `/telemetry/budget`. Aucune session n'a été enregistrée de 06:03 à 20:10 UTC.
+  - Cause : `callTelemetryBudget` appelait le Durable Object en RPC, car sur un vrai stub `typeof stub[method] === "function"` est toujours vrai. Or `TelemetryBudget` n'étend pas `DurableObject`.
+  - Correctif : passer par `stub.fetch()` en premier. Si le budget est indisponible, la session est gardée au lieu de faire planter `/log`.
+  - Vérifié : `/telemetry/status` répond 200, et une visite réelle est enregistrée (session4, audiofix470).
+  - Les lots gardés dans IndexedDB par les téléphones (72 h, 4 au plus) devraient repartir à la prochaine visite. Ce n'est pas vérifié.
+- Les événements `samples_*` étaient jetés par la page : ils n'étaient pas dans `RAW_EVENTS`. Sept d'entre eux sont maintenant envoyés seuls (`DIRECT_EVENTS`) : `samples_open`, `samples_section`, `samples_audio_slow` (avec `delta_ms`, aussi pour la lecture en flux), `samples_audio_fail`, `samples_unavailable`, `samples_goto`, `samples_swipe_close`.
+- Piège noté : les tests du Worker simulent le stub avec de simples méthodes et n'ont pas vu le problème.

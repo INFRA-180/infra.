@@ -2224,7 +2224,7 @@
         g.disconnect();
         e.node.disconnect();
       } catch (_e) {}
-      el.onended = el.onerror = null;
+      el.onended = el.onerror = el.onplaying = null;
       e.busy = false;
     };
     var v = {
@@ -2264,6 +2264,13 @@
       release();
       if (eng.cur === v) eng.cur = null;
       onFail();
+    };
+    var tStart = Date.now();
+    el.onplaying = function () {
+      el.onplaying = null;
+      var ms = Date.now() - tStart;
+      if (ms > 1500)
+        track("samples_audio_slow", { delta_ms: ms, mode: st.mix ? "mix" : "samples" });
     };
     el.src = xUrl(sg.x[0]) + (off > 0.05 ? "#t=" + off.toFixed(2) : "");
     try {
@@ -2390,7 +2397,7 @@
         )
           pauseMusic();
         if (Date.now() - t0 > 1500)
-          track("samples_audio_slow", { ms: Date.now() - t0 });
+          track("samples_audio_slow", { delta_ms: Date.now() - t0, mode: st.mix ? "mix" : "samples" });
         engPreload(item, k);
         setTimeout(paintBar, 30);
       },

@@ -4,6 +4,14 @@
   // Call sites remain verbose for local diagnostics. Only the compact
   // transitions assembled below are written to the session journal.
   const RAW_EVENTS = new Set([
+    // Lecteur Samples (19/11/2026) : ouverture, section, lenteur ou échec d'un extrait, gestes clés.
+    "samples_open",
+    "samples_section",
+    "samples_audio_slow",
+    "samples_audio_fail",
+    "samples_unavailable",
+    "samples_goto",
+    "samples_swipe_close",
     "script_error",
     "album_switch",
     "audio_network_result",
@@ -97,6 +105,13 @@
     "waiting"
   ]);
   const DIRECT_EVENTS = new Set([
+    "samples_open",
+    "samples_section",
+    "samples_audio_slow",
+    "samples_audio_fail",
+    "samples_unavailable",
+    "samples_goto",
+    "samples_swipe_close",
     "external_resume_recovery_failed",
     "fullscreen_viewport",
     "mini_player_visibility",

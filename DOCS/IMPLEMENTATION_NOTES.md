@@ -2036,3 +2036,15 @@ c'était le système, pas le thème », « on doit pouvoir quitter en appuyant h
   - Worker : limites par visiteur (musique 600/min, téléchargements 30/min, Sphragis 20/min, compteurs Cloudflare
     sans écriture KV) ; les sessions de télémétrie schéma 2-4 passent par le budget quotidien ; tableau de bord
     rafraîchi toutes les 5 min, onglet visible seulement.
+
+## 19/11/2026 — « ⋯ » du grand lecteur, fondu entre deux samples (Claude, audiofix467)
+
+- Grand lecteur : « ⋯ » à côté du cœur (téléphone : à droite du cœur ; ordinateur : juste avant le cœur, dans la
+  barre du haut). Menu sombre : Télécharger le morceau · Aller vers le(s) sample(s) · Crédits · Partager… ·
+  Copier le lien. « Aller vers » et « Crédits » seulement si le morceau a des samples (`samples.js` chargé à la
+  demande, 2,5 s au plus). Crédits = samples utilisés, dans l'ordre où ils entrent (artiste — titre, année, voix),
+  avec Retour. Code : `src/js/track-actions.js` (`showMenu` commun avec l'appui long / clic droit).
+- Mix : fondu croisé d'1 s entre deux parties (deux samples, ou deux passages). La partie suivante se charge
+  muette dans un 2e lecteur YouTube caché 4 s avant ; quand il répond, les deux lecteurs échangent leur rôle et le
+  son passe de l'un à l'autre (puissance égale), l'image aussi. iPhone (volume bloqué) ou lecteur pas prêt : saut
+  comme avant. Vérifié hors écran sur CANDANA (Milan Pilar → Michael Jackson).

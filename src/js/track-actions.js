@@ -2,6 +2,8 @@
 // Aucune icône en plus sur les lignes : on l'ouvre par l'appui long (téléphone) ou le clic droit
 // (ordinateur), ou Maj+F10 / touche Menu au clavier, sur une ligne de morceau (Bibliothèque, page d'album).
 // Actions : Télécharger le morceau (Cloudflare, pochette intégrée), Partager… (carte de partage), Copier le lien.
+// 19/11/2026 (INFRA : « partager dans le grand lecteur, trois petits points ») : « ⋯ » à côté du cœur du grand
+// lecteur, même menu + « Aller vers le sample » et « Crédits » quand le morceau a des samples.
 (function () {
   "use strict";
 
@@ -15,9 +17,10 @@
   let press = null;
   let swallowClickUntil = 0;
 
+  const TRACK_PATH = /streams\/(?:[^/]+\/)?([a-z0-9-]+)\/(\d{1,3})-[^/]+\.m4a$/i; // avec ou sans dossier de version
   function trackOf(row) {
     const path = row.getAttribute("data-bib-path") || row.getAttribute("data-favorite-path") || "";
-    const match = path.match(/streams\/(?:[^/]+\/)?([a-z0-9-]+)\/(\d{1,3})-[^/]+\.m4a$/i); // avec ou sans dossier de version
+    const match = path.match(TRACK_PATH);
     if (!match) return null;
     const titleNode = row.querySelector(".tx .t, .track-name");
     const albumNode = row.querySelector(".tx .a");
@@ -83,7 +86,10 @@
   const ICON = {
     dl: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>',
     share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M6 12v7h12v-7"/></svg>',
-    link: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>'
+    link: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+    sample: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h3l2-6 3 12 3-9 2 3h5"/></svg>',
+    credits: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 9h6M9 13h6M9 17h3"/></svg>',
+    back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>'
   };
 
   function injectStyle() {
@@ -107,6 +113,24 @@
         padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
       .ta-menu.is-sheet button { min-height: 52px; padding: 0; font-size: 16px; }
       .ta-menu button:hover, .ta-menu button:focus-visible { background: rgba(127,127,127,.12); outline: none; }
+      .ta-menu .ta-credit { padding: 8px 8px 10px; font-size: 13px; line-height: 1.35; }
+      .ta-menu.is-sheet .ta-credit { padding: 8px 0 10px; font-size: 15px; }
+      .ta-menu .ta-credit b { font-weight: 600; } .ta-menu .ta-credit span { opacity: .55; }
+      .ta-menu .ta-credits { max-height: min(50vh, 360px); overflow-y: auto; }
+      .now-playing-meta.has-more { grid-template-columns: minmax(0, 1fr) 40px 40px; column-gap: 0; }
+      .now-playing-meta.has-more .now-playing-meta-text { margin-right: 12px; }
+      .np-more { width: 40px; min-height: 40px; display: grid; place-items: center; justify-self: end; align-self: start; border: 0;
+        background: transparent; color: rgba(255,255,255,.92); padding: 0; cursor: pointer; touch-action: manipulation; }
+      .np-more svg { width: 25px; height: 25px; display: block; fill: currentColor; }
+      /* Ordinateur : le cœur est dans la barre du haut (V19) ; « ⋯ » se place juste avant lui. */
+      @media (min-width: 981px) {
+        .now-playing-meta.has-more { grid-template-columns: minmax(0, 1fr) 40px; column-gap: 12px; }
+        .now-playing-meta.has-more .now-playing-meta-text { margin-right: 0; }
+        .np-more { position: absolute; top: 50px; right: 272px; width: 44px; min-height: 44px; z-index: 5; }
+        .now-playing-overlay.is-queue-inline .np-more { top: calc(50px + var(--np-scroll, 0px) - var(--np-bar-shift, 0px)); }
+      }
+      .ta-menu.is-dark { --ta-bg: rgba(28,28,30,.97); --ta-ink: #fff; }
+      .np-more:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 6px; }
       .ta-menu svg { width: 20px; height: 20px; justify-self: center; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
       .ta-toast { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 2147483002; padding: 8px 14px; border-radius: 999px;
         background: rgba(17,17,17,.92); color: #fff; font: 600 13px/1.2 "Avenir Next", "Avenir", Arial, sans-serif; opacity: 0;
@@ -133,9 +157,17 @@
   function openMenu(row, x, y, viaKeyboard) {
     const t = trackOf(row);
     if (!t) return;
+    showMenu(t, row, x, y, viaKeyboard, [
+      ["dl", "Télécharger le morceau", function () { download(t); }],
+      ["share", "Partager…", function () { share(t, row); }],
+      ["link", "Copier le lien", function () { copyLink(trackUrl(t)); }]
+    ], x !== null);
+  }
+
+  function showMenu(t, row, x, y, viaKeyboard, items, asSheet) {
     closeMenu();
     injectStyle();
-    const sheet = window.matchMedia && window.matchMedia("(max-width: 639px)").matches && !viaKeyboard && x !== null;
+    const sheet = window.matchMedia && window.matchMedia("(max-width: 639px)").matches && !viaKeyboard && asSheet;
     const body = getComputedStyle(document.body);
     const scrim = document.createElement("div");
     scrim.className = "ta-scrim" + (sheet ? " is-sheet" : "");
@@ -143,13 +175,11 @@
     box.className = "ta-menu" + (sheet ? " is-sheet" : "");
     box.setAttribute("role", "menu");
     box.setAttribute("aria-label", t.title);
-    box.style.setProperty("--ta-bg", body.backgroundColor && body.backgroundColor !== "rgba(0, 0, 0, 0)" ? body.backgroundColor : "#fff");
-    box.style.setProperty("--ta-ink", body.color || "#111");
-    const items = [
-      ["dl", "Télécharger le morceau", function () { download(t); }],
-      ["share", "Partager…", function () { share(t, row); }],
-      ["link", "Copier le lien", function () { copyLink(trackUrl(t)); }]
-    ];
+    if (row.matches("[data-np-more]")) box.classList.add("is-dark");
+    else {
+      box.style.setProperty("--ta-bg", body.backgroundColor && body.backgroundColor !== "rgba(0, 0, 0, 0)" ? body.backgroundColor : "#fff");
+      box.style.setProperty("--ta-ink", body.color || "#111");
+    }
     box.innerHTML =
       `<div class="ta-head"><b></b><span></span></div>` +
       items.map(function (it, i) { return `<button type="button" role="menuitem" data-ta="${i}">${ICON[it[0]]}<span>${it[1]}</span></button>`; }).join("");
@@ -166,16 +196,17 @@
       box.style.left = left + "px";
       box.style.top = top + "px";
     }
-    row.classList.add("ta-held");
-    menu = { scrim, box, row, invoker: row.querySelector("button") || row };
+    if (row.matches(ROW_SELECTOR)) row.classList.add("ta-held");
+    menu = { scrim, box, row, invoker: row.matches("button") ? row : row.querySelector("button") || row };
     scrim.addEventListener("pointerdown", function (e) { e.preventDefault(); swallowClickUntil = Date.now() + 500; closeMenu(); });
     scrim.addEventListener("contextmenu", function (e) { e.preventDefault(); closeMenu(); });
     box.addEventListener("click", function (e) {
       const b = e.target.closest("[data-ta]");
       if (!b) return;
-      const action = items[Number(b.getAttribute("data-ta"))][2];
+      const it = items[Number(b.getAttribute("data-ta"))];
+      if (it[3] === "keep") { it[2](box); return; } // reste ouvert (Crédits)
       closeMenu();
-      action();
+      it[2]();
     });
     if (viaKeyboard) box.querySelector("button").focus();
   }
@@ -247,6 +278,101 @@
   }, true);
   window.addEventListener("resize", closeMenu);
   injectStyle();
+
+  // ---------- Grand lecteur : « ⋯ » à côté du cœur ----------
+  const DOTS = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
+  let samplesJs = null;
+  function samplesApi() {
+    if (window.InfraSamples) return Promise.resolve(window.InfraSamples);
+    if (samplesJs) return samplesJs;
+    samplesJs = new Promise(function (resolve, reject) {
+      const s = document.createElement("script");
+      s.src = `${siteRoot()}assets/js/samples.js?v=${encodeURIComponent(window.INFRA_BUILD_TAG || "")}`;
+      s.async = true;
+      s.onload = function () { window.InfraSamples ? resolve(window.InfraSamples) : reject(new Error("samples")); };
+      s.onerror = function () { samplesJs = null; reject(new Error("samples")); };
+      document.head.appendChild(s);
+    });
+    return samplesJs;
+  }
+  function samplesOf(t) {
+    // Les samples de ce morceau (avec les voix), dans l'ordre où ils entrent ; [] si aucun ou hors ligne.
+    const wait = new Promise(function (resolve) { window.setTimeout(function () { resolve(null); }, 2500); });
+    const get = samplesApi().then(function (api) { return api.load(); }).catch(function () { return null; });
+    return Promise.race([get, wait]).then(function (data) {
+      const album = data && (data.albums || []).find(function (a) { return a.title === t.album; });
+      if (!album) return [];
+      return album.items.filter(function (i) { return i.track === t.title; })
+        .sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
+    });
+  }
+  function currentTrack() {
+    const overlay = document.getElementById("infraNowPlayingOverlay");
+    const fav = overlay && overlay.querySelector("[data-now-playing-favorite]");
+    const match = (fav && fav.getAttribute("data-favorite-path") || "").match(TRACK_PATH);
+    if (!match) return null;
+    const title = overlay.querySelector("[data-now-playing-title]");
+    const album = overlay.querySelector("[data-now-playing-album]");
+    return { slug: match[1], n: Number(match[2]), title: title ? title.textContent.trim() : "Morceau",
+      album: album ? album.textContent.trim() : "" };
+  }
+  function showCredits(t, list, box) {
+    const lines = list.map(function (i) {
+      const who = [i.a, i.t].filter(Boolean).join(" — ");
+      const extra = [i.an, i.v ? "voix" : ""].filter(Boolean).join(" · ");
+      return `<div class="ta-credit"><b></b>${extra ? " <span></span>" : ""}</div>`.replace("<b></b>", "<b>" + esc(who) + "</b>")
+        .replace("<span></span>", "<span>" + esc(extra) + "</span>");
+    }).join("");
+    box.innerHTML = `<div class="ta-head"><b></b><span>Samples utilisés</span></div><div class="ta-credits">${lines}</div>` +
+      `<button type="button" role="menuitem" data-ta-back>${ICON.back}<span>Retour</span></button>`;
+    box.querySelector(".ta-head b").textContent = t.title;
+    box.querySelector("[data-ta-back]").addEventListener("click", function (e) { e.stopPropagation(); openNowPlayingMenu(); });
+  }
+  function esc(text) {
+    return String(text == null ? "" : text).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
+  }
+  function goToSample(t) {
+    const close = document.querySelector("#infraNowPlayingOverlay [data-now-playing-close]");
+    if (close) close.click();
+    samplesApi().then(function (api) { return api.openTrack(t.album, t.title); })
+      .then(function (ok) { if (!ok) say("Aucun sample pour ce morceau"); })
+      .catch(function () { say("Samples indisponibles hors ligne"); });
+  }
+  function openNowPlayingMenu() {
+    const t = currentTrack();
+    const button = document.querySelector("#infraNowPlayingOverlay [data-np-more]");
+    if (!t || !button) return;
+    samplesOf(t).then(function (list) {
+      const items = [["dl", "Télécharger le morceau", function () { download(t); }]];
+      if (list.length) {
+        items.push(["sample", list.length > 1 ? "Aller vers les samples" : "Aller vers le sample", function () { goToSample(t); }]);
+        items.push(["credits", "Crédits", function (box) { showCredits(t, list, box); }, "keep"]);
+      }
+      items.push(["share", "Partager…", function () { share(t, button); }]);
+      items.push(["link", "Copier le lien", function () { copyLink(trackUrl(t)); }]);
+      showMenu(t, button, null, null, false, items, true);
+    });
+  }
+  function ensureNowPlayingMore() {
+    const overlay = document.getElementById("infraNowPlayingOverlay");
+    const meta = overlay && overlay.querySelector(".now-playing-meta");
+    if (!meta || meta.querySelector("[data-np-more]")) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "np-more";
+    button.setAttribute("data-np-more", "");
+    button.setAttribute("aria-label", "Plus d'options");
+    button.setAttribute("aria-haspopup", "menu");
+    button.innerHTML = DOTS;
+    button.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); openNowPlayingMenu(); });
+    meta.appendChild(button);
+    meta.classList.add("has-more");
+  }
+  // Le grand lecteur est construit puis ouvert à la demande : on pose « ⋯ » à chaque ouverture.
+  new MutationObserver(function () {
+    if (document.documentElement.classList.contains("now-playing-open")) ensureNowPlayingMore();
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  ensureNowPlayingMore();
   // Lien partagé d'un morceau (…-infra.html#titre-N, finition 19/11) : la page de l'album s'ouvre sur ce
   // morceau (défilement jusqu'à lui, ligne brièvement marquée) ; on attend que les lignes soient là (3 s au plus).
   function revealSharedTrack() {

@@ -47,6 +47,8 @@
     OVERLAP = 2, // sortie de ton morceau vers le sample suivant (fondu croisé)
     XF = 0.35, // entrée : sample → ton morceau, quasi coupe (évite le clic), à plein volume
     LEAD = 3,
+    SEGXF = 1, // 19/11 (INFRA : « fais la transition entre les deux samples ») : fondu croisé entre deux parties
+    SEGPRE = 4, // la partie suivante se prépare, muette, dans un 2e lecteur caché, SEGPRE s avant
     SORTS = ["bpm", "bpmdown", "shuffle", "album"],
     ticker = 0;
   var pref = { sec: "samples", voix: false, sort: {} };
@@ -262,12 +264,14 @@
       sg = item.segs[k],
       before = item.segs[duo.k];
     if (!sg) return;
+    var swap = canSwapNext(); // avant de passer à la partie suivante (nx.k === duo.k + 1)
     duo.k = k;
     duo.end = sg.s1;
     duo.armed = false;
     duo.segAt = Date.now();
     yt.time = sg.s0;
-    if (sg.y === before.y && sg.s0 >= before.s1) send("seekTo", [sg.s0, true]);
+    if (swap) swapToNext(sg);
+    else if (sg.y === before.y && sg.s0 >= before.s1) send("seekTo", [sg.s0, true]);
     else
       send("loadVideoById", [
         { videoId: sg.y, startSeconds: sg.s0, endSeconds: endFor(item, k) },
@@ -469,7 +473,8 @@
       // L'image se réduit avec la hauteur de l'écran : titre, barre et commandes toujours visibles (INFRA, 19/11).
       ".sx-art{position:relative;width:min(100%,max(160px,calc(100vh - 350px)));width:min(100%,max(160px,calc(100dvh - 350px)));margin:0 auto;aspect-ratio:1;border-radius:24px;overflow:hidden;background:#000}",
       ".sx-vid{position:absolute;inset:0;overflow:hidden}",
-      ".sx-vid iframe{position:absolute;top:0;left:50%;height:100%;width:177.78%;transform:translateX(-50%);border:0;display:block}",
+      ".sx-vid iframe{position:absolute;top:0;left:50%;height:100%;width:177.78%;transform:translateX(-50%);border:0;display:block;transition:opacity 1s ease}",
+      ".sx-vid iframe[data-smp-next]{opacity:0;pointer-events:none}",
       ".sx-cov{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;pointer-events:none;transition:opacity 1.4s ease}",
       ".sx-cov.on{opacity:1;pointer-events:auto}",
       ".sx-meta{display:flex;align-items:flex-end;gap:16px;margin-top:20px}",
@@ -661,7 +666,7 @@
       svg('<path d="M6 6l12 12M18 6L6 18"/>', LINE) +
       "</button></span></div>" +
       '<div class="sx-main">' +
-      '<div class="sx-art"><div class="sx-vid"><iframe data-smp-frame title="Sample" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>' +
+      '<div class="sx-art"><div class="sx-vid"><iframe data-smp-next title="Sample suivant" tabindex="-1" aria-hidden="true" allow="autoplay; encrypted-media"></iframe><iframe data-smp-frame title="Sample" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>' +
       '<img class="sx-cov" data-smp-cov alt=""></div>' +
       '<div class="sx-meta"><div class="sx-mt"><b class="sx-title" data-smp-t dir="auto"></b>' +
       '<small data-smp-a dir="auto"></small></div>' +
@@ -697,6 +702,89 @@
         ORIGIN,
       );
     } catch (_e) {}
+  }
+  // Fondu croisé entre deux parties (deux samples, ou deux passages d'un même sample) : la partie suivante
+  // est chargée MUETTE dans le 2e lecteur, puis les deux lecteurs échangent leur rôle et le son passe de l'un
+  // à l'autre en SEGXF s (puissance égale). iPhone (volume bloqué) ou lecteur pas prêt : saut comme avant.
+  var nx = { k: -1, item: null, ready: false };
+  function nextFrame() {
+    return sheet && $("[data-smp-next]", sheet);
+  }
+  function sendTo(f, func, args) {
+    if (!f || !f.contentWindow) return;
+    try {
+      f.contentWindow.postMessage(
+        JSON.stringify({ event: "command", func: func, args: args || [] }),
+        ORIGIN,
+      );
+    } catch (_e) {}
+  }
+  function listenTo(f) {
+    if (!f || !f.contentWindow) return;
+    try {
+      f.contentWindow.postMessage(
+        JSON.stringify({ event: "listening", id: "infra-samples-next", channel: "widget" }),
+        ORIGIN,
+      );
+    } catch (_e) {}
+  }
+  function dropNext() {
+    nx.k = -1;
+    nx.item = null;
+    nx.ready = false;
+    var f = nextFrame();
+    if (f && f.getAttribute("src")) {
+      sendTo(f, "stopVideo");
+      f.removeAttribute("src");
+    }
+  }
+  function prepNext() {
+    var item = duo.item,
+      k = duo.k + 1,
+      sg = item && item.segs && item.segs[k],
+      f = nextFrame();
+    if (!sg || !f || (nx.item === item && nx.k === k)) return;
+    nx.k = k;
+    nx.item = item;
+    nx.ready = false;
+    f.src = embed(sg.y, sg.s0, endFor(item, k)) + "&mute=1";
+  }
+  function canSwapNext() {
+    return nx.ready && nx.item === duo.item && nx.k === duo.k + 1 && canFade();
+  }
+  function swapToNext(sg) {
+    var old = frame(),
+      nf = nextFrame();
+    sendTo(nf, "seekTo", [sg.s0, true]);
+    sendTo(nf, "setVolume", [0]);
+    sendTo(nf, "unMute");
+    sendTo(nf, "playVideo");
+    old.removeAttribute("data-smp-frame");
+    old.setAttribute("data-smp-next", "");
+    old.setAttribute("tabindex", "-1");
+    nf.removeAttribute("data-smp-next");
+    nf.removeAttribute("tabindex");
+    nf.setAttribute("data-smp-frame", "");
+    nx.k = -1;
+    nx.item = null;
+    nx.ready = false;
+    st.ready = true;
+    listen();
+    xfade(
+      function (v) {
+        sendTo(nf, "setVolume", [Math.round(v * 100)]);
+      },
+      function (v) {
+        sendTo(old, "setVolume", [Math.round(v * 100)]);
+      },
+      SEGXF * 1000,
+    );
+    later(function () {
+      if (old !== frame() && !nx.item) {
+        sendTo(old, "stopVideo");
+        old.removeAttribute("src");
+      }
+    }, SEGXF * 1000 + 300);
   }
   function embed(id, start, end) {
     var p = new URLSearchParams({
@@ -752,6 +840,7 @@
     if (!sheet || sheet.hidden) return;
     var f = frame();
     if (f) f.removeAttribute("src");
+    dropNext();
     stopDuo(true);
     clearInterval(ticker);
     st.ready = false;
@@ -766,6 +855,7 @@
   function play(item, fresh, fadeIn, offset) {
     var f = frame();
     if (!f || !item) return;
+    dropNext();
     stopDuo(!fadeIn && trackPhase());
     var fade = fadeIn && canFade();
     if (fadeIn) {
@@ -1166,6 +1256,7 @@
       return paintBar();
     }
     if (duo.phase === "pre") cancelPre();
+    dropNext();
     var S = cur.S || Math.max(1, cur.s1 - cur.s0);
     if (t < S) {
       var loc = locate(cur, t);
@@ -1226,6 +1317,11 @@
   // Messages du lecteur YouTube : prêt, position, fin d'un sample, sample indisponible.
   window.addEventListener("message", function (e) {
     if (!sheet || sheet.hidden || e.origin !== ORIGIN) return;
+    var nf = nextFrame();
+    if (nf && nf.getAttribute("src") && e.source === nf.contentWindow) {
+      nx.ready = true; // le lecteur caché répond : il est prêt pour le fondu
+      return;
+    }
     var f = frame();
     if (!f || e.source !== f.contentWindow) return;
     var m;
@@ -1253,13 +1349,15 @@
       // fin d'une partie : partie suivante (minuterie précise, ou fin de vidéo)
       var tp = yt.time,
         kk = duo.k;
+      if (!settling && isFinite(tp) && canFade() && duo.end - tp < SEGPRE) prepNext();
       if (!settling && isFinite(tp) && !duo.armed && duo.end - tp < 1.5) {
         duo.armed = true;
         later(
           function () {
             if (duo.k === kk) nextSeg();
           },
-          Math.max(0, (duo.end - tp) * 1000),
+          // fondu : il commence SEGXF s avant la fin de la partie, pour finir pile à sa fin
+          Math.max(0, (duo.end - tp - (canSwapNext() ? SEGXF : 0)) * 1000),
         );
       }
       if (!settling && (state === 0 || state === 2) && tp >= duo.end - 0.6)
@@ -1298,6 +1396,14 @@
   document.addEventListener(
     "load",
     function (e) {
+      if (e.target && e.target === nextFrame() && e.target.getAttribute("src")) {
+        var nf = e.target;
+        [0, 400, 1500].forEach(function (ms) {
+          setTimeout(function () {
+            listenTo(nf);
+          }, ms);
+        });
+      }
       if (e.target && e.target === frame()) {
         listen();
         setTimeout(listen, 400);

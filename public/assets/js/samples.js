@@ -349,10 +349,14 @@
       ".sx-arrow{font-style:normal;font-size:12px;font-weight:800}",
       // Lecteur plein écran (INFRA, 19/11 : « réutiliser la lecture en plein écran ») : mêmes valeurs que
       // le grand lecteur du site (fond flou de la pochette, titre Antique Olive, blanc sur sombre).
-      ".smp-sheet.sx-fs{display:block;background:#0a0b0e;color:#fff;opacity:0;transition:opacity .25s ease}",
-      ".smp-sheet.sx-fs.on{opacity:1;background:#0a0b0e}",
+      // Fond = exactement celui du grand lecteur des albums (INFRA, 19/11) : voile sombre + page floutée
+      // (styles.css .now-playing-overlay), pochette de l'album floutée (élément .now-playing-backdrop du
+      // site, réutilisé tel quel), dégradé ::before (mêmes valeurs, version ordinateur dès 860 px).
+      ".smp-sheet.sx-fs{display:block;background:rgba(6,7,10,.62);-webkit-backdrop-filter:blur(18px) saturate(1.18);backdrop-filter:blur(18px) saturate(1.18);color:#fff;opacity:0;overflow:hidden;transition:opacity .25s ease}",
+      ".smp-sheet.sx-fs.on{opacity:1;background:rgba(6,7,10,.62)}",
+      "@supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){.smp-sheet.sx-fs,.smp-sheet.sx-fs.on{background:rgba(10,10,15,.95)}}",
       ".sx-fs{--w:min(540px,calc(100vw - 32px))}",
-      ".sx-bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.08);filter:blur(42px) saturate(1.18);opacity:.72}",
+      "@media (min-width:860px){.sx-fs::before{background:radial-gradient(90% 78% at 32% 0%,rgba(255,255,255,.13),rgba(255,255,255,0) 60%),linear-gradient(180deg,rgba(5,6,9,.2),rgba(5,6,9,.76))}}",
       ".sx-fs::before{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(90% 80% at 50% 0%,rgba(255,255,255,.15),rgba(255,255,255,0) 58%),linear-gradient(180deg,rgba(5,6,9,.18),rgba(5,6,9,.78))}",
       ".sx-panel{position:relative;z-index:2;height:100%;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:calc(8px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));outline:none}",
       ".sx-top{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:var(--w);margin:0 auto 8px}",
@@ -365,7 +369,8 @@
       ".sx-x{width:40px;height:40px;border:0;background:none;padding:0;color:#fff;display:grid;place-items:center;cursor:pointer;margin-right:-10px}",
       ".sx-x svg{width:22px;height:22px}",
       ".sx-main{max-width:var(--w);margin:0 auto}",
-      ".sx-art{position:relative;width:100%;aspect-ratio:1;border-radius:24px;overflow:hidden;background:#000}",
+      // L'image se réduit avec la hauteur de l'écran : titre, barre et commandes toujours visibles (INFRA, 19/11).
+      ".sx-art{position:relative;width:min(100%,max(160px,calc(100vh - 350px)));width:min(100%,max(160px,calc(100dvh - 350px)));margin:0 auto;aspect-ratio:1;border-radius:24px;overflow:hidden;background:#000}",
       ".sx-vid{position:absolute;inset:0;overflow:hidden}",
       ".sx-vid iframe{position:absolute;top:0;left:50%;height:100%;width:177.78%;transform:translateX(-50%);border:0;display:block}",
       ".sx-cov{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;pointer-events:none;transition:opacity 1.4s ease}",
@@ -543,7 +548,7 @@
     sheet.setAttribute("aria-modal", "true");
     sheet.setAttribute("aria-label", "Lecteur de samples");
     sheet.innerHTML =
-      '<div class="sx-bg" data-smp-bg aria-hidden="true"></div>' +
+      '<div class="now-playing-backdrop" data-smp-bg aria-hidden="true"></div>' +
       '<div class="sx-panel" tabindex="-1">' +
       '<div class="sx-top"><span class="sx-kick" data-smp-kicker></span>' +
       '<span class="sx-tools">' +
@@ -840,14 +845,9 @@
           .filter(Boolean)
           .join(" · ");
     $("[data-smp-cov]", sheet).classList.toggle("on", inTrack);
+    // même asset que le grand lecteur : la pochette de l'album (sample comme morceau)
     $("[data-smp-bg]", sheet).style.backgroundImage =
-      'url("' +
-      (inTrack
-        ? assetUrl(cur.cover)
-        : "https://i.ytimg.com/vi/" +
-          encodeURIComponent(cur.y) +
-          "/hqdefault.jpg") +
-      '")';
+      'url("' + assetUrl(cur.cover) + '")';
     var leg = $("[data-smp-leg]", sheet).children;
     if (leg.length === 2) {
       leg[0].classList.toggle("on", !inTrack);

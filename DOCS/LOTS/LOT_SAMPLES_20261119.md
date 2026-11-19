@@ -119,3 +119,20 @@ Statuts possibles : ouvert · maquette · validé · fait · reporté.
 - Reste à choisir :
   - (a) YouTube amélioré : caché, se relance tout seul, fondus réparés sur Mac, coupes sur iPhone ;
   - (b) extraits du passage exact sur R2, déjà en place pour la musique : vrais fondus partout, sans pub. Le site est public, donc les extraits le seraient aussi.
+
+## L. Décision d'INFRA (19/11) : extraits sur R2, YouTube en secours — validé
+
+- Poids estimé : 477 passages tirés de 390 vidéos, soit environ 4 h 10 de son, 5 h 10 avec 4 s de marge de chaque côté pour les fondus.
+  - 128 kbps : ≈ 290 Mo ; 192 kbps : ≈ 440 Mo ; 256 kbps : ≈ 580 Mo.
+  - Pochettes (390, 600 px) : ≈ 30 Mo.
+  - Tout tient dans l'offre gratuite de R2 (10 Go).
+- Sources : les fichiers locaux d'INFRA. Emplacement à confirmer.
+- Pochettes : d'abord les métadonnées du fichier, sinon le web (pochette de l'album, puis miniature YouTube).
+- YouTube reste en secours, et en lien « voir l'original ».
+- Étapes :
+  1. inventaire des fichiers locaux ;
+  2. découpe des passages (s0 − 4 s → s1 + 4 s) ;
+  3. pochettes ;
+  4. envoi sur R2 via le Worker audio ;
+  5. lecteur Web Audio avec vrais fondus ;
+  6. secours YouTube.

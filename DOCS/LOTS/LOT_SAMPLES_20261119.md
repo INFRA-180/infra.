@@ -136,3 +136,28 @@ Statuts possibles : ouvert · maquette · validé · fait · reporté.
   4. envoi sur R2 via le Worker audio ;
   5. lecteur Web Audio avec vrais fondus ;
   6. secours YouTube.
+- Qualité choisie par INFRA : **très bonne (256 kbps, ≈ 580 Mo)**. On pourra convertir plus léger plus tard. Pochettes en WebP.
+- Pistes pour trouver les originaux, d'après INFRA :
+  - projets Ableton (sûr pour les récents) ;
+  - `Music/Sample Loop` ;
+  - un vieux dossier de rangement dans `Music` ;
+  - dossiers Soulseek.
+  - Les introuvables pourront être téléchargés via INFRA_SEEK.
+
+## M. Plan de recherche et de fabrication (19/11)
+
+1. **Recherche (5 agents, lecture seule)** :
+   - Ableton : lire les projets pour savoir quel fichier chaque morceau utilise et quel passage ;
+   - Sample Loop et SAMPLE DIVERS ;
+   - Soulseek et INFRA_SEEK ;
+   - le reste de `Music` et l'iTunes, avec le vieux dossier de rangement ;
+   - le reste du disque, plus les outils.
+   - Résultats dans le dossier temporaire de la session, rien n'est déplacé.
+2. **Croisement** : un fichier retenu par original (le plus long et le plus propre), avec un score de confiance. Liste des manquants.
+3. **Manquants** : téléchargement par INFRA_SEEK, ou yt-dlp en dernier recours. **Seulement après le oui d'INFRA.**
+4. **Calage** : `s0`/`s1` sont des temps de la vidéo YouTube. Un fichier local peut être décalé (intro, version différente). On recale avec le passage lu dans le projet Ableton, sinon par comparaison du son.
+5. **Découpe** : passage de s0 − 4 s à s1 + 4 s, en AAC 256 kbps (`.m4a`, lu partout, iPhone compris), avec un fondu très court aux bords. Une seule copie par passage.
+6. **Pochettes** : celle du fichier, sinon le web (album), sinon la miniature YouTube. Converties en WebP 600 px.
+7. **Envoi sur R2** par le Worker audio, chemin `samples/<id>.m4a`. Les originaux restent sur le Mac. La limite par visiteur s'applique.
+8. **Lecteur** : Web Audio avec de vrais fondus, iPhone compris, démarrage au toucher, rien d'affiché. YouTube reste en secours si un extrait manque, plus le lien « voir l'original ».
+9. Vérifier sur le site en ligne, puis faire une sauvegarde.

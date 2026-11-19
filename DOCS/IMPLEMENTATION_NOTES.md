@@ -2110,3 +2110,13 @@ c'était le système, pas le thème », « on doit pouvoir quitter en appuyant h
   - glisser (vrais événements tactiles, Chromium) ;
   - « Aller au morceau » (MARJOLAINE joue) ;
   - fondus et Mix inchangés.
+
+## 19/11/2026 · Samples : démarrage immédiat, barres de défilement, NASCAR (v471, Claude)
+
+- INFRA : « ça met énormément de temps à play, mets la même politique que la bibliothèque ». Cause prouvée : le lecteur téléchargeait et décodait tout l'extrait (≈ 1,7 Mo) avant le premier son, soit 8,6 s mesurées sur un réseau mobile lent simulé.
+- Correction : le premier son est lu **pendant qu'il arrive**, comme la bibliothèque. On utilise un élément `<audio>` (CORS) branché dans Web Audio par `createMediaElementSource`, ce qui garde les fondus. Un petit lot de 3 lecteurs est déverrouillé dans le geste (son vide), pour l'iPhone.
+- Le préchargement du son suivant attend 4 s, pour ne pas voler la bande passante au premier. Les sons suivants préchargés passent par les tampons, avec des fondus exacts.
+- Mesuré sur le même réseau lent : le son part en environ 2 s, puis la lecture est fluide. Les fondus (Chromium, WebKit), le Mix et le secours YouTube sont inchangés.
+- Plus de barre de défilement dans le lecteur Samples : on fait défiler sans barre.
+- NASCAR (PBB) : le son venait bien du fichier des projets NASCAR (Bleach OST 2, « 20 - Torn Apart.flac », 2 min 44, référencé par les 6 versions du projet). Le lien YouTube pointait vers « Torn Apart - heavy metal » (4 min 27, autre version), remplacé par `6s-wjQ7hx_0` (CD 2006, 2 min 44).
+  - 94 extraits viennent d'un fichier dont la durée diffère de la vidéo YouTube liée (liste `_private/samples-extraits/versions_differentes.json`). Le son reste celui des projets ; les liens YouTube de ces samples sont à revoir.

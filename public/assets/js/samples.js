@@ -553,6 +553,9 @@
       ".sx-leg button:hover{color:rgba(255,255,255,.75)}",
       ".sx-leg button.on{color:#fff;font-weight:700}",
       ".sx-leg button.s.on{color:#e0353b}",
+      // INFRA, 19/11 : pas de barre de défilement dans le lecteur (on fait défiler, c'est tout)
+      ".smp-sheet .sx-panel,.smp-sheet .sx-queue{scrollbar-width:none;-ms-overflow-style:none}",
+      ".smp-sheet .sx-panel::-webkit-scrollbar,.smp-sheet .sx-queue::-webkit-scrollbar{display:none;width:0;height:0}",
       ".sx-info{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 14px;width:100%;font-size:13px;color:rgba(255,255,255,.6)}",
       ".sx-info .sx-pas{font-variant-numeric:tabular-nums}",
       ".sx-leg .sx-go{flex:none;max-width:100%;margin:-6px 0;padding:6px 0;color:#fff;font-weight:400}",
@@ -2023,6 +2026,7 @@
         s.start(0);
       } catch (_e) {}
     }
+    unlockPool();
     return eng.ctx;
   }
   // Parties jouées d'un item : ses passages (Samples, Acapella) ou les parties de l'enchaînement (Mix).
@@ -2084,7 +2088,11 @@
             if (!r.ok) throw new Error("extrait " + r.status);
             return r.arrayBuffer();
           })
-          .then(decode),
+          .then(decode)
+          .then(function (b) {
+            e.buf = b;
+            return b;
+          }),
       };
       e.p.catch(function () {
         if (eng.bufs[name] === e) delete eng.bufs[name];
@@ -2140,10 +2148,135 @@
   // Temps YouTube entendu par une voix, et instant (horloge audio) où elle atteindra le temps YouTube t.
   function ytNow(v) {
     if (!v) return 0;
+    if (v.el) return v.x0 + (v.el.readyState > 0 ? v.el.currentTime : v.off);
     return v.x0 + v.off + Math.max(0, eng.ctx.currentTime - v.at);
   }
   function ctxAt(v, t) {
+    if (v.el) return eng.ctx.currentTime + (t - ytNow(v));
     return v.at + (t - v.x0 - v.off);
+  }
+  // 19/11 (INFRA : « ça met énormément de temps à play ») : comme la bibliothèque, le premier son est lu
+  // pendant qu'il arrive (élément <audio> branché dans Web Audio pour garder les fondus), au lieu
+  // d'attendre le téléchargement complet. Les extraits suivants, préchargés, passent par les tampons.
+  var SILENT =
+    "data:audio/wav;base64,UklGRiwAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQgAAAAAAAAAAAAAAA==";
+  function poolEl(fresh) {
+    eng.pool = eng.pool || [];
+    if (!fresh)
+      for (var i = 0; i < eng.pool.length; i++) if (!eng.pool[i].busy) return eng.pool[i];
+    if (eng.pool.length >= 3 || !eng.ctx) return null;
+    var el = new Audio();
+    el.crossOrigin = "anonymous";
+    el.preload = "auto";
+    el.setAttribute("playsinline", "");
+    var e = { el: el, busy: false, node: null };
+    try {
+      e.node = eng.ctx.createMediaElementSource(el);
+    } catch (_e) {
+      return null;
+    }
+    eng.pool.push(e);
+    return e;
+  }
+  // Pendant le geste : chaque lecteur du lot joue un son vide, pour que l'iPhone le laisse jouer ensuite seul.
+  function unlockPool() {
+    if (!eng.ctx) return;
+    for (var n = 0; n < 2 && (eng.pool || []).length < 2; n++) if (!poolEl(true)) break;
+    (eng.pool || []).forEach(function (e) {
+      if (e.busy || e.ok) return;
+      try {
+        e.el.src = SILENT;
+        var p = e.el.play();
+        e.ok = true;
+        if (p && p.then)
+          p.then(
+            function () {
+              if (!e.busy) e.el.pause();
+            },
+            function () {
+              e.ok = false;
+            },
+          );
+      } catch (_e) {}
+    });
+  }
+  function startStreamVoice(item, k, ytFrom, when, fade, onFail) {
+    var c = eng.ctx,
+      sg = segsOf(item)[k],
+      e = poolEl();
+    if (!e) return null;
+    e.busy = true;
+    var el = e.el,
+      g = c.createGain(),
+      off = Math.max(0, ytFrom - sg.x[1]),
+      stopT = null;
+    try {
+      e.node.disconnect();
+    } catch (_e) {}
+    e.node.connect(g);
+    g.connect(c.destination);
+    var release = function () {
+      clearTimeout(stopT);
+      try {
+        el.pause();
+      } catch (_e) {}
+      try {
+        g.disconnect();
+        e.node.disconnect();
+      } catch (_e) {}
+      el.onended = el.onerror = null;
+      e.busy = false;
+    };
+    var v = {
+      el: el,
+      g: g,
+      item: item,
+      k: k,
+      sg: sg,
+      name: sg.x[0],
+      x0: sg.x[1],
+      off: off,
+      at: when,
+      gv: { from: 0, to: 0, when: 0, dur: 0.02 },
+      s: {
+        stop: function (t) {
+          clearTimeout(stopT);
+          stopT = setTimeout(function () {
+            var j = eng.voices.indexOf(v);
+            if (j >= 0) eng.voices.splice(j, 1);
+            release();
+          }, Math.max(0, (t - c.currentTime) * 1000));
+        },
+      },
+    };
+    g.gain.value = 0;
+    setCurve(v, 0, 1, when, fade);
+    el.onended = function () {
+      var j = eng.voices.indexOf(v);
+      if (j >= 0) eng.voices.splice(j, 1);
+      release();
+      if (eng.cur === v && !v.done) engEnded(v);
+    };
+    el.onerror = function () {
+      if (v.done) return;
+      var j = eng.voices.indexOf(v);
+      if (j >= 0) eng.voices.splice(j, 1);
+      release();
+      if (eng.cur === v) eng.cur = null;
+      onFail();
+    };
+    el.src = xUrl(sg.x[0]) + (off > 0.05 ? "#t=" + off.toFixed(2) : "");
+    try {
+      if (off > 0.05) el.currentTime = off;
+    } catch (_e) {}
+    var p = el.play();
+    if (p && p.catch)
+      p.catch(function (err) {
+        if (err && err.name === "AbortError") return;
+        if (el.onerror) el.onerror();
+      });
+    eng.voices.push(v);
+    return v;
   }
   function startVoice(buf, item, k, ytFrom, when, fade) {
     var c = eng.ctx,
@@ -2215,6 +2348,29 @@
     eng.paused = false;
     eng.hold = null;
     ensureCtx();
+    var ready = eng.bufs[sg.x[0]] && eng.bufs[sg.x[0]].buf;
+    if (!ready && eng.ctx && eng.ctx.state === "running") {
+      var now0 = eng.ctx.currentTime,
+        at0 = Math.max(now0 + 0.02, when || 0),
+        d0 = xf || 0.05;
+      var sv = startStreamVoice(item, k, ytFrom, at0, d0, function () {
+        if (gen === eng.gen) engFail(item, k);
+      });
+      if (sv) {
+        if (eng.cur) fadeOutVoice(eng.cur, at0, d0);
+        eng.cur = sv;
+        eng.armed = false;
+        if (!trackPhase() && Date.now() >= duo.outroUntil && duo.phase !== "pre")
+          pauseMusic();
+        // le flux d'abord : le préchargement du suivant attend que ce son soit bien parti (réseau lent)
+        var g0 = gen;
+        setTimeout(function () {
+          if (g0 === eng.gen) engPreload(item, k);
+        }, 4000);
+        setTimeout(paintBar, 30);
+        return;
+      }
+    }
     eng.loading = true;
     var t0 = Date.now();
     getBuf(sg.x[0]).then(
@@ -2572,6 +2728,15 @@
         paused: eng.paused,
         loading: !!eng.loading,
         bufs: Object.keys(eng.bufs),
+        pool: (eng.pool || []).map(function (e) {
+          return {
+            busy: e.busy,
+            rs: e.el.readyState,
+            t: e.el.currentTime,
+            paused: e.el.paused,
+            err: e.el.error ? e.el.error.code : 0,
+          };
+        }),
         yt: yt.time,
         phase: duo.phase,
         k: duo.k,

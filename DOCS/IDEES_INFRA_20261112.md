@@ -49,3 +49,19 @@ Maquettes du jour : V10 → V17 dans `DOCS/maquettes/` (chacune avec son `MAQUET
   - Les pièces existent déjà : le catalogue du site (albums, pochettes), le registre des samples (lot du 19/11), les projets Ableton (dates, version de Live).
   - L'app Mac peut tourner directement depuis une clé USB. Sur iPhone, une app doit être installée et ne peut pas tourner depuis la clé ; le dossier de musique, lui, peut être copié.
   - Variante la plus simple et portable : une page web hors ligne sur la clé (dossier + index.html), lisible partout.
+
+## 19/11/2026 · Refaire les albums LVEM (La vie en musique) une bonne fois pour toutes
+
+- Constat en lecture seule dans iTunes (noms de dossiers seulement) : les LVEM ne sont pas perdus, mais ils sont **éparpillés** sous plusieurs noms d'artiste.
+  - Kayoshin : Vol. 1 à 8.
+  - INFRA. LVEM : Vol. 9 à 15, dont des « .5 ».
+  - Zaccary : Vol. 9 ; Fight : Vol. 10 ; Compilations : Vol. 11 ; Kyozai : « LVEM MP3 ».
+  - Kayo/LVEM LOST : 130 titres sans album.
+  - En tout : Infra_ 303, INFRA. LVEM 141, Kayo 130, Kayoshin 66, Kyozai 7.
+- Proposition :
+  1. Inventaire en lecture seule : chaque morceau avec son nom, son ancien album, la date de son projet Ableton et les doublons.
+  2. Reconstituer les volumes 1 à 15 d'après les tags, les dates et les projets.
+  3. Ranger LVEM LOST par date.
+  4. INFRA valide la liste.
+  5. Fabriquer une copie propre (un seul nom d'artiste, numérotation, pochettes, crédits) **dans un nouveau dossier**, sans toucher à la bibliothèque Music.
+- Ce sera la base de l'app ou de la clé « discographie ».

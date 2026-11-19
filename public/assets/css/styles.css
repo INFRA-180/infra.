@@ -6254,3 +6254,15 @@ html.smp-open, html.smp-open body { overflow: hidden; }
 .smp-x:focus:not(:focus-visible), .smp-ctr button:focus:not(:focus-visible), .smp-mixbtn:focus:not(:focus-visible) { outline: none; }
 .smp-x:hover, .smp-ctr button:hover { color: #e0353b; }
 .smp-mixbtn svg { color: #e0353b !important; }
+
+/* 19/11/2026 · INFRA : « gris trop pâle, les numéros… le noir, c'est mieux ». Numéros, durées et comptes en noir
+   (les titres de rubrique en capitales gardent leur gris). */
+.album-screen .tracks .play-btn,
+.album-screen .tracks .track-duration,
+.album-screen .tracks:has(.bib-collection-hero) .play-btn,
+.album-screen .tracks:has(.bib-collection-hero) .track-duration,
+.bib-li .bib-lead,
+.bib-row .d,
+.bib-tab .n,
+.home-screen .albums-grid .album-card > span.bib-meta,
+.home-screen .playlist-card .playlist-card-meta { color: var(--ink); }

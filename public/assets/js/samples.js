@@ -553,6 +553,11 @@
       ".sx-leg button:hover{color:rgba(255,255,255,.75)}",
       ".sx-leg button.on{color:#fff;font-weight:700}",
       ".sx-leg button.s.on{color:#e0353b}",
+      ".sx-info{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 14px;width:100%;font-size:13px;color:rgba(255,255,255,.6)}",
+      ".sx-info .sx-pas{font-variant-numeric:tabular-nums}",
+      ".sx-leg .sx-go{flex:none;max-width:100%;margin:-6px 0;padding:6px 0;color:#fff;font-weight:400}",
+      ".sx-leg .sx-go b{font-weight:700}",
+      ".sx-leg .sx-go:hover{color:#fff;text-decoration:underline}",
       ".sx-ctr{display:grid;grid-template-columns:minmax(44px,1fr) auto auto auto minmax(44px,1fr);align-items:center;justify-items:center;column-gap:clamp(8px,4vw,28px);margin:12px 0 4px}",
       ".sx-ctr>button{width:56px;height:56px;border:0;background:none;padding:0;color:#fff;cursor:pointer;display:grid;place-items:center;transition:transform .12s}",
       ".sx-ctr>button svg{width:30px;height:30px}",
@@ -600,16 +605,16 @@
     var voixSec = pref.sec === "voix";
     var pool = mix ? chainOf(all()) : all().filter(keep(mix, secVoix()));
     var html =
-      '<div class="sx-sec" role="tablist" aria-label="Samples, Acapella ou Mix">' +
+      '<div class="sx-sec" role="tablist" aria-label="Samples, Mix ou Acapella">' +
       '<button type="button" role="tab" data-smp-sec="samples" aria-selected="' +
       (!mix && !voixSec) +
       '">Samples</button>' +
-      '<button type="button" role="tab" data-smp-sec="voix" aria-selected="' +
-      voixSec +
-      '">Acapella</button>' +
       '<button type="button" role="tab" data-smp-sec="mix" aria-selected="' +
       mix +
-      '">Mix</button></div>' +
+      '">Mix</button>' +
+      '<button type="button" role="tab" data-smp-sec="voix" aria-selected="' +
+      voixSec +
+      '">Acapella</button></div>' +
       '<p class="sx-sub">' +
       (mix
         ? "Le passage samplé, puis ton morceau là où il entre."
@@ -735,6 +740,7 @@
     document.body.appendChild(sheet);
     sheet.addEventListener("click", onSheetClick);
     bindBar($("[data-smp-bar]", sheet));
+    bindSwipeClose();
     return sheet;
   }
   function frame() {
@@ -860,7 +866,7 @@
     } else if (start) p.set("start", String(Math.floor(start)));
     return ORIGIN + "/embed/" + encodeURIComponent(id) + "?" + p.toString();
   }
-  function open(list, title, scope, album, voix) {
+  function open(list, title, scope, album, voix, cue) {
     buildSheet();
     st.list = list;
     st.title = title;
@@ -884,7 +890,13 @@
     requestAnimationFrame(function () {
       sheet.classList.add("on");
     });
-    play(first, true);
+    if (cue && !st.mix) {
+      // rien ne joue : le premier son est prêt, la liste montre les morceaux de l'album
+      st.cued = true;
+      st.pos = st.list.indexOf(first);
+      paint(true);
+      paintNow();
+    } else play(first, true);
     clearInterval(ticker);
     ticker = setInterval(paintBar, 250);
     clearInterval(eng.tick);
@@ -915,6 +927,7 @@
         } catch (_e) {}
     }, 600);
     st.ready = false;
+    st.cued = false;
     st.pos = -1;
     sheet.classList.remove("on");
     // Audit 19/11 : il se fermait d'un coup ; on laisse le fondu de sortie se jouer (comme à l'ouverture).
@@ -931,6 +944,7 @@
   function play(item, fresh, fadeIn, offset, when) {
     var f = frame();
     if (!f || !item) return;
+    st.cued = false;
     var useE = useEng(item),
       hadVoice = !!(eng.on && eng.cur && !eng.paused);
     dropNext();
@@ -1080,7 +1094,7 @@
         '" dir="auto">' +
         esc(cur.track) +
         "</button>"
-      : "";
+      : infoHtml(cur);
     var list = shownList(),
       html = "",
       group = null,
@@ -1152,6 +1166,60 @@
       on.scrollIntoView({ block: "nearest" });
   }
   // En haut : ce qu'on entend (le sample, puis ton morceau).
+  // Samples / Acapella (INFRA, 19/11) : quel passage de l'original a été samplé, où il entre dans ton morceau,
+  // et un bouton pour y aller.
+  function infoHtml(cur) {
+    if (!cur) return "";
+    var parts = (cur.p && cur.p.length ? cur.p : [[cur.s0, cur.s1]]).filter(
+      function (q) {
+        return isFinite(q[0]) && isFinite(q[1]) && q[1] > q[0];
+      },
+    );
+    var pas = parts.length
+      ? (parts.length > 1 ? "Passages " : "Passage ") +
+        parts
+          .map(function (q) {
+            return mmss(q[0]) + " → " + mmss(q[1]);
+          })
+          .join(" · ") +
+        " de l’original"
+      : "";
+    var go = cur.src
+      ? '<button type="button" class="sx-go" data-smp-goto title="Écouter ton morceau à cet endroit" dir="auto">' +
+        (isFinite(cur.at) ? "Entre à " + mmss(cur.at) + " dans " : "Aller à ") +
+        "<b>" +
+        esc(cur.track) +
+        "</b> ›</button>"
+      : "";
+    return (
+      '<div class="sx-info">' +
+      (pas ? '<span class="sx-pas">' + pas + "</span>" : "") +
+      go +
+      "</div>"
+    );
+  }
+  // « Aller au morceau » : ferme le lecteur de samples et lance ton morceau à l'entrée du sample.
+  function goToTrack(cur) {
+    var lib = window.InfraLibraryPlayback;
+    if (!cur || !cur.src || !lib || typeof lib.playPaths !== "function") return;
+    var at = isFinite(cur.at) ? Math.max(0, cur.at) : 0;
+    track("samples_goto", { at: Math.round(at) });
+    close();
+    var a = audioEl(),
+      seek = function () {
+        var el = audioEl();
+        if (el && at && Math.abs(el.currentTime - at) > 0.4)
+          try {
+            el.currentTime = at;
+          } catch (_e) {}
+      },
+      once = function () {
+        if (a) a.removeEventListener("playing", once);
+        seek();
+      };
+    if (a && at) a.addEventListener("playing", once);
+    if (!lib.playPaths([cur.src], 0) && a) a.removeEventListener("playing", once);
+  }
   function paintNow() {
     var cur = st.list[st.pos];
     if (!sheet || !cur) return;
@@ -1172,10 +1240,10 @@
           .join(" · ");
     // Extrait audio : pas de vidéo, la pochette du sample à sa place (celle de l'album pour ton morceau).
     var cov = $("[data-smp-cov]", sheet),
-      covSrc = inTrack || !eng.on ? assetUrl(cur.cover) : smpCover(smp, cur);
+      covSrc = inTrack || !(eng.on || st.cued) ? assetUrl(cur.cover) : smpCover(smp, cur);
     if (cov.getAttribute("src") !== covSrc) cov.setAttribute("src", covSrc);
-    cov.classList.toggle("on", inTrack || eng.on);
-    $(".sx-vid", sheet).hidden = eng.on;
+    cov.classList.toggle("on", inTrack || eng.on || st.cued);
+    $(".sx-vid", sheet).hidden = eng.on || st.cued;
     // même asset que le grand lecteur : la pochette de l'album (sample comme morceau)
     $("[data-smp-bg]", sheet).style.backgroundImage =
       'url("' + assetUrl(cur.cover) + '")';
@@ -1421,6 +1489,7 @@
     paintBar();
   }
   function toggle() {
+    if (st.cued) return play(st.list[st.pos], true);
     if (trackPhase()) {
       var a = audioEl();
       if (!a) return;
@@ -2318,6 +2387,72 @@
       : assetUrl(cur.cover);
   }
 
+  // Glisser vers le bas pour fermer, comme le grand lecteur (INFRA, 19/11). Seulement quand le panneau est
+  // tout en haut, jamais depuis la barre de lecture ni les tris ; suit le doigt, ferme au-delà de 110 px
+  // ou sur un geste rapide.
+  function bindSwipeClose() {
+    var panel = $(".sx-panel", sheet),
+      y0 = null,
+      x0 = 0,
+      t0 = 0,
+      dy = 0,
+      live = false;
+    var reset = function (anim) {
+      panel.style.transition = anim ? "transform .22s ease" : "";
+      panel.style.transform = "";
+      y0 = null;
+      dy = 0;
+      live = false;
+    };
+    panel.addEventListener(
+      "touchstart",
+      function (e) {
+        if (e.touches.length !== 1 || panel.scrollTop > 2) return (y0 = null);
+        var t = e.target;
+        if (t.closest && t.closest("[data-smp-bar],.sx-ctr,input,a")) return (y0 = null);
+        y0 = e.touches[0].clientY;
+        x0 = e.touches[0].clientX;
+        t0 = Date.now();
+        dy = 0;
+        live = false;
+      },
+      { passive: true },
+    );
+    panel.addEventListener(
+      "touchmove",
+      function (e) {
+        if (y0 == null) return;
+        if (e.touches.length !== 1) return reset(true);
+        var d = e.touches[0].clientY - y0,
+          dx = Math.abs(e.touches[0].clientX - x0);
+        if (!live) {
+          if (d < 8 || dx > d) {
+            if (d < -4 || dx > 12) y0 = null;
+            return;
+          }
+          live = true;
+        }
+        dy = Math.max(0, d);
+        if (e.cancelable) e.preventDefault();
+        panel.style.transition = "";
+        panel.style.transform = "translateY(" + dy.toFixed(1) + "px)";
+      },
+      { passive: false },
+    );
+    var end = function () {
+      if (y0 == null) return;
+      var fast = live && dy > 40 && dy / Math.max(1, Date.now() - t0) > 0.6;
+      if (live && (dy > 110 || fast)) {
+        track("samples_swipe_close", {});
+        reset(false);
+        close();
+      } else reset(true);
+    };
+    panel.addEventListener("touchend", end);
+    panel.addEventListener("touchcancel", function () {
+      reset(true);
+    });
+  }
   function onSheetClick(e) {
     ensureCtx();
     var t = e.target;
@@ -2329,6 +2464,7 @@
     if (t.closest("[data-smp-prev]")) return prev();
     if (t.closest("[data-smp-next]")) return step(1);
     if (t.closest("[data-smp-pp]")) return toggle();
+    if (t.closest("[data-smp-goto]")) return goToTrack(st.list[st.pos]);
     // « Sample » : le sample reprend au début ; nom du morceau : saut à ton morceau (INFRA, 19/11).
     var jump = t.closest("[data-smp-jump]");
     if (jump) {
@@ -2386,7 +2522,8 @@
     var al = t.closest("[data-smp-album]");
     if (al) {
       var a = data.albums[Number(al.getAttribute("data-smp-album"))];
-      if (a) open(a.items.slice(), a.title, "album", a);
+      // Samples / Acapella (INFRA, 19/11) : on ouvre l'album sans rien lancer, pour choisir le morceau.
+      if (a) open(a.items.slice(), a.title, "album", a, null, pref.sec !== "mix");
     }
   });
 

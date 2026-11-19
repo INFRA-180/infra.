@@ -2096,3 +2096,17 @@ c'était le système, pas le thème », « on doit pouvoir quitter en appuyant h
   - YouTube seulement si `x` manque ou si l'extrait ne se charge pas.
   - En Samples et Acapella, on entend le passage samplé, plus la vidéo depuis 0.
 - Vérifié en headless (Chromium, WebKit) : démarrage au clic, fondus tracés, Mix vers le morceau, pause et reprise, secours YouTube sur 404. **Non vérifié sur un vrai iPhone.**
+
+## 19/11/2026 · Lecteur Samples : lisibilité (v470, Claude)
+
+- Onglets dans l'ordre **Samples · Mix · Acapella**.
+- Sous la barre (Samples, Acapella) : « Passage 0:22 → 1:05 de l'original » (tous les passages s'il y en a plusieurs), puis un bouton « Entre à 0:00 dans MARJOLAINE › ». Ce bouton ferme le lecteur de samples et lance le morceau d'INFRA à l'entrée du sample (`at`), par `InfraLibraryPlayback.playPaths`.
+- Clic sur un album en Samples ou Acapella : le lecteur s'ouvre **sans rien lancer** (`st.cued`). Le premier son est prêt, avec sa pochette ; Lecture ou un toucher dans la liste le lance. En Mix, l'enchaînement démarre toujours seul.
+- Glisser vers le bas pour fermer, comme le grand lecteur : seulement quand le panneau est tout en haut, jamais depuis la barre ni les commandes ; fermeture au-delà de 110 px ou sur un geste rapide.
+- Numéros, durées et comptes en noir (`var(--ink)`) au lieu du gris à 40 %, à la demande d'INFRA. Les titres de rubrique en capitales gardent leur gris.
+- Vérifié en headless :
+  - ordre des onglets ;
+  - ouverture sans lecture, puis lecture ;
+  - glisser (vrais événements tactiles, Chromium) ;
+  - « Aller au morceau » (MARJOLAINE joue) ;
+  - fondus et Mix inchangés.

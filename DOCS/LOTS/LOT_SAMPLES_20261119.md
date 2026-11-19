@@ -206,3 +206,15 @@ Statuts possibles : ouvert · maquette · validé · fait · reporté.
 - À écouter : Action Bronson « Vega » (passage presque silencieux, sans doute décalé) et « Rue Modeste 4 » (très faible, fichier douteux).
 - 54 vidéos YouTube n'ont pas répondu : indisponibles, bloquées par un label, ou limite de YouTube atteinte. Le secours YouTube ne marchera pas pour certaines : un argument de plus pour R2.
 - Scripts : `build-extraits.js`, `fix.js`, `covers2.js` (dans `_private`).
+
+## Q. En ligne (19/11) : v469, `c8cd50a`, déploiement réussi
+
+- Lecteur Web Audio avec les extraits R2 : F1, F2 et F3 faits (sans pub, démarrage seul, pas de vidéo). C1 fait : vrais fondus.
+- Vérifié sur le site en ligne en headless (WebKit, mobile et ordinateur) : le son démarre et la pochette s'affiche. **iPhone réel non essayé.**
+- Reste du lot :
+  - A1 gris → noir ; A2 lignes d'album ; A3 Favoris ; A5 onglets Samples · Mix · Acapella ;
+  - B1 à B5 : section samplée, repère d'entrée, « Aller au morceau », glisser vers le bas, pas de lancement automatique au clic sur un album ;
+  - D1 à D4 : raps non marqués comme voix, données à corriger ;
+  - E1 : Crédits ;
+  - 28 calages à écouter ;
+  - remise des fichiers dans Ableton (attend le oui d'INFRA).

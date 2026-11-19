@@ -42,7 +42,7 @@ import {
   reportLaunchSummary
 } from "./runtime/page-init.js";
 
-window.INFRA_BUILD_TAG = "audiofix461-20261119";
+window.INFRA_BUILD_TAG = "audiofix462-20261119";
 
 installScriptErrorReporting(trackAudioRuntimeEvent);
 // Section Samples (18/11/2026) : gestes notés dans la même télémétrie, sans contenu privé.
@@ -577,7 +577,7 @@ const PREFETCH_MAX_ATTEMPTS = 2;
 
 const WORKER_URL = "https://infra180-api.pages.dev";
 
-const SPA_SHELL_VERSION = "infra-shell-20261119-audio461";
+const SPA_SHELL_VERSION = "infra-shell-20261119-audio462";
 
 const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
 
@@ -594,7 +594,7 @@ const LIVE_CATALOG_CACHE_NAME = `${SPA_SHELL_VERSION}-catalog`;
 
 const LIVE_CATALOG_TIMEOUT_MS = 3500;
 
-const LOCAL_CATALOG_VERSION = "audiofix461-20261119";
+const LOCAL_CATALOG_VERSION = "audiofix462-20261119";
 
 const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
@@ -622,7 +622,7 @@ const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
 
 const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
 
-const runtimeVersion = "audiofix461-20261119";
+const runtimeVersion = "audiofix462-20261119";
 
 const runtime = (function () {
   const scriptEl =
@@ -711,6 +711,16 @@ document.addEventListener("visibilitychange", function () {
   requestServiceWorkerUpdateCheck("visible");
   window.setTimeout(applyWaitingServiceWorkerWhenIdle, 1200);
 });
+
+// Mise à jour plus rapide (INFRA, 19/11/2026) : tant que le site est ouvert et visible, on regarde toutes
+// les 2 minutes s'il y a une nouvelle version (petite requête du seul sw.js) ; elle s'applique dès que
+// rien ne joue (règle du 08/11 inchangée : jamais pendant la lecture).
+const SERVICE_WORKER_UPDATE_INTERVAL_MS = 120000;
+window.setInterval(function () {
+  if (document.visibilityState !== "visible") return;
+  requestServiceWorkerUpdateCheck("interval");
+  window.setTimeout(applyWaitingServiceWorkerWhenIdle, 1200);
+}, SERVICE_WORKER_UPDATE_INTERVAL_MS);
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", function () {

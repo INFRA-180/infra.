@@ -401,6 +401,8 @@ function isBusyForServiceWorkerUpdate() {
   if (Number.isFinite(audioState.pendingStartTime) && audioState.pendingStartTime !== null) return true;
   const root = document.documentElement;
   if (root.classList.contains("now-playing-open") || root.classList.contains("pwa-swap-active")) return true;
+  // Lecteur des samples ouvert (vidéo YouTube, hors <audio>) : on attend qu'il soit fermé (INFRA, 19/11/2026).
+  if (root.classList.contains("smp-open")) return true;
   return false;
 }
 

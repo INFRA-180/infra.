@@ -2000,3 +2000,8 @@ c'était le système, pas le thème », « on doit pouvoir quitter en appuyant h
 - `samples.js` réécrit : sections Samples / Mix (choix retenu, `localStorage` `infra-samples`) ; « → morceau » retiré (le Mix le remplace) ; ordre BPM / aléatoire / morceaux retenu par écran ; lecteur avec titre de ce qu'on entend, barre sample | morceau (position lue dans les messages YouTube puis dans `<audio>`), lecture/pause, pictos sans rond.
 - Styles injectés par `samples.js` (`#sx-style`) : `styles.css` est figé par empreinte et sa version n'a pas été changée (montée de version d'une autre session en cours, non commitée). Le service worker sert `samples.js` en « périmé puis rafraîchi » : la nouvelle version s'affiche au 2e chargement.
 - Limite connue : iPhone ne laisse pas régler le volume d'un `<audio>` ni de YouTube depuis la page ; les fondus de 5 s y sont des coupures franches au même volume.
+
+## 19/11/2026 — Mise à jour plus rapide du site (Claude)
+- INFRA : « des fois ça met du temps ». Causes : (1) trois envois Samples sans `npm run bump` → le service worker ne change pas, `samples.js` servi « périmé puis rafraîchi » (2 rechargements) ; (2) vérification de mise à jour seulement au retour au premier plan ; (3) application seulement quand rien ne joue (règle du 08/11, gardée) ; (4) GitHub Pages ≈ 1 min par déploiement.
+- Corrigé : vérification toutes les 2 min tant que la page est visible (`scripts.js`, seul `sw.js` est demandé) ; le lecteur des samples ouvert compte comme « occupé » (`theme-admin-pwa.js`, classe `smp-open`).
+- **Règle : chaque envoi qui change un fichier public passe par `npm run bump`**, même un petit patch d'un seul script.

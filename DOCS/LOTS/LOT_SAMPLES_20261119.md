@@ -187,3 +187,22 @@ Statuts possibles : ouvert · maquette · validé · fait · reporté.
   - Cas 2 : fichier absent, re-téléchargé. On contrôle la durée exacte ; si elle diffère, le calage peut être décalé de quelques millisecondes, à signaler projet par projet.
   - Les anciens chemins visent `iTunes/Music/...`, la bibliothèque Music, qui est en lecture seule. Proposition : un dossier « Fichiers retrouvés » ; Ableton les retrouve seul via « Rechercher », sans modifier les .als.
 - **Statut : à faire après le oui d'INFRA, car on écrit dans les dossiers Ableton.**
+
+## P. Fabrication locale des extraits (19/11), dans `_private/samples-extraits/`, non publié
+
+- **446 passages sur 446 découpés** : AAC 256 kbps (`aac_at`), de s0 − 4 s à s1 + 4 s, fondu de 30 ms aux bords. **512 Mo.**
+- Sources :
+  - fichiers locaux ;
+  - 3 originaux manquants téléchargés en entier ;
+  - 3 passages pris au milieu de longs mix YouTube, téléchargés seulement sur la partie utile.
+  - Les fichiers « [cut-hh-mm-ss] » de Sample Loop sont des bouts de vidéo : leur début sert de décalage, le calage est exact.
+- **Pochettes 387/387**, WebP 600 px, 15 Mo :
+  - 271 tirées des fichiers ;
+  - 29 pochettes officielles d'album (Apple), à regarder une fois ;
+  - 87 images YouTube.
+- **Calage** :
+  - 359 originaux confirmés (même durée que la vidéo YouTube, découpe, ou passage confirmé par le projet Ableton) ;
+  - **28 à vérifier à l'oreille** (`calage_a_verifier.json`).
+- À écouter : Action Bronson « Vega » (passage presque silencieux, sans doute décalé) et « Rue Modeste 4 » (très faible, fichier douteux).
+- 54 vidéos YouTube n'ont pas répondu : indisponibles, bloquées par un label, ou limite de YouTube atteinte. Le secours YouTube ne marchera pas pour certaines : un argument de plus pour R2.
+- Scripts : `build-extraits.js`, `fix.js`, `covers2.js` (dans `_private`).

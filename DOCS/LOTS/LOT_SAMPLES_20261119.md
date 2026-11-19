@@ -161,3 +161,19 @@ Statuts possibles : ouvert · maquette · validé · fait · reporté.
 7. **Envoi sur R2** par le Worker audio, chemin `samples/<id>.m4a`. Les originaux restent sur le Mac. La limite par visiteur s'applique.
 8. **Lecteur** : Web Audio avec de vrais fondus, iPhone compris, démarrage au toucher, rien d'affiché. YouTube reste en secours si un extrait manque, plus le lien « voir l'original ».
 9. Vérifier sur le site en ligne, puis faire une sauvegarde.
+
+## N. Bilan de la recherche des originaux (19/11, 5 agents, lecture seule)
+
+- **387 sur 390 trouvés sur le Mac** : 368 sûrs, 19 à vérifier (extrait coupé, fichier plus court que le passage, ou rapprochement faible). 223 ont été trouvés par plusieurs agents.
+- Formats : 133 FLAC, 131 WAV ou AIFF, 122 MP3, 1 M4A.
+- Où :
+  - Sample Loop (souvent avec l'identifiant YouTube dans le nom) ;
+  - Soulseek (FLAC) ;
+  - SAMPLE DIVERS/SAMPLE PERDU ;
+  - iTunes/Compilations/SAMPLE 2 ;
+  - projets Ableton (fichiers déplacés retrouvés par leur nom) ;
+  - Téléchargements/MEDIA (3).
+- **Manquants (3)** : Emerald Web « Aqua Regia (Side B) », « Sounds of Solaris », « 13 POLAR REGIONS ». À télécharger après le oui d'INFRA.
+- Calage : sur 342 originaux dont le passage est lu dans Ableton, 297 commencent au même endroit que `s0` (à 1,5 s près). Les temps du site correspondent donc déjà aux fichiers locaux. Les ~45 autres sont à vérifier (plusieurs clips, version différente).
+- Fichiers de travail (temporaires) : `manifest.json` (1 fichier par original), `weak.json`, `missing.json`, dans le dossier temporaire de la session. Copiés dans `_private/samples-extraits/` (non publié).
+- Les .als : ~6 800, dont 5 739 sauvegardes automatiques d'Ableton ; ~700 vrais projets. Plus ancien projet repéré : « Ballade en forêt », 12/11/2020, Live 10.1.4.

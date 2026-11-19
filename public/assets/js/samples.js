@@ -57,7 +57,12 @@
   try {
     var saved = JSON.parse(localStorage.getItem("infra-samples") || "null");
     if (saved && typeof saved === "object") {
-      if (saved.sec === "mix" || saved.sec === "samples" || saved.sec === "voix") pref.sec = saved.sec;
+      if (
+        saved.sec === "mix" ||
+        saved.sec === "samples" ||
+        saved.sec === "voix"
+      )
+        pref.sec = saved.sec;
       pref.voix = saved.voix === true;
       if (saved.sort && typeof saved.sort === "object") pref.sort = saved.sort;
     } else pref.voix = localStorage.getItem("infra-samples-voix") === "1";
@@ -168,6 +173,8 @@
                 dt: Number(it.dt) || 0,
                 bpm: Array.isArray(it.bpm) ? it.bpm : null,
                 tb: Number(it.tb) || 0,
+                x: xList(it.x),
+                c: it.c === 1,
               });
             });
           });
@@ -181,6 +188,23 @@
         throw err;
       });
     return loading;
+  }
+  // Extraits audio (samples.json v2) : [nomFichier, x0 (temps YouTube du début), xd (durée)].
+  function xList(x) {
+    if (!Array.isArray(x) || !x.length) return null;
+    var ok = x.every(function (e) {
+      return (
+        Array.isArray(e) &&
+        /^[\w.-]+$/.test(String(e[0] || "")) &&
+        isFinite(e[1]) &&
+        Number(e[2]) > 0
+      );
+    });
+    return ok
+      ? x.map(function (e) {
+          return [String(e[0]), Number(e[1]), Number(e[2])];
+        })
+      : null;
   }
   function duoOk(i) {
     return (
@@ -213,9 +237,16 @@
       var segs = [],
         S = 0;
       chain.forEach(function (c, ci) {
-        (c.p || [[c.s0, c.s1]]).forEach(function (q) {
+        (c.p || [[c.s0, c.s1]]).forEach(function (q, qi) {
           if (!(q[1] > q[0])) return;
-          segs.push({ y: c.y, s0: q[0], s1: q[1], ci: ci, from: S });
+          segs.push({
+            y: c.y,
+            s0: q[0],
+            s1: q[1],
+            ci: ci,
+            from: S,
+            x: c.x ? c.x[qi] || null : null,
+          });
           S += q[1] - q[0];
         });
       });
@@ -273,6 +304,19 @@
       sg = item.segs[k],
       before = item.segs[duo.k];
     if (!sg) return;
+    if (eng.on) {
+      // extraits : fondu croisé de SEGXF s centré sur la fin de la partie (marge des extraits)
+      var v = eng.cur,
+        when = v && v.item === item ? ctxAt(v, before.s1 - SEGXF / 2) : 0;
+      duo.k = k;
+      duo.end = sg.s1;
+      duo.armed = false;
+      duo.segAt = Date.now();
+      engStart(item, k, Math.max(sg.x[1], sg.s0 - SEGXF / 2), SEGXF, when);
+      paintNow();
+      track("samples_part", { k: k, n: item.segs.length });
+      return;
+    }
     var swap = canSwapNext(); // avant de passer à la partie suivante (nx.k === duo.k + 1)
     duo.k = k;
     duo.end = sg.s1;
@@ -282,7 +326,8 @@
     if (swap) swapToNext(sg);
     else {
       if (nx.item) dropNext(); // préparé mais pas prêt : on l'arrête (sinon il joue muet pour rien)
-      if (sg.y === before.y && sg.s0 >= before.s1) send("seekTo", [sg.s0, true]);
+      if (sg.y === before.y && sg.s0 >= before.s1)
+        send("seekTo", [sg.s0, true]);
       else
         send("loadVideoById", [
           { videoId: sg.y, startSeconds: sg.s0, endSeconds: endFor(item, k) },
@@ -725,7 +770,11 @@
     if (!f || !f.contentWindow) return;
     try {
       f.contentWindow.postMessage(
-        JSON.stringify({ event: "listening", id: "infra-samples-next", channel: "widget" }),
+        JSON.stringify({
+          event: "listening",
+          id: "infra-samples-next",
+          channel: "widget",
+        }),
         ORIGIN,
       );
     } catch (_e) {}
@@ -786,12 +835,15 @@
       },
       SEGXF * 1000,
     );
-    later(function () {
-      if (old !== frame() && !nx.item) {
-        sendTo(old, "stopVideo");
-        old.removeAttribute("src");
-      }
-    }, SEGXF * 1000 + 300);
+    later(
+      function () {
+        if (old !== frame() && !nx.item) {
+          sendTo(old, "stopVideo");
+          old.removeAttribute("src");
+        }
+      },
+      SEGXF * 1000 + 300,
+    );
   }
   function embed(id, start, end) {
     var p = new URLSearchParams({
@@ -825,6 +877,7 @@
       first = shownList()[0];
     }
     if (!first) return;
+    ensureCtx(); // dans le geste : indispensable sur iPhone
     if (st.mix) unlockAudio();
     sheet.hidden = false;
     document.documentElement.classList.add("smp-open");
@@ -834,6 +887,8 @@
     play(first, true);
     clearInterval(ticker);
     ticker = setInterval(paintBar, 250);
+    clearInterval(eng.tick);
+    eng.tick = setInterval(engTick, 100);
     track("samples_open", {
       mode: st.mix ? "mix" : "samples",
       scope: scope,
@@ -849,7 +904,16 @@
     if (f) f.removeAttribute("src");
     dropNext();
     stopDuo(true);
+    engStop(0.25);
     clearInterval(ticker);
+    clearInterval(eng.tick);
+    setTimeout(function () {
+      // lecteur fermé : l'horloge audio s'arrête (rouverte dans le prochain geste)
+      if (eng.ctx && sheet && sheet.hidden && eng.ctx.state === "running")
+        try {
+          eng.ctx.suspend();
+        } catch (_e) {}
+    }, 600);
     st.ready = false;
     st.pos = -1;
     sheet.classList.remove("on");
@@ -863,20 +927,26 @@
   function trackPhase() {
     return st.mix && (duo.phase === "track" || duo.phase === "mixin");
   }
-  function play(item, fresh, fadeIn, offset) {
+  // when : instant (horloge audio) du fondu, pour un enchaînement automatique programmé à l'avance.
+  function play(item, fresh, fadeIn, offset, when) {
     var f = frame();
     if (!f || !item) return;
+    var useE = useEng(item),
+      hadVoice = !!(eng.on && eng.cur && !eng.paused);
     dropNext();
     stopDuo(!fadeIn && trackPhase());
     var fade = fadeIn && canFade();
     if (fadeIn) {
       // fondu croisé : le morceau sort pendant que le sample entre (iPhone : coupe nette)
       duo.outroUntil = Date.now() + OVERLAP * 1000 + 1500;
+      // extrait : il entre par son propre gain (moteur) ; ton morceau sort par le volume si possible
       if (fade)
         xfade(
-          function (v) {
-            setVideoVolume(v * 100);
-          },
+          useE
+            ? noop
+            : function (v) {
+                setVideoVolume(v * 100);
+              },
           setAudioVolume,
           OVERLAP * 1000,
         );
@@ -908,6 +978,22 @@
     yt.time = start;
     yt.dur = 0;
     yt.state = -1;
+    if (useE) {
+      // extrait audio : aucun lecteur YouTube chargé
+      if (f.getAttribute("src")) f.removeAttribute("src");
+      st.ready = false;
+      var segs = segsOf(item),
+        loc0 = locate({ segs: segs }, offset || 0),
+        sg0 = segs[loc0.k],
+        xf = fadeIn ? OVERLAP : !hadVoice ? 0 : offset ? 0.06 : SMPXF,
+        from = sg0.s0 + loc0.local;
+      if (!offset && xf) from = Math.max(sg0.x[1], sg0.s0 - xf / 2); // marge de l'extrait
+      yt.time = from;
+      engStart(item, loc0.k, from, xf, when);
+      paint(fresh);
+      return;
+    }
+    engStop(0.3);
     if (fresh || !st.ready) {
       st.ready = false;
       f.src = embed(vid, start, endS);
@@ -950,7 +1036,6 @@
     var bpmBox = $("[data-smp-bpm]", sheet);
     bpmBox.hidden = !bpmOf(cur);
     bpmBox.firstChild.textContent = bpmOf(cur) || "";
-    $("[data-smp-cov]", sheet).src = assetUrl(cur.cover);
     // barre : un segment (Samples) ou deux (Mix : sample | morceau)
     // barre : Samples = un morceau ; Mix = chaque partie du (des) sample(s), puis ton morceau
     var segsM = cur.segs || [{ s0: cur.s0, s1: cur.s1, ci: 0, from: 0 }],
@@ -1026,7 +1111,9 @@
         '><img src="' +
         (st.mix
           ? esc(assetUrl(i.cover))
-          : "https://i.ytimg.com/vi/" + esc(i.y) + "/mqdefault.jpg") +
+          : i.c
+            ? esc(assetUrl("assets/samples/" + i.y + ".webp"))
+            : "https://i.ytimg.com/vi/" + esc(i.y) + "/mqdefault.jpg") +
         '" alt="" loading="lazy" decoding="async"><span><b dir="auto">' +
         esc(i.t) +
         (st.mix ? " → " + esc(i.track) : "") +
@@ -1083,7 +1170,12 @@
         ]
           .filter(Boolean)
           .join(" · ");
-    $("[data-smp-cov]", sheet).classList.toggle("on", inTrack);
+    // Extrait audio : pas de vidéo, la pochette du sample à sa place (celle de l'album pour ton morceau).
+    var cov = $("[data-smp-cov]", sheet),
+      covSrc = inTrack || !eng.on ? assetUrl(cur.cover) : smpCover(smp, cur);
+    if (cov.getAttribute("src") !== covSrc) cov.setAttribute("src", covSrc);
+    cov.classList.toggle("on", inTrack || eng.on);
+    $(".sx-vid", sheet).hidden = eng.on;
     // même asset que le grand lecteur : la pochette de l'album (sample comme morceau)
     $("[data-smp-bg]", sheet).style.backgroundImage =
       'url("' + assetUrl(cur.cover) + '")';
@@ -1098,12 +1190,37 @@
     paintBar();
   }
   function audioEl() {
-    return document.getElementById("infraGlobalAudio") || document.querySelector("audio");
+    return (
+      document.getElementById("infraGlobalAudio") ||
+      document.querySelector("audio")
+    );
   }
   // Position dans la barre : t (secondes depuis le début du sample) sur T (durée totale).
   function barState() {
     var cur = st.list[st.pos];
     if (!cur) return null;
+    if (!st.mix && eng.on) {
+      var xs = segsOf(cur),
+        XT = segsLen(xs),
+        v = eng.cur,
+        h = eng.hold,
+        xk = -1,
+        xt = 0;
+      if (v && v.item === cur) {
+        xk = v.k;
+        xt = ytNow(v);
+      } else if (h && h.item === cur) {
+        xk = h.k;
+        xt = h.t;
+      }
+      if (xk < 0) return { S: 0, T: XT, t: 0 };
+      var xg = xs[xk];
+      return {
+        S: 0,
+        T: XT,
+        t: clamp(xg.from + clamp(xt - xg.s0, 0, xg.s1 - xg.s0), 0, XT),
+      };
+    }
     if (!st.mix)
       return {
         S: 0,
@@ -1128,6 +1245,7 @@
       var a = audioEl();
       return !!(a && !a.paused);
     }
+    if (eng.on) return !eng.paused && (!!eng.cur || eng.loading);
     return yt.state === 1 || yt.state === 3;
   }
   function paintBar() {
@@ -1259,6 +1377,10 @@
   function seekTo(t) {
     var cur = st.list[st.pos];
     if (!cur) return;
+    if (!st.mix && eng.on) {
+      engSeek(cur, t);
+      return paintBar();
+    }
     if (!st.mix) {
       if (yt.dur) {
         send("seekTo", [t, true]);
@@ -1271,7 +1393,10 @@
     var S = cur.S || Math.max(1, cur.s1 - cur.s0);
     if (t < S) {
       var loc = locate(cur, t);
-      if (duo.phase === "sample" && loc.k === (duo.k || 0)) {
+      if (duo.phase === "sample" && loc.k === (duo.k || 0) && eng.on) {
+        engSeek(cur, t);
+        duo.armed = false;
+      } else if (duo.phase === "sample" && loc.k === (duo.k || 0)) {
         var sg = cur.segs ? cur.segs[loc.k] : { s0: cur.s0 };
         send("seekTo", [sg.s0 + loc.local, true]);
         yt.time = sg.s0 + loc.local;
@@ -1281,6 +1406,7 @@
       var off = clamp(t - S, 0, TRACK - 1);
       if (duo.phase === "sample") {
         // saut direct dans ton morceau
+        if (eng.on) engHush(0.3);
         send("pauseVideo");
         startTrack(cur, entryOf(cur), off, "track", TRACK - off);
       } else {
@@ -1305,6 +1431,11 @@
         clearTimeout(duo.out);
         pauseMusic();
       }
+    } else if (eng.on) {
+      if (isPlaying()) {
+        if (duo.phase === "pre") cancelPre();
+        engPause();
+      } else engResume();
     } else if (isPlaying()) {
       if (duo.phase === "pre") cancelPre();
       send("pauseVideo");
@@ -1360,7 +1491,8 @@
       // fin d'une partie : partie suivante (minuterie précise, ou fin de vidéo)
       var tp = yt.time,
         kk = duo.k;
-      if (!settling && isFinite(tp) && canFade() && duo.end - tp < SEGPRE) prepNext();
+      if (!settling && isFinite(tp) && canFade() && duo.end - tp < SEGPRE)
+        prepNext();
       if (!settling && isFinite(tp) && !duo.armed && duo.end - tp < 1.5) {
         duo.armed = true;
         later(
@@ -1407,7 +1539,11 @@
   document.addEventListener(
     "load",
     function (e) {
-      if (e.target && e.target === nextFrame() && e.target.getAttribute("src")) {
+      if (
+        e.target &&
+        e.target === nextFrame() &&
+        e.target.getAttribute("src")
+      ) {
         var nf = e.target;
         nx.loaded = true;
         [0, 400, 1500].forEach(function (ms) {
@@ -1455,8 +1591,11 @@
         !sheet.hidden &&
         duo.phase !== "mixin" &&
         duo.phase !== "pre"
-      )
-        send("pauseVideo");
+      ) {
+        if (eng.on) {
+          if (eng.cur || eng.loading) engPause();
+        } else send("pauseVideo");
+      }
     },
     true,
   );
@@ -1465,6 +1604,8 @@
     function (e) {
       if (!sheet || sheet.hidden) return;
       var tag = e.target && e.target.tagName;
+      if (e.key === " " || e.key === "ArrowRight" || e.key === "ArrowLeft")
+        ensureCtx();
       if (e.key === "Escape") {
         e.stopPropagation();
         close();
@@ -1500,7 +1641,8 @@
     // Audit du 19/11 : ton morceau préparé muet (« pre ») ne doit jamais s'entendre, et fermer pendant sa
     // sortie (fondu vers le sample suivant) doit aussi l'arrêter — avant, il continuait à plein volume.
     var wasPre = duo.phase === "pre";
-    if (wasPre || (pauseTrack && (trackPhase() || Date.now() < duo.outroUntil))) pauseMusic();
+    if (wasPre || (pauseTrack && (trackPhase() || Date.now() < duo.outroUntil)))
+      pauseMusic();
     duo.phase = "";
     duo.outroUntil = 0;
     var c = sheet && $("[data-smp-cov]", sheet);
@@ -1689,14 +1831,18 @@
         try {
           el.currentTime = base;
         } catch (_e) {}
+      // extrait : vrai fondu de sortie par le gain (iPhone compris) ; ton morceau entre comme avant
+      if (eng.on) engHush(XF);
       if (fade) {
         setAudioVolume(0);
         el.muted = false;
         xfade(
           setAudioVolume,
-          function (v) {
-            setVideoVolume(v * 100);
-          },
+          eng.on
+            ? noop
+            : function (v) {
+                setVideoVolume(v * 100);
+              },
           XF * 1000,
         );
       } else {
@@ -1755,7 +1901,425 @@
     }
   }
 
+  // ---------- Extraits audio (Cloudflare R2) : moteur Web Audio ----------
+  // 19/11 : les samples sont joués depuis de courts extraits (AAC, ~s0 − 4 s → s1 + 4 s) au lieu des
+  // iframes YouTube : vrais fondus partout (iPhone compris, le gain d'un AudioContext n'est pas bloqué
+  // comme <audio>.volume), démarrage au toucher, aucune vidéo affichée. YouTube reste le secours (item
+  // sans extrait, ou extrait introuvable). Temps YouTube t → temps dans l'extrait : t − x0.
+  var XBASE =
+      "https://infra180-api.pages.dev/audio/assets/music/streams/samples/",
+    SMPXF = 2, // fondu croisé entre deux samples
+    MAXBUF = 3, // extraits décodés gardés en mémoire
+    LOOK = 1.2; // avance (s) avec laquelle une transition est programmée sur l'horloge audio
+  var eng = {
+    ctx: null,
+    bufs: {},
+    lru: [],
+    voices: [],
+    cur: null,
+    hold: null,
+    on: false,
+    paused: false,
+    armed: false,
+    gen: 0,
+    tick: 0,
+  };
+  function noop() {}
+  function audioCtor() {
+    return window.AudioContext || window.webkitAudioContext || null;
+  }
+  // À appeler DANS le geste (clic, touche) : sur iPhone, l'AudioContext ne démarre qu'ainsi.
+  function ensureCtx() {
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = "playback"; // ignore le bouton silencieux
+    } catch (_e) {}
+    var AC = audioCtor();
+    if (!AC) return null;
+    if (!eng.ctx)
+      try {
+        eng.ctx = new AC();
+      } catch (_e) {
+        return null;
+      }
+    if (eng.ctx.state !== "running") {
+      try {
+        var p = eng.ctx.resume();
+        if (p && p.catch) p.catch(noop);
+      } catch (_e) {}
+      try {
+        // un son vide joué pendant le geste déverrouille la sortie (anciens iOS)
+        var s = eng.ctx.createBufferSource();
+        s.buffer = eng.ctx.createBuffer(1, 1, 22050);
+        s.connect(eng.ctx.destination);
+        s.start(0);
+      } catch (_e) {}
+    }
+    return eng.ctx;
+  }
+  // Parties jouées d'un item : ses passages (Samples, Acapella) ou les parties de l'enchaînement (Mix).
+  function segsOf(i) {
+    if (i.segs) return i.segs;
+    if (!i._segs) {
+      var S = 0,
+        out = [];
+      (i.p || [[i.s0, i.s1]]).forEach(function (q, qi) {
+        var x = i.x ? i.x[qi] || null : null,
+          a = Number(q && q[0]),
+          b = Number(q && q[1]);
+        if (!(b > a) && x) {
+          a = x[1];
+          b = x[1] + x[2];
+        }
+        if (!(b > a)) return;
+        out.push({ y: i.y, s0: a, s1: b, ci: 0, from: S, x: x });
+        S += b - a;
+      });
+      i._segs = out;
+    }
+    return i._segs;
+  }
+  function useEng(i) {
+    if (!i || i.noX || !audioCtor()) return false;
+    var segs = segsOf(i);
+    return (
+      segs.length > 0 &&
+      segs.every(function (sg) {
+        return !!sg.x;
+      })
+    );
+  }
+  function segsLen(segs) {
+    return segs.reduce(function (a, sg) {
+      return a + sg.s1 - sg.s0;
+    }, 0);
+  }
+  function xUrl(name) {
+    return XBASE + encodeURIComponent(name) + ".m4a";
+  }
+  function decode(ab) {
+    var c = eng.ctx || ensureCtx();
+    return new Promise(function (res, rej) {
+      if (!c) return rej(new Error("no audio"));
+      var p = c.decodeAudioData(ab, res, rej); // forme à rappels : anciens Safari
+      if (p && p.then) p.then(res, rej);
+    });
+  }
+  // fetch → arrayBuffer → decodeAudioData ; au plus MAXBUF extraits gardés (le plus ancien sort, sauf
+  // celui qu'on entend ou qu'on reprendra après une pause). Pas de Range : le service worker laisse passer.
+  function getBuf(name) {
+    var e = eng.bufs[name];
+    if (!e) {
+      e = eng.bufs[name] = {
+        p: fetch(xUrl(name), { mode: "cors", credentials: "omit" })
+          .then(function (r) {
+            if (!r.ok) throw new Error("extrait " + r.status);
+            return r.arrayBuffer();
+          })
+          .then(decode),
+      };
+      e.p.catch(function () {
+        if (eng.bufs[name] === e) delete eng.bufs[name];
+        var j = eng.lru.indexOf(name);
+        if (j >= 0) eng.lru.splice(j, 1);
+      });
+    }
+    var j = eng.lru.indexOf(name);
+    if (j >= 0) eng.lru.splice(j, 1);
+    eng.lru.push(name);
+    var keepNames = eng.voices
+      .map(function (v) {
+        return v.name;
+      })
+      .concat(eng.hold ? [eng.hold.name, name] : [name]);
+    for (var k = 0; eng.lru.length > MAXBUF && k < eng.lru.length;) {
+      var old = eng.lru[k];
+      if (keepNames.indexOf(old) >= 0) k++;
+      else {
+        eng.lru.splice(k, 1);
+        delete eng.bufs[old];
+      }
+    }
+    return e.p;
+  }
+  // Fondu à puissance égale (entrée en sinus, sortie en cosinus), en paliers linéaires sur l'horloge audio.
+  function shape(a, b, p) {
+    return b > a
+      ? a + (b - a) * Math.sin((p * Math.PI) / 2)
+      : b + (a - b) * Math.cos((p * Math.PI) / 2);
+  }
+  function gainAt(v, t) {
+    var r = v.gv;
+    if (!r) return 1;
+    if (t <= r.when) return r.from;
+    if (t >= r.when + r.dur) return r.to;
+    return shape(r.from, r.to, (t - r.when) / r.dur);
+  }
+  function setCurve(v, from, to, when, dur) {
+    var gp = v.g.gain,
+      now = eng.ctx.currentTime,
+      n = 16;
+    dur = Math.max(0.02, dur);
+    when = Math.max(now, when);
+    var nowV = gainAt(v, now);
+    gp.cancelScheduledValues(0);
+    gp.setValueAtTime(nowV, now);
+    gp.setValueAtTime(from, Math.max(now, when));
+    for (var k = 1; k <= n; k++)
+      gp.linearRampToValueAtTime(shape(from, to, k / n), when + (dur * k) / n);
+    v.gv = { from: from, to: to, when: when, dur: dur };
+  }
+  // Temps YouTube entendu par une voix, et instant (horloge audio) où elle atteindra le temps YouTube t.
+  function ytNow(v) {
+    if (!v) return 0;
+    return v.x0 + v.off + Math.max(0, eng.ctx.currentTime - v.at);
+  }
+  function ctxAt(v, t) {
+    return v.at + (t - v.x0 - v.off);
+  }
+  function startVoice(buf, item, k, ytFrom, when, fade) {
+    var c = eng.ctx,
+      sg = segsOf(item)[k],
+      g = c.createGain(),
+      s = c.createBufferSource();
+    s.buffer = buf;
+    s.connect(g);
+    g.connect(c.destination);
+    var v = {
+      s: s,
+      g: g,
+      item: item,
+      k: k,
+      sg: sg,
+      name: sg.x[0],
+      x0: sg.x[1],
+      off: clamp(ytFrom - sg.x[1], 0, Math.max(0, buf.duration - 0.05)),
+      at: when,
+      gv: { from: 0, to: 0, when: 0, dur: 0.02 }, // muette jusqu'à son départ
+    };
+    g.gain.value = 0;
+    setCurve(v, 0, 1, when, fade);
+    s.onended = function () {
+      var j = eng.voices.indexOf(v);
+      if (j >= 0) eng.voices.splice(j, 1);
+      try {
+        g.disconnect();
+      } catch (_e) {}
+      if (eng.cur === v && !v.done) engEnded(v);
+    };
+    s.start(when, v.off);
+    eng.voices.push(v);
+    return v;
+  }
+  function fadeOutVoice(v, when, dur) {
+    if (!v || v.done) return;
+    v.done = true;
+    setCurve(v, gainAt(v, when), 0, when, dur);
+    try {
+      v.s.stop(when + Math.max(0.02, dur) + 0.05);
+    } catch (_e) {}
+    if (eng.cur === v) eng.cur = null;
+  }
+  // Coupe tout ce que joue le moteur (fondu court) ; les chargements en cours sont oubliés.
+  function engHush(d) {
+    eng.gen++;
+    eng.armed = false;
+    eng.loading = false;
+    if (!eng.ctx) return;
+    var now = eng.ctx.currentTime;
+    eng.voices.slice().forEach(function (v) {
+      fadeOutVoice(v, now, d);
+    });
+    eng.cur = null;
+  }
+  function engStop(d) {
+    eng.on = false;
+    eng.paused = false;
+    eng.hold = null;
+    engHush(d == null ? 0.15 : d);
+  }
+  // Joue la partie k de l'item à partir du temps YouTube ytFrom ; fondu croisé de xf s avec ce qui
+  // joue, à l'instant « when » de l'horloge audio (maintenant par défaut).
+  function engStart(item, k, ytFrom, xf, when) {
+    var gen = ++eng.gen,
+      sg = segsOf(item)[k];
+    eng.on = true;
+    eng.paused = false;
+    eng.hold = null;
+    ensureCtx();
+    eng.loading = true;
+    var t0 = Date.now();
+    getBuf(sg.x[0]).then(
+      function (buf) {
+        if (gen !== eng.gen || !sheet || sheet.hidden) return;
+        eng.loading = false;
+        var now = eng.ctx.currentTime,
+          at = Math.max(now + 0.02, when || 0),
+          d = xf || 0.05;
+        if (eng.cur) fadeOutVoice(eng.cur, at, d);
+        eng.cur = startVoice(buf, item, k, ytFrom, at, d);
+        eng.armed = false;
+        if (
+          !trackPhase() &&
+          Date.now() >= duo.outroUntil &&
+          duo.phase !== "pre"
+        )
+          pauseMusic();
+        if (Date.now() - t0 > 1500)
+          track("samples_audio_slow", { ms: Date.now() - t0 });
+        engPreload(item, k);
+        setTimeout(paintBar, 30);
+      },
+      function () {
+        if (gen !== eng.gen) return;
+        eng.loading = false;
+        engFail(item, k);
+      },
+    );
+  }
+  // Précharge ce qui vient après : la partie suivante, sinon le premier extrait du son suivant.
+  function engPreload(item, k) {
+    var segs = segsOf(item),
+      nxt = segs[k + 1];
+    if (!nxt) {
+      var list = shownList(),
+        n = list[list.indexOf(item) + 1];
+      if (n && useEng(n)) nxt = segsOf(n)[0];
+    }
+    if (nxt && nxt.x) getBuf(nxt.x[0]).catch(noop);
+  }
+  // Extrait introuvable (404, réseau) : cet item repasse par YouTube, comme avant.
+  function engFail(item, k) {
+    track("samples_audio_fail", { mode: st.mix ? "mix" : "samples" });
+    item.noX = true;
+    engStop(0.1);
+    if (!sheet || sheet.hidden || st.list[st.pos] !== item) return;
+    play(item, true, false, st.mix ? segsOf(item)[k].from : 0);
+  }
+  function engPause() {
+    var v = eng.cur;
+    if (v) eng.hold = { item: v.item, k: v.k, t: ytNow(v), name: v.name };
+    engHush(0.08);
+    eng.paused = true;
+    yt.state = 2;
+  }
+  function engResume() {
+    ensureCtx();
+    var h = eng.hold,
+      cur = st.list[st.pos];
+    if (h && h.item === cur) {
+      if (st.mix) {
+        duo.k = h.k;
+        duo.end = segsOf(cur)[h.k].s1;
+      }
+      engStart(h.item, h.k, h.t, 0.08);
+    } else if (cur) play(cur, false, false, 0);
+  }
+  function engSeek(item, t) {
+    var segs = segsOf(item),
+      loc = locate({ segs: segs }, t),
+      y = segs[loc.k].s0 + loc.local;
+    yt.time = y;
+    if (st.mix) {
+      duo.k = loc.k;
+      duo.end = segs[loc.k].s1;
+    }
+    if (eng.paused) {
+      eng.hold = { item: item, k: loc.k, t: y, name: segs[loc.k].x[0] };
+      return;
+    }
+    engStart(item, loc.k, y, 0.06);
+  }
+  // Fin naturelle de l'extrait sans transition programmée (onglet en arrière-plan…).
+  function engEnded(v) {
+    eng.cur = null;
+    if (st.mix) {
+      if (duo.phase === "sample" && !isLastSeg()) {
+        if (!eng.armed) {
+          eng.armed = true;
+          nextSeg();
+        }
+      } else if (duo.phase === "sample" || duo.phase === "pre") mixIn();
+      return;
+    }
+    if (!eng.armed) engAuto(v);
+  }
+  // Fin d'un sample (Samples, Acapella) : le suivant entre en fondu croisé de SMPXF s.
+  function engAuto(v) {
+    eng.armed = true;
+    var list = shownList(),
+      next = list[list.indexOf(v.item) + 1],
+      now = eng.ctx.currentTime;
+    if (!next) {
+      if (eng.cur === v)
+        fadeOutVoice(v, Math.max(now, ctxAt(v, v.sg.s1 - 0.5)), 1);
+      return;
+    }
+    if (!useEng(next)) {
+      // son suivant sans extrait : YouTube prend le relais à la fin de celui-ci
+      var ms = Math.max(0, (ctxAt(v, v.sg.s1) - now) * 1000);
+      setTimeout(function () {
+        if (eng.on && st.list[st.pos] === v.item && !eng.paused) play(next);
+      }, ms);
+      return;
+    }
+    play(next, false, false, 0, ctxAt(v, v.sg.s1 - SMPXF / 2));
+  }
+  // Toutes les 100 ms : position, puis transitions programmées à l'avance sur l'horloge audio.
+  function engTick() {
+    if (!eng.on || !eng.ctx || !sheet || sheet.hidden) return;
+    var v = eng.cur;
+    if (eng.paused || !v || v.item !== st.list[st.pos]) return;
+    var tp = ytNow(v),
+      sg = v.sg,
+      last = v.k >= segsOf(v.item).length - 1;
+    yt.time = tp;
+    yt.state = 1;
+    if (st.mix) {
+      if (duo.phase !== "sample" && duo.phase !== "pre") return;
+      if (!last) {
+        if (!eng.armed && sg.s1 - tp < SEGXF / 2 + LOOK) {
+          eng.armed = true;
+          nextSeg();
+        }
+        return;
+      }
+      if (
+        duo.phase === "sample" &&
+        tp >= duo.end - XF - LEAD &&
+        tp < duo.end - XF
+      )
+        preroll();
+      if (tp >= duo.end - XF) mixIn();
+      return;
+    }
+    if (eng.armed) return;
+    if (!last) {
+      if (sg.s1 - tp < SEGXF / 2 + LOOK) {
+        eng.armed = true;
+        var nk = v.k + 1,
+          ns = segsOf(v.item)[nk];
+        engStart(
+          v.item,
+          nk,
+          Math.max(ns.x[1], ns.s0 - SEGXF / 2),
+          SEGXF,
+          ctxAt(v, sg.s1 - SEGXF / 2),
+        );
+        track("samples_part", { k: nk, n: segsOf(v.item).length });
+      }
+      return;
+    }
+    if (sg.s1 - tp < SMPXF / 2 + LOOK) engAuto(v);
+  }
+  // Pochette affichée à la place de la vidéo : celle du sample (assets/samples/<y>.webp) si elle existe.
+  function smpCover(smp, cur) {
+    return smp && smp.c
+      ? assetUrl("assets/samples/" + smp.y + ".webp")
+      : assetUrl(cur.cover);
+  }
+
   function onSheetClick(e) {
+    ensureCtx();
     var t = e.target;
     if (t === sheet || (t.closest && t.closest("[data-smp-close]")))
       return close();
@@ -1811,7 +2375,11 @@
       var mix = pref.sec === "mix";
       return open(
         mix ? all() : all().filter(keep(mix, secVoix())),
-        mix ? "Tout le Mix" : pref.sec === "voix" ? "Toutes les voix" : "Tous les samples",
+        mix
+          ? "Tout le Mix"
+          : pref.sec === "voix"
+            ? "Toutes les voix"
+            : "Tous les samples",
         "all",
       );
     }
@@ -1824,12 +2392,16 @@
 
   function same(x, y) {
     var n = function (v) {
-      return String(v || "").normalize("NFC").trim().toLocaleUpperCase("fr");
+      return String(v || "")
+        .normalize("NFC")
+        .trim()
+        .toLocaleUpperCase("fr");
     };
     return n(x) === n(y);
   }
   // Afficher les samples d'un morceau (avec les voix), pour le futur clic droit › Afficher les samples.
   function openTrack(albumTitle, trackTitle) {
+    ensureCtx(); // encore dans le geste (clic droit › Afficher les samples)
     return load().then(function () {
       // Le grand lecteur écrit titres et albums en majuscules (« HE 4.0026 », « V-23Π56 ») : comparaison sans casse.
       var a = data.albums.filter(function (x) {
@@ -1854,5 +2426,28 @@
     openTrack: openTrack,
     same: same,
     close: close,
+    // état du moteur audio, pour les vérifications (aucune donnée privée)
+    audioState: function () {
+      return {
+        ctx: eng.ctx ? eng.ctx.state : "",
+        time: eng.ctx ? eng.ctx.currentTime : 0,
+        on: eng.on,
+        paused: eng.paused,
+        loading: !!eng.loading,
+        bufs: Object.keys(eng.bufs),
+        yt: yt.time,
+        phase: duo.phase,
+        k: duo.k,
+        voices: eng.voices.map(function (v) {
+          return {
+            name: v.name,
+            k: v.k,
+            gain: v.g.gain.value,
+            yt: ytNow(v),
+            cur: v === eng.cur,
+          };
+        }),
+      };
+    },
   };
 })();

@@ -2080,3 +2080,19 @@ c'était le système, pas le thème », « on doit pouvoir quitter en appuyant h
 - Non changé, à décider par INFRA : 1er Play d'un album ou d'une playlist à froid → Radio (notes
   contradictoires) ; lignes d'album de 94 px sur ordinateur (place réservée à la barre du morceau) ; colonne
   étroite des Favoris ; contrastes des gris (numéros, durées, onglets non choisis).
+
+## 19/11/2026 · Samples : extraits sur R2 et lecteur Web Audio (Claude)
+
+- Demande d'INFRA : pas de pub, lancement automatique, pas de vidéo affichée, de vraies transitions (iPhone compris). Choix validé : **extraits sur R2**, YouTube en secours.
+- 446 passages (s0 − 4 s → s1 + 4 s) tirés des originaux locaux d'INFRA. AAC 256k, clé R2 `assets/music/streams/samples/<id>_<s0×10>-<s1×10>.m4a`, servis par la route `/audio/` existante du Worker (aucun changement de Worker).
+- Fabrication locale et privée : `_private/samples-extraits/` (`build-extraits.js`, `covers2.js`, `upload-r2.sh`).
+- `public/data/samples.json` passe en version 2 : `x` = liste `[fichier, début en temps YouTube, durée]` par passage, `c` = pochette `public/assets/samples/<y>.webp` (600 px).
+  - **Attention** : `INVENTAIRE_SAMPLES/_outils/publie.py` refabrique ce fichier et effacerait `x` et `c`. Il faut l'adapter avant de le relancer.
+- `samples.js` :
+  - un seul `AudioContext` débloqué dans le geste (`audioSession.type = "playback"`) ;
+  - extraits chargés par `fetch` + `decodeAudioData`, au plus 3 en mémoire, le suivant préchargé ;
+  - fondu croisé à puissance égale : 2 s entre samples, 1 s entre passages, 0,35 s vers le morceau dans le Mix ;
+  - pochette à la place de la vidéo ;
+  - YouTube seulement si `x` manque ou si l'extrait ne se charge pas.
+  - En Samples et Acapella, on entend le passage samplé, plus la vidéo depuis 0.
+- Vérifié en headless (Chromium, WebKit) : démarrage au clic, fondus tracés, Mix vers le morceau, pause et reprise, secours YouTube sur 404. **Non vérifié sur un vrai iPhone.**

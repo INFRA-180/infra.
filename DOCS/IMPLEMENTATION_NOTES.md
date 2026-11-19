@@ -2005,3 +2005,19 @@ c'était le système, pas le thème », « on doit pouvoir quitter en appuyant h
 - INFRA : « des fois ça met du temps ». Causes : (1) trois envois Samples sans `npm run bump` → le service worker ne change pas, `samples.js` servi « périmé puis rafraîchi » (2 rechargements) ; (2) vérification de mise à jour seulement au retour au premier plan ; (3) application seulement quand rien ne joue (règle du 08/11, gardée) ; (4) GitHub Pages ≈ 1 min par déploiement.
 - Corrigé : vérification toutes les 2 min tant que la page est visible (`scripts.js`, seul `sw.js` est demandé) ; le lecteur des samples ouvert compte comme « occupé » (`theme-admin-pwa.js`, classe `smp-open`).
 - **Règle : chaque envoi qui change un fichier public passe par `npm run bump`**, même un petit patch d'un seul script.
+
+## 19/11/2026 — Samples : vraie durée, parties, samples à la suite, entrée pile et forte (Claude)
+- INFRA : « me faire exactement commencer le sample… la musique, elle soit forte ». Ton morceau entre PILE à la
+  seconde où le sample y apparaît (`at`), à plein volume, en 0,35 s (avant : 5 s plus tôt en fondu lent).
+  Préparé muet 3 s avant, recalé, déclenché par minuterie. iPhone : coupe nette (volume bloqué).
+- Données (`INVENTAIRE_SAMPLES/_outils`, hors dépôt) : `temps.py` v2 lit les clips de l'ARRANGEMENT (plus ceux
+  des cases de session) et le passage réellement entendu de chacun ; passages réunis si < 2 s d'écart ;
+  parties dans l'ordre d'écoute (3 au plus, 45 s au plus, 30 s chacun si plusieurs samples dans le morceau) ;
+  `fort.py` mesure sur le morceau publié (12 s lues en flux, rien enregistré) le moment où le son devient fort
+  quand l'entrée est en fondu → champ `go` (≥ 0,5 s de décalage) ; `publie.py` écrit `p` (parties) et `go`.
+- Lecteur : en Mix, un « enchaînement » par morceau = ses samples triés par entrée, chacun en parties
+  (`chainOf`, `segs`) ; saut dans la même vidéo par `seekTo`, autre sample par `loadVideoById` ; barre et
+  légende par sample ; ton morceau entre à l'entrée du premier.
+- Finition (audit de 5 agents, `DOCS/AUDIT_FINITION_20261119.md`, local) : lignes non sélectionnables dès le
+  chargement (`track-actions.js`), menu sûr (fond, Échap, clavier), lien `#titre-N` qui amène au morceau,
+  cache hors ligne de l'onglet Samples.

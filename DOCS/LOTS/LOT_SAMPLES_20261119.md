@@ -109,3 +109,13 @@ Statuts possibles : ouvert · maquette · validé · fait · reporté.
    - Limite de (a) : Apple choisit les 30 s, ce n'est pas le passage samplé.
 3. Voix non marquées : déplacer les ~20 raps complets vers Acapella, liste à valider.
 4. Crédits : INFRA donne logiciel, ordinateur et lieu par album, ou l'agent lit les projets Ableton.
+
+## K. Réponse d'INFRA (19/11)
+
+- Apple : **refusé**.
+- Règles YouTube : sans importance, usage perso, rien à vendre. On peut cacher le lecteur.
+- Question d'INFRA : pourquoi « coupé » alors que le fondu marchait hier ? Réponse : le fondu marche sur Mac. Sur iPhone, Apple bloque le réglage du volume d'une vidéo YouTube, donc on coupe sec. C'est une limite de l'iPhone, pas une règle de YouTube.
+- Pubs sur iPhone : au pire, INFRA utilisera Brave. Demande : un bloqueur de pub iPhone qui marche partout (à vérifier sur iPhone).
+- Reste à choisir :
+  - (a) YouTube amélioré : caché, se relance tout seul, fondus réparés sur Mac, coupes sur iPhone ;
+  - (b) extraits du passage exact sur R2, déjà en place pour la musique : vrais fondus partout, sans pub. Le site est public, donc les extraits le seraient aussi.

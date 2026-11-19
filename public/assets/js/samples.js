@@ -44,7 +44,8 @@
     from: 0,
   };
   var TRACK = 60,
-    OVERLAP = 5,
+    OVERLAP = 2, // sortie de ton morceau vers le sample suivant (fondu croisé)
+    XF = 0.35, // entrée : sample → ton morceau, quasi coupe (évite le clic), à plein volume
     LEAD = 3,
     SORTS = ["bpm", "bpmdown", "shuffle", "album"],
     ticker = 0;
@@ -151,6 +152,7 @@
                 s0: Number(it.s0),
                 s1: Number(it.s1),
                 at: Number(it.at),
+                go: it.go == null ? NaN : Number(it.go),
                 dt: Number(it.dt) || 0,
                 bpm: Array.isArray(it.bpm) ? it.bpm : null,
                 tb: Number(it.tb) || 0,
@@ -989,13 +991,7 @@
       if (duo.phase === "sample") {
         // saut direct dans ton morceau
         send("pauseVideo");
-        startTrack(
-          cur,
-          Math.max(0, cur.at - OVERLAP),
-          off,
-          "track",
-          TRACK - off,
-        );
+        startTrack(cur, entryOf(cur), off, "track", TRACK - off);
       } else {
         var a = audioEl();
         if (a)
@@ -1068,11 +1064,11 @@
       if (
         duo.phase === "sample" &&
         isFinite(tm) &&
-        tm >= duo.end - OVERLAP - LEAD &&
-        tm < duo.end - OVERLAP
+        tm >= duo.end - XF - LEAD &&
+        tm < duo.end - XF
       )
         preroll();
-      if (isFinite(tm) && tm >= duo.end - OVERLAP) mixIn();
+      if (isFinite(tm) && tm >= duo.end - XF) mixIn();
       else if (state === 0 || (state === 2 && tm >= duo.end - 0.6)) mixIn();
     } else if (!st.mix && state === 0) step(1);
     if (m.event === "onError") {
@@ -1269,6 +1265,9 @@
   //   on ouvre le son en fondu à puissance égale (pas de creux au milieu) ;
   // - iPhone : le volume ne se règle pas depuis une page → pas de chevauchement à plein volume, mais
   //   une coupe nette et calée (le morceau prend la place du sample).
+  // - 19/11 (INFRA : « exactement commencer le sample… la musique, elle soit forte ») : ton morceau
+  //   n'entre plus 5 s avant en fondu lent, mais PILE à la seconde où le sample y apparaît, à plein
+  //   volume, en XF s (le temps d'éviter un clic).
   var fadeOk = null;
   function canFade() {
     if (fadeOk !== null) return fadeOk;
@@ -1300,15 +1299,23 @@
       })(k);
     }
   }
+  // Où ton morceau entre : la seconde où le sample y apparaît (ou, si l'entrée est en fondu, le moment
+  // où le son devient fort : champ « go » mesuré sur ton fichier audio).
+  function entryOf(i) {
+    return Math.max(0, isFinite(i.go) ? i.go : i.at);
+  }
   function preroll() {
     if (duo.phase !== "sample") return;
     var i = duo.item;
     var a = audioEl();
     if (a) a.muted = true;
-    if (!startTrack(i, Math.max(0, i.at - OVERLAP), -LEAD, "pre", null)) {
+    if (!startTrack(i, entryOf(i), -LEAD, "pre", null)) {
       if (a) a.muted = false;
       duo.phase = "sample";
+      return;
     }
+    // l'entrée est déclenchée par une minuterie, plus précise que les messages de YouTube
+    later(mixIn, Math.max(0, (duo.end - XF - yt.time) * 1000));
   }
   function cancelPre() {
     duo.timers.forEach(clearTimeout);
@@ -1323,7 +1330,7 @@
     var i = duo.item,
       pre = duo.phase === "pre",
       fade = canFade(),
-      base = Math.max(0, i.at - OVERLAP);
+      base = entryOf(i);
     if (!pre) {
       // pas eu le temps de pré-charger (saut, sample court) : lancé muet, son ouvert une fois calé
       var a0 = audioEl();
@@ -1332,7 +1339,7 @@
     }
     duo.phase = "mixin";
     var c = $("[data-smp-cov]", sheet);
-    if (c) c.style.transitionDuration = (fade ? OVERLAP : 0.6) + "s";
+    if (c) c.style.transitionDuration = "0.5s";
     var open = function () {
       var el = audioEl();
       if (!el) return;
@@ -1348,7 +1355,7 @@
           function (v) {
             setVideoVolume(v * 100);
           },
-          OVERLAP * 1000,
+          XF * 1000,
         );
       } else {
         el.muted = false;
@@ -1366,7 +1373,7 @@
         setAudioVolume(1);
         if (duo.phase === "mixin") duo.phase = "track";
       },
-      wait + (fade ? OVERLAP * 1000 : 0) + 200,
+      wait + (fade ? XF * 1000 : 0) + 100,
     );
     scheduleOut(TRACK + wait / 1000);
     track("samples_mix_in", { bpm: bpmOf(i), pre: pre, fade: fade });

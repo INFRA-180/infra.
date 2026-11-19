@@ -218,3 +218,19 @@ Statuts possibles : ouvert · maquette · validé · fait · reporté.
   - E1 : Crédits ;
   - 28 calages à écouter ;
   - remise des fichiers dans Ableton (attend le oui d'INFRA).
+
+## R. En ligne (19/11) : v470, `421c1fd`
+
+- Le 1er déploiement a échoué à cause d'un incident GitHub (artefact introuvable) ; relancé, réussi.
+- Faits et vérifiés sur le site en ligne :
+  - A1 numéros et durées en noir ;
+  - A5 onglets Samples · Mix · Acapella ;
+  - B1 passage samplé ; B2 entrée dans le morceau (texte, sans repère sur la barre) ; B3 « Aller au morceau » ;
+  - B4 glisser vers le bas ; B5 album ouvert sans lecture.
+- Reste :
+  - A2 lignes d'album ; A3 Favoris ;
+  - D1 à D4 : raps à classer en Acapella, données ;
+  - E1 Crédits ;
+  - 28 calages à écouter ;
+  - fichiers à remettre dans Ableton (attend le oui) ;
+  - iPhone réel.

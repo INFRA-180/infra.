@@ -1,9 +1,11 @@
 // Section Samples (maquette Samples v2 validée le 18/11/2026, puis maquette « Samples et Mix » V1 validée le
 // 19/11/2026 : DOCS/maquettes/MAQUETTE_SAMPLES_MIX_V1_20261119.html).
 // Onglet « Samples » de la bibliothèque, deux sections :
-// - Samples : les morceaux d'origine (vidéos YouTube) en simple playlist ; voix (a cappella) en option.
+// - Samples : les morceaux d'origine (vidéos YouTube) en simple playlist, sans les voix ;
+// - Acapella (19/11, INFRA : « fais une playlist acapella pour départager les deux ») : les voix seules ;
 // - Mix : le passage samplé par INFRA (lu dans le projet Ableton), puis son morceau là où le sample entre :
-//   5 s de chevauchement, 1 minute de morceau, puis fondu croisé avec le sample suivant.
+//   entrée pile à l'endroit du sample (fondu de 0,35 s), 1 minute de morceau, puis fondu croisé avec le
+//   sample suivant ; entre deux samples d'un même morceau, fondu croisé d'1 s.
 // Lecteur simple : titre de ce qu'on entend en haut, une vraie barre (sample | morceau), précédent ·
 // lecture/pause · suivant, pictos sans rond ni carré (INFRA, 19/11). Ordre au choix partout : par BPM,
 // aléatoire ou dans l'ordre des morceaux (picto à côté de « Tout » et à droite du titre), retenu par écran.
@@ -55,7 +57,7 @@
   try {
     var saved = JSON.parse(localStorage.getItem("infra-samples") || "null");
     if (saved && typeof saved === "object") {
-      if (saved.sec === "mix" || saved.sec === "samples") pref.sec = saved.sec;
+      if (saved.sec === "mix" || saved.sec === "samples" || saved.sec === "voix") pref.sec = saved.sec;
       pref.voix = saved.voix === true;
       if (saved.sort && typeof saved.sort === "object") pref.sort = saved.sort;
     } else pref.voix = localStorage.getItem("infra-samples-voix") === "1";
@@ -65,13 +67,20 @@
       localStorage.setItem("infra-samples", JSON.stringify(pref));
     } catch (_e) {}
   }
+  // Section en cours : samples (sans voix), voix (acapella seules) ou mix.
+  function secVoix() {
+    return pref.sec === "voix" ? "only" : false;
+  }
+  function sortKey(mix) {
+    return mix ? "mix-" : pref.sec === "voix" ? "voix-" : "smp-";
+  }
   function sortFor(mix, scope) {
-    var v = pref.sort[(mix ? "mix-" : "smp-") + scope];
+    var v = pref.sort[sortKey(mix) + scope];
     if (SORTS.indexOf(v) >= 0) return v;
     return scope === "all" ? (mix ? "bpm" : "shuffle") : "album";
   }
   function setSort(mix, scope, v) {
-    pref.sort[(mix ? "mix-" : "smp-") + scope] = v;
+    pref.sort[sortKey(mix) + scope] = v;
     save();
   }
   // BPM : 1er toucher du plus lent au plus rapide, 2e du plus rapide au plus lent, 3e ordre des morceaux.
@@ -271,17 +280,21 @@
     duo.segAt = Date.now();
     yt.time = sg.s0;
     if (swap) swapToNext(sg);
-    else if (sg.y === before.y && sg.s0 >= before.s1) send("seekTo", [sg.s0, true]);
-    else
-      send("loadVideoById", [
-        { videoId: sg.y, startSeconds: sg.s0, endSeconds: endFor(item, k) },
-      ]);
+    else {
+      if (nx.item) dropNext(); // préparé mais pas prêt : on l'arrête (sinon il joue muet pour rien)
+      if (sg.y === before.y && sg.s0 >= before.s1) send("seekTo", [sg.s0, true]);
+      else
+        send("loadVideoById", [
+          { videoId: sg.y, startSeconds: sg.s0, endSeconds: endFor(item, k) },
+        ]);
+    }
     paintNow();
     track("samples_part", { k: k, n: item.segs.length });
   }
   function keep(mix, voix) {
     return function (i) {
-      return mix ? duoOk(i) : voix || !i.v;
+      if (mix) return duoOk(i);
+      return voix === "only" ? i.v : voix || !i.v;
     };
   }
   // Tri sur le vrai tempo du morceau (affiché partout, INFRA 19/11) ; tempo inconnu en dernier.
@@ -367,10 +380,6 @@
   );
   var PREV = svg('<path fill="currentColor" d="M6 5h2v14H6zM20 5v14L9 12z"/>');
   var NEXT = svg('<path fill="currentColor" d="M16 5h2v14h-2zM4 5v14l11-7z"/>');
-  var VOICE = svg(
-    '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>',
-    LINE,
-  );
   // Ordre (INFRA, 19/11) : « BPM » et « aléatoire » côte à côte, l'actif en foncé ; toucher l'actif
   // le relâche → ordre des morceaux. Le mot « BPM » plutôt qu'un métronome ; aléatoire = deux flèches
   // qui se croisent (forme de la lecture aléatoire d'Apple Musique).
@@ -429,7 +438,8 @@
       ".sx-sec{display:flex;gap:28px;align-items:baseline;margin:4px 0 6px}",
       ".sx-sec button{border:0;background:none;padding:0;cursor:pointer;font:inherit;font-size:34px;font-weight:800;letter-spacing:-.02em;color:rgba(17,17,17,.22);transition:color .2s}",
       '.sx-sec button[aria-selected="true"]{color:var(--ink,#111)}',
-      "@media (max-width:639px){.sx-sec button{font-size:28px}}",
+      "@media (max-width:639px){.sx-sec{gap:20px}.sx-sec button{font-size:26px}}",
+      "@media (max-width:379px){.sx-sec{gap:16px}.sx-sec button{font-size:23px}}",
       ".sx-sub{font-size:13px;color:rgba(17,17,17,.5);margin:0 0 10px}",
       ".sx-allrow{display:flex;align-items:center;gap:4px;margin-bottom:16px}",
       ".sx-all{display:flex;align-items:center;gap:12px;min-height:58px;padding:6px 8px 6px 0;border:0;background:none;font:inherit;color:var(--ink,#111);text-align:left;cursor:pointer}",
@@ -455,6 +465,7 @@
       // site, réutilisé tel quel), dégradé ::before (mêmes valeurs, version ordinateur dès 860 px).
       ".smp-sheet.sx-fs{display:block;background:rgba(6,7,10,.62);-webkit-backdrop-filter:blur(18px) saturate(1.18);backdrop-filter:blur(18px) saturate(1.18);color:#fff;opacity:0;overflow:hidden;transition:opacity .25s ease}",
       ".smp-sheet.sx-fs.on{opacity:1;background:rgba(6,7,10,.62)}",
+      ".smp-sheet.sx-fs:not(.on){pointer-events:none}",
       "@supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){.smp-sheet.sx-fs,.smp-sheet.sx-fs.on{background:rgba(10,10,15,.95)}}",
       ".sx-fs{--w:min(540px,calc(100vw - 32px))}",
       "@media (min-width:860px){.sx-fs::before{background:radial-gradient(90% 78% at 32% 0%,rgba(255,255,255,.13),rgba(255,255,255,0) 60%),linear-gradient(180deg,rgba(5,6,9,.2),rgba(5,6,9,.76))}}",
@@ -474,7 +485,7 @@
       ".sx-art{position:relative;width:min(100%,max(160px,calc(100vh - 350px)));width:min(100%,max(160px,calc(100dvh - 350px)));margin:0 auto;aspect-ratio:1;border-radius:24px;overflow:hidden;background:#000}",
       ".sx-vid{position:absolute;inset:0;overflow:hidden}",
       ".sx-vid iframe{position:absolute;top:0;left:50%;height:100%;width:177.78%;transform:translateX(-50%);border:0;display:block;transition:opacity 1s ease}",
-      ".sx-vid iframe[data-smp-next]{opacity:0;pointer-events:none}",
+      ".sx-vid iframe[data-smp-alt]{opacity:0;pointer-events:none}",
       ".sx-cov{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;pointer-events:none;transition:opacity 1.4s ease}",
       ".sx-cov.on{opacity:1;pointer-events:auto}",
       ".sx-meta{display:flex;align-items:flex-end;gap:16px;margin-top:20px}",
@@ -541,62 +552,53 @@
       return;
     }
     var mix = pref.sec === "mix";
-    var pool = mix ? chainOf(all()) : all().filter(keep(mix, pref.voix));
+    var voixSec = pref.sec === "voix";
+    var pool = mix ? chainOf(all()) : all().filter(keep(mix, secVoix()));
     var html =
-      '<div class="sx-sec" role="tablist" aria-label="Samples ou Mix">' +
+      '<div class="sx-sec" role="tablist" aria-label="Samples, Acapella ou Mix">' +
       '<button type="button" role="tab" data-smp-sec="samples" aria-selected="' +
-      !mix +
+      (!mix && !voixSec) +
       '">Samples</button>' +
+      '<button type="button" role="tab" data-smp-sec="voix" aria-selected="' +
+      voixSec +
+      '">Acapella</button>' +
       '<button type="button" role="tab" data-smp-sec="mix" aria-selected="' +
       mix +
       '">Mix</button></div>' +
       '<p class="sx-sub">' +
       (mix
         ? "Le passage samplé, puis ton morceau là où il entre."
-        : "Les morceaux d'origine, en playlist.") +
+        : voixSec
+          ? "Les voix que tu as reprises, seules."
+          : "Les morceaux d'origine, en playlist.") +
       "</p>" +
       '<div class="sx-allrow"><button type="button" class="sx-all" data-smp-all><span class="sx-allic">' +
       PLAY +
       "</span><span><b>" +
-      (mix ? "Tout le Mix" : "Tous les samples") +
+      (mix ? "Tout le Mix" : voixSec ? "Toutes les voix" : "Tous les samples") +
       "</b><small>" +
       pool.length +
-      (mix
-        ? " enchaînements"
-        : pref.voix
-          ? " sons, avec les voix"
-          : " samples") +
+      (mix ? " enchaînements" : voixSec ? " voix" : " samples") +
       "</small></span></button>" +
       sortBtns(sortFor(mix, "all"), "all") +
-      (mix
-        ? ""
-        : '<button type="button" class="sx-ic' +
-          (pref.voix ? " on" : "") +
-          '" data-smp-voixbtn aria-pressed="' +
-          pref.voix +
-          '" title="' +
-          (pref.voix ? "Avec les voix (a cappella)" : "Sans les voix") +
-          '" aria-label="Voix (a cappella)">' +
-          VOICE +
-          "</button>") +
       "</div>" +
       '<ul class="smp-grid">' +
       data.albums
         .map(function (a, i) {
           var n = mix
             ? chainOf(a.items).length
-            : a.items.filter(keep(mix, pref.voix)).length;
-          if (mix && !n) return "";
+            : a.items.filter(keep(mix, secVoix())).length;
+          if (!n) return "";
           var label = mix
             ? n + (n > 1 ? " enchaînements" : " enchaînement")
-            : n
-              ? n + (n > 1 ? " samples" : " sample")
-              : a.items.length + " voix";
+            : voixSec
+              ? n + " voix"
+              : n + (n > 1 ? " samples" : " sample");
           return (
             '<li><button type="button" class="smp-al" data-smp-album="' +
             i +
             '" aria-label="' +
-            (mix ? "Mix de " : "Samples de ") +
+            (mix ? "Mix de " : voixSec ? "Voix de " : "Samples de ") +
             esc(a.title) +
             '"><span class="smp-cover"><img src="' +
             esc(assetUrl(a.cover)) +
@@ -666,7 +668,7 @@
       svg('<path d="M6 6l12 12M18 6L6 18"/>', LINE) +
       "</button></span></div>" +
       '<div class="sx-main">' +
-      '<div class="sx-art"><div class="sx-vid"><iframe data-smp-next title="Sample suivant" tabindex="-1" aria-hidden="true" allow="autoplay; encrypted-media"></iframe><iframe data-smp-frame title="Sample" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>' +
+      '<div class="sx-art"><div class="sx-vid"><iframe data-smp-alt title="Sample suivant" tabindex="-1" aria-hidden="true" allow="autoplay; encrypted-media"></iframe><iframe data-smp-frame title="Sample" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>' +
       '<img class="sx-cov" data-smp-cov alt=""></div>' +
       '<div class="sx-meta"><div class="sx-mt"><b class="sx-title" data-smp-t dir="auto"></b>' +
       '<small data-smp-a dir="auto"></small></div>' +
@@ -706,9 +708,9 @@
   // Fondu croisé entre deux parties (deux samples, ou deux passages d'un même sample) : la partie suivante
   // est chargée MUETTE dans le 2e lecteur, puis les deux lecteurs échangent leur rôle et le son passe de l'un
   // à l'autre en SEGXF s (puissance égale). iPhone (volume bloqué) ou lecteur pas prêt : saut comme avant.
-  var nx = { k: -1, item: null, ready: false };
+  var nx = { k: -1, item: null, ready: false, loaded: false };
   function nextFrame() {
-    return sheet && $("[data-smp-next]", sheet);
+    return sheet && $("iframe[data-smp-alt]", sheet);
   }
   function sendTo(f, func, args) {
     if (!f || !f.contentWindow) return;
@@ -747,6 +749,7 @@
     nx.k = k;
     nx.item = item;
     nx.ready = false;
+    nx.loaded = false; // les messages de l'ancienne vidéo ne comptent pas : on attend le chargement de la nouvelle
     f.src = embed(sg.y, sg.s0, endFor(item, k)) + "&mute=1";
   }
   function canSwapNext() {
@@ -760,10 +763,14 @@
     sendTo(nf, "unMute");
     sendTo(nf, "playVideo");
     old.removeAttribute("data-smp-frame");
-    old.setAttribute("data-smp-next", "");
+    old.setAttribute("data-smp-alt", "");
     old.setAttribute("tabindex", "-1");
-    nf.removeAttribute("data-smp-next");
+    old.setAttribute("aria-hidden", "true");
+    old.setAttribute("title", "Sample suivant");
+    nf.removeAttribute("data-smp-alt");
     nf.removeAttribute("tabindex");
+    nf.removeAttribute("aria-hidden");
+    nf.setAttribute("title", "Sample");
     nf.setAttribute("data-smp-frame", "");
     nx.k = -1;
     nx.item = null;
@@ -809,7 +816,7 @@
     st.album = album || null;
     st.mix = pref.sec === "mix";
     if (st.mix) st.list = list = chainOf(list);
-    st.voix = voix == null ? pref.voix : voix;
+    st.voix = voix == null ? secVoix() : voix;
     st.sort = sortFor(st.mix, scope);
     reshuffle(null);
     var first = shownList()[0];
@@ -846,7 +853,11 @@
     st.ready = false;
     st.pos = -1;
     sheet.classList.remove("on");
-    sheet.hidden = true;
+    // Audit 19/11 : il se fermait d'un coup ; on laisse le fondu de sortie se jouer (comme à l'ouverture).
+    var closing = sheet;
+    setTimeout(function () {
+      if (!closing.classList.contains("on")) closing.hidden = true;
+    }, 260);
     document.documentElement.classList.remove("smp-open");
   }
   function trackPhase() {
@@ -1319,7 +1330,7 @@
     if (!sheet || sheet.hidden || e.origin !== ORIGIN) return;
     var nf = nextFrame();
     if (nf && nf.getAttribute("src") && e.source === nf.contentWindow) {
-      nx.ready = true; // le lecteur caché répond : il est prêt pour le fondu
+      if (nx.loaded) nx.ready = true; // le lecteur caché (nouvelle vidéo) répond : prêt pour le fondu
       return;
     }
     var f = frame();
@@ -1398,6 +1409,7 @@
     function (e) {
       if (e.target && e.target === nextFrame() && e.target.getAttribute("src")) {
         var nf = e.target;
+        nx.loaded = true;
         [0, 400, 1500].forEach(function (ms) {
           setTimeout(function () {
             listenTo(nf);
@@ -1413,6 +1425,9 @@
     true,
   );
   function pauseMusic() {
+    // le bouton du lecteur est une bascule : ne l'appuyer que si la musique joue vraiment (sinon il la relance)
+    var el = audioEl();
+    if (el && el.paused) return;
     var toggleBtn = $(".global-transport.is-playing [data-transport-toggle]");
     if (toggleBtn && typeof toggleBtn.click === "function") toggleBtn.click();
   }
@@ -1482,7 +1497,10 @@
     duo.timers.forEach(clearTimeout);
     duo.timers = [];
     clearTimeout(duo.out);
-    if (pauseTrack && trackPhase()) pauseMusic();
+    // Audit du 19/11 : ton morceau préparé muet (« pre ») ne doit jamais s'entendre, et fermer pendant sa
+    // sortie (fondu vers le sample suivant) doit aussi l'arrêter — avant, il continuait à plein volume.
+    var wasPre = duo.phase === "pre";
+    if (wasPre || (pauseTrack && (trackPhase() || Date.now() < duo.outroUntil))) pauseMusic();
     duo.phase = "";
     duo.outroUntil = 0;
     var c = sheet && $("[data-smp-cov]", sheet);
@@ -1508,9 +1526,11 @@
     var a = audioEl();
     var seek = function () {
       var el = audioEl();
+      // seulement tant qu'on est dans la phase de départ : une fois le morceau entré (« mixin »), la seconde
+      // visée de la préparation (entrée − 3 s) ne doit plus être réappliquée (réseau lent : entrée 3 s trop tôt).
       if (
         el &&
-        (trackPhase() || duo.phase === "pre") &&
+        duo.phase === phase &&
         Math.abs(el.currentTime - target) > 0.4
       ) {
         try {
@@ -1533,6 +1553,16 @@
     if (a) {
       if (hush) a.muted = true;
       a.addEventListener("playing", onPlaying);
+      // Morceau qui finit avant la minute (PHI, MIEL…) : on passe tout de suite au sample suivant.
+      if (!a.__smpEnded) {
+        a.__smpEnded = true;
+        a.addEventListener("ended", function () {
+          if (st.mix && trackPhase() && sheet && !sheet.hidden) {
+            clearTimeout(duo.out);
+            mixOut();
+          }
+        });
+      }
     }
     if (!lib.playPaths([i.src], 0)) {
       if (a) a.removeEventListener("playing", onPlaying);
@@ -1760,7 +1790,8 @@
     if (!t || !t.closest || !data) return;
     var sec = t.closest("[data-smp-sec]");
     if (sec) {
-      pref.sec = sec.getAttribute("data-smp-sec") === "mix" ? "mix" : "samples";
+      var want = sec.getAttribute("data-smp-sec");
+      pref.sec = want === "mix" || want === "voix" ? want : "samples";
       save();
       track("samples_section", { sec: pref.sec });
       return rerender();
@@ -1776,16 +1807,11 @@
       track("samples_sort", { sort: v, scope: "all", mode: pref.sec });
       return rerender();
     }
-    if (t.closest("[data-smp-voixbtn]")) {
-      pref.voix = !pref.voix;
-      save();
-      return rerender();
-    }
     if (t.closest("[data-smp-all]")) {
       var mix = pref.sec === "mix";
       return open(
-        mix ? all() : all().filter(keep(mix, pref.voix)),
-        mix ? "Tout le Mix" : "Tous les samples",
+        mix ? all() : all().filter(keep(mix, secVoix())),
+        mix ? "Tout le Mix" : pref.sec === "voix" ? "Toutes les voix" : "Tous les samples",
         "all",
       );
     }
@@ -1796,15 +1822,22 @@
     }
   });
 
+  function same(x, y) {
+    var n = function (v) {
+      return String(v || "").normalize("NFC").trim().toLocaleUpperCase("fr");
+    };
+    return n(x) === n(y);
+  }
   // Afficher les samples d'un morceau (avec les voix), pour le futur clic droit › Afficher les samples.
   function openTrack(albumTitle, trackTitle) {
     return load().then(function () {
+      // Le grand lecteur écrit titres et albums en majuscules (« HE 4.0026 », « V-23Π56 ») : comparaison sans casse.
       var a = data.albums.filter(function (x) {
-        return x.title === albumTitle;
+        return same(x.title, albumTitle);
       })[0];
       if (!a) return false;
       var items = a.items.filter(function (i) {
-        return i.track === trackTitle;
+        return same(i.track, trackTitle);
       });
       if (!items.length) return false;
       var sec = pref.sec;
@@ -1819,6 +1852,7 @@
     render: render,
     load: load,
     openTrack: openTrack,
+    same: same,
     close: close,
   };
 })();

@@ -23,7 +23,8 @@ codeAssertDoesNotMatch(runtime, /SKIP_WAITING/, "no unconditional skip-waiting m
 assert.equal((codeMatch(worker, /skipWaiting\s*\(/g) || []).length, 1, "the worker skips waiting only on the idle request");
 codeAssertMatch(worker, /INFRA_SW_ACTIVATE_IDLE[\s\S]{0,80}self\.skipWaiting\(\)/);
 assert.equal((codeMatch(runtime, /window\.location\.reload\s*\(/g) || []).length, 1, "a single guarded reload");
-codeAssertMatch(scripts, /if \(!serviceWorkerIdleUpdateRequested\) return;\s*if \(isBusyForServiceWorkerUpdate\(\)\) return;\s*window\.location\.reload\(\);/);
+// 19/11 : si une lecture est repartie, la page recharge dès que plus rien ne joue (plus jamais pendant la lecture).
+codeAssertMatch(scripts, /if \(!serviceWorkerIdleUpdateRequested\) return;[\s\S]{0,400}if \(isBusyForServiceWorkerUpdate\(\)\) window\.setTimeout\(reloadWhenIdle, 5000\);\s*if \(isBusyForServiceWorkerUpdate\(\)\) return;\s*window\.location\.reload\(\);/);
 codeAssertMatch(scripts, /if \(audio && !audio\.paused && !audio\.ended\) return true;/, "never update while audio plays");
 codeAssertDoesNotMatch(runtime, /SERVICE_WORKER_RELOAD_|attemptDeferredServiceWorkerReload|scheduleDeferredServiceWorkerReload/);
 codeAssertDoesNotMatch(runtime, /sw_reload_pending|sw_reload_executed/, "audiofix402 must not emit reload events");

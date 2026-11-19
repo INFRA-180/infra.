@@ -42,7 +42,7 @@ import {
   reportLaunchSummary
 } from "./runtime/page-init.js";
 
-window.INFRA_BUILD_TAG = "audiofix467-20261119";
+window.INFRA_BUILD_TAG = "audiofix468-20261119";
 
 installScriptErrorReporting(trackAudioRuntimeEvent);
 // Section Samples (18/11/2026) : gestes notés dans la même télémétrie, sans contenu privé.
@@ -577,7 +577,7 @@ const PREFETCH_MAX_ATTEMPTS = 2;
 
 const WORKER_URL = "https://infra180-api.pages.dev";
 
-const SPA_SHELL_VERSION = "infra-shell-20261119-audio467";
+const SPA_SHELL_VERSION = "infra-shell-20261119-audio468";
 
 const SPA_SHELL_CACHE_NAME = `${SPA_SHELL_VERSION}-shell`;
 
@@ -594,7 +594,7 @@ const LIVE_CATALOG_CACHE_NAME = `${SPA_SHELL_VERSION}-catalog`;
 
 const LIVE_CATALOG_TIMEOUT_MS = 3500;
 
-const LOCAL_CATALOG_VERSION = "audiofix467-20261119";
+const LOCAL_CATALOG_VERSION = "audiofix468-20261119";
 
 const audioTelemetryModule = window.InfraAudioTelemetry || null;
 
@@ -622,7 +622,7 @@ const DESKTOP_TRANSPORT_COVER_MIN_WIDTH = 380;
 
 const DESKTOP_TRANSPORT_COVER_MIN_HEIGHT = 150;
 
-const runtimeVersion = "audiofix467-20261119";
+const runtimeVersion = "audiofix468-20261119";
 
 const runtime = (function () {
   const scriptEl =
@@ -725,9 +725,23 @@ window.setInterval(function () {
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", function () {
     if (!serviceWorkerIdleUpdateRequested) return;
-    if (isBusyForServiceWorkerUpdate()) return;
-    window.location.reload();
+    // 19/11 (audit) : si une lecture est repartie entre-temps, on recharge dès que plus rien ne joue
+    // (avant, la page gardait l'ancien code jusqu'à un rechargement manuel).
+    (function reloadWhenIdle() {
+      if (isBusyForServiceWorkerUpdate()) window.setTimeout(reloadWhenIdle, 5000);
+      if (isBusyForServiceWorkerUpdate()) return;
+      window.location.reload();
+    })();
   });
+  // Hors ligne (audit du 19/11) : les pochettes des albums jamais ouverts manquaient. Une seule fois, au calme,
+  // et pas en mode « économie de données » : le service worker garde les 33 pochettes (≈ 7 Mo).
+  window.setTimeout(function () {
+    const connection = navigator.connection || {};
+    if (connection.saveData || /(^|-)2g$/.test(String(connection.effectiveType || ""))) return;
+    navigator.serviceWorker.ready.then(function (registration) {
+      if (registration.active) registration.active.postMessage({ type: "INFRA_SW_WARM_COVERS" });
+    }).catch(function () {});
+  }, 20000);
   document.addEventListener(
     "pause",
     function (event) {

@@ -16,8 +16,32 @@
   let menu = null;
   let press = null;
   let swallowClickUntil = 0;
+  let swallowAnyUntil = 0; // fond du menu touché : le clic qui suit ne doit rien activer dessous
+  let awaitRelease = false; // appui long : seul le clic de CE relâchement est avalé
 
   const TRACK_PATH = /streams\/(?:[^/]+\/)?([a-z0-9-]+)\/(\d{1,3})-[^/]+\.m4a$/i; // avec ou sans dossier de version
+  // Position réelle du morceau dans son album (audit du 19/11) : le numéro du nom de fichier peut mentir
+  // (V-23π56 : STROMBOLI et PANAREA sont tous deux « 08- ») ; le serveur, lui, compte les positions.
+  let positions = null;
+  function loadPositions() {
+    if (positions) return;
+    positions = {};
+    fetch(`${siteRoot()}data/tracks.json?v=${encodeURIComponent(window.INFRA_BUILD_TAG || "")}`)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        ((data && data.albums) || []).forEach(function (a) {
+          (a.tracks || []).forEach(function (t, i) {
+            const m = String(t.src || "").match(TRACK_PATH);
+            if (m) positions[`${m[1]}/${String(t.src).split("/").pop()}`] = i + 1;
+          });
+        });
+      })
+      .catch(function () { positions = null; });
+  }
+  function positionOf(path, match) {
+    const key = `${match[1]}/${String(path).split("/").pop()}`;
+    return (positions && positions[key]) || Number(match[2]);
+  }
   function trackOf(row) {
     const path = row.getAttribute("data-bib-path") || row.getAttribute("data-favorite-path") || "";
     const match = path.match(TRACK_PATH);
@@ -27,7 +51,7 @@
     const pageTitle = document.querySelector("body.album-screen main h1");
     return {
       slug: match[1],
-      n: Number(match[2]),
+      n: positionOf(path, match),
       title: titleNode ? titleNode.textContent.trim() : "Morceau",
       album: albumNode ? albumNode.textContent.trim() : pageTitle ? pageTitle.textContent.trim() : ""
     };
@@ -66,14 +90,31 @@
     say(ok ? "Lien copié" : "Copie impossible");
   }
 
+  // Finition 19/11 : on vérifie d'abord que le fichier est disponible (en-têtes seulement, la suite est coupée) ;
+  // sinon une erreur du serveur (ou hors ligne) remplaçait toute la page et coupait la musique.
   function download(t) {
-    const a = document.createElement("a");
-    a.href = `${WORKER_URL}/download/${t.slug}/${t.n}`;
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    say(`Téléchargement : ${t.title}`);
+    const url = `${WORKER_URL}/download/${t.slug}/${t.n}`;
+    const stop = typeof AbortController === "function" ? new AbortController() : null;
+    say(`Préparation : ${t.title}`);
+    fetch(url, { mode: "cors", cache: "no-store", signal: stop ? stop.signal : undefined })
+      .then(function (response) {
+        if (stop) stop.abort();
+        if (!response.ok) {
+          say(response.status === 429 ? "Trop de téléchargements, réessaie dans une minute" : "Téléchargement indisponible pour le moment");
+          return;
+        }
+        const a = document.createElement("a");
+        a.href = url;
+        a.rel = "noopener";
+        a.setAttribute("download", "");
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        say(`Téléchargement : ${t.title}`);
+      })
+      .catch(function () {
+        say(navigator.onLine === false ? "Téléchargement impossible hors ligne" : "Téléchargement indisponible pour le moment");
+      });
   }
 
   function share(t, invoker) {
@@ -128,6 +169,10 @@
         .now-playing-meta.has-more .now-playing-meta-text { margin-right: 0; }
         .np-more { position: absolute; top: 50px; right: 272px; width: 44px; min-height: 44px; z-index: 5; }
         .now-playing-overlay.is-queue-inline .np-more { top: calc(50px + var(--np-scroll, 0px) - var(--np-bar-shift, 0px)); }
+      }
+      /* Audit 19/11 : à 1024 px la colonne de lecture ne faisait que 260 px et les commandes dépassaient la barre. */
+      @media (min-width: 981px) and (max-width: 1199px) {
+        .now-playing-panel { column-gap: 48px; padding-left: 48px; padding-right: 48px; }
       }
       .ta-menu.is-dark { --ta-bg: rgba(28,28,30,.97); --ta-ink: #fff; }
       .np-more:focus-visible { outline: 2px solid rgba(255,255,255,.6); outline-offset: 2px; border-radius: 6px; }
@@ -198,7 +243,7 @@
     }
     if (row.matches(ROW_SELECTOR)) row.classList.add("ta-held");
     menu = { scrim, box, row, invoker: row.matches("button") ? row : row.querySelector("button") || row };
-    scrim.addEventListener("pointerdown", function (e) { e.preventDefault(); swallowClickUntil = Date.now() + 500; closeMenu(); });
+    scrim.addEventListener("pointerdown", function (e) { e.preventDefault(); swallowAnyUntil = Date.now() + 500; closeMenu(); });
     scrim.addEventListener("contextmenu", function (e) { e.preventDefault(); closeMenu(); });
     box.addEventListener("click", function (e) {
       const b = e.target.closest("[data-ta]");
@@ -232,7 +277,8 @@
     if (!row || e.target.closest(".bib-heart, [data-bib-trackheart]")) return;
     press = { id: e.pointerId, x: e.clientX, y: e.clientY, row, timer: window.setTimeout(function () {
       if (!press) return;
-      swallowClickUntil = Date.now() + 700;
+      swallowClickUntil = Date.now() + 5000;
+      awaitRelease = true;
       try { if (navigator.vibrate) navigator.vibrate(8); } catch (_e) { /* pas de vibration */ }
       openMenu(press.row, press.x, press.y, false);
       press = null;
@@ -242,20 +288,37 @@
   document.addEventListener("pointermove", function (e) {
     if (press && e.pointerId === press.id && Math.hypot(e.clientX - press.x, e.clientY - press.y) > MOVE_TOLERANCE_PX) cancelPress();
   }, { capture: true, passive: true });
-  document.addEventListener("pointerup", cancelPress, { capture: true, passive: true });
+  document.addEventListener("pointerup", function () {
+    cancelPress();
+    // Audit 19/11 : avant, la garde restait armée 700 ms et avalait le 1er vrai toucher dans le menu.
+    if (awaitRelease) { awaitRelease = false; swallowClickUntil = Date.now() + 150; }
+  }, { capture: true, passive: true });
+  // Menu ouvert pendant que le doigt est encore posé : il ne fait plus défiler la liste derrière.
+  document.addEventListener("touchmove", function (e) {
+    if (menu && !menu.box.contains(e.target)) e.preventDefault();
+  }, { capture: true, passive: false });
   document.addEventListener("pointercancel", cancelPress, { capture: true, passive: true });
   window.addEventListener("scroll", cancelPress, { capture: true, passive: true });
   // Le relâchement de l'appui long ne lance pas le morceau
   document.addEventListener("click", function (e) {
-    if (Date.now() < swallowClickUntil && (rowFrom(e.target) || (menu && menu.box.contains(e.target)))) { e.preventDefault(); e.stopImmediatePropagation(); swallowClickUntil = 0; }
+    const now = Date.now();
+    if (now < swallowAnyUntil) { e.preventDefault(); e.stopImmediatePropagation(); swallowAnyUntil = 0; return; }
+    if (now < swallowClickUntil && (rowFrom(e.target) || (menu && (menu.box.contains(e.target) || menu.scrim === e.target)))) { e.preventDefault(); e.stopImmediatePropagation(); swallowClickUntil = 0; }
   }, true);
+  // Retour (historique) : le menu et la carte de partage ne restent pas ouverts sur la page d'avant (audit 19/11).
+  window.addEventListener("popstate", function () {
+    closeMenu();
+    const card = document.getElementById("infraShareDialog");
+    if (card && card.open && typeof card.close === "function") card.close();
+  });
 
   // Clavier : Maj+F10 ou touche Menu sur une ligne ; ↑ ↓ dans le menu ; Échap ferme
   document.addEventListener("keydown", function (e) {
     if (menu) {
-      const items = Array.from(menu.box.querySelectorAll("[data-ta]"));
+      const items = Array.from(menu.box.querySelectorAll("[data-ta], [data-ta-back]"));
       const i = items.indexOf(document.activeElement);
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeMenu(); }
+      else if (!items.length) return;
       else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
         e.stopPropagation();
@@ -278,6 +341,17 @@
   }, true);
   window.addEventListener("resize", closeMenu);
   injectStyle();
+  window.setTimeout(loadPositions, 1500);
+
+  // Hors ligne (audit du 19/11) : appuyer sur lecture échouait sans rien dire. Un seul message, discret.
+  let offlineSaidAt = 0;
+  document.addEventListener("error", function (e) {
+    const el = e.target;
+    if (!el || el.tagName !== "AUDIO" || navigator.onLine !== false) return;
+    if (Date.now() - offlineSaidAt < 8000) return;
+    offlineSaidAt = Date.now();
+    say("Hors ligne : la musique reviendra avec la connexion");
+  }, true);
 
   // ---------- Grand lecteur : « ⋯ » à côté du cœur ----------
   const DOTS = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
@@ -300,20 +374,26 @@
     const wait = new Promise(function (resolve) { window.setTimeout(function () { resolve(null); }, 2500); });
     const get = samplesApi().then(function (api) { return api.load(); }).catch(function () { return null; });
     return Promise.race([get, wait]).then(function (data) {
-      const album = data && (data.albums || []).find(function (a) { return a.title === t.album; });
+      // Le grand lecteur écrit titres et albums en majuscules : comparaison sans casse (81 morceaux manquaient).
+      const album = data && (data.albums || []).find(function (a) { return sameText(a.title, t.album); });
       if (!album) return [];
-      return album.items.filter(function (i) { return i.track === t.title; })
+      return album.items.filter(function (i) { return sameText(i.track, t.title); })
         .sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
     });
+  }
+  function sameText(x, y) {
+    const n = function (v) { return String(v || "").normalize("NFC").trim().toLocaleUpperCase("fr"); };
+    return n(x) === n(y);
   }
   function currentTrack() {
     const overlay = document.getElementById("infraNowPlayingOverlay");
     const fav = overlay && overlay.querySelector("[data-now-playing-favorite]");
-    const match = (fav && fav.getAttribute("data-favorite-path") || "").match(TRACK_PATH);
+    const favPath = (fav && fav.getAttribute("data-favorite-path")) || "";
+    const match = favPath.match(TRACK_PATH);
     if (!match) return null;
     const title = overlay.querySelector("[data-now-playing-title]");
     const album = overlay.querySelector("[data-now-playing-album]");
-    return { slug: match[1], n: Number(match[2]), title: title ? title.textContent.trim() : "Morceau",
+    return { slug: match[1], n: positionOf(favPath, match), title: title ? title.textContent.trim() : "Morceau",
       album: album ? album.textContent.trim() : "" };
   }
   function showCredits(t, list, box) {
@@ -343,6 +423,9 @@
     const button = document.querySelector("#infraNowPlayingOverlay [data-np-more]");
     if (!t || !button) return;
     samplesOf(t).then(function (list) {
+      // Pendant le chargement (2,5 s au plus), le lecteur a pu se fermer ou changer de morceau : on n'ouvre rien.
+      const now = currentTrack();
+      if (!document.documentElement.classList.contains("now-playing-open") || !now || now.slug !== t.slug || now.n !== t.n) return;
       const items = [["dl", "Télécharger le morceau", function () { download(t); }]];
       if (list.length) {
         items.push(["sample", list.length > 1 ? "Aller vers les samples" : "Aller vers le sample", function () { goToSample(t); }]);
@@ -368,9 +451,32 @@
     meta.appendChild(button);
     meta.classList.add("has-more");
   }
+  // Ordinateur : le cœur (et « ⋯ ») se placent juste avant « À suivre », quelle que soit sa largeur.
+  // Audit 19/11 : à droite fixe (228 px), le cœur chevauchait « À suivre » dès 1680 px de large.
+  function placeTopIcons() {
+    const overlay = document.getElementById("infraNowPlayingOverlay");
+    const heart = overlay && overlay.querySelector("[data-now-playing-favorite]");
+    const more = overlay && overlay.querySelector("[data-np-more]");
+    const toggle = overlay && overlay.querySelector("[data-now-playing-queue-toggle]");
+    if (!heart) return;
+    if (window.innerWidth < 981 || !toggle || !heart.offsetParent) {
+      heart.style.removeProperty("right");
+      if (more) more.style.removeProperty("right");
+      return;
+    }
+    const host = heart.offsetParent.getBoundingClientRect();
+    const right = Math.round(host.right - toggle.getBoundingClientRect().left + 8);
+    if (right < 0 || right > host.width) return;
+    heart.style.right = right + "px";
+    if (more) more.style.right = right + 44 + "px";
+  }
+  window.addEventListener("resize", function () { window.requestAnimationFrame(placeTopIcons); });
   // Le grand lecteur est construit puis ouvert à la demande : on pose « ⋯ » à chaque ouverture.
   new MutationObserver(function () {
-    if (document.documentElement.classList.contains("now-playing-open")) ensureNowPlayingMore();
+    if (!document.documentElement.classList.contains("now-playing-open")) return;
+    ensureNowPlayingMore();
+    placeTopIcons();
+    window.setTimeout(placeTopIcons, 400);
   }).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
   ensureNowPlayingMore();
   // Lien partagé d'un morceau (…-infra.html#titre-N, finition 19/11) : la page de l'album s'ouvre sur ce

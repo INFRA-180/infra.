@@ -2048,3 +2048,35 @@ c'était le système, pas le thème », « on doit pouvoir quitter en appuyant h
   muette dans un 2e lecteur YouTube caché 4 s avant ; quand il répond, les deux lecteurs échangent leur rôle et le
   son passe de l'un à l'autre (puissance égale), l'image aussi. iPhone (volume bloqué) ou lecteur pas prêt : saut
   comme avant. Vérifié hors écran sur CANDANA (Milan Pilar → Michael Jackson).
+
+## 19/11/2026 — Grande vérification par 6 agents, section Acapella, corrections (Claude, audiofix468)
+
+- **Acapella** (INFRA : « une playlist acapella pour départager les deux ») : trois sections, Samples (299, sans
+  aucune voix) · Acapella (123 voix seules) · Mix. Le bouton « voix » disparaît ; tri mémorisé par section.
+- Samples / Mix : fermer pendant la préparation muette ou pendant la sortie de ton morceau l'arrête (avant, il
+  continuait, parfois à plein volume) ; « pause » ne relance plus jamais la lecture (bouton bascule) ; la seconde
+  de préparation (entrée − 3 s) n'est plus réappliquée après l'entrée (réseau lent : entrée 3 s trop tôt) ; un
+  morceau qui finit avant la minute passe au sample suivant ; lecteur caché renommé `data-smp-alt` (collision
+  avec le bouton Suivant), prêt seulement après chargement de la nouvelle vidéo, arrêté s'il ne sert pas.
+- Menus : titres comparés sans casse (81 morceaux sans « Aller vers le sample » ni « Crédits ») ; numéro de
+  morceau = position dans l'album (V-23π56 : STROMBOLI téléchargeait PANAREA) ; téléchargement vérifié avant de
+  quitter la page (erreur, limite, hors ligne → petit message) ; clavier sans erreur après Crédits ; menu jamais
+  ouvert sur un morceau qui a changé ; 1er toucher dans le menu après l'appui long accepté ; toucher le fond ne
+  touche rien dessous ; glisser ou défiler derrière le menu bloqué ; Retour ferme menu et carte ; Échap sur la
+  carte de partage ne quitte plus l'album.
+- Hors ligne : les 33 pochettes gardées une fois, au calme (pas en économie de données) ; message « Hors ligne »
+  quand un morceau ne peut pas se lancer. Mise à jour : si une lecture repart pendant l'activation, la page
+  recharge dès que plus rien ne joue.
+- Worker (a4e4b7f5) : musique 120 requêtes/min par adresse (mesuré : 10/min au plus en écoute), plage après la
+  fin → 416, téléchargement protégé si R2 tombe, compteur de télémétrie par visiteur.
+- Reste connu : publicités YouTube dans le Mix (non maîtrisable), données à revoir (CONTEMPLATION : entrée
+  après la fin du morceau ; 3 samples sans temps).
+- Mise en page (même lot) : ordinateur, le cœur et « ⋯ » se placent juste avant « À suivre » quelle que soit
+  sa largeur (chevauchement dès 1680 px) ; de 981 à 1199 px, marges du grand lecteur réduites (commandes qui
+  dépassaient à 1024) ; carte de partage : place du logo réservée (elle sautait à l'ouverture), plus de rond au
+  survol du bouton du haut ; lecteur Samples : fondu à la fermeture ; grand lecteur sur téléphone : la page
+  revient exactement à sa position à la fermeture ; service worker : un chargement audio interrompu ne lève
+  plus d'erreur sur Safari.
+- Non changé, à décider par INFRA : 1er Play d'un album ou d'une playlist à froid → Radio (notes
+  contradictoires) ; lignes d'album de 94 px sur ordinateur (place réservée à la barre du morceau) ; colonne
+  étroite des Favoris ; contrastes des gris (numéros, durées, onglets non choisis).

@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20261119-audio467";
+const VERSION = "infra-shell-20261119-audio468";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const LIVE_CATALOG_CACHE = `${VERSION}-catalog`;
@@ -47,14 +47,14 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix467-20261119",
-  "./assets/js/bibliotheque.js?v=bibliotheque-v53-20261119",
-  "./assets/js/app.js?v=audiofix467-20261119",
+  "./assets/css/styles.css?v=audiofix468-20261119",
+  "./assets/js/bibliotheque.js?v=bibliotheque-v54-20261119",
+  "./assets/js/app.js?v=audiofix468-20261119",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix467-20261119",
-  "./data/track-durations.json?v=audiofix467-20261119",
-  "./data/tracks.json?v=audiofix467-20261119",
+  "./data/catalog.json?v=audiofix468-20261119",
+  "./data/track-durations.json?v=audiofix468-20261119",
+  "./data/tracks.json?v=audiofix468-20261119",
   "./data/playlists.json?v=playlist-collage-20260802",
   "./assets/css/playlists.css?v=playlist-collage-20260802",
   "./assets/branding/infra-logo-white-photoroom-title.png",
@@ -74,13 +74,13 @@ const SHELL_ASSETS = [
 // audio. A missing admin/QR/Sphragis file must therefore never invalidate the
 // complete shell installation.
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/scripts.admin.js?v=audiofix467-20261119",
+  "./assets/js/scripts.admin.js?v=audiofix468-20261119",
   // Onglet Samples hors ligne (finition 19/11) : mêmes adresses que celles demandées par la page
-  "./assets/js/samples.js?v=audiofix467-20261119",
-  "./data/samples.json?v=audiofix467-20261119",
+  "./assets/js/samples.js?v=audiofix468-20261119",
+  "./data/samples.json?v=audiofix468-20261119",
   // la Bibliothèque demande playlists.json avec l'étiquette de version du site (les pages de playlists,
   // avec playlist-collage) : les deux adresses sont gardées pour le hors ligne
-  "./data/playlists.json?v=audiofix467-20261119",
+  "./data/playlists.json?v=audiofix468-20261119",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./sphragis/",
   "./sphragis/index.html",
@@ -172,6 +172,29 @@ self.addEventListener("install", (event) => {
   event.waitUntil(installShellCache());
 });
 
+// Hors ligne : les 33 pochettes, une à une, seulement celles qui manquent (demandé par la page, au calme).
+let coverWarmRunning = false;
+async function warmCoverCache() {
+  if (coverWarmRunning) return;
+  coverWarmRunning = true;
+  try {
+    const cache = await caches.open(COVERS_CACHE);
+    const base = new URL("./", self.location.href);
+    for (const relativePath of CANONICAL_COVER_PATHS) {
+      const url = new URL(relativePath, base).href;
+      if (await cache.match(url)) continue;
+      try {
+        const response = await fetch(url, { credentials: "same-origin" });
+        if (response && response.ok) await cache.put(url, response);
+      } catch (_error) {
+        return; // réseau coupé : on reprendra une autre fois
+      }
+    }
+  } finally {
+    coverWarmRunning = false;
+  }
+}
+
 async function reconcileCoverCache() {
   const cache = await caches.open(COVERS_CACHE);
   const requests = await cache.keys();
@@ -210,6 +233,10 @@ self.addEventListener("message", (event) => {
   // Demandé par la page seulement quand elle est visible et que rien ne joue (INFRA, 08/11/2026).
   if (event && event.data && event.data.type === "INFRA_SW_ACTIVATE_IDLE") {
     self.skipWaiting();
+    return;
+  }
+  if (event && event.data && event.data.type === "INFRA_SW_WARM_COVERS") {
+    event.waitUntil(warmCoverCache());
     return;
   }
   if (event && event.data && event.data.type === "INFRA_SW_VERSION_REQUEST") {
@@ -708,7 +735,8 @@ self.addEventListener("fetch", (event) => {
     const rangeHeader = request.headers.get("Range") || request.headers.get("range") || "";
     const isSingleRange = /^bytes=(?:\d+-\d*|-\d+)$/i.test(rangeHeader);
     if (request.method === "GET" && request.mode === "cors" && isSingleRange) {
-      event.respondWith(servePrefetchedAudioOrNetwork(request, url, event));
+      // Audit 19/11 (Safari) : un chargement interrompu par le changement de morceau ne doit pas lever d'erreur.
+      event.respondWith(servePrefetchedAudioOrNetwork(request, url, event).catch(() => Response.error()));
     }
     // WebKit must handle no-cors and non-Range media requests natively. Relaying
     // those through fetch(request) strips media-specific headers on iOS.

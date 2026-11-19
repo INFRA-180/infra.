@@ -1019,6 +1019,7 @@
     function (event) {
       if (event.defaultPrevented) return;
       if (document.querySelector(".ta-menu")) return; // menu d'un morceau ouvert : Échap le ferme, sans quitter la page
+      if (document.querySelector("#infraShareDialog[open]")) return; // carte de partage ouverte : Échap la ferme (audit 19/11)
       var target = event.target,
         typing =
           target &&
@@ -1737,6 +1738,12 @@
       "touchmove",
       function (e) {
         if (!g || !e.touches || !e.touches[0]) return;
+        // Menu d'un morceau ouvert par l'appui long : le doigt qui glisse ne change pas d'onglet derrière (audit 19/11).
+        if (document.querySelector(".ta-menu")) {
+          finishTabSlide();
+          g = null;
+          return;
+        }
         var cx = e.touches[0].clientX,
           mx = cx - g.x,
           my = e.touches[0].clientY - g.y,

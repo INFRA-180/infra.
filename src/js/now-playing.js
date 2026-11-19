@@ -541,10 +541,12 @@
       document.body.style.removeProperty("left");
       document.body.style.removeProperty("right");
       document.body.style.removeProperty("width");
+      // Audit 19/11 : le mini-lecteur (et sa place en bas de page) revient AVANT de rendre la position,
+      // sinon la page est plus courte et, tout en bas, elle remontait de ~76 px sur téléphone.
+      syncTransportUi();
       if (wasOpen && Number.isFinite(audioState.nowPlayingScrollY)) {
         window.scrollTo(0, audioState.nowPlayingScrollY);
       }
-      syncTransportUi();
     }
 
     function openNowPlayingOverlay() {

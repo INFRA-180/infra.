@@ -216,7 +216,8 @@
       '    <div class="share-copy-toast" data-share-copy-toast role="status" aria-live="polite" aria-atomic="true"></div>',
       "  </header>",
       '  <div class="share-qr" data-share-qr aria-live="off"></div>',
-      '  <img class="share-brand-logo" data-share-brand-logo alt="" aria-hidden="true" decoding="async" />',
+      // Audit 19/11 : place du logo réservée (proportions du fichier), la carte ne saute plus à l'ouverture.
+      '  <img class="share-brand-logo" data-share-brand-logo alt="" aria-hidden="true" decoding="async" width="1260" height="220" style="aspect-ratio:1260/220" />',
       // INFRA 19/11/2026 : le lien est visible et se copie d'un toucher (petit « Lien copié »).
       '  <button class="share-link" type="button" data-share-link aria-label="Copier le lien"></button>',
       "</div>"
@@ -307,6 +308,13 @@
       }
     });
 
+    // Audit 19/11 (INFRA : jamais de rond derrière un bouton) : le bouton du haut à droite reste un simple picto au survol.
+    if (!document.getElementById("infraShareCopyStyle")) {
+      const style = document.createElement("style");
+      style.id = "infraShareCopyStyle";
+      style.textContent = ".share-dialog .share-copy:hover,.share-dialog .share-copy:focus-visible{background:transparent}.share-dialog .share-copy:hover{outline:none}";
+      document.head.appendChild(style);
+    }
     getPersistRoot().appendChild(dialog);
     dialogParts = { dialog, closeButton, copyButton, copyToast, title, qr, brandLogo, linkButton };
     return dialogParts;

@@ -69,3 +69,43 @@ Statuts possibles : ouvert · maquette · validé · fait · reporté.
 - Rien n'a été essayé sur un vrai iPhone.
 - Chaque nouvelle phrase d'INFRA s'ajoute ici avant de coder ; la liste entière est renvoyée à chaque ajout.
 - Le lot est fini quand tout est fermé ou reporté. La sauvegarde du site se fait après l'implémentation (`BACKUPS/`).
+
+## H. Recherche web (19/11, agent web)
+
+- YouTube intégré : interdit de bloquer les pubs, de cacher le lecteur (min. 200×200, visible) ou de séparer le son. youtube-nocookie garde les pubs. La plupart des titres samplés sont réclamés par des labels, donc des pubs sont possibles.
+- iPhone : `setVolume` sur une iframe ne fait rien, donc aucun vrai fondu possible avec YouTube. La lecture automatique échoue quand `playVideo` arrive après un délai ou sur un lecteur chargé après le toucher.
+- Piste n° 1 : extraits Apple de 30 s (iTunes Search API, `previewUrl`, CORS ouvert, gratuit, sans compte), lus en Web Audio : sans pub, cachés, vrais fondus. Il faut un lien Apple Music à côté. Limite : Apple choisit les 30 s, ce n'est pas forcément le passage samplé.
+- Piste n° 2 : Deezer (30 s, les liens expirent). Spotify : à écarter (plus d'extraits depuis le 27/11/2024).
+- Héberger soi-même des extraits : risque de droits d'auteur, déconseillé.
+
+## I. Vérification du code local (19/11, agent code)
+
+- Données : 422 samples. 419 ont le passage source (`s0`/`s1`) et la seconde d'entrée dans le morceau (`at`). Il n'existe aucun libellé de section : on l'affichera comme « passage 1:12 → 1:20 ». 45 samples sont sans artiste.
+- À corriger : CONTEMPLATION (`at` 152,7 s pour un morceau de 125 s) ; MARSELHA (titre et artiste inversés, sans temps) ; « Remembrances » (CERISES) et « Laure » (PECHES) sans temps.
+- Crédits : aucune donnée (logiciel, ordinateur, lieu). Il faudra qu'INFRA les donne, ou les lire dans les projets Ableton.
+- Voix : seul le champ `v` les détecte. Une vingtaine de raps complets ne sont pas marqués (Kendrick, Jul ×5, Freeze ×2, 2Pac…). Deux chemins mélangent voix et samples dans la liste et dans le lien YouTube (`samples.js` 823-826 et 1845).
+- Pause au lancement : la page ne relance jamais `playVideo` quand le lecteur est prêt, et sur iPhone le toucher ne passe pas dans l'iframe YouTube.
+- Mix coupé :
+  - iPhone : aucun fondu possible, on coupe sec.
+  - Ordinateur : le lecteur suivant est déclaré prêt trop tôt et ramené en arrière au moment du fondu ; le fondu ne dure qu'1 s.
+- Clic sur un album : le premier sample part d'office (`samples.js` 1818-1834).
+- Glisser vers le bas : déjà écrit dans le grand lecteur (`transport-builder.js` 375-600), à réutiliser avec une zone de prise hors vidéo.
+- Ordre des onglets : `samples.js` 558-567.
+
+## J. Proposition (à valider)
+
+1. Applicable sans autre choix :
+   - gris → noir ;
+   - onglets Samples · Mix · Acapella ;
+   - glisser vers le bas ;
+   - clic sur un album → liste des morceaux, rien ne démarre ;
+   - pour chaque sample, afficher « passage x → y de l'original, entre à z dans ton morceau » avec un repère sur la barre et un bouton « Aller au morceau » ;
+   - voix jamais mélangées aux samples ;
+   - lignes d'album et Favoris resserrés sur ordinateur.
+2. Choix de la source du son (le cœur du lot) :
+   - (a) **mixte, recommandé** : extraits Apple de 30 s en Web Audio pour l'écoute et les fondus (sans pub, caché, démarre seul), plus un bouton « Passage exact sur YouTube » visible ;
+   - (b) YouTube seul, visible, avec pubs et coupures sur iPhone ;
+   - (c) héberger ses propres extraits du passage exact : parfait techniquement, mais risque de droits d'auteur.
+   - Limite de (a) : Apple choisit les 30 s, ce n'est pas le passage samplé.
+3. Voix non marquées : déplacer les ~20 raps complets vers Acapella, liste à valider.
+4. Crédits : INFRA donne logiciel, ordinateur et lieu par album, ou l'agent lit les projets Ableton.

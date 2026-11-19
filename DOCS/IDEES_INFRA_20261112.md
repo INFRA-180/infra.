@@ -40,3 +40,12 @@ Maquettes du jour : V10 → V17 dans `DOCS/maquettes/` (chacune avec son `MAQUET
 - INFRA : la barre de lecture du grand lecteur sur ordinateur ne se voit pas et ne permet pas d'avancer / reculer (« pas très pratique ») ; vérifier aussi la PWA. Cause prouvée, correction proposée : `DOCS/GEOMETRIE_V19_20261113.md`.
 
 - 13/11 · Carte QR (appui long sur le logo) : doit rester ouverte après le relâchement et ne se fermer **que par la croix** (sinon impossible de faire scanner le QR). Noté dans `LOTS/REPRISE.md`, à faire.
+
+## 19/11/2026 · Discographie complète dans une app (plus tard)
+
+- Idée d'INFRA : une app Mac et iPhone avec **tous** ses morceaux (environ 700 depuis 2020), rangés par album et numérotés, avec les crédits (logiciel, ordinateur, lieu, samples utilisés). Moins de 10 Go, sur clé USB ou disque. Pour écouter, et comme archive propre en plus des sauvegardes.
+- Faisable :
+  - 700 morceaux en AAC 256 kbps ≈ 4 à 5 Go ; en sans perte (ALAC/FLAC) ≈ 20 Go. On peut mélanger : sans perte pour les albums sortis, AAC pour le reste.
+  - Les pièces existent déjà : le catalogue du site (albums, pochettes), le registre des samples (lot du 19/11), les projets Ableton (dates, version de Live).
+  - L'app Mac peut tourner directement depuis une clé USB. Sur iPhone, une app doit être installée et ne peut pas tourner depuis la clé ; le dossier de musique, lui, peut être copié.
+  - Variante la plus simple et portable : une page web hors ligne sur la clé (dossier + index.html), lisible partout.

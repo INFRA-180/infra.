@@ -57,11 +57,14 @@ assert.ok(
 );
 // INFRA 19/11/2026 : le lien est de nouveau visible et se copie d'un toucher (remplace la règle du 13/11).
 assert.ok(codeHas(dialogMarkup, 'class="share-link" type="button" data-share-link'), "visible link to copy is missing");
-assert.ok(codeHas(script, 'linkButton.addEventListener("click", function () { copyButton.click(); });'), "visible link does not copy");
+assert.ok(codeHas(script, 'linkButton.addEventListener("click", copyLink);'), "visible link does not copy");
+// INFRA 19/11/2026 : partage d'Apple quand l'appareil le propose, sinon le bouton du haut copie.
+assert.ok(codeHas(script, 'if (!nativeShare) return copyLink();'), "top button no longer copies without native share");
+assert.ok(codeHas(script, "await navigator.share({ title:"), "native share sheet is not offered");
 assert.ok(!codeHas(dialogMarkup, "Copier le lien</button>"), "legacy text copy button is still rendered");
 
-const copyHandlerStart = codeIndexOf(script, 'copyButton.addEventListener("click"');
-const copyHandlerEnd = codeIndexOf(script, "\n\n    getPersistRoot()", copyHandlerStart);
+const copyHandlerStart = codeIndexOf(script, "async function copyLink() {");
+const copyHandlerEnd = codeIndexOf(script, 'linkButton.addEventListener("click", copyLink);', copyHandlerStart);
 const copyHandler = script.slice(copyHandlerStart, copyHandlerEnd);
 assert.ok(copyHandlerStart >= 0 && copyHandlerEnd > copyHandlerStart, "copy click handler is missing");
 assert.ok(codeHas(copyHandler, "await copyText(copyUrl, dialog)"), "clipboard write is not called from the explicit click");

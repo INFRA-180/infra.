@@ -2021,3 +2021,18 @@ c'était le système, pas le thème », « on doit pouvoir quitter en appuyant h
 - Finition (audit de 5 agents, `DOCS/AUDIT_FINITION_20261119.md`, local) : lignes non sélectionnables dès le
   chargement (`track-actions.js`), menu sûr (fond, Échap, clavier), lien `#titre-N` qui amène au morceau,
   cache hors ligne de l'onglet Samples.
+
+## 19/11/2026 — Synchro sans Musique, limites Cloudflare, partage d'Apple (Claude, audiofix466)
+
+- Partage : dans la carte, le bouton du haut ouvre le partage d'Apple (`navigator.share` : Messages, AirDrop…)
+  quand l'appareil le propose (iPhone, Safari Mac), sinon il copie le lien ; le lien du bas copie toujours.
+  Aucun nouveau bouton ailleurs (INFRA : « le partage, mais pas partout »).
+- Hors dépôt public (`_private/`, désormais avec un historique Git local sans remote) :
+  - la synchro lit la bibliothèque et les pochettes par le framework Apple `iTunesLibrary`, sans ouvrir
+    Musique (mêmes 303 pistes, mêmes playlists dans le même ordre, pochettes identiques à l'octet) ; l'ancien
+    lecteur ne sert qu'en secours si Musique est déjà ouverte ;
+  - la publication automatique ne pousse plus que son propre commit (sha exact), et attend si d'autres commits
+    locaux le précèdent ;
+  - Worker : limites par visiteur (musique 600/min, téléchargements 30/min, Sphragis 20/min, compteurs Cloudflare
+    sans écriture KV) ; les sessions de télémétrie schéma 2-4 passent par le budget quotidien ; tableau de bord
+    rafraîchi toutes les 5 min, onglet visible seulement.

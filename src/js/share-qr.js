@@ -275,8 +275,16 @@
       window.clearTimeout(copyStateTimer);
     });
     const linkButton = dialog.querySelector("[data-share-link]");
-    linkButton.addEventListener("click", function () { copyButton.click(); });
-    copyButton.addEventListener("click", async function () {
+    // INFRA 19/11/2026 (« le partage, mais pas partout ») : quand l'appareil sait partager (iPhone, Safari Mac),
+    // le bouton du haut ouvre le partage d'Apple (Messages, AirDrop…) ; le lien du bas copie toujours.
+    // Ailleurs, le bouton du haut reste « Copier le lien ».
+    const nativeShare = typeof navigator.share === "function" && window.isSecureContext;
+    if (nativeShare) {
+      copyButton.setAttribute("aria-label", "Partager");
+      copyButton.classList.add("is-native-share");
+      copyButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" style="translate:0 0"><path d="M12 15V3m-4 4 4-4 4 4M8 11H5v10h14V11h-3"/></svg>';
+    }
+    async function copyLink() {
       const copyToken = openToken;
       const copyUrl = currentShareUrl;
       const copied = await copyText(copyUrl, dialog);
@@ -288,6 +296,15 @@
         return;
       }
       showCopyFeedback(copied ? "Lien copié" : "Copie impossible", copied ? "success" : "error");
+    }
+    linkButton.addEventListener("click", copyLink);
+    copyButton.addEventListener("click", async function () {
+      if (!nativeShare) return copyLink();
+      try {
+        await navigator.share({ title: title.textContent || "INFRA.", url: currentShareUrl });
+      } catch (error) {
+        if (!error || error.name !== "AbortError") copyLink(); // partage impossible : on copie
+      }
     });
 
     getPersistRoot().appendChild(dialog);

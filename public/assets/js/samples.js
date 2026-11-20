@@ -53,7 +53,7 @@
     SEGPRE = 4, // la partie suivante se prépare, muette, dans un 2e lecteur caché, SEGPRE s avant
     SORTS = ["bpm", "bpmdown", "shuffle", "album"],
     ticker = 0;
-  var pref = { sec: "samples", voix: false, sort: {} };
+  var pref = { sec: "samples", voix: false, sort: {}, mixo: null };
   try {
     var saved = JSON.parse(localStorage.getItem("infra-samples") || "null");
     if (saved && typeof saved === "object") {
@@ -65,6 +65,8 @@
         pref.sec = saved.sec;
       pref.voix = saved.voix === true;
       if (saved.sort && typeof saved.sort === "object") pref.sort = saved.sort;
+      // options du Mix (durée, effet), 20/11 : validées à la lecture par mixOpts()
+      if (saved.mixo && typeof saved.mixo === "object") pref.mixo = saved.mixo;
     } else pref.voix = localStorage.getItem("infra-samples-voix") === "1";
   } catch (_e) {}
   function save() {
@@ -307,12 +309,17 @@
     if (eng.on) {
       // extraits : fondu croisé de SEGXF s centré sur la fin de la partie (marge des extraits)
       var v = eng.cur,
-        when = v && v.item === item ? ctxAt(v, before.s1 - SEGXF / 2) : 0;
+        when = v && v.item === item ? ctxAt(v, before.s1 - SEGXF / 2) : null;
       duo.k = k;
       duo.end = sg.s1;
       duo.armed = false;
       duo.segAt = Date.now();
-      engStart(item, k, Math.max(sg.x[1], sg.s0 - SEGXF / 2), SEGXF, when);
+      engStart(
+        item,
+        k,
+        Math.max(sg.x[1], sg.s0 - SEGXF / 2),
+        planOf("seg", item, item, { dur: SEGXF, when: when, k: k }),
+      );
       paintNow();
       track("samples_part", { k: k, n: item.segs.length });
       return;
@@ -835,24 +842,25 @@
     nx.ready = false;
     st.ready = true;
     listen();
-    xfade(
-      function (v) {
-        sendTo(nf, "setVolume", [Math.round(v * 100)]);
+    var plan = transition(
+      {
+        set: function (v) {
+          sendTo(old, "setVolume", [Math.round(v * 100)]);
+        },
       },
-      function (v) {
-        sendTo(old, "setVolume", [Math.round(v * 100)]);
+      {
+        set: function (v) {
+          sendTo(nf, "setVolume", [Math.round(v * 100)]);
+        },
       },
-      SEGXF * 1000,
+      planOf("seg", duo.item, duo.item, { dur: SEGXF, k: duo.k }),
     );
-    later(
-      function () {
-        if (old !== frame() && !nx.item) {
-          sendTo(old, "stopVideo");
-          old.removeAttribute("src");
-        }
-      },
-      SEGXF * 1000 + 300,
-    );
+    clockAt(plan.when + SEGXF + 0.3, function () {
+      if (old !== frame() && !nx.item) {
+        sendTo(old, "stopVideo");
+        old.removeAttribute("src");
+      }
+    });
   }
   function embed(id, start, end) {
     var p = new URLSearchParams({
@@ -920,6 +928,8 @@
     dropNext();
     stopDuo(true);
     engStop(0.25);
+    evFlush(); // l'interface sait que la transition en cours s'arrête
+    clockClear();
     clearInterval(ticker);
     clearInterval(eng.tick);
     setTimeout(function () {
@@ -943,37 +953,38 @@
   function trackPhase() {
     return st.mix && (duo.phase === "track" || duo.phase === "mixin");
   }
-  // when : instant (horloge audio) du fondu, pour un enchaînement automatique programmé à l'avance.
-  function play(item, fresh, fadeIn, offset, when) {
+  // plan : transition préparée par planOf() (instant sur l'horloge audio, durée, effet), pour un
+  // enchaînement automatique ; sinon passage manuel (fondu SMPXF), saut ou premier son.
+  function play(item, fresh, fadeIn, offset, plan) {
     var f = frame();
     if (!f || !item) return;
     st.cued = false;
     var useE = useEng(item),
-      hadVoice = !!(eng.on && eng.cur && !eng.paused);
+      hadVoice = !!(eng.on && eng.cur && !eng.paused),
+      prevItem = st.list[st.pos];
     dropNext();
     stopDuo(!fadeIn && trackPhase());
     var fade = fadeIn && canFade();
     if (fadeIn) {
-      // fondu croisé : le morceau sort pendant que le sample entre (iPhone : coupe nette)
-      duo.outroUntil = Date.now() + OVERLAP * 1000 + 1500;
-      // extrait : il entre par son propre gain (moteur) ; ton morceau sort par le volume si possible
-      if (fade)
-        xfade(
-          useE
-            ? noop
-            : function (v) {
+      // morceau → sample : le morceau sort pendant que le sample entre (iPhone : coupe nette)
+      plan = plan || planOf("out", prevItem, item);
+      duo.outroUntil = Date.now() + plan.dur * 1000 + 1500;
+      // extrait : il entre par son propre gain (moteur, dans engStart) ; ton morceau sort par le volume
+      transition(
+        fade ? { set: setAudioVolume } : null,
+        useE || !fade
+          ? null
+          : {
+              set: function (v) {
                 setVideoVolume(v * 100);
               },
-          setAudioVolume,
-          OVERLAP * 1000,
-        );
-      later(
-        function () {
-          pauseMusic();
-          setAudioVolume(1);
-        },
-        fade ? OVERLAP * 1000 + 100 : 900,
+            },
+        plan,
       );
+      clockAt(plan.when + (fade ? plan.dur + 0.1 : 0.9), function () {
+        pauseMusic();
+        setAudioVolume(1);
+      });
     }
     st.pos = st.list.indexOf(item);
     var start = offset || 0,
@@ -1002,11 +1013,20 @@
       var segs = segsOf(item),
         loc0 = locate({ segs: segs }, offset || 0),
         sg0 = segs[loc0.k],
-        xf = fadeIn ? OVERLAP : !hadVoice ? 0 : offset ? 0.06 : SMPXF,
+        xf = plan ? plan.dur : !hadVoice ? 0 : offset ? 0.06 : SMPXF,
         from = sg0.s0 + loc0.local;
       if (!offset && xf) from = Math.max(sg0.x[1], sg0.s0 - xf / 2); // marge de l'extrait
       yt.time = from;
-      engStart(item, loc0.k, from, xf, when);
+      engStart(
+        item,
+        loc0.k,
+        from,
+        plan ||
+          planOf(offset ? "seek" : hadVoice ? "skip" : "first", prevItem, item, {
+            dur: xf,
+            k: loc0.k,
+          }),
+      );
       paint(fresh);
       return;
     }
@@ -1208,20 +1228,35 @@
     var at = isFinite(cur.at) ? Math.max(0, cur.at) : 0;
     track("samples_goto", { at: Math.round(at) });
     close();
-    var a = audioEl(),
-      seek = function () {
-        var el = audioEl();
-        if (el && at && Math.abs(el.currentTime - at) > 0.4)
-          try {
-            el.currentTime = at;
-          } catch (_e) {}
-      },
-      once = function () {
-        if (a) a.removeEventListener("playing", once);
-        seek();
-      };
-    if (a && at) a.addEventListener("playing", once);
-    if (!lib.playPaths([cur.src], 0) && a) a.removeEventListener("playing", once);
+    var seek = function () {
+      var el = audioEl();
+      if (el && at && Math.abs(el.currentTime - at) > 0.4)
+        try {
+          el.currentTime = at;
+        } catch (_e) {}
+    };
+    if (at) onNextPlaying(audioEl(), seek);
+    if (!lib.playPaths([cur.src], 0)) dropPlaying();
+  }
+  // Rapport terrain 20/11 (§ 3a, bugs 1-2) : un seul écouteur « playing » en attente à la fois. Le précédent
+  // est retiré, et il expire s'il ne vient jamais (sinon il recalait plus tard un autre morceau).
+  var waitPlaying = null;
+  function onNextPlaying(a, fn) {
+    dropPlaying();
+    if (!a) return;
+    var h = function () {
+      dropPlaying();
+      fn();
+    };
+    waitPlaying = { a: a, h: h, t: setTimeout(dropPlaying, 20000) };
+    a.addEventListener("playing", h);
+  }
+  function dropPlaying() {
+    var w = waitPlaying;
+    if (!w) return;
+    waitPlaying = null;
+    clearTimeout(w.t);
+    w.a.removeEventListener("playing", w.h);
   }
   function paintNow() {
     var cur = st.list[st.pos];
@@ -1500,7 +1535,7 @@
         resumeMusic();
         scheduleOut(Math.max(1, TRACK - (a.currentTime - duo.from)));
       } else {
-        clearTimeout(duo.out);
+        clearOut();
         pauseMusic();
       }
     } else if (eng.on) {
@@ -1567,12 +1602,12 @@
         prepNext();
       if (!settling && isFinite(tp) && !duo.armed && duo.end - tp < 1.5) {
         duo.armed = true;
-        later(
+        // fondu : il commence SEGXF s avant la fin de la partie, pour finir pile à sa fin
+        clockAt(
+          now() + Math.max(0, duo.end - tp - (canSwapNext() ? SEGXF : 0)),
           function () {
             if (duo.k === kk) nextSeg();
           },
-          // fondu : il commence SEGXF s avant la fin de la partie, pour finir pile à sa fin
-          Math.max(0, (duo.end - tp - (canSwapNext() ? SEGXF : 0)) * 1000),
         );
       }
       if (!settling && (state === 0 || state === 2) && tp >= duo.end - 0.6)
@@ -1699,17 +1734,25 @@
   );
 
   // ---------- Mix : sample → morceau ----------
+  // Attentes de chargement (pas de son) ; tout ce qui s'entend passe par clockAt / clockRamp.
   function later(fn, ms) {
     duo.timers.push(setTimeout(fn, ms));
   }
+  // Fin de la minute de ton morceau, comptée sur l'horloge audio.
   function scheduleOut(sec) {
-    clearTimeout(duo.out);
-    duo.out = setTimeout(mixOut, sec * 1000);
+    clearOut();
+    duo.out = clockAt(now() + sec, mixOut, "out");
+  }
+  function clearOut() {
+    if (duo.out && typeof duo.out === "object") duo.out.dead = true;
+    duo.out = 0;
   }
   function stopDuo(pauseTrack) {
     duo.timers.forEach(clearTimeout);
     duo.timers = [];
-    clearTimeout(duo.out);
+    clockClear("duo");
+    clearOut();
+    dropPlaying();
     // Audit du 19/11 : ton morceau préparé muet (« pre ») ne doit jamais s'entendre, et fermer pendant sa
     // sortie (fondu vers le sample suivant) doit aussi l'arrêter — avant, il continuait à plein volume.
     var wasPre = duo.phase === "pre";
@@ -1759,27 +1802,25 @@
       if (hush && el && duo.phase === "track") el.muted = false;
       hush = false;
     };
-    var onPlaying = function () {
-      seek();
-      if (a) a.removeEventListener("playing", onPlaying);
-      setTimeout(unhush, 150);
-    };
     if (a) {
       if (hush) a.muted = true;
-      a.addEventListener("playing", onPlaying);
+      onNextPlaying(a, function () {
+        seek();
+        setTimeout(unhush, 150);
+      });
       // Morceau qui finit avant la minute (PHI, MIEL…) : on passe tout de suite au sample suivant.
       if (!a.__smpEnded) {
         a.__smpEnded = true;
         a.addEventListener("ended", function () {
           if (st.mix && trackPhase() && sheet && !sheet.hidden) {
-            clearTimeout(duo.out);
+            clearOut();
             mixOut();
           }
         });
       }
     }
     if (!lib.playPaths([i.src], 0)) {
-      if (a) a.removeEventListener("playing", onPlaying);
+      dropPlaying();
       if (phase !== "pre") step(1);
       return false;
     }
@@ -1790,19 +1831,6 @@
     paintNow();
     if (seconds != null) scheduleOut(seconds);
     return true;
-  }
-  function ramp(set, from, to, ms) {
-    var n = 10;
-    for (var k = 1; k <= n; k++) {
-      (function (k) {
-        later(
-          function () {
-            set(from + ((to - from) * k) / n);
-          },
-          (ms * k) / n,
-        );
-      })(k);
-    }
   }
   function setAudioVolume(v) {
     var el = audioEl();
@@ -1839,22 +1867,6 @@
     } catch (_e) {}
     return fadeOk;
   }
-  // Fondu croisé à puissance égale : ce qui entre suit un sinus, ce qui sort un cosinus.
-  function xfade(setIn, setOut, ms) {
-    var n = 24;
-    for (var k = 1; k <= n; k++) {
-      (function (k) {
-        later(
-          function () {
-            var x = (k / n) * (Math.PI / 2);
-            setIn(Math.sin(x));
-            setOut(Math.cos(x));
-          },
-          (ms * k) / n,
-        );
-      })(k);
-    }
-  }
   // Où ton morceau entre : la seconde où le sample y apparaît (ou, si l'entrée est en fondu, le moment
   // où le son devient fort : champ « go » mesuré sur ton fichier audio).
   function entryOf(i) {
@@ -1870,12 +1882,18 @@
       duo.phase = "sample";
       return;
     }
-    // l'entrée est déclenchée par une minuterie, plus précise que les messages de YouTube
-    later(mixIn, Math.max(0, (duo.end - XF - yt.time) * 1000));
+    // l'entrée est calée sur l'horloge audio : instant exact de l'extrait, sinon temps YouTube
+    var v = eng.on && eng.cur && eng.cur.item === i ? eng.cur : null;
+    clockAt(
+      v ? ctxAt(v, duo.end - XF) : now() + Math.max(0, duo.end - XF - yt.time),
+      mixIn,
+    );
   }
   function cancelPre() {
     duo.timers.forEach(clearTimeout);
     duo.timers = [];
+    clockClear("duo");
+    dropPlaying();
     pauseMusic();
     var a = audioEl();
     if (a) a.muted = false;
@@ -1896,6 +1914,9 @@
     duo.phase = "mixin";
     var c = $("[data-smp-cov]", sheet);
     if (c) c.style.transitionDuration = "0.5s";
+    // sample → morceau : toujours « pile et fort » (XF s, sans effet), quel que soit le réglage du Mix
+    var wait = pre ? 0 : 1.3,
+      plan = planOf("in", i, i, { dur: XF, when: now() + wait });
     var open = function () {
       var el = audioEl();
       if (!el) return;
@@ -1904,53 +1925,52 @@
           el.currentTime = base;
         } catch (_e) {}
       // extrait : vrai fondu de sortie par le gain (iPhone compris) ; ton morceau entre comme avant
-      if (eng.on) engHush(XF);
+      var out = eng.on
+        ? { all: true }
+        : fade
+          ? {
+              set: function (v) {
+                setVideoVolume(v * 100);
+              },
+            }
+          : null;
       if (fade) {
         setAudioVolume(0);
         el.muted = false;
-        xfade(
-          setAudioVolume,
-          eng.on
-            ? noop
-            : function (v) {
-                setVideoVolume(v * 100);
-              },
-          XF * 1000,
-        );
+        transition(out, { set: setAudioVolume }, plan);
       } else {
         el.muted = false;
-        send("pauseVideo");
+        if (!eng.on) send("pauseVideo");
+        transition(out, null, plan);
       }
       paintNow();
     };
-    var wait = pre ? 0 : 1300;
-    if (wait) later(open, wait);
+    if (wait) clockAt(plan.when, open);
     else open();
-    later(
-      function () {
-        send("pauseVideo");
-        setVideoVolume(100);
-        setAudioVolume(1);
-        if (duo.phase === "mixin") duo.phase = "track";
-      },
-      wait + (fade ? XF * 1000 : 0) + 100,
-    );
-    scheduleOut(TRACK + wait / 1000);
+    clockAt(plan.when + (fade ? XF : 0) + 0.1, function () {
+      send("pauseVideo");
+      setVideoVolume(100);
+      setAudioVolume(1);
+      if (duo.phase === "mixin") duo.phase = "track";
+    });
+    scheduleOut(TRACK + wait);
     track("samples_mix_in", { bpm: bpmOf(i), pre: pre, fade: fade });
   }
-  // Fin de la minute : le sample suivant entre pendant que le morceau sort.
+  // Fin de la minute : le sample suivant entre pendant que le morceau sort (durée et effet du Mix).
   function mixOut() {
-    var list = shownList();
-    var next = list[list.indexOf(st.list[st.pos]) + 1];
+    var list = shownList(),
+      cur = st.list[st.pos],
+      next = list[list.indexOf(cur) + 1];
     if (!next) {
-      ramp(setAudioVolume, 1, 0, 3000);
-      later(function () {
+      var t = now();
+      clockRamp(setAudioVolume, 1, 0, t, 3, "duo", true);
+      clockAt(t + 3.2, function () {
         pauseMusic();
         setAudioVolume(1);
-      }, 3200);
+      });
       return;
     }
-    play(next, false, true);
+    play(next, false, true, 0, planOf("out", cur, next));
   }
   // iPhone : le lecteur INFRA doit avoir été touché pendant le geste pour pouvoir repartir seul ensuite.
   function unlockAudio() {
@@ -1973,6 +1993,435 @@
     }
   }
 
+  // ---------- Horloge audio (20/11) : tout ce qui s'entend est calé sur ctx.currentTime ----------
+  // Ton morceau (<audio> du site) et YouTube ne passent pas par Web Audio : leur volume est réglé par
+  // petits pas lus sur la même horloge (20 ms). Si le contexte audio est arrêté (onglet caché, iPhone
+  // « interrupted »), chaque tâche retombe sur l'heure murale pour ne jamais rester bloquée.
+  var clk = { jobs: [], iv: 0 };
+  function ctxNow() {
+    var c = eng.ctx;
+    return c && c.state === "running" ? c.currentTime : null;
+  }
+  function now() {
+    var t = ctxNow();
+    return t != null ? t : performance.now() / 1000;
+  }
+  function clockJob(j, t, grp) {
+    j.t = t;
+    j.ctx = ctxNow() != null;
+    j.w = Date.now() + (t - now()) * 1000;
+    j.grp = grp || "duo";
+    clk.jobs.push(j);
+    if (!clk.iv) clk.iv = setInterval(clockTick, 20);
+    return j;
+  }
+  // fn à l'instant t de l'horloge audio. Groupes : « duo » (effacé par stopDuo), « out » (fin de la
+  // minute de ton morceau), « eng » (moteur), « ev » (événements pour l'interface).
+  function clockAt(t, fn, grp) {
+    return clockJob({ fn: fn }, t, grp);
+  }
+  // Volume 0..1 d'un lecteur hors Web Audio : fondu à puissance égale (ou linéaire) de t à t + d.
+  function clockRamp(set, from, to, t, d, grp, lin) {
+    return clockJob(
+      { set: set, from: from, to: to, d: Math.max(0.02, d), lin: !!lin },
+      t,
+      grp,
+    );
+  }
+  function clockTick() {
+    var jobs = clk.jobs,
+      keep = [],
+      c = ctxNow();
+    clk.jobs = [];
+    jobs.forEach(function (j) {
+      if (j.dead) return;
+      var e = j.ctx && c != null ? c - j.t : (Date.now() - j.w) / 1000;
+      try {
+        if (j.set) {
+          if (e < 0) return keep.push(j);
+          var p = Math.min(1, e / j.d);
+          j.set(j.lin ? j.from + (j.to - j.from) * p : shape(j.from, j.to, p));
+          if (p < 1) keep.push(j);
+        } else if (e >= 0) {
+          j.dead = true;
+          j.fn();
+        } else keep.push(j);
+      } catch (err) {
+        setTimeout(function () {
+          throw err;
+        });
+      }
+    });
+    clk.jobs = keep.concat(clk.jobs).filter(function (j) {
+      return !j.dead;
+    });
+    if (!clk.jobs.length) {
+      clearInterval(clk.iv);
+      clk.iv = 0;
+    }
+  }
+  function clockClear(grp) {
+    clk.jobs.forEach(function (j) {
+      if (!grp || j.grp === grp) j.dead = true;
+    });
+    clk.jobs = clk.jobs.filter(function (j) {
+      return !j.dead;
+    });
+  }
+
+  // ---------- Options du Mix (T bis, validé par INFRA le 20/11) ----------
+  // Durée : Aucune · 5 s · Auto (4 mesures) ; effet : Fondu (défaut) · Reverb · Écho · Basses · Hasard
+  // qui écoute. Pour sample → sample (Samples, A cappella) et morceau → sample (Mix) ; sample → morceau
+  // reste à XF s, « pile et fort ». Les effets ne touchent que la sortie du sample (ton morceau n'y passe
+  // pas). Les règles (durée, hasard) viennent de samples-mix-core.js s'il est chargé, sinon du repli.
+  var CORE0 = {
+    DURATIONS: ["none", "5", "auto"],
+    EFFECTS: ["fade", "reverb", "echo", "bass", "listen"],
+    DEFAULTS: { dur: "auto", fx: "fade" },
+    NONE_S: 0.03,
+    transitionSeconds: function (c, bpm, m) {
+      if (c === "none") return 0.03;
+      var w = c === "5" ? 5 : bpm > 0 ? clamp(960 / bpm, 4, 12) : 8;
+      return Math.max(0.03, Math.min(w, 2 * (m >= 0 ? m : 4)));
+    },
+    resolveEffect: function (fx, a, b) {
+      if (fx !== "listen") return fx;
+      var g = a > 0 && b > 0 ? Math.abs(a - b) : NaN;
+      return !isFinite(g) || g < 4 ? "fade" : g <= 12 ? "bass" : "echo";
+    },
+  };
+  function core() {
+    var c = window.InfraSamplesMixCore;
+    return c && typeof c.transitionSeconds === "function" ? c : CORE0;
+  }
+  var ALIAS = {
+    aucune: "none",
+    0: "none",
+    "5s": "5",
+    fondu: "fade",
+    basses: "bass",
+    filtre: "bass",
+    hasard: "listen",
+    random: "listen",
+    "aléatoire": "listen",
+    "écho": "echo",
+  };
+  function normOpt(v, list) {
+    var s = String(v == null ? "" : v)
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "");
+    s = ALIAS[s] || s;
+    return list.indexOf(s) >= 0 ? s : null;
+  }
+  function mixOpts() {
+    var C = core(),
+      o = pref.mixo || {};
+    return {
+      dur: normOpt(o.dur, C.DURATIONS) || C.DEFAULTS.dur,
+      fx: normOpt(o.fx, C.EFFECTS) || C.DEFAULTS.fx,
+    };
+  }
+  // Tempo entendu : le sample joue à son tempo d'origine (bpm[0] s'il a été changé), ton morceau à tb.
+  function smpTempo(s) {
+    return s ? Number(s.bpm && s.bpm[0]) || Number(s.tb) || 0 : 0;
+  }
+  // Marges réelles des extraits (champ x : [id, début, durée]) : beaucoup n'ont pas 4 s des deux côtés.
+  function marginBefore(sg) {
+    return sg && sg.x ? Math.max(0, sg.s0 - sg.x[1]) : 60;
+  }
+  function marginAfter(sg, v) {
+    if (!sg || !sg.x) return 60;
+    var m = sg.x[1] + sg.x[2] - sg.s1;
+    if (v && v.len) m = Math.min(m, v.x0 + v.len - sg.s1);
+    return Math.max(0, m);
+  }
+  var MIXED = { smp: 1, out: 1 },
+    EMIT = { smp: 1, out: 1, in: 1, seg: 1, skip: 1 },
+    planSeq = 0;
+  // Durée et effet réellement joués pour un passage. kind : « smp » (sample → sample), « out » (ton
+  // morceau → sample), « in » (sample → morceau), « seg » (partie → partie), « skip » (passage à la main),
+  // « seek », « first », « resume ». o : { dur, when, k, voice (voix qui sort, pour sa vraie marge) }.
+  function planOf(kind, from, to, o) {
+    o = o || {};
+    var C = core(),
+      opt = mixOpts(),
+      dur = o.dur > 0 ? o.dur : 0.05,
+      fx = "fade",
+      tOut = 0,
+      tIn = 0;
+    if (MIXED[kind]) {
+      var eIn = !!to && useEng(to),
+        eOut = false,
+        m = 60;
+      tOut = kind === "out" ? Number(from && from.tb) || 0 : smpTempo(from);
+      tIn = smpTempo(to);
+      if (kind === "smp" && from && useEng(from)) {
+        var ls = segsOf(from);
+        m = marginAfter(ls[ls.length - 1], o.voice);
+        eOut = true;
+      }
+      if (eIn) m = Math.min(m, marginBefore(segsOf(to)[0]));
+      else if (to) m = Math.min(m, OVERLAP / 2); // YouTube : fondu court, comme avant
+      // iPhone : ton morceau est coupé net ; le sample entre comme avant (OVERLAP s au plus)
+      if (kind === "out" && !canFade()) m = Math.min(m, OVERLAP / 2);
+      dur = C.transitionSeconds(opt.dur, tOut, m);
+      // Extrait sans marge suffisante (la moitié des passages, 20/11) : jamais moins que le fondu validé
+      // d'avant (SMPXF / OVERLAP, qui rogne déjà au bord de l'extrait), sauf « Aucune ».
+      var base = kind === "smp" ? SMPXF : OVERLAP;
+      if (opt.dur !== "none" && dur < base) dur = base;
+      fx = C.resolveEffect(opt.fx, tOut, tIn);
+      if (dur < 0.1) {
+        dur = C.NONE_S || 0.03;
+        fx = "cut";
+      } else if (fx !== "fade" && !(kind === "smp" ? eOut : eIn)) fx = "fade";
+    }
+    return {
+      id: ++planSeq,
+      kind: kind,
+      when: o.when != null ? o.when : now(),
+      dur: dur,
+      fx: fx,
+      picked: MIXED[kind] ? opt.fx : "fade",
+      opt: { dur: opt.dur, fx: opt.fx }, // le choix de l'utilisateur (dur / fx : ce qui est vraiment joué)
+      fromBpm: bpmOf(from),
+      toBpm: bpmOf(to),
+      fromTempo: tOut,
+      toTempo: tIn,
+      toCover: !to ? "" : kind === "in" ? assetUrl(to.cover) : coverOf(to, o.k),
+      ev: {},
+    };
+  }
+  function coverOf(item, k) {
+    if (!useEng(item)) return assetUrl(item.cover);
+    var sg = item.segs && item.segs[k || 0],
+      s = item.chain ? item.chain[sg ? sg.ci : 0] : item;
+    return smpCover(s, item);
+  }
+
+  // UNE fonction pour tous les passages : fondu à puissance égale sur l'horloge audio, effet sur la sortie
+  // du sample, événements pour l'interface. from / to : { v: voix Web Audio }, { all: true } (toutes les
+  // voix du moteur), { set: fn(0..1) } (volume de ton morceau ou de YouTube), ou null. Peut être appelée
+  // en deux fois pour un même plan (ton morceau d'abord, l'extrait quand il est prêt) : un seul événement.
+  function transition(from, to, plan, at) {
+    var T = Math.max(now(), at || plan.when || 0),
+      D = plan.dur;
+    if (from && from.all) engHush(D, T);
+    else if (from && from.v) {
+      if (plan.kind === "smp") applyFx(from.v, plan, "out", T);
+      fadeOutVoice(from.v, T, D);
+    } else if (from && from.set) clockRamp(from.set, 1, 0, T, D);
+    if (to && to.v) {
+      setCurve(to.v, 0, 1, T, D);
+      if (plan.kind === "smp") applyFx(to.v, plan, "swap", T);
+      else if (plan.kind === "out") applyFx(to.v, plan, "in", T);
+    } else if (to && to.set) clockRamp(to.set, 0, 1, T, D);
+    emit(plan, T);
+    return plan;
+  }
+  // Événements DOM « samples:transition » (detail : phase start | end, fx joué, dur, BPM, pochette).
+  var evEnd = null;
+  function emit(plan, T) {
+    if (!EMIT[plan.kind] || plan.ev.done) return;
+    plan.ev.done = true;
+    evFlush();
+    var fire = function (phase) {
+      try {
+        document.dispatchEvent(
+          new CustomEvent("samples:transition", {
+            detail: {
+              phase: phase,
+              kind: plan.kind,
+              fx: plan.fx,
+              picked: plan.picked,
+              dur: plan.dur,
+              fromBpm: plan.fromBpm,
+              toBpm: plan.toBpm,
+              toCover: plan.toCover,
+              opt: plan.opt,
+            },
+          }),
+        );
+      } catch (_e) {}
+    };
+    clockAt(
+      T,
+      function () {
+        plan.ev.started = true;
+        fire("start");
+        if (MIXED[plan.kind])
+          track("samples_mix_fx", {
+            fx: plan.fx,
+            dur_s: Math.round(plan.dur * 10) / 10,
+            bpm_gap:
+              plan.fromTempo && plan.toTempo
+                ? Math.round(Math.abs(plan.fromTempo - plan.toTempo))
+                : -1,
+          });
+      },
+      "ev",
+    );
+    evEnd = clockAt(
+      T + plan.dur,
+      function () {
+        evEnd = null;
+        if (plan.ev.started) fire("end");
+      },
+      "ev",
+    );
+  }
+  // La transition affichée se termine tout de suite (on passe à autre chose, ou le lecteur se ferme).
+  function evFlush() {
+    var e = evEnd;
+    evEnd = null;
+    clockClear("ev");
+    if (e) e.fn();
+  }
+
+  // ---------- Bus de sortie et effets ----------
+  // voix : source → passe-haut (10 Hz, transparent ; « Basses » le fait monter) → gain → bus.in → bus.out
+  // → sortie. Les effets reçoivent un envoi pris avant le gain de la voix et reviennent dans bus.out.
+  function bus() {
+    var c = eng.ctx;
+    if (!c) return null;
+    if (eng.bus && eng.bus.c === c) return eng.bus;
+    var b = { c: c, in: c.createGain(), out: c.createGain(), rev: null };
+    b.in.connect(b.out);
+    b.out.connect(c.destination);
+    eng.bus = b;
+    return b;
+  }
+  // Reverb : réponse générée (bruit stéréo qui décroît, 2,4 s), créée une seule fois.
+  function reverbIn() {
+    var b = bus();
+    if (!b) return null;
+    if (!b.rev) {
+      var c = b.c,
+        n = Math.round(c.sampleRate * 2.4),
+        ir = c.createBuffer(2, n, c.sampleRate);
+      for (var ch = 0; ch < 2; ch++) {
+        var d = ir.getChannelData(ch);
+        for (var i = 0; i < n; i++)
+          d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+      }
+      var cv = c.createConvolver(),
+        r = c.createGain();
+      cv.buffer = ir;
+      r.gain.value = 0.8;
+      cv.connect(r);
+      r.connect(b.out);
+      b.rev = cv;
+    }
+    return b.rev;
+  }
+  // Écho : retard calé sur le tempo (3/4 de temps), retour 0,45 (< 1) assombri par un passe-bas.
+  // Un par transition ; débranché quand la queue est éteinte.
+  function echoIn(bpm, until) {
+    var b = bus();
+    if (!b) return null;
+    var c = b.c,
+      dt = clamp((60 / (bpm > 0 ? bpm : 120)) * 0.75, 0.12, 1.2),
+      inp = c.createGain(),
+      dl = c.createDelay(2),
+      lp = c.createBiquadFilter(),
+      fb = c.createGain(),
+      out = c.createGain();
+    dl.delayTime.value = dt;
+    lp.type = "lowpass";
+    lp.frequency.value = 2400;
+    fb.gain.value = 0.45;
+    out.gain.value = 0.7;
+    inp.connect(dl);
+    dl.connect(lp);
+    lp.connect(fb);
+    fb.connect(dl);
+    lp.connect(out);
+    out.connect(b.out);
+    setTimeout(
+      function () {
+        [inp, dl, lp, fb, out].forEach(function (n) {
+          try {
+            n.disconnect();
+          } catch (_e) {}
+        });
+      },
+      Math.max(0, until - c.currentTime + dt * 14 + 1) * 1000,
+    );
+    return inp;
+  }
+  function sendFrom(v, dest) {
+    var s = eng.ctx.createGain();
+    s.gain.value = 0;
+    v.hp.connect(s);
+    s.connect(dest);
+    (v.sends = v.sends || []).push(s);
+    return s.gain;
+  }
+  // role : « out » (sample qui sort), « in » (sample qui entre après ton morceau : effet à l'envers),
+  // « swap » (sample qui entre après un sample : seules ses basses attendent le milieu).
+  function applyFx(v, plan, role, T) {
+    var D = plan.dur,
+      fx = plan.fx;
+    if (!eng.ctx || !v.hp || fx === "fade" || fx === "cut") return;
+    try {
+      if (fx === "bass") {
+        var f = v.hp.frequency;
+        f.cancelScheduledValues(T);
+        if (role === "out") {
+          f.setValueAtTime(20, T);
+          f.exponentialRampToValueAtTime(900, T + D);
+        } else if (role === "in") {
+          f.setValueAtTime(900, T);
+          f.exponentialRampToValueAtTime(10, T + D);
+        } else {
+          f.setValueAtTime(320, T);
+          f.setValueAtTime(320, T + D / 2);
+          f.exponentialRampToValueAtTime(10, T + D / 2 + 0.12);
+        }
+        return;
+      }
+      if (role === "swap") return;
+      var dest =
+        fx === "reverb"
+          ? reverbIn()
+          : fx === "echo"
+            ? echoIn(role === "out" ? plan.fromTempo : plan.toTempo, T + D)
+            : null;
+      if (!dest) return;
+      var g = sendFrom(v, dest),
+        top = fx === "reverb" ? 0.9 : 0.8;
+      if (role === "out") {
+        // l'envoi monte pendant que le sample sort, puis se coupe : la queue reste seule
+        g.setValueAtTime(0, T);
+        g.linearRampToValueAtTime(top, T + D * 0.5);
+        g.setValueAtTime(top, Math.max(T + D * 0.5, T + D - 0.03));
+        g.linearRampToValueAtTime(0, T + D);
+      } else {
+        // le sample sort de l'effet à mesure qu'il entre
+        g.setValueAtTime(top, T);
+        g.linearRampToValueAtTime(0, T + D * (fx === "echo" ? 0.6 : 1));
+      }
+    } catch (_e) {}
+  }
+  function unplug(v) {
+    [v.g, v.hp].concat(v.sends || []).forEach(function (n) {
+      try {
+        if (n) n.disconnect();
+      } catch (_e) {}
+    });
+  }
+  function voiceNodes(c) {
+    var hp = c.createBiquadFilter(),
+      g = c.createGain();
+    hp.type = "highpass";
+    hp.frequency.value = 10;
+    hp.Q.value = 0.7071;
+    g.gain.value = 0;
+    hp.connect(g);
+    g.connect(bus().in);
+    return { hp: hp, g: g };
+  }
+
   // ---------- Extraits audio (Cloudflare R2) : moteur Web Audio ----------
   // 19/11 : les samples sont joués depuis de courts extraits (AAC, ~s0 − 4 s → s1 + 4 s) au lieu des
   // iframes YouTube : vrais fondus partout (iPhone compris, le gain d'un AudioContext n'est pas bloqué
@@ -1982,6 +2431,7 @@
       "https://infra180-api.pages.dev/audio/assets/music/streams/samples/",
     SMPXF = 2, // fondu croisé entre deux samples
     MAXBUF = 3, // extraits décodés gardés en mémoire
+    POOL = 3, // lecteurs <audio> pour la lecture en flux, tous débloqués pendant le geste
     LOOK = 1.2; // avance (s) avec laquelle une transition est programmée sur l'horloge audio
   var eng = {
     ctx: null,
@@ -2052,7 +2502,8 @@
     return i._segs;
   }
   function useEng(i) {
-    if (!i || i.noX || !audioCtor()) return false;
+    // noX : instant jusqu'auquel l'extrait est mis de côté (échec réseau), plus « toute la session »
+    if (!i || (i.noX && Date.now() < i.noX) || !audioCtor()) return false;
     var segs = segsOf(i);
     return (
       segs.length > 0 &&
@@ -2133,9 +2584,9 @@
   }
   function setCurve(v, from, to, when, dur) {
     var gp = v.g.gain,
-      now = eng.ctx.currentTime,
-      n = 16;
+      now = eng.ctx.currentTime;
     dur = Math.max(0.02, dur);
+    var n = Math.max(16, Math.ceil(dur * 8)); // fondus longs (Mix) : paliers de 1/8 s au plus
     when = Math.max(now, when);
     var nowV = gainAt(v, now);
     gp.cancelScheduledValues(0);
@@ -2164,7 +2615,7 @@
     eng.pool = eng.pool || [];
     if (!fresh)
       for (var i = 0; i < eng.pool.length; i++) if (!eng.pool[i].busy) return eng.pool[i];
-    if (eng.pool.length >= 3 || !eng.ctx) return null;
+    if (eng.pool.length >= POOL || !eng.ctx) return null;
     var el = new Audio();
     el.crossOrigin = "anonymous";
     el.preload = "auto";
@@ -2179,9 +2630,11 @@
     return e;
   }
   // Pendant le geste : chaque lecteur du lot joue un son vide, pour que l'iPhone le laisse jouer ensuite seul.
+  // Rapport terrain 20/11 (§ 3a, bug 4) : les POOL lecteurs sont tous créés ici, dans le geste (avant, le
+  // 3e naissait plus tard, hors geste, et l'iPhone pouvait le refuser).
   function unlockPool() {
     if (!eng.ctx) return;
-    for (var n = 0; n < 2 && (eng.pool || []).length < 2; n++) if (!poolEl(true)) break;
+    while ((eng.pool || []).length < POOL) if (!poolEl(true)) break;
     (eng.pool || []).forEach(function (e) {
       if (e.busy || e.ok) return;
       try {
@@ -2200,28 +2653,28 @@
       } catch (_e) {}
     });
   }
-  function startStreamVoice(item, k, ytFrom, when, fade, onFail) {
+  // Voix muette (gain 0) : c'est transition() qui l'ouvre, avec la durée et l'effet du passage.
+  function startStreamVoice(item, k, ytFrom, when, onFail) {
     var c = eng.ctx,
       sg = segsOf(item)[k],
       e = poolEl();
     if (!e) return null;
     e.busy = true;
     var el = e.el,
-      g = c.createGain(),
+      nd = voiceNodes(c),
       off = Math.max(0, ytFrom - sg.x[1]),
       stopT = null;
     try {
       e.node.disconnect();
     } catch (_e) {}
-    e.node.connect(g);
-    g.connect(c.destination);
+    e.node.connect(nd.hp);
     var release = function () {
       clearTimeout(stopT);
       try {
         el.pause();
       } catch (_e) {}
+      unplug(v);
       try {
-        g.disconnect();
         e.node.disconnect();
       } catch (_e) {}
       el.onended = el.onerror = el.onplaying = null;
@@ -2229,12 +2682,14 @@
     };
     var v = {
       el: el,
-      g: g,
+      g: nd.g,
+      hp: nd.hp,
       item: item,
       k: k,
       sg: sg,
       name: sg.x[0],
       x0: sg.x[1],
+      len: sg.x[2],
       off: off,
       at: when,
       gv: { from: 0, to: 0, when: 0, dur: 0.02 },
@@ -2249,8 +2704,6 @@
         },
       },
     };
-    g.gain.value = 0;
-    setCurve(v, 0, 1, when, fade);
     el.onended = function () {
       var j = eng.voices.indexOf(v);
       if (j >= 0) eng.voices.splice(j, 1);
@@ -2263,7 +2716,7 @@
       if (j >= 0) eng.voices.splice(j, 1);
       release();
       if (eng.cur === v) eng.cur = null;
-      onFail();
+      onFail(v);
     };
     var tStart = Date.now();
     el.onplaying = function () {
@@ -2285,42 +2738,44 @@
     eng.voices.push(v);
     return v;
   }
-  function startVoice(buf, item, k, ytFrom, when, fade) {
+  function startVoice(buf, item, k, ytFrom, when) {
     var c = eng.ctx,
       sg = segsOf(item)[k],
-      g = c.createGain(),
+      nd = voiceNodes(c),
       s = c.createBufferSource();
     s.buffer = buf;
-    s.connect(g);
-    g.connect(c.destination);
+    s.connect(nd.hp);
     var v = {
       s: s,
-      g: g,
+      g: nd.g,
+      hp: nd.hp,
       item: item,
       k: k,
       sg: sg,
       name: sg.x[0],
       x0: sg.x[1],
+      len: buf.duration,
       off: clamp(ytFrom - sg.x[1], 0, Math.max(0, buf.duration - 0.05)),
       at: when,
       gv: { from: 0, to: 0, when: 0, dur: 0.02 }, // muette jusqu'à son départ
     };
-    g.gain.value = 0;
-    setCurve(v, 0, 1, when, fade);
     s.onended = function () {
       var j = eng.voices.indexOf(v);
       if (j >= 0) eng.voices.splice(j, 1);
-      try {
-        g.disconnect();
-      } catch (_e) {}
+      unplug(v);
       if (eng.cur === v && !v.done) engEnded(v);
     };
     s.start(when, v.off);
     eng.voices.push(v);
     return v;
   }
-  function fadeOutVoice(v, when, dur) {
-    if (!v || v.done) return;
+  // force : voix déjà en train de sortir (fondu long du Mix) raccourcie quand tout s'arrête (fermer, pause).
+  function fadeOutVoice(v, when, dur, force) {
+    if (!v || (v.done && !force)) return;
+    if (v.done) {
+      var r = v.gv;
+      if (r && r.to === 0 && r.when + r.dur <= when + dur) return; // déjà plus court
+    }
     v.done = true;
     setCurve(v, gainAt(v, when), 0, when, dur);
     try {
@@ -2328,15 +2783,16 @@
     } catch (_e) {}
     if (eng.cur === v) eng.cur = null;
   }
-  // Coupe tout ce que joue le moteur (fondu court) ; les chargements en cours sont oubliés.
-  function engHush(d) {
+  // Coupe tout ce que joue le moteur (fondu de d s, maintenant ou à l'instant « when ») ; les chargements
+  // en cours sont oubliés.
+  function engHush(d, when) {
     eng.gen++;
     eng.armed = false;
     eng.loading = false;
     if (!eng.ctx) return;
-    var now = eng.ctx.currentTime;
+    var t = Math.max(eng.ctx.currentTime, when || 0);
     eng.voices.slice().forEach(function (v) {
-      fadeOutVoice(v, now, d);
+      fadeOutVoice(v, t, d, true);
     });
     eng.cur = null;
   }
@@ -2346,9 +2802,10 @@
     eng.hold = null;
     engHush(d == null ? 0.15 : d);
   }
-  // Joue la partie k de l'item à partir du temps YouTube ytFrom ; fondu croisé de xf s avec ce qui
-  // joue, à l'instant « when » de l'horloge audio (maintenant par défaut).
-  function engStart(item, k, ytFrom, xf, when) {
+  // Joue la partie k de l'item à partir du temps YouTube ytFrom ; le passage avec ce qui joue suit le
+  // plan (instant sur l'horloge audio, durée, effet) : voir transition().
+  // noStream : lecture en flux refusée (autoplay iPhone, réseau) → on repasse par le tampon décodé.
+  function engStart(item, k, ytFrom, plan, noStream) {
     var gen = ++eng.gen,
       sg = segsOf(item)[k];
     eng.on = true;
@@ -2356,15 +2813,17 @@
     eng.hold = null;
     ensureCtx();
     var ready = eng.bufs[sg.x[0]] && eng.bufs[sg.x[0]].buf;
-    if (!ready && eng.ctx && eng.ctx.state === "running") {
-      var now0 = eng.ctx.currentTime,
-        at0 = Math.max(now0 + 0.02, when || 0),
-        d0 = xf || 0.05;
-      var sv = startStreamVoice(item, k, ytFrom, at0, d0, function () {
-        if (gen === eng.gen) engFail(item, k);
+    if (!ready && !noStream && eng.ctx && eng.ctx.state === "running") {
+      var at0 = Math.max(eng.ctx.currentTime + 0.02, plan.when || 0);
+      // Rapport terrain 20/11 (§ 3a, bug 3) : un refus passager ne bascule plus l'extrait sur YouTube
+      // pour toute la session ; on réessaie aussitôt par le tampon (fetch + décodage, sans <audio>).
+      var sv = startStreamVoice(item, k, ytFrom, at0, function (v) {
+        if (gen !== eng.gen) return;
+        track("samples_audio_retry", { mode: st.mix ? "mix" : "samples" });
+        engStart(item, k, Math.max(ytFrom, ytNow(v)), plan, true);
       });
       if (sv) {
-        if (eng.cur) fadeOutVoice(eng.cur, at0, d0);
+        transition(eng.cur ? { v: eng.cur } : null, { v: sv }, plan, at0);
         eng.cur = sv;
         eng.armed = false;
         if (!trackPhase() && Date.now() >= duo.outroUntil && duo.phase !== "pre")
@@ -2384,11 +2843,10 @@
       function (buf) {
         if (gen !== eng.gen || !sheet || sheet.hidden) return;
         eng.loading = false;
-        var now = eng.ctx.currentTime,
-          at = Math.max(now + 0.02, when || 0),
-          d = xf || 0.05;
-        if (eng.cur) fadeOutVoice(eng.cur, at, d);
-        eng.cur = startVoice(buf, item, k, ytFrom, at, d);
+        var at = Math.max(eng.ctx.currentTime + 0.02, plan.when || 0),
+          nv = startVoice(buf, item, k, ytFrom, at);
+        transition(eng.cur ? { v: eng.cur } : null, { v: nv }, plan, at);
+        eng.cur = nv;
         eng.armed = false;
         if (
           !trackPhase() &&
@@ -2419,10 +2877,12 @@
     }
     if (nxt && nxt.x) getBuf(nxt.x[0]).catch(noop);
   }
-  // Extrait introuvable (404, réseau) : cet item repasse par YouTube, comme avant.
+  // Extrait introuvable (404, réseau) : cet item repasse par YouTube, comme avant — 2 minutes au premier
+  // échec (le réseau revient), puis pour la session au deuxième.
   function engFail(item, k) {
     track("samples_audio_fail", { mode: st.mix ? "mix" : "samples" });
-    item.noX = true;
+    item.xFails = (item.xFails || 0) + 1;
+    item.noX = item.xFails >= 2 ? Infinity : Date.now() + 120000;
     engStop(0.1);
     if (!sheet || sheet.hidden || st.list[st.pos] !== item) return;
     play(item, true, false, st.mix ? segsOf(item)[k].from : 0);
@@ -2443,7 +2903,7 @@
         duo.k = h.k;
         duo.end = segsOf(cur)[h.k].s1;
       }
-      engStart(h.item, h.k, h.t, 0.08);
+      engStart(h.item, h.k, h.t, planOf("resume", null, null, { dur: 0.08 }));
     } else if (cur) play(cur, false, false, 0);
   }
   function engSeek(item, t) {
@@ -2459,7 +2919,7 @@
       eng.hold = { item: item, k: loc.k, t: y, name: segs[loc.k].x[0] };
       return;
     }
-    engStart(item, loc.k, y, 0.06);
+    engStart(item, loc.k, y, planOf("seek", null, null, { dur: 0.06 }));
   }
   // Fin naturelle de l'extrait sans transition programmée (onglet en arrière-plan…).
   function engEnded(v) {
@@ -2475,26 +2935,42 @@
     }
     if (!eng.armed) engAuto(v);
   }
-  // Fin d'un sample (Samples, Acapella) : le suivant entre en fondu croisé de SMPXF s.
+  // Fin d'un sample (Samples, A cappella) : le suivant entre selon les options du Mix (durée, effet),
+  // centré sur la jointure et plafonné par la vraie marge des deux extraits.
+  function nextOf(item) {
+    var list = shownList();
+    return list[list.indexOf(item) + 1];
+  }
   function engAuto(v) {
     eng.armed = true;
-    var list = shownList(),
-      next = list[list.indexOf(v.item) + 1],
-      now = eng.ctx.currentTime;
+    var next = nextOf(v.item),
+      t = eng.ctx.currentTime;
     if (!next) {
       if (eng.cur === v)
-        fadeOutVoice(v, Math.max(now, ctxAt(v, v.sg.s1 - 0.5)), 1);
+        fadeOutVoice(v, Math.max(t, ctxAt(v, v.sg.s1 - 0.5)), 1);
       return;
     }
     if (!useEng(next)) {
       // son suivant sans extrait : YouTube prend le relais à la fin de celui-ci
-      var ms = Math.max(0, (ctxAt(v, v.sg.s1) - now) * 1000);
-      setTimeout(function () {
-        if (eng.on && st.list[st.pos] === v.item && !eng.paused) play(next);
-      }, ms);
+      clockAt(
+        Math.max(t, ctxAt(v, v.sg.s1)),
+        function () {
+          if (eng.on && st.list[st.pos] === v.item && !eng.paused) play(next);
+        },
+        "eng",
+      );
       return;
     }
-    play(next, false, false, 0, ctxAt(v, v.sg.s1 - SMPXF / 2));
+    var plan = planOf("smp", v.item, next, { voice: v, k: 0 });
+    plan.when = ctxAt(v, v.sg.s1 - plan.dur / 2);
+    play(next, false, false, 0, plan);
+  }
+  // Durée du prochain passage sample → sample (pour l'armer à temps).
+  function autoDur(v) {
+    var next = nextOf(v.item);
+    return next && useEng(next)
+      ? planOf("smp", v.item, next, { voice: v }).dur
+      : SMPXF;
   }
   // Toutes les 100 ms : position, puis transitions programmées à l'avance sur l'horloge audio.
   function engTick() {
@@ -2534,14 +3010,138 @@
           v.item,
           nk,
           Math.max(ns.x[1], ns.s0 - SEGXF / 2),
-          SEGXF,
-          ctxAt(v, sg.s1 - SEGXF / 2),
+          planOf("seg", v.item, v.item, {
+            dur: SEGXF,
+            when: ctxAt(v, sg.s1 - SEGXF / 2),
+            k: nk,
+          }),
         );
         track("samples_part", { k: nk, n: segsOf(v.item).length });
       }
       return;
     }
-    if (sg.s1 - tp < SMPXF / 2 + LOOK) engAuto(v);
+    // dernier passage : la transition est armée LOOK s avant son début (au plus 6 s avant la jointure)
+    if (sg.s1 - tp < 6 + LOOK && sg.s1 - tp < autoDur(v) / 2 + LOOK) engAuto(v);
+  }
+  // Retour sur la page (iPhone : contexte « interrupted » après verrouillage ou arrière-plan) : on relance.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible" || !eng.ctx || !sheet || sheet.hidden)
+      return;
+    if (eng.ctx.state !== "running")
+      try {
+        var p = eng.ctx.resume();
+        if (p && p.catch) p.catch(noop);
+      } catch (_e) {}
+  });
+
+  // ---------- API pour l'interface (page Mix, menu ⋯ du lecteur) ----------
+  function getOptions() {
+    var C = core(),
+      o = mixOpts();
+    return {
+      dur: o.dur,
+      fx: o.fx,
+      defaults: { dur: C.DEFAULTS.dur, fx: C.DEFAULTS.fx },
+      durations: C.DURATIONS.slice(),
+      effects: C.EFFECTS.slice(),
+      // iPhone : ton morceau ne se fond pas (coupe nette) ; les effets restent sur le sample
+      trackFades: canFade(),
+    };
+  }
+  function setOptions(o) {
+    var C = core(),
+      cur = mixOpts(),
+      next = { dur: cur.dur, fx: cur.fx };
+    if (o && o.dur != null) next.dur = normOpt(o.dur, C.DURATIONS) || cur.dur;
+    if (o && o.fx != null) next.fx = normOpt(o.fx, C.EFFECTS) || cur.fx;
+    pref.mixo = next;
+    save();
+    if (next.dur !== cur.dur) track("samples_mix_opt", { opt: "dur", choice: next.dur });
+    if (next.fx !== cur.fx) track("samples_mix_opt", { opt: "fx", choice: next.fx });
+    var out = getOptions();
+    try {
+      document.dispatchEvent(new CustomEvent("samples:options", { detail: out }));
+    } catch (_e) {}
+    return out;
+  }
+  // false = option à griser. iPhone (volume de ton morceau bloqué) : dans le Mix, ton morceau est coupé
+  // net et le sample entre en OVERLAP s au plus, donc seules « Aucune » et les effets restent vrais.
+  function supports(kind, value) {
+    var C = core();
+    if (kind === "fx") return !!normOpt(value, C.EFFECTS);
+    if (kind !== "dur") return false;
+    var d = normOpt(value, C.DURATIONS);
+    if (!d) return false;
+    return d === "none" || pref.sec !== "mix" || canFade();
+  }
+  // Ce qu'on entend maintenant (aucune donnée privée), pour l'interface ; null si le lecteur est fermé.
+  function current() {
+    var cur = st.list[st.pos];
+    if (!sheet || sheet.hidden || !cur) return null;
+    var inTrack = trackPhase(),
+      smp = curSample() || cur;
+    return {
+      mode: st.mix ? "mix" : pref.sec === "voix" ? "voix" : "samples",
+      phase: inTrack ? "track" : "sample",
+      title: inTrack ? cur.track : smp.t,
+      artist: inTrack ? "INFRA" : smp.a,
+      track: cur.track,
+      album: cur.album,
+      bpm: bpmOf(cur),
+      tempo: inTrack ? Number(cur.tb) || 0 : smpTempo(smp),
+      cover:
+        inTrack || !(eng.on || st.cued) ? assetUrl(cur.cover) : smpCover(smp, cur),
+      playing: isPlaying(),
+    };
+  }
+  function resetOptions() {
+    var C = core();
+    return setOptions({ dur: C.DEFAULTS.dur, fx: C.DEFAULTS.fx });
+  }
+  // Le prochain passage tel qu'il sera joué (durée, effet réel), sans rien lancer ; null si aucun.
+  function nextTransition() {
+    var cur = st.list[st.pos];
+    if (!sheet || sheet.hidden || !cur) return null;
+    var next = nextOf(cur);
+    if (!next) return null;
+    var p = st.mix
+      ? planOf("out", cur, next)
+      : planOf("smp", cur, next, {
+          voice: eng.cur && eng.cur.item === cur ? eng.cur : null,
+        });
+    return {
+      kind: p.kind,
+      dur: p.dur,
+      fx: p.fx,
+      picked: p.picked,
+      fromBpm: p.fromBpm,
+      toBpm: p.toBpm,
+      toCover: p.toCover,
+    };
+  }
+  // « Écouter la transition » : saute 6 s avant la prochaine transition (Mix : fin de la minute de ton
+  // morceau ; Samples : jointure avec le sample suivant, moins la moitié du fondu).
+  function previewTransition() {
+    var cur = st.list[st.pos];
+    if (!sheet || sheet.hidden || !cur) return null;
+    ensureCtx();
+    if (st.cued) {
+      toggle();
+      return null;
+    }
+    var nt = nextTransition(),
+      b = barState(),
+      was = isPlaying();
+    if (!b || !b.T) return null;
+    var t = st.mix ? b.T - 6 : b.T - (nt ? nt.dur / 2 : 0) - 6;
+    seekTo(Math.max(0, t));
+    // Mix : le saut dans ton morceau le lance déjà ; Samples en pause : on reprend à la nouvelle place
+    if (!st.mix && !was) toggle();
+    track("samples_mix_try", {
+      fx: nt ? nt.fx : "",
+      dur_s: nt ? Math.round(nt.dur * 10) / 10 : 0,
+    });
+    return nt;
   }
   // Pochette affichée à la place de la vidéo : celle du sample (assets/samples/<y>.webp) si elle existe.
   function smpCover(smp, cur) {
@@ -2726,6 +3326,16 @@
     openTrack: openTrack,
     same: same,
     close: close,
+    // Options du Mix (20/11) : voir DOCS/LOTS/AGENTS_MIX_20261120/CODE_A_MOTEUR.md
+    mix: {
+      getOptions: getOptions,
+      setOptions: setOptions,
+      resetOptions: resetOptions,
+      nextTransition: nextTransition,
+      previewTransition: previewTransition,
+      supports: supports,
+    },
+    current: current,
     // état du moteur audio, pour les vérifications (aucune donnée privée)
     audioState: function () {
       return {

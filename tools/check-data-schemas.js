@@ -104,7 +104,29 @@ if (samples) {
     if (tracks && !known.has(a.title)) fail(`samples.albums[${i}].title : album inconnu de tracks.json (${a.title})`);
     (a.tracks || []).forEach((t, j) =>
       (t.items || []).forEach((it, k) => {
-        if (!/^[\w-]{11}$/.test(String(it && it.y))) fail(`samples.albums[${i}].tracks[${j}].items[${k}].y : identifiant YouTube invalide`);
+        const where = `samples.albums[${i}].tracks[${j}].items[${k}]`;
+        if (!/^[\w-]{11}$/.test(String(it && it.y))) fail(`${where}.y : identifiant YouTube invalide`);
+        if (!it) return;
+        // 20/11/2026 : forme des temps, passages, extraits, tempo, pochette et voix (le sens est vérifié par tools/test-samples.js)
+        if ("v" in it && it.v !== 1) fail(`${where}.v : 1 ou absent`);
+        if ("c" in it && it.c !== 1) fail(`${where}.c : 1 ou absent`);
+        if ("tb" in it && !(num(it.tb) && it.tb > 0)) fail(`${where}.tb : BPM > 0 attendu`);
+        const timed = ["s0", "s1", "at", "x", "p"].some((key) => key in it);
+        if (!timed) return; // son sans temps : exclu du Mix (D4, liste dans tools/test-samples.js)
+        need(it, where, { s0: num, s1: num, at: num });
+        if (num(it.s0) && num(it.s1) && !(it.s0 < it.s1)) fail(`${where} : s0 doit être avant s1`);
+        const parts = "p" in it ? it.p : [[it.s0, it.s1]];
+        if (!Array.isArray(parts) || !parts.length || !parts.every((q) => Array.isArray(q) && q.length === 2 && num(q[0]) && num(q[1]) && q[0] < q[1])) {
+          fail(`${where}.p : liste de passages [début, fin] attendue`);
+          return;
+        }
+        if (!Array.isArray(it.x) || it.x.length !== parts.length) fail(`${where}.x : un extrait par passage attendu`);
+        else
+          it.x.forEach((x, n) => {
+            if (!Array.isArray(x) || !/^[\w-]{11}_\d+-\d+$/.test(String(x[0])) || !num(x[1]) || !(num(x[2]) && x[2] > 0)) {
+              fail(`${where}.x[${n}] : [nom, début, durée] attendu`);
+            }
+          });
       })
     );
   });

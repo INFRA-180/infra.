@@ -403,6 +403,7 @@ function runRegressionSuite() {
     "tools/test-code-text.js",
     "tools/test-script-errors.js", // lot 9 : erreurs JavaScript remontées
     "tools/check-data-schemas.js", // lot 9 : forme des données, une seule version, une seule adresse du Worker
+    "tools/test-samples.js", // 20/11/2026 : données Samples, cœur du Mix, télémétrie Samples
     "tools/verify-audio-stability.js",
     "tools/verify-public-boundary.js"
   ];

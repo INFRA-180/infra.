@@ -12,6 +12,19 @@
     "samples_unavailable",
     "samples_goto",
     "samples_swipe_close",
+    // Samples (20/11/2026) : passages et Mix, auparavant jetés faute d'être listés ici.
+    "samples_part",
+    "samples_seek",
+    "samples_toggle",
+    "samples_sort",
+    "samples_mix_in",
+    "samples_jump",
+    // Page Mix (lot T, 20/11/2026) : options, effet joué, essai, glisser d'onglet, micro A cappella.
+    "samples_mix_opt",
+    "samples_mix_fx",
+    "samples_mix_try",
+    "samples_tab_swipe",
+    "samples_voice_mark",
     "script_error",
     "album_switch",
     "audio_network_result",
@@ -112,6 +125,19 @@
     "samples_unavailable",
     "samples_goto",
     "samples_swipe_close",
+    // Samples (20/11/2026) : passages et Mix, auparavant jetés faute d'être listés ici.
+    "samples_part",
+    "samples_seek",
+    "samples_toggle",
+    "samples_sort",
+    "samples_mix_in",
+    "samples_jump",
+    // Page Mix (lot T, 20/11/2026) : options, effet joué, essai, glisser d'onglet, micro A cappella.
+    "samples_mix_opt",
+    "samples_mix_fx",
+    "samples_mix_try",
+    "samples_tab_swipe",
+    "samples_voice_mark",
     "external_resume_recovery_failed",
     "fullscreen_viewport",
     "mini_player_visibility",
@@ -200,7 +226,16 @@
     "resume_gate_reason",
     "home_restore_mode",
     "previous_launch_build",
-    "previous_launch_route_kind"
+    "previous_launch_route_kind",
+    // Samples / Mix (20/11/2026) : réglages et repères compacts, jamais de titre ni d'adresse.
+    "sec",
+    "sort",
+    "scope",
+    "to",
+    "fx",
+    "opt",
+    "choice",
+    "tab"
   ]);
   const TELEMETRY_NUMBER_FIELDS = new Set([
     "timestamp_ms",
@@ -456,7 +491,14 @@
     "queue_reorder_count",
     "queue_reorder_success_count",
     "queue_reorder_cancel_count",
-    "launch_summary_count"
+    "launch_summary_count",
+    // Samples / Mix (20/11/2026) : passage, BPM, entrée de la voix, durée et écart de tempo d'une transition.
+    "n",
+    "k",
+    "bpm",
+    "at",
+    "bpm_gap",
+    "dur_s"
   ]);
   const TELEMETRY_BOOLEAN_FIELDS = new Set([
     "fine_event",
@@ -544,7 +586,10 @@
     "source_hidden_while_ghost",
     "theme_tokens_frozen",
     "route_host_has_current",
-    "single_route_invariant"
+    "single_route_invariant",
+    // Samples / Mix (20/11/2026) : morceau préchargé, fondu possible.
+    "pre",
+    "fade"
   ]);
 
   function now() {

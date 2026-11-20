@@ -234,3 +234,10 @@ Statuts possibles : ouvert · maquette · validé · fait · reporté.
   - 28 calages à écouter ;
   - fichiers à remettre dans Ableton (attend le oui) ;
   - iPhone réel.
+
+## S. v471-472 en ligne (20/11/2026)
+
+- Poussé 5b77d2b, déploiement vert.
+- Site en ligne, réseau lent simulé : le son démarre tout de suite (lecture en flux).
+- Télémétrie : `samples_open` et `samples_section` reçus par le serveur (réponse 204).
+- Non vérifié sur un vrai iPhone.

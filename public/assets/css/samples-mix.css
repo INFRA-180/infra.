@@ -1,0 +1,302 @@
+/* Onglet Samples · barre de pictos, page Mix, menu ⋯ du Mix, transitions, repère de voix.
+   Choix validés par INFRA le 20/11/2026 (LOT_SAMPLES_20261119 § T bis). Chargé par samples.js.
+   Comportement : samples-mix-ui.js. Aucun fond, cadre ni pastille derrière un picto (charte). */
+
+/* ===================== RÉGLAGES (à ajuster après validation de la maquette) ===================== */
+:root {
+  /* Barre de pictos */
+  --sx-tab-cell: 44px;          /* cible tactile (44 pt) */
+  --sx-tab-icon: 26px;          /* dessin du picto, Mac (28 sur iPhone, plus bas) */
+  --sx-tab-gap: 24px;           /* écart entre deux pictos */
+  --sx-tab-off: .35;            /* gris des pictos non choisis (charte : 35 %) */
+  --sx-tab-label: 11px;         /* nom sous le picto choisi */
+  --sx-tab-anim: 150ms;         /* passage d'un picto à l'autre */
+  --sx-bar-top: calc(env(safe-area-inset-top, 0px) + 48px); /* collée sous la barre de la bibliothèque */
+  --sx-bar-bg: rgba(255, 255, 255, .92);                    /* même voile que la barre de la bibliothèque */
+
+  /* Page Mix : pile de pochettes */
+  --sx-stack: 128px;            /* côté d'une pochette, Mac (104 sur iPhone) */
+  --sx-stack-shift: 8px;        /* décalage entre deux cartes */
+  --sx-stack-radius: 10px;
+  --sx-stack-behind: .72;       /* luminosité des cartes de derrière */
+
+  /* Rouge : seulement la partie sample de la barre, ton plus doux (T bis 8). Ancien : #e0353b */
+  --sx-red: #e5605f;
+
+  /* Transition dans le lecteur */
+  --sx-xf-ease: linear;         /* la pochette suit le fondu : linéaire = au rythme du son */
+  --sx-xf-fx-size: 28px;        /* picto de l'effet sur le bord */
+  --sx-xf-fade: 250ms;          /* « Réduire les animations » : simple fondu */
+
+  /* « À suivre » : picto d'effet entre deux lignes */
+  --sx-xfm-size: 16px;
+  --sx-xfm-alpha: .45;
+
+  /* A cappella : mini-ligne de ton morceau */
+  --sx-vline: 2px;
+  --sx-vline-alpha: .3;
+  --sx-vmic: 20px;
+
+  /* « À suivre » : la ligne en cours en blanc gras, les autres un peu moins blanches (le rouge est parti) */
+  --sx-row-ink: rgba(255, 255, 255, .78);
+
+  /* Menu ⋯ */
+  --sx-menu-dim: .6;            /* choix non actifs : gris foncé, pas pâle (A1) */
+  --sx-menu-off: .35;           /* options grisées (« Pas encore sur iPhone ») */
+}
+@media (max-width: 639px) {
+  :root { --sx-tab-icon: 28px; --sx-stack: 104px; }
+}
+/* ================================================================================================= */
+
+/* ---------- Barre de pictos ---------- */
+.sx-tabs {
+  position: sticky;
+  top: var(--sx-bar-top);
+  z-index: 15;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sx-tab-gap);
+  /* le dessin du 1er picto part de la même ligne que la grille (case de 44, dessin centré) */
+  margin: 0 calc((var(--sx-tab-icon) - var(--sx-tab-cell)) / 2) 8px;
+  padding: 4px 0 12px;
+  background: var(--sx-bar-bg);
+  -webkit-backdrop-filter: saturate(1.4) blur(16px);
+  backdrop-filter: saturate(1.4) blur(16px);
+}
+.sx-tab {
+  position: relative;
+  flex: none;
+  width: var(--sx-tab-cell);
+  height: var(--sx-tab-cell);
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--ink, #111);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sx-tab-ic { display: grid; place-items: center; opacity: var(--sx-tab-off); transition: opacity var(--sx-tab-anim); }
+.sx-tab-ic svg { width: var(--sx-tab-icon); height: var(--sx-tab-icon); display: block; }
+.sx-tab:hover .sx-tab-ic, .sx-tab:focus-visible .sx-tab-ic { opacity: .6; }
+.sx-tab.on .sx-tab-ic { opacity: 1; }
+.sx-tab-name {
+  position: absolute;
+  top: calc(100% - 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: var(--sx-tab-label);
+  font-weight: 800;
+  letter-spacing: .01em;
+  line-height: 1;
+}
+.sx-tab:focus-visible, .sx-more:focus-visible, .sx-opts:focus-visible, .sx-stack:focus-visible {
+  outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px;
+}
+.sx-more {
+  flex: none;
+  margin-left: auto;
+  width: var(--sx-tab-cell);
+  height: var(--sx-tab-cell);
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--ink, #111);
+  cursor: pointer;
+}
+.sx-more svg { width: 24px; height: 24px; }
+.sx-more[hidden] { display: none; }
+
+/* glisser entre sections (iPhone) : le contenu suit le doigt, la barre reste */
+.sx-page > :not(.sx-tabs) { transform: translateX(var(--sx-swipe-x, 0px)); transition: transform .22s ease; }
+.sx-page.sx-swiping > :not(.sx-tabs) { transition: none; }
+
+/* ---------- Page Mix ---------- */
+.sx-mixhead { display: flex; align-items: center; gap: 20px; margin: 4px 0 24px; }
+.sx-stack {
+  position: relative;
+  flex: none;
+  width: calc(var(--sx-stack) + 2 * var(--sx-stack-shift));
+  height: calc(var(--sx-stack) + 2 * var(--sx-stack-shift));
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: #fff;
+  -webkit-tap-highlight-color: transparent;
+}
+.sx-stack-c {
+  position: absolute;
+  width: var(--sx-stack);
+  height: var(--sx-stack);
+  left: calc(var(--k) * var(--sx-stack-shift));
+  top: calc((2 - var(--k)) * var(--sx-stack-shift));
+  border-radius: var(--sx-stack-radius);
+  object-fit: cover;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+  filter: brightness(var(--sx-stack-behind));
+  transition: transform .2s ease;
+}
+.sx-stack-c[style*="--k:0"] { filter: none; }
+.sx-stack-play {
+  position: absolute;
+  left: 0;
+  top: calc(2 * var(--sx-stack-shift));
+  width: var(--sx-stack);
+  height: var(--sx-stack);
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, .7));
+  pointer-events: none;
+}
+.sx-stack-play svg { width: 32px; height: 32px; }
+.sx-stack:hover .sx-stack-c[style*="--k:0"], .sx-stack:focus-visible .sx-stack-c[style*="--k:0"] { transform: translate(-2px, 2px); }
+.sx-stack:active { transform: scale(.97); }
+.sx-mixinfo { flex: 1; min-width: 0; }
+.sx-mixtitle { display: block; border: 0; background: none; padding: 0; font: inherit; color: var(--ink, #111); text-align: left; cursor: pointer; }
+.sx-mixtitle b { display: block; font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+.sx-mixtitle small { display: block; font-size: 12px; color: rgba(17, 17, 17, .45); font-variant-numeric: tabular-nums; }
+.sx-mixrow { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
+.sx-sorts { display: flex; align-items: center; }
+.sx-opts {
+  margin-left: auto;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(17, 17, 17, .6);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sx-opts:hover { color: var(--ink, #111); }
+.sx-opts-ic { display: grid; place-items: center; }
+.sx-opts-ic svg { width: 18px; height: 18px; display: block; }
+.sx-opts-go { font-size: 16px; line-height: 1; }
+@media (max-width: 639px) {
+  .sx-mixhead { flex-direction: column; align-items: stretch; gap: 12px; }
+  .sx-stack { align-self: flex-start; }
+}
+
+/* ---------- Menu ⋯ du Mix (sur la base du menu « ta-menu » du site) ---------- */
+.ta-menu.sxm { min-width: 300px; max-width: min(330px, calc(100vw - 32px)); padding: 8px; }
+.ta-menu.sxm.is-sheet { max-width: none; min-width: 0; }
+.sxm-h { padding: 8px 8px 4px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .55; }
+.ta-menu.is-sheet .sxm-h { padding: 8px 0 4px; }
+.sxm-dur { display: flex; gap: 4px; }
+.sxm-fx { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; }
+.ta-menu .sxm-dur button, .ta-menu .sxm-fx button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: auto;
+  min-height: 44px;
+  padding: 0 4px;
+  text-align: center;
+  opacity: var(--sx-menu-dim);
+  background: none;
+  transition: opacity var(--sx-tab-anim);
+}
+.ta-menu .sxm-dur button { flex: 1; font-size: 14px; }
+.ta-menu.is-sheet .sxm-dur button { min-height: 48px; font-size: 16px; padding: 0; }
+.ta-menu .sxm-fx button { min-height: 64px; font-size: 11px; }
+.ta-menu.is-sheet .sxm-fx button { min-height: 68px; font-size: 12px; padding: 0; }
+.ta-menu .sxm-fx svg { width: 24px; height: 24px; }
+.ta-menu .sxm-dur button:hover, .ta-menu .sxm-fx button:hover { background: none; opacity: .85; }
+.ta-menu .sxm-dur button.on, .ta-menu .sxm-fx button.on { opacity: 1; font-weight: 800; }
+.ta-menu .sxm-fx button.on svg { stroke-width: 2.6; }
+.ta-menu.sxm button.off, .ta-menu.sxm button.off:hover { opacity: var(--sx-menu-off); cursor: default; background: none; }
+.ta-menu .sxm-dur button.on.off, .ta-menu .sxm-fx button.on.off { opacity: calc(var(--sx-menu-off) + .2); }
+.sxm-note { margin: 4px 8px 0; font-size: 12px; opacity: .55; }
+.ta-menu.is-sheet .sxm-note { margin: 4px 0 0; font-size: 13px; }
+.sxm-acts { margin-top: 8px; }
+
+/* ---------- Lecteur : ⋯ dans la barre du haut (version sombre) ---------- */
+.sx-fs .sx-tools .sx-more { width: 40px; height: 40px; margin: 0; color: rgba(255, 255, 255, .75); }
+.sx-fs .sx-tools .sx-more:hover { color: #fff; }
+
+/* ---------- Lecteur : la pochette suivante glisse au rythme du fondu ---------- */
+.sx-xf { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity var(--sx-xf-fade) ease; }
+.sx-xf.on { opacity: 1; }
+.sx-xf img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; clip-path: inset(0 0 0 100%); }
+.sx-xf.go img { clip-path: inset(0 0 0 0); transition: clip-path var(--sx-xf-dur, 5s) var(--sx-xf-ease); }
+.sx-xf-edge { position: absolute; inset: 0; transform: translateX(100%); }
+.sx-xf.go .sx-xf-edge { transform: translateX(0); transition: transform var(--sx-xf-dur, 5s) var(--sx-xf-ease); }
+.sx-xf-fx {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: var(--sx-xf-fx-size);
+  height: var(--sx-xf-fx-size);
+  transform: translate(-50%, -50%);
+  color: #fff;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, .65));
+}
+.sx-xf-fx svg { width: 100%; height: 100%; display: block; }
+/* Réduire les animations : pas de glissé, simple fondu ; le picto reste au centre bas */
+.sx-xf.reduce img { clip-path: none; opacity: 0; transition: none; }
+.sx-xf.reduce.go img { opacity: 1; transition: opacity var(--sx-xf-fade) ease; }
+.sx-xf.reduce .sx-xf-edge, .sx-xf.reduce.go .sx-xf-edge { transform: none; transition: none; }
+.sx-xf.reduce .sx-xf-fx { left: 50%; top: auto; bottom: 8%; transform: translateX(-50%); }
+
+/* ---------- « À suivre » : ligne en cours = blanc gras (plus de rouge) ---------- */
+.sx-fs .smp-row:not(.on) b { color: var(--sx-row-ink); }
+
+/* ---------- « À suivre » du Mix : picto d'effet à la place du trait entre deux lignes ---------- */
+.sx-fs .smp-list.sx-hasxf .smp-row { border-bottom-color: transparent; }
+.sx-xfm {
+  list-style: none;
+  height: var(--sx-xfm-size);
+  margin: -4px 0;
+  padding-left: calc(22px - var(--sx-xfm-size) / 2); /* sous le centre des vignettes de 44 */
+  color: rgba(255, 255, 255, var(--sx-xfm-alpha));
+  pointer-events: auto;
+}
+.sx-xfm svg { width: var(--sx-xfm-size); height: var(--sx-xfm-size); display: block; }
+
+/* ---------- A cappella : mini-ligne de ton morceau, micro à l'entrée de la voix ---------- */
+.sx-vmark { margin-top: 8px; }
+.sx-vmark[hidden] { display: none; }
+.sx-vline {
+  display: block;
+  width: 100%;
+  height: 44px;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: #fff;
+}
+.sx-vtrk {
+  position: relative;
+  display: block;
+  height: var(--sx-vline);
+  background: rgba(255, 255, 255, var(--sx-vline-alpha));
+}
+.sx-vtrk i {
+  position: absolute;
+  top: 50%;
+  width: var(--sx-vmic);
+  height: var(--sx-vmic);
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .5));
+}
+.sx-vtrk i svg { width: 100%; height: 100%; display: block; }
+.sx-vline:hover .sx-vtrk, .sx-vline:focus-visible .sx-vtrk { background: rgba(255, 255, 255, .55); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sx-tab-ic, .sx-stack-c, .sx-page > :not(.sx-tabs), .ta-menu .sxm-dur button, .ta-menu .sxm-fx button { transition: none; }
+  .sx-xf { transition: none; }
+}

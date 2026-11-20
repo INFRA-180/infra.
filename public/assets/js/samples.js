@@ -480,15 +480,9 @@
     var s = document.createElement("style");
     s.id = "sx-style";
     s.textContent = [
-      ".sx-sec{display:flex;gap:28px;align-items:baseline;margin:4px 0 6px}",
-      ".sx-sec button{border:0;background:none;padding:0;cursor:pointer;font:inherit;font-size:34px;font-weight:800;letter-spacing:-.02em;color:rgba(17,17,17,.22);transition:color .2s}",
-      '.sx-sec button[aria-selected="true"]{color:var(--ink,#111)}',
-      "@media (max-width:639px){.sx-sec{gap:20px}.sx-sec button{font-size:26px}}",
-      "@media (max-width:379px){.sx-sec{gap:16px}.sx-sec button{font-size:23px}}",
-      ".sx-sub{font-size:13px;color:rgba(17,17,17,.5);margin:0 0 10px}",
       ".sx-allrow{display:flex;align-items:center;gap:4px;margin-bottom:16px}",
       ".sx-all{display:flex;align-items:center;gap:12px;min-height:58px;padding:6px 8px 6px 0;border:0;background:none;font:inherit;color:var(--ink,#111);text-align:left;cursor:pointer}",
-      ".sx-allic{display:grid;place-items:center;width:28px;height:28px;color:#e0353b;transition:transform .2s}",
+      ".sx-allic{display:grid;place-items:center;width:28px;height:28px;color:var(--ink,#111);transition:transform .2s}",
       ".sx-allic svg{width:28px;height:28px}",
       ".sx-all:hover .sx-allic,.sx-all:focus-visible .sx-allic{transform:scale(1.12)}",
       ".sx-all b{display:block;font-size:17px;font-weight:800;letter-spacing:-.01em}",
@@ -545,14 +539,16 @@
       ".sx-trk{position:absolute;left:0;right:0;top:12px;height:4px;display:flex;gap:3px}",
       ".sx-seg{position:relative;height:100%;background:rgba(255,255,255,.22);overflow:hidden}",
       ".sx-seg i{position:absolute;left:0;top:0;bottom:0;width:0;background:#fff}",
-      ".sx-seg.s i{background:#e0353b}",
+      // Rouge (T bis 8, 20/11) : seulement la partie sample de la barre, ton plus doux. Valeur réglée dans
+      // samples-mix.css (--sx-red) ; le repli ici sert avant le chargement de ce fichier.
+      ".sx-seg.s i{background:var(--sx-red,#e5605f)}",
       ".sx-knob{position:absolute;top:6px;left:0;width:3px;height:16px;margin-left:-1.5px;background:#fff;pointer-events:none}",
       ".sx-times{display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums}",
       ".sx-leg{display:flex;gap:3px;margin-top:6px;font-size:13px}",
       ".sx-leg button{min-width:0;border:0;background:none;padding:6px 0;margin:-6px 0;font:inherit;text-align:left;cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:rgba(255,255,255,.4)}",
       ".sx-leg button:hover{color:rgba(255,255,255,.75)}",
       ".sx-leg button.on{color:#fff;font-weight:700}",
-      ".sx-leg button.s.on{color:#e0353b}",
+      ".sx-leg button.s.on{color:#fff}",
       // INFRA, 19/11 : pas de barre de défilement dans le lecteur (on fait défiler, c'est tout)
       ".smp-sheet .sx-panel,.smp-sheet .sx-queue{scrollbar-width:none;-ms-overflow-style:none}",
       ".smp-sheet .sx-panel::-webkit-scrollbar,.smp-sheet .sx-queue::-webkit-scrollbar{display:none;width:0;height:0}",
@@ -575,7 +571,7 @@
       ".sx-fs .smp-row{color:#fff;border-bottom-color:rgba(255,255,255,.1)}",
       ".sx-fs .smp-row img{width:44px;height:44px;border-radius:6px;background:rgba(255,255,255,.08)}",
       ".sx-fs .smp-row small{color:rgba(255,255,255,.5)}",
-      ".sx-fs .smp-row.on b{color:#e0353b}",
+      ".sx-fs .smp-row.on b{color:#fff;font-weight:800}",
       ".sx-fs .smp-grp{color:rgba(255,255,255,.5)}",
       ".sx-rb{flex:none;min-width:34px;text-align:right;font-family:'Antique Olive','Helvetica Neue',Arial,sans-serif;font-size:15px;color:rgba(255,255,255,.85);font-variant-numeric:tabular-nums}",
       ".sx-fs .smp-row em{font-style:normal;font-size:12px;color:rgba(255,255,255,.45);font-variant-numeric:tabular-nums;flex:none;min-width:30px;text-align:right}",
@@ -584,9 +580,169 @@
       "@media (prefers-reduced-motion:reduce){.sx-cov,.sx-allic,.sx-ctr>button,.smp-sheet.sx-fs{transition:none}}",
     ].join("\n");
     document.head.appendChild(s);
+    // Barre de pictos, page Mix, menu ⋯ du Mix, transitions et repère de voix (T bis, 20/11) : leur style
+    // et leur comportement vivent à part (samples-mix.css, samples-mix-ui.js), chargés ici, après ce style.
+    var tag = window.INFRA_BUILD_TAG
+      ? "?v=" + encodeURIComponent(window.INFRA_BUILD_TAG)
+      : "";
+    var link = document.createElement("link");
+    link.id = "sx-mix-css";
+    link.rel = "stylesheet";
+    link.href = assetUrl("assets/css/samples-mix.css") + tag;
+    document.head.appendChild(link);
+    if (!window.InfraSamplesUI) {
+      var ui = document.createElement("script");
+      ui.src = assetUrl("assets/js/samples-mix-ui.js") + tag;
+      ui.async = true;
+      document.head.appendChild(ui);
+    }
   }
 
   // ---------- Page (onglet Samples) ----------
+  // Barre de pictos collée en haut (T bis 5 et 7, 20/11) : vinyle · deux ondes croisées · micro. Le choisi
+  // est plein, son nom dessous ; les autres en trait gris, sans nom ; aucun fond ni rond derrière.
+  // Style : samples-mix.css ; touches 1/2/3 et glisser entre sections : samples-mix-ui.js.
+  var TAB_DIM = ' width="26" height="26"';
+  var TABS = [
+    {
+      k: "samples",
+      name: "Samples",
+      hint: "Les morceaux d’origine, en playlist",
+      line: svg(
+        '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5.8a6.2 6.2 0 0 1 6.2 6.2"/>',
+        TAB_DIM + LINE,
+      ),
+      full: svg(
+        '<defs><mask id="sx-m-vinyl"><rect width="24" height="24" fill="#fff"/><circle cx="12" cy="12" r="2.3" fill="#000"/><path d="M12 5.8a6.2 6.2 0 0 1 6.2 6.2" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round"/></mask></defs><circle cx="12" cy="12" r="9.95" fill="currentColor" mask="url(#sx-m-vinyl)"/>',
+        TAB_DIM,
+      ),
+    },
+    {
+      k: "mix",
+      name: "Mix",
+      hint: "Le passage samplé, puis ton morceau là où il entre",
+      line: svg(
+        '<path d="M2.5 7c6 0 7 10 19 10"/><path d="M2.5 17c6 0 7-10 19-10"/>',
+        TAB_DIM + LINE,
+      ),
+      full: svg(
+        '<path d="M2.5 7c6 0 7 10 19 10"/><path d="M2.5 17c6 0 7-10 19-10"/>',
+        TAB_DIM + LINE.replace('stroke-width="1.9"', 'stroke-width="3"'),
+      ),
+    },
+    {
+      k: "voix",
+      name: "A cappella",
+      hint: "Les voix que tu as reprises, seules",
+      line: svg(
+        '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>',
+        TAB_DIM + LINE,
+      ),
+      full: svg(
+        '<rect x="8.6" y="2.6" width="6.8" height="11.8" rx="3.4" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" stroke-width="2.4"/>',
+        TAB_DIM + LINE,
+      ),
+    },
+  ];
+  var DOTS = svg(
+    '<circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/>',
+    ' width="24" height="24" fill="currentColor"',
+  );
+  function moreBtn() {
+    return (
+      '<button type="button" class="sx-more" data-sx-mixmore aria-haspopup="menu" aria-label="Options du Mix" title="Options du Mix">' +
+      DOTS +
+      "</button>"
+    );
+  }
+  function tabsHtml(sec) {
+    return (
+      '<div class="sx-tabs" role="tablist" aria-label="Samples, Mix ou A cappella" data-sx-tabs>' +
+      TABS.map(function (t, i) {
+        var on = sec === t.k;
+        return (
+          '<button type="button" role="tab" class="sx-tab' +
+          (on ? " on" : "") +
+          '" data-smp-sec="' +
+          t.k +
+          '" aria-selected="' +
+          on +
+          '" tabindex="' +
+          (on ? 0 : -1) +
+          '" aria-label="' +
+          t.name +
+          '" title="' +
+          t.name +
+          " (" +
+          (i + 1) +
+          ") · " +
+          t.hint +
+          '"><span class="sx-tab-ic">' +
+          (on ? t.full : t.line) +
+          "</span>" +
+          (on
+            ? '<span class="sx-tab-name" aria-hidden="true">' +
+              t.name +
+              "</span>"
+            : "") +
+          "</button>"
+        );
+      }).join("") +
+      (sec === "mix" ? moreBtn() : "") +
+      "</div>"
+    );
+  }
+  // Page Mix (T bis 6) : pile des 3 prochaines pochettes (toucher = lancer « Tout le Mix »), le nombre
+  // d'enchaînements et l'écart de tempo, BPM / aléatoire (V1), ligne des réglages « ≈ Auto · Fondu › ».
+  function mixHead(pool) {
+    var sort = sortFor(true, "all"),
+      order =
+        sort === "bpm" || sort === "bpmdown"
+          ? byTempo(pool, sort === "bpmdown")
+          : sort === "shuffle"
+            ? shuffle(pool)
+            : pool,
+      covers = [],
+      bpms = pool.map(bpmOf).filter(Boolean);
+    order.forEach(function (c) {
+      if (covers.length < 3 && c.cover && covers.indexOf(c.cover) < 0)
+        covers.push(c.cover);
+    });
+    var ui = window.InfraSamplesUI;
+    return (
+      '<div class="sx-mixhead"><button type="button" class="sx-stack" data-smp-all aria-label="Lancer tout le Mix" title="Lancer tout le Mix">' +
+      covers
+        .map(function (c, k) {
+          return (
+            '<img class="sx-stack-c" style="--k:' +
+            k +
+            '" src="' +
+            esc(assetUrl(c)) +
+            '" alt="" decoding="async">'
+          );
+        })
+        .reverse()
+        .join("") +
+      '<span class="sx-stack-play">' +
+      PLAY +
+      "</span></button>" +
+      '<div class="sx-mixinfo"><button type="button" class="sx-mixtitle" data-smp-all tabindex="-1" aria-hidden="true"><b>Tout le Mix</b><small>' +
+      pool.length +
+      " enchaînements" +
+      (bpms.length
+        ? " · " +
+          Math.min.apply(null, bpms) +
+          " → " +
+          Math.max.apply(null, bpms) +
+          " BPM"
+        : "") +
+      '</small></button><div class="sx-mixrow"><span class="sx-sorts">' +
+      sortBtns(sort, "all") +
+      '</span><button type="button" class="sx-opts" data-sx-mixopts aria-haspopup="menu" aria-label="Options du Mix" title="Options du Mix">' +
+      (ui && ui.optsLine ? ui.optsLine() : "") +
+      "</button></div></div></div>"
+    );
+  }
   function render(panel) {
     if (!panel) return;
     lastPanel = panel;
@@ -608,33 +764,19 @@
     var voixSec = pref.sec === "voix";
     var pool = mix ? chainOf(all()) : all().filter(keep(mix, secVoix()));
     var html =
-      '<div class="sx-sec" role="tablist" aria-label="Samples, Mix ou Acapella">' +
-      '<button type="button" role="tab" data-smp-sec="samples" aria-selected="' +
-      (!mix && !voixSec) +
-      '">Samples</button>' +
-      '<button type="button" role="tab" data-smp-sec="mix" aria-selected="' +
-      mix +
-      '">Mix</button>' +
-      '<button type="button" role="tab" data-smp-sec="voix" aria-selected="' +
-      voixSec +
-      '">Acapella</button></div>' +
-      '<p class="sx-sub">' +
+      tabsHtml(pref.sec) +
       (mix
-        ? "Le passage samplé, puis ton morceau là où il entre."
-        : voixSec
-          ? "Les voix que tu as reprises, seules."
-          : "Les morceaux d'origine, en playlist.") +
-      "</p>" +
-      '<div class="sx-allrow"><button type="button" class="sx-all" data-smp-all><span class="sx-allic">' +
-      PLAY +
-      "</span><span><b>" +
-      (mix ? "Tout le Mix" : voixSec ? "Toutes les voix" : "Tous les samples") +
-      "</b><small>" +
-      pool.length +
-      (mix ? " enchaînements" : voixSec ? " voix" : " samples") +
-      "</small></span></button>" +
-      sortBtns(sortFor(mix, "all"), "all") +
-      "</div>" +
+        ? mixHead(pool)
+        : '<div class="sx-allrow"><button type="button" class="sx-all" data-smp-all><span class="sx-allic">' +
+          PLAY +
+          "</span><span><b>" +
+          (voixSec ? "Toutes les voix" : "Tous les samples") +
+          "</b><small>" +
+          pool.length +
+          (voixSec ? " voix" : " samples") +
+          "</small></span></button>" +
+          sortBtns(sortFor(mix, "all"), "all") +
+          "</div>") +
       '<ul class="smp-grid">' +
       data.albums
         .map(function (a, i) {
@@ -666,7 +808,9 @@
         })
         .join("") +
       "</ul>";
-    panel.innerHTML = html;
+    panel.innerHTML = '<div class="sx-page" data-sx-page>' + html + "</div>";
+    if (window.InfraSamplesUI && window.InfraSamplesUI.afterRender)
+      window.InfraSamplesUI.afterRender(panel);
   }
   function rerender() {
     if (lastPanel && lastPanel.isConnected) render(lastPanel);
@@ -717,18 +861,24 @@
       '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="currentColor"/><path d="M10 16.3V8.2l6-1.4v7.9" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><circle cx="8.6" cy="16.4" r="1.6" fill="#fff"/><circle cx="14.6" cy="14.8" r="1.6" fill="#fff"/></svg></a>' +
       '<a class="smp-ytic" data-smp-yt target="_blank" rel="noopener" aria-label="Ouvrir dans YouTube" title="Ouvrir dans YouTube">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4" fill="currentColor"/><path d="M10 9.2v5.6l4.8-2.8z" fill="#fff"/></svg></a>' +
+      // ⋯ du Mix (T bis) : affiché seulement en lecture Mix, par samples-mix-ui.js
+      moreBtn().replace("<button ", "<button hidden ") +
       '<button type="button" class="sx-x" data-smp-close aria-label="Fermer" title="Fermer (Échap)">' +
       svg('<path d="M6 6l12 12M18 6L6 18"/>', LINE) +
       "</button></span></div>" +
       '<div class="sx-main">' +
       '<div class="sx-art"><div class="sx-vid"><iframe data-smp-alt title="Sample suivant" tabindex="-1" aria-hidden="true" allow="autoplay; encrypted-media"></iframe><iframe data-smp-frame title="Sample" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>' +
-      '<img class="sx-cov" data-smp-cov alt=""></div>' +
+      '<img class="sx-cov" data-smp-cov alt="">' +
+      // transition du Mix : la pochette suivante glisse sur l'actuelle, picto de l'effet sur le bord
+      '<div class="sx-xf" data-sx-xf aria-hidden="true"><img alt=""><span class="sx-xf-edge"><i class="sx-xf-fx"></i></span></div></div>' +
       '<div class="sx-meta"><div class="sx-mt"><b class="sx-title" data-smp-t dir="auto"></b>' +
       '<small data-smp-a dir="auto"></small></div>' +
       '<div class="sx-bpm" data-smp-bpm title="Tempo du morceau"><b></b><small>BPM</small></div></div>' +
       '<div class="sx-bar" data-smp-bar role="slider" aria-label="Position" tabindex="0"><div class="sx-trk" data-smp-trk></div><i class="sx-knob" data-smp-knob></i></div>' +
       '<div class="sx-times"><span data-smp-t0>0:00</span><span data-smp-t1></span></div>' +
       '<div class="sx-leg" data-smp-leg></div>' +
+      // A cappella : mini-ligne de ton morceau, micro à l'entrée de la voix (rempli par samples-mix-ui.js)
+      '<div class="sx-vmark" data-sx-vmark hidden></div>' +
       '<div class="sx-ctr"><span data-smp-sortl></span><button type="button" data-smp-prev aria-label="Précédent">' +
       PREV +
       '</button><button type="button" class="sx-pp" data-smp-pp aria-label="Lecture">' +

@@ -139,6 +139,8 @@
     try {
       o = (m && m.getOptions()) || {};
     } catch (_e) {}
+    // Le moteur nomme le hasard « listen » ; l'interface, « random ».
+    if (o.fx === "listen") o.fx = "random";
     return {
       dur: label(DUR, o.dur) ? o.dur : CFG.defaults.dur,
       fx: label(FX, o.fx) ? o.fx : CFG.defaults.fx

@@ -597,6 +597,13 @@
     link.rel = "stylesheet";
     link.href = assetUrl("assets/css/samples-mix.css") + tag;
     document.head.appendChild(link);
+    // Règles du Mix (durée, hasard qui écoute, courbes) : samples-mix-core.js ; le moteur a un repli identique.
+    if (!window.InfraSamplesMixCore) {
+      var mc = document.createElement("script");
+      mc.src = assetUrl("assets/js/samples-mix-core.js") + tag;
+      mc.async = true;
+      document.head.appendChild(mc);
+    }
     if (!window.InfraSamplesUI) {
       var ui = document.createElement("script");
       ui.src = assetUrl("assets/js/samples-mix-ui.js") + tag;

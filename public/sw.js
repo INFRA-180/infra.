@@ -77,6 +77,9 @@ const OPTIONAL_SHELL_ASSETS = [
   "./assets/js/scripts.admin.js?v=audiofix472-20261119",
   // Onglet Samples hors ligne (finition 19/11) : mêmes adresses que celles demandées par la page
   "./assets/js/samples.js?v=audiofix472-20261119",
+  "./assets/js/samples-mix-core.js?v=audiofix472-20261119",
+  "./assets/js/samples-mix-ui.js?v=audiofix472-20261119",
+  "./assets/css/samples-mix.css?v=audiofix472-20261119",
   "./data/samples.json?v=audiofix472-20261119",
   // la Bibliothèque demande playlists.json avec l'étiquette de version du site (les pages de playlists,
   // avec playlist-collage) : les deux adresses sont gardées pour le hors ligne

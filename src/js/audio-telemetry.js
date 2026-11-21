@@ -25,6 +25,10 @@
     "samples_mix_try",
     "samples_tab_swipe",
     "samples_voice_mark",
+    // Page d'un album et sélecteur des années (C2, 21/11/2026).
+    "samples_album",
+    "samples_years",
+    "samples_year",
     "samples_audio_retry",
     "script_error",
     "album_switch",
@@ -139,6 +143,10 @@
     "samples_mix_try",
     "samples_tab_swipe",
     "samples_voice_mark",
+    // Page d'un album et sélecteur des années (C2, 21/11/2026).
+    "samples_album",
+    "samples_years",
+    "samples_year",
     "samples_audio_retry",
     "external_resume_recovery_failed",
     "fullscreen_viewport",

@@ -21,7 +21,8 @@
 
   var data = null,
     loading = null,
-    lastPanel = null;
+    lastPanel = null,
+    albumView = null; // page d'un album (T38-T50) : index dans data.albums, ou null = la grille
   var st = {
     list: [],
     shuf: [],
@@ -757,6 +758,15 @@
         });
       return;
     }
+    if (albumView != null && data.albums[albumView]) {
+      panel.innerHTML =
+        '<div class="sx-page sx-albpage" data-sx-page>' +
+        albumPage(data.albums[albumView]) +
+        "</div>";
+      if (window.InfraSamplesUI && window.InfraSamplesUI.afterRender)
+        window.InfraSamplesUI.afterRender(panel);
+      return;
+    }
     var mix = pref.sec === "mix";
     var voixSec = pref.sec === "voix";
     var pool = mix ? chainOf(all()) : all().filter(keep(mix, secVoix()));
@@ -815,6 +825,357 @@
     if (window.InfraSamplesUI && window.InfraSamplesUI.afterRender)
       window.InfraSamplesUI.afterRender(panel);
   }
+  // ---------- Page d'un album (INFRA, 21/11, proposition A validée, T38-T50) ----------
+  // Forme de la vraie page album du site : « ‹ Samples », pochette, titre, ligne d'infos, pictos en haut
+  // à droite (▶ · Mix · aléatoire · années). Liste dans l'ordre du son : d'abord les samples (les
+  // originaux), puis « ↳ TON MORCEAU » qui les reprend. Toucher une ligne ouvre le plein écran.
+  var HOOK = svg('<path d="M5 3v8a5 5 0 0 0 5 5h9M15 12l4 4-4 4"/>', LINE);
+  var INF_IC = svg(
+    '<path d="M12 12c-2.2-2.9-3.1-4.5-4.5-4.5a4.5 4.5 0 0 0 0 9c1.4 0 2.3-1.6 4.5-4.5s3.1-4.5 4.5-4.5a4.5 4.5 0 0 1 0 9c-1.4 0-2.3-1.6-4.5-4.5z"/>',
+    LINE,
+  );
+  var YEARS_IC = svg(
+    '<path d="M3 16h18M5 16v-2.5M8.5 16v-2.5M15.5 16v-2.5M19 16v-2.5M12 16V9.5M9.5 4.5 12 7l2.5-2.5"/>',
+    LINE,
+  );
+  var BACK_IC = svg('<path d="M15 5l-7 7 7 7"/>', LINE);
+  function entre(at) {
+    return isFinite(at) && at > 0 ? "à " + mmss(at) : "dès le début";
+  }
+  function itemCover(i) {
+    return i.c
+      ? esc(assetUrl("assets/samples/" + i.y + ".webp"))
+      : "https://i.ytimg.com/vi/" + esc(i.y) + "/mqdefault.jpg";
+  }
+  function albumItems(a) {
+    return a.items.filter(keep(false, secVoix()));
+  }
+  function yearSpan(y) {
+    return y
+      ? '<span class="sx-yr" role="button" tabindex="0" data-smp-year="' +
+          esc(y) +
+          '" title="Les années des samples">' +
+          esc(y) +
+          "</span>"
+      : "";
+  }
+  function albumPage(a) {
+    var items = albumItems(a),
+      ys = items
+        .map(function (i) {
+          return +i.an;
+        })
+        .filter(Boolean),
+      y0 = ys.length ? Math.min.apply(null, ys) : 0,
+      y1 = ys.length ? Math.max.apply(null, ys) : 0,
+      groups = [],
+      byTrack = {};
+    items.forEach(function (i) {
+      if (!byTrack[i.track]) {
+        byTrack[i.track] = { t: i.track, n: i.n, tb: i.tb, items: [] };
+        groups.push(byTrack[i.track]);
+      }
+      byTrack[i.track].items.push(i);
+    });
+    groups.sort(function (x, y) {
+      return x.n - y.n;
+    });
+    var word = pref.sec === "voix" ? " voix" : items.length > 1 ? " samples" : " sample";
+    var html =
+      '<button type="button" class="sx-back" data-smp-back>' +
+      BACK_IC +
+      "Samples</button>" +
+      '<div class="sx-ahead"><img class="sx-acov" src="' +
+      esc(assetUrl(a.cover)) +
+      '" alt="" decoding="async"><div class="sx-atx"><h2 class="sx-atitle" dir="auto">' +
+      esc(a.title) +
+      "</h2><p>" +
+      items.length +
+      word +
+      " · " +
+      groups.length +
+      (groups.length > 1 ? " morceaux" : " morceau") +
+      (y0
+        ? ' · <span class="sx-yr" role="button" tabindex="0" data-smp-year="' +
+          y0 +
+          '" title="Les années des samples">' +
+          (y0 === y1 ? y0 : y0 + " → " + y1) +
+          "</span>"
+        : "") +
+      '</p></div><div class="sx-aacts">' +
+      '<button type="button" class="sx-aplay" data-smp-aplay title="Écouter les samples de l’album" aria-label="Écouter les samples de l’album">' +
+      PLAY +
+      '</button><button type="button" data-smp-amix title="Mix de l’album" aria-label="Mix de l’album">' +
+      INF_IC +
+      '</button><button type="button" data-smp-ashuf title="Aléatoire" aria-label="Aléatoire">' +
+      SORT_ICON.shuffle +
+      "</button>" +
+      (y0
+        ? '<button type="button" data-smp-years title="Les années des samples" aria-label="Les années des samples">' +
+          YEARS_IC +
+          "</button>"
+        : "") +
+      '</div></div><div class="sx-alist">';
+    groups.forEach(function (g, gi) {
+      g.items.forEach(function (i) {
+        html +=
+          '<button type="button" class="sx-li sx-sub" data-smp-item="' +
+          a.items.indexOf(i) +
+          '"><img src="' +
+          itemCover(i) +
+          '" alt="" loading="lazy" decoding="async"><span class="sx-litx"><b dir="auto">' +
+          esc(i.t) +
+          '</b><small><i class="sx-dot" aria-hidden="true"></i>' +
+          esc(i.a || "Artiste à compléter") +
+          (i.an ? " · " + yearSpan(i.an) : "") +
+          '</small></span><span class="sx-lir">' +
+          (isFinite(i.at) ? entre(i.at) : "") +
+          "</span></button>";
+      });
+      html +=
+        '<button type="button" class="sx-li sx-res" data-smp-track="' +
+        esc(g.t) +
+        '"><span class="sx-hook">' +
+        HOOK +
+        '</span><span class="sx-litx"><b dir="auto">' +
+        esc(g.t) +
+        "</b><small>" +
+        (gi + 1) +
+        ' · ton morceau</small></span><span class="sx-lir">' +
+        (g.tb ? Math.round(g.tb) + " BPM" : "") +
+        "</span></button>";
+    });
+    return html + "</div>";
+  }
+
+  // Sélecteur des années, façon horlogerie (T44-T48) : une voie de petits traits (année, sample,
+  // décennie), l'année choisie dans une fenêtre, un tambour qui tourne ; molette, glisser, flèches.
+  // Appuyer sur l'année ouvre son sample en plein écran.
+  var yp = null;
+  function yearData(a) {
+    var by = {};
+    albumItems(a).forEach(function (i) {
+      var y = +i.an;
+      if (y) (by[y] = by[y] || []).push(i);
+    });
+    return {
+      by: by,
+      ys: Object.keys(by)
+        .map(Number)
+        .sort(function (x, y) {
+          return x - y;
+        }),
+    };
+  }
+  function closeYears() {
+    if (!yp) return;
+    yp.el.remove();
+    document.removeEventListener("pointerdown", yp.out, true);
+    var back = yp.anchor;
+    yp = null;
+    if (back && back.focus) back.focus({ preventScroll: true });
+  }
+  function openYears(a, year, anchor) {
+    closeYears();
+    var W = yearData(a);
+    if (!W.ys.length) return;
+    var sel = 0,
+      best = 1e9;
+    W.ys.forEach(function (y, k) {
+      var d = Math.abs(y - (+year || W.ys[0]));
+      if (d < best) {
+        best = d;
+        sel = k;
+      }
+    });
+    var y0 = W.ys[0],
+      y1 = W.ys[W.ys.length - 1],
+      P = 4,
+      rt = "";
+    for (var y = y0; y <= y1; y++) {
+      var dec = y % 10 === 0,
+        s = !!W.by[y];
+      rt +=
+        '<span class="sx-tk' +
+        (dec ? " d" : "") +
+        (s ? " s" : "") +
+        '" style="top:' +
+        (y - y0) * P +
+        "px;width:" +
+        (dec ? 14 : s ? 10 : 6) +
+        'px"></span>' +
+        (dec
+          ? '<span class="sx-lb" style="top:' +
+            (y - y0) * P +
+            'px">’' +
+            String(y).slice(2) +
+            "</span>"
+          : "");
+    }
+    var el = document.createElement("div");
+    el.className = "sx-yp";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-label", "Les années des samples");
+    el.innerHTML =
+      '<div class="sx-wheel" tabindex="0" role="spinbutton" aria-label="Année du sample" aria-valuemin="' +
+      y0 +
+      '" aria-valuemax="' +
+      y1 +
+      '"><div class="sx-ruler"><div class="sx-rt"><span class="sx-rail" style="left:30px"></span><span class="sx-rail" style="left:36px"></span>' +
+      rt +
+      '</div><span class="sx-idx"></span></div><div class="sx-drum"><span class="sx-win"></span>' +
+      W.ys
+        .map(function (yy, k) {
+          return '<button type="button" tabindex="-1" data-wy="' + k + '">' + yy + "</button>";
+        })
+        .join("") +
+      '</div></div><button type="button" class="sx-wcap"></button>';
+    document.body.appendChild(el);
+    yp = { el: el, a: a, W: W, sel: sel, anchor: anchor };
+    function paint(flash) {
+      var y = W.ys[yp.sel];
+      el.querySelectorAll(".sx-drum button").forEach(function (b) {
+        var d = +b.getAttribute("data-wy") - yp.sel,
+          ad = Math.abs(d);
+        b.classList.toggle("c", d === 0);
+        b.style.transform = "translateY(" + d * 24 + "px) rotateX(" + -d * 20 + "deg)";
+        b.style.opacity = ad > 2 ? 0 : [1, 0.4, 0.15][ad];
+      });
+      el.querySelector(".sx-rt").style.transform =
+        "translateY(" + (58 - (y - y0) * P) + "px)";
+      if (flash) {
+        var ix = el.querySelector(".sx-idx");
+        ix.classList.add("blink");
+        setTimeout(function () {
+          ix.classList.remove("blink");
+        }, 60);
+      }
+      var ks = W.by[y],
+        x = ks[0],
+        wh = el.querySelector(".sx-wheel");
+      wh.setAttribute("aria-valuenow", y);
+      wh.setAttribute("aria-valuetext", y + ", " + ks.length + " sample" + (ks.length > 1 ? "s" : ""));
+      el.querySelector(".sx-wcap").innerHTML =
+        "<b>" +
+        esc(x.t) +
+        "</b><small>" +
+        esc(x.a || "Artiste à compléter") +
+        "</small><small>→ " +
+        esc(x.track) +
+        (ks.length > 1 ? " · +" + (ks.length - 1) + " autre" + (ks.length > 2 ? "s" : "") : "") +
+        '</small><span class="sx-wgo">' +
+        PLAY +
+        "Écouter</span>";
+      document.querySelectorAll(".sx-li[data-smp-item]").forEach(function (l) {
+        var it = a.items[+l.getAttribute("data-smp-item")];
+        l.classList.toggle("sel", ks.indexOf(it) >= 0);
+      });
+    }
+    function step(n) {
+      var v = clamp(yp.sel + n, 0, W.ys.length - 1);
+      if (v !== yp.sel) {
+        yp.sel = v;
+        paint(true);
+        track("samples_year", { n: W.ys[v] });
+      }
+    }
+    function go() {
+      var x = W.by[W.ys[yp.sel]][0];
+      closeYears();
+      openAlbumAt(a, x);
+    }
+    var wh = el.querySelector(".sx-wheel"),
+      acc = 0,
+      py = null,
+      moved = false;
+    wh.addEventListener(
+      "wheel",
+      function (e) {
+        e.preventDefault();
+        acc += e.deltaY;
+        if (Math.abs(acc) >= 40) {
+          step(acc > 0 ? 1 : -1);
+          acc = 0;
+        }
+      },
+      { passive: false },
+    );
+    wh.addEventListener("pointerdown", function (e) {
+      py = e.clientY;
+      moved = false;
+      try {
+        wh.setPointerCapture(e.pointerId);
+      } catch (_e) {}
+    });
+    wh.addEventListener("pointermove", function (e) {
+      if (py == null) return;
+      var dy = e.clientY - py;
+      if (Math.abs(dy) >= 22) {
+        step(dy < 0 ? 1 : -1);
+        py = e.clientY;
+        moved = true;
+      }
+    });
+    wh.addEventListener("pointerup", function (e) {
+      py = null;
+      if (moved) return;
+      var b = document.elementFromPoint(e.clientX, e.clientY);
+      b = b && b.closest && b.closest("[data-wy]");
+      if (!b) return;
+      var k = +b.getAttribute("data-wy");
+      if (k === yp.sel) go();
+      else {
+        yp.sel = k;
+        paint(true);
+      }
+    });
+    wh.addEventListener("keydown", function (e) {
+      var k = e.key;
+      if (k === "ArrowDown") step(1);
+      else if (k === "ArrowUp") step(-1);
+      else if (k === "PageDown" || k === "PageUp") {
+        var t = W.ys[yp.sel] + (k === "PageDown" ? 10 : -10),
+          bi = 0,
+          bd = 1e9;
+        W.ys.forEach(function (yy, i) {
+          if (Math.abs(yy - t) < bd) {
+            bd = Math.abs(yy - t);
+            bi = i;
+          }
+        });
+        step(bi - yp.sel);
+      } else if (k === "Home") step(-yp.sel);
+      else if (k === "End") step(W.ys.length - 1 - yp.sel);
+      else if (k === "Enter") go();
+      else if (k === "Escape") closeYears();
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    el.querySelector(".sx-wcap").addEventListener("click", go);
+    yp.out = function (e) {
+      if (yp && !yp.el.contains(e.target)) closeYears();
+    };
+    document.addEventListener("pointerdown", yp.out, true);
+    // place : sous l'année touchée, toujours dans l'écran ; sur iPhone, en feuille du bas
+    if (window.innerWidth >= 640 && anchor && anchor.getBoundingClientRect) {
+      var r = anchor.getBoundingClientRect(),
+        w = el.offsetWidth,
+        hh = el.offsetHeight;
+      el.style.left = clamp(r.left, 12, window.innerWidth - w - 12) + "px";
+      el.style.top = clamp(r.bottom + 6, 12, window.innerHeight - hh - 12) + "px";
+    } else el.classList.add("sheet");
+    paint(false);
+    wh.focus({ preventScroll: true });
+    track("samples_years", { n: W.ys.length });
+  }
+  function openAlbumAt(a, start, mixMode) {
+    var sec = pref.sec;
+    if (mixMode) pref.sec = "mix";
+    open(albumItems(a).slice(), a.title, "album", a, null, false, start);
+    pref.sec = sec;
+  }
+
   function rerender() {
     if (lastPanel && lastPanel.isConnected) render(lastPanel);
   }
@@ -1023,7 +1384,7 @@
     } else if (start) p.set("start", String(Math.floor(start)));
     return ORIGIN + "/embed/" + encodeURIComponent(id) + "?" + p.toString();
   }
-  function open(list, title, scope, album, voix, cue) {
+  function open(list, title, scope, album, voix, cue, start) {
     buildSheet();
     st.list = list;
     st.title = title;
@@ -1034,7 +1395,8 @@
     st.voix = voix == null ? secVoix() : voix;
     st.sort = sortFor(st.mix, scope);
     reshuffle(null);
-    var first = shownList()[0];
+    var first =
+      start && shownList().indexOf(start) >= 0 ? start : shownList()[0];
     if (!first && !st.voix && !st.mix) {
       st.voix = true; // album sans sample instrumental : on montre ses voix
       first = shownList()[0];
@@ -3428,11 +3790,57 @@
         "all",
       );
     }
+    var cur = albumView != null ? data.albums[albumView] : null;
+    if (cur) {
+      if (t.closest("[data-smp-back]")) return backToGrid();
+      var yr = t.closest("[data-smp-year]");
+      if (yr) {
+        e.preventDefault();
+        e.stopPropagation();
+        return openYears(cur, yr.getAttribute("data-smp-year"), yr);
+      }
+      var ys = t.closest("[data-smp-years]");
+      if (ys) return openYears(cur, null, ys);
+      var it = t.closest("[data-smp-item]");
+      if (it) return openAlbumAt(cur, cur.items[+it.getAttribute("data-smp-item")]);
+      var tr = t.closest("[data-smp-track]");
+      if (tr) {
+        var first = cur.items.filter(function (i) {
+          return i.track === tr.getAttribute("data-smp-track");
+        })[0];
+        return goToTrack(first);
+      }
+      if (t.closest("[data-smp-aplay]")) return openAlbumAt(cur, null);
+      if (t.closest("[data-smp-amix]")) return openAlbumAt(cur, null, true);
+      if (t.closest("[data-smp-ashuf]")) {
+        setSort(false, "album", "shuffle");
+        return openAlbumAt(cur, null);
+      }
+    }
     var al = t.closest("[data-smp-album]");
     if (al) {
-      var a = data.albums[Number(al.getAttribute("data-smp-album"))];
-      // Samples / Acapella (INFRA, 19/11) : on ouvre l'album sans rien lancer, pour choisir le morceau.
-      if (a) open(a.items.slice(), a.title, "album", a, null, pref.sec !== "mix");
+      // Toucher un album ouvre sa page (navigation) ; toucher une ligne ouvre le plein écran (T40).
+      albumView = Number(al.getAttribute("data-smp-album"));
+      track("samples_album", { sec: pref.sec });
+      rerender();
+      if (lastPanel && lastPanel.scrollIntoView)
+        lastPanel.scrollIntoView({ block: "start" });
+    }
+  });
+  function backToGrid() {
+    closeYears();
+    albumView = null;
+    rerender();
+  }
+  // Échap remonte d'un niveau : la carte des années, puis la page de l'album vers la grille.
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || (sheet && !sheet.hidden)) return;
+    if (yp) {
+      closeYears();
+      e.preventDefault();
+    } else if (albumView != null && lastPanel && lastPanel.isConnected) {
+      backToGrid();
+      e.preventDefault();
     }
   });
 

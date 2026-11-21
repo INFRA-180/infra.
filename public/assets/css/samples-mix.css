@@ -388,3 +388,25 @@
 .sx-wgo { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11px; font-weight: 800; color: #e0353b; }
 .sx-wgo svg { width: 10px; height: 10px; }
 @media (prefers-reduced-motion: reduce) { .sx-drum button, .sx-rt, .sx-yp { transition: none; animation: none; } }
+
+/* ---------- Plein écran du sample (INFRA, 21/11, T16-T24, T59, « ton morceau suit ») ---------- */
+.sx-back-fs { width: 44px; height: 44px; margin-left: -11px; display: grid; place-items: center; border: 0; background: none; padding: 0; color: #fff; cursor: pointer; }
+.sx-back-fs svg { width: 22px; height: 22px; }
+.sx-top .sx-tools { margin-left: auto; }
+.sx-tag { display: block; margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: rgba(255, 255, 255, .72); }
+.sx-tag:empty { display: none; }
+.sx-tag .sx-yr { margin-left: 6px; padding: 1px 6px; border: 1px solid var(--sx-red); border-radius: 5px; color: var(--sx-red); letter-spacing: .04em; font-variant-numeric: tabular-nums; border-bottom-style: solid; }
+/* la suivante : ton morceau, en bas à droite, plus petite et grisée ; la toucher y va */
+/* en diagonale : le sample en haut à gauche, plus grand ; ton morceau en bas à droite, plus petit.
+   Même hauteur que la pochette seule : titre, barre et commandes restent visibles. */
+.sx-main.has-next { display: grid; grid-template-columns: 64fr 36fr; column-gap: 14px; align-items: end; }
+.sx-main.has-next > * { grid-column: 1 / -1; }
+.sx-main.has-next > .sx-art { grid-column: 1; width: 100%; margin: 0; }
+.sx-main.has-next > .sx-next { grid-column: 2; }
+.sx-next { position: relative; display: block; width: 100%; margin: 0; padding: 0; border: 0; background: none; cursor: pointer; }
+.sx-next[hidden] { display: none; }
+.sx-next img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; filter: grayscale(1) brightness(.8); opacity: .5; transition: opacity .3s, filter .3s; box-shadow: 0 16px 36px rgba(0, 0, 0, .45); }
+.sx-next:hover img, .sx-next:focus-visible img { opacity: .75; }
+.sx-next .sx-hook { position: absolute; left: 0; top: -30px; width: 22px; height: 22px; color: rgba(255, 255, 255, .5); }
+.sx-next .sx-hook svg { width: 22px; height: 22px; }
+.sx-leg [data-smp-jump="1"] b { font-weight: 700; color: #fff; }

@@ -222,11 +222,12 @@
   // Mix (INFRA, 19/11) : les samples d'un même morceau sont joués à la suite, dans l'ordre où ils y
   // entrent, chacun en une ou plusieurs parties (vraie durée lue dans le projet Ableton), puis ton morceau
   // entre pile à l'entrée du premier. Un enchaînement = le 1er sample + { chain, segs, S }.
-  function chainOf(list) {
+  // single (INFRA, 21/11, « ton morceau suit ») : en Samples, chaque sample est suivi de ton morceau.
+  function chainOf(list, single) {
     var groups = [],
       byKey = {};
     list.filter(duoOk).forEach(function (i) {
-      var k = i.album + "|" + i.track;
+      var k = i.album + "|" + i.track + (single ? "|" + i.y + "|" + i.s0 : "");
       if (!byKey[k]) {
         byKey[k] = [];
         groups.push(byKey[k]);
@@ -1217,7 +1218,9 @@
     sheet.innerHTML =
       '<div class="now-playing-backdrop" data-smp-bg aria-hidden="true"></div>' +
       '<div class="sx-panel" tabindex="-1">' +
-      '<div class="sx-top"><span class="sx-kick" data-smp-kicker></span>' +
+      '<div class="sx-top"><button type="button" class="sx-back-fs" data-smp-close aria-label="Retour" title="Retour (Échap)">' +
+      svg('<path d="M20 12H5M11 6l-6 6 6 6"/>', LINE) +
+      '</button><span class="sx-kick" data-smp-kicker hidden></span>' +
       '<span class="sx-tools">' +
       '<a class="smp-ytic" data-smp-sp target="_blank" rel="noopener" aria-label="Chercher dans Spotify" title="Chercher ce sample dans Spotify">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="currentColor"/><path d="M7 9.6c3.4-1 7.2-.7 10.2 1M7.6 12.6c2.8-.8 5.8-.5 8.3.9M8.3 15.4c2.2-.6 4.4-.3 6.4.7" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg></a>' +
@@ -1227,15 +1230,16 @@
       '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4" fill="currentColor"/><path d="M10 9.2v5.6l4.8-2.8z" fill="#fff"/></svg></a>' +
       // ⋯ du Mix (T bis) : affiché seulement en lecture Mix, par samples-mix-ui.js
       moreBtn().replace("<button ", "<button hidden ") +
-      '<button type="button" class="sx-x" data-smp-close aria-label="Fermer" title="Fermer (Échap)">' +
-      svg('<path d="M6 6l12 12M18 6L6 18"/>', LINE) +
-      "</button></span></div>" +
+      "</span></div>" +
       '<div class="sx-main">' +
       '<div class="sx-art"><div class="sx-vid"><iframe data-smp-alt title="Sample suivant" tabindex="-1" aria-hidden="true" allow="autoplay; encrypted-media"></iframe><iframe data-smp-frame title="Sample" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>' +
       '<img class="sx-cov" data-smp-cov alt="">' +
       // transition du Mix : la pochette suivante glisse sur l'actuelle, picto de l'effet sur le bord
       '<div class="sx-xf" data-sx-xf aria-hidden="true"><img alt=""><span class="sx-xf-edge"><i class="sx-xf-fx"></i></span></div></div>' +
-      '<div class="sx-meta"><div class="sx-mt"><b class="sx-title" data-smp-t dir="auto"></b>' +
+      '<button type="button" class="sx-next" data-smp-jump="1" hidden title="Aller à ton morceau"><span class="sx-hook">' +
+      HOOK +
+      '</span><img alt="" data-smp-nextcov></button>' +
+      '<div class="sx-meta"><div class="sx-mt"><span class="sx-tag" data-smp-tag></span><b class="sx-title" data-smp-t dir="auto"></b>' +
       '<small data-smp-a dir="auto"></small></div>' +
       '<div class="sx-bpm" data-smp-bpm title="Tempo du morceau"><b></b><small>BPM</small></div></div>' +
       '<div class="sx-bar" data-smp-bar role="slider" aria-label="Position" tabindex="0"><div class="sx-trk" data-smp-trk></div><i class="sx-knob" data-smp-knob></i></div>' +
@@ -1390,13 +1394,20 @@
     st.title = title;
     st.scope = scope;
     st.album = album || null;
-    st.mix = pref.sec === "mix";
-    if (st.mix) st.list = list = chainOf(list);
+    // Samples (INFRA, 21/11 : « ton morceau suit ») : le sample, puis ton morceau, dans le même lecteur,
+    // avec le même moteur que le Mix (un enchaînement par sample). A cappella reste sample seul.
+    st.sec = pref.sec;
+    st.mix = pref.sec === "mix" || pref.sec === "samples";
+    if (st.mix) st.list = list = chainOf(list, pref.sec === "samples");
     st.voix = voix == null ? secVoix() : voix;
-    st.sort = sortFor(st.mix, scope);
+    st.sort = sortFor(pref.sec === "mix", scope);
     reshuffle(null);
-    var first =
-      start && shownList().indexOf(start) >= 0 ? start : shownList()[0];
+    var sl = shownList(),
+      first = start
+        ? sl.filter(function (c) {
+            return c === start || (c.chain && c.chain.indexOf(start) >= 0);
+          })[0] || sl[0]
+        : sl[0];
     if (!first && !st.voix && !st.mix) {
       st.voix = true; // album sans sample instrumental : on montre ses voix
       first = shownList()[0];
@@ -1421,7 +1432,7 @@
     clearInterval(eng.tick);
     eng.tick = setInterval(engTick, 100);
     track("samples_open", {
-      mode: st.mix ? "mix" : "samples",
+      mode: st.sec === "mix" ? "mix" : "samples",
       scope: scope,
       sort: st.sort,
       n: shown().length,
@@ -1571,7 +1582,7 @@
     var cur = st.list[st.pos];
     if (!cur) return;
     $("[data-smp-kicker]", sheet).textContent =
-      (st.mix ? "Mix · " : "Samples · ") + st.title;
+      (st.sec === "mix" ? "Mix · " : "Samples · ") + st.title;
     $("[data-smp-sortl]", sheet).innerHTML = sortBtns(st.sort, "here", "bpm");
     $("[data-smp-sortr]", sheet).innerHTML = sortBtns(
       st.sort,
@@ -1623,7 +1634,9 @@
         '<button type="button" data-smp-jump="1" title="Aller à ton morceau" style="flex:' +
         TRACK +
         '" dir="auto">' +
-        esc(cur.track) +
+        (st.sec === "samples"
+          ? "Puis <b>" + esc(cur.track) + "</b>, qui le reprend " + entre(cur.at)
+          : esc(cur.track)) +
         "</button>"
       : infoHtml(cur);
     var list = shownList(),
@@ -1772,6 +1785,26 @@
     var inTrack = trackPhase(),
       smp = curSample() || cur;
     $("[data-smp-t]", sheet).textContent = inTrack ? cur.track : smp.t;
+    var tag = $("[data-smp-tag]", sheet);
+    tag.innerHTML = inTrack
+      ? ""
+      : "Sample" +
+        (smp.an
+          ? ' <span class="sx-yr" role="button" tabindex="0" data-smp-year="' +
+            esc(smp.an) +
+            '">' +
+            esc(smp.an) +
+            "</span>"
+          : "");
+    var nx = $(".sx-next", sheet);
+    nx.hidden = inTrack || !st.mix;
+    $(".sx-main", sheet).classList.toggle("has-next", !nx.hidden);
+    if (!nx.hidden) {
+      var nc = $("[data-smp-nextcov]", sheet),
+        ns = assetUrl(cur.cover);
+      if (nc.getAttribute("src") !== ns) nc.setAttribute("src", ns);
+      nx.setAttribute("aria-label", "Puis " + cur.track);
+    }
     // Spotify et Apple Music : recherche du sample entendu
     var q = encodeURIComponent([smp.a, smp.t].filter(Boolean).join(" "));
     $("[data-smp-sp]", sheet).href = "https://open.spotify.com/search/" + q;
@@ -1780,7 +1813,8 @@
       ? ["INFRA", cur.album, transfo(smp)].filter(Boolean).join(" · ")
       : [
           who(smp) + (smp.v ? (who(smp) ? " · " : "") + "voix" : ""),
-          "samplé dans " + cur.track,
+          // en Samples, « Puis TON MORCEAU, qui le reprend à 0:10 » le dit déjà sous la barre
+          st.sec === "samples" && st.mix ? "" : "samplé dans " + cur.track,
         ]
           .filter(Boolean)
           .join(" · ");
@@ -2061,7 +2095,7 @@
   function setSortHere(v) {
     var cur = st.list[st.pos];
     st.sort = v;
-    setSort(st.mix, st.scope, v);
+    setSort(st.sec === "mix", st.scope, v);
     if (v === "shuffle") reshuffle(cur);
     paint(false);
     track("samples_sort", {
@@ -3736,6 +3770,8 @@
     if (t.closest("[data-smp-next]")) return step(1);
     if (t.closest("[data-smp-pp]")) return toggle();
     if (t.closest("[data-smp-goto]")) return goToTrack(st.list[st.pos]);
+    var yr = t.closest("[data-smp-year]");
+    if (yr && st.album) return openYears(st.album, yr.getAttribute("data-smp-year"), yr);
     // « Sample » : le sample reprend au début ; nom du morceau : saut à ton morceau (INFRA, 19/11).
     var jump = t.closest("[data-smp-jump]");
     if (jump) {
@@ -3790,7 +3826,10 @@
         "all",
       );
     }
-    var cur = albumView != null ? data.albums[albumView] : null;
+    var cur =
+      albumView != null && !(sheet && sheet.contains(t))
+        ? data.albums[albumView]
+        : null;
     if (cur) {
       if (t.closest("[data-smp-back]")) return backToGrid();
       var yr = t.closest("[data-smp-year]");

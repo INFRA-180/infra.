@@ -3913,6 +3913,298 @@
     });
   }
 
+  // ---------- Clic droit (Mac) et appui long (iPhone) sur tout ce qui se touche (INFRA, 21/11, T55) ----------
+  // Même menu que le reste du site (.ta-menu de track-actions.js) : sur ordinateur à côté du pointeur,
+  // sur iPhone en feuille du bas. Chaque élément a ses actions ; partout ailleurs, rien (menu du navigateur).
+  var cmenu = null;
+  var IC = {
+    play: PLAY,
+    hook: HOOK,
+    mix: INF_IC,
+    years: YEARS_IC,
+    shuf: SORT_ICON.shuffle,
+    open: svg('<path d="M9 5l7 7-7 7"/>', LINE),
+    tab: svg('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>', LINE),
+    dl: svg('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', LINE),
+    link: svg('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>', LINE),
+    yt: svg('<rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.2v5.6l4.8-2.8z"/>', LINE),
+  };
+  function sayMsg(m) {
+    var t = document.getElementById("infraTrackToast");
+    if (!t) {
+      t = document.createElement("div");
+      t.id = "infraTrackToast";
+      t.className = "ta-toast";
+      t.setAttribute("role", "status");
+      t.setAttribute("aria-live", "polite");
+      document.body.appendChild(t);
+    }
+    t.textContent = m;
+    t.classList.add("is-on");
+    clearTimeout(t.__sx);
+    t.__sx = setTimeout(function () {
+      t.classList.remove("is-on");
+    }, 2200);
+  }
+  function copyLink(hash) {
+    var url = location.origin + location.pathname + (hash || "#samples");
+    var done = function (ok) {
+      sayMsg(ok ? "Lien copié" : "Copie impossible");
+    };
+    try {
+      navigator.clipboard.writeText(url).then(
+        function () {
+          done(true);
+        },
+        function () {
+          done(false);
+        },
+      );
+    } catch (_e) {
+      done(false);
+    }
+  }
+  function openTab(url) {
+    var a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  function dlFile(url, name) {
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = name || "";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  function ytUrl(i) {
+    return "https://www.youtube.com/watch?v=" + encodeURIComponent(i.y) + (isFinite(i.s0) ? "&t=" + Math.floor(i.s0) + "s" : "");
+  }
+  function ctxFor(t) {
+    var el, a, i;
+    if ((el = t.closest("[data-smp-album]")) && data) {
+      a = data.albums[+el.getAttribute("data-smp-album")];
+      if (!a) return null;
+      return {
+        head: [a.title, albumItems(a).length + " samples"],
+        kind: "album",
+        items: [
+          ["Ouvrir", IC.open, function () { el.click(); }],
+          ["Lire", IC.play, function () { openAlbumAt(a, null); }],
+          ["Aléatoire", IC.shuf, function () { setSort(false, "album", "shuffle"); openAlbumAt(a, null); }],
+          ["Mix de l’album", IC.mix, function () { openAlbumAt(a, null, true); }],
+          ["Les années des samples", IC.years, function () { openYears(a, null, el); }],
+          ["Télécharger la pochette", IC.dl, function () { dlFile(assetUrl(a.cover), a.title + ".webp"); }],
+          ["Copier le lien", IC.link, function () { copyLink(); }],
+        ],
+      };
+    }
+    var cur = albumView != null && data ? data.albums[albumView] : st.album;
+    if ((el = t.closest("[data-smp-item]")) && cur) {
+      i = cur.items[+el.getAttribute("data-smp-item")];
+      if (!i) return null;
+      return {
+        head: [i.t, who(i)],
+        kind: "sample",
+        items: [
+          ["Lire", IC.play, function () { openAlbumAt(cur, i); }],
+          ["Écouter " + i.track + ", qui le reprend", IC.hook, function () { goToTrack(i); }],
+          i.an ? ["Les samples de " + i.an, IC.years, function () { openYears(cur, i.an, el); }] : null,
+          ["Ouvrir sur YouTube", IC.yt, function () { openTab(ytUrl(i)); }],
+          ["Copier le lien", IC.link, function () { copyLink(); }],
+        ],
+      };
+    }
+    if ((el = t.closest("[data-smp-track]")) && cur) {
+      var tt = el.getAttribute("data-smp-track"),
+        its = cur.items.filter(function (x) {
+          return x.track === tt;
+        });
+      return {
+        head: [tt, cur.title],
+        kind: "track",
+        items: [
+          ["Lire " + tt, IC.play, function () { goToTrack(its[0]); }],
+          ["Écouter ses samples", IC.hook, function () { openAlbumAt(cur, its[0]); }],
+          ["Mix du morceau", IC.mix, function () { openAlbumAt(cur, its[0], true); }],
+          ["Copier le lien", IC.link, function () { copyLink(); }],
+        ],
+      };
+    }
+    if ((el = t.closest(".sx-acov")) && cur) {
+      return {
+        head: [cur.title, ""],
+        kind: "cover",
+        items: [
+          ["Lire", IC.play, function () { openAlbumAt(cur, null); }],
+          ["Mix de l’album", IC.mix, function () { openAlbumAt(cur, null, true); }],
+          ["Les années des samples", IC.years, function () { openYears(cur, null, el); }],
+          ["Télécharger la pochette", IC.dl, function () { dlFile(assetUrl(cur.cover), cur.title + ".webp"); }],
+          ["Ouvrir la pochette dans un nouvel onglet", IC.tab, function () { openTab(assetUrl(cur.cover)); }],
+          ["Copier le lien", IC.link, function () { copyLink(); }],
+        ],
+      };
+    }
+    if ((el = t.closest(".sx-art, .sx-next")) && st.list[st.pos]) {
+      var c = st.list[st.pos],
+        smp = curSample() || c,
+        trackSide = el.classList.contains("sx-next") || trackPhase(),
+        img = trackSide ? assetUrl(c.cover) : smpCover(smp, c);
+      return {
+        head: trackSide ? [c.track, c.album] : [smp.t, who(smp)],
+        kind: "player",
+        items: [
+          ["Télécharger la pochette", IC.dl, function () { dlFile(img, ""); }],
+          ["Ouvrir la pochette dans un nouvel onglet", IC.tab, function () { openTab(img); }],
+          trackSide ? null : ["Ouvrir sur YouTube", IC.yt, function () { openTab(ytUrl(smp)); }],
+          trackSide ? null : ["Aller à " + c.track, IC.hook, function () { goToTrack(smp); }],
+          ["Copier le lien", IC.link, function () { copyLink(); }],
+        ],
+      };
+    }
+    if ((el = t.closest("[data-smp-i]"))) {
+      var q = st.list[+el.getAttribute("data-smp-i")];
+      if (!q) return null;
+      return {
+        head: [q.t, q.track || ""],
+        kind: "queue",
+        items: [
+          ["Lire maintenant", IC.play, function () { play(q); }],
+          ["Ouvrir sur YouTube", IC.yt, function () { openTab(ytUrl(q.chain ? q.chain[0] : q)); }],
+        ],
+      };
+    }
+    if ((el = t.closest("[data-smp-year]")) && cur) {
+      var yy = el.getAttribute("data-smp-year");
+      return { head: [yy, "Les samples de cette année"], kind: "year", items: [["Les années des samples", IC.years, function () { openYears(cur, yy, el); }]] };
+    }
+    return null;
+  }
+  function closeCtx() {
+    if (!cmenu) return;
+    cmenu.scrim.remove();
+    cmenu.box.remove();
+    cmenu = null;
+  }
+  function showCtx(target, x, y, viaKey) {
+    var m = ctxFor(target);
+    if (!m) return false;
+    closeCtx();
+    var sheetMode = !viaKey && window.matchMedia && window.matchMedia("(max-width: 639px)").matches;
+    var scrim = document.createElement("div"),
+      box = document.createElement("div");
+    scrim.className = "ta-scrim" + (sheetMode ? " is-sheet" : "");
+    box.className = "ta-menu sx-ctx" + (sheetMode ? " is-sheet" : "");
+    box.setAttribute("role", "menu");
+    var items = m.items.filter(Boolean);
+    box.innerHTML =
+      '<div class="ta-head"><b>' + esc(m.head[0]) + "</b>" + (m.head[1] ? "<span>" + esc(m.head[1]) + "</span>" : "") + "</div>" +
+      items
+        .map(function (it, k) {
+          return '<button type="button" role="menuitem" data-ci="' + k + '">' + it[1] + "<span>" + esc(it[0]) + "</span></button>";
+        })
+        .join("");
+    document.body.appendChild(scrim);
+    document.body.appendChild(box);
+    cmenu = { scrim: scrim, box: box };
+    if (!sheetMode) {
+      var w = box.offsetWidth,
+        hh = box.offsetHeight;
+      box.style.left = clamp(x, 8, window.innerWidth - w - 8) + "px";
+      box.style.top = clamp(y, 8, window.innerHeight - hh - 8) + "px";
+    }
+    scrim.addEventListener("click", closeCtx);
+    scrim.addEventListener("contextmenu", function (e) {
+      e.preventDefault();
+      closeCtx();
+    });
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-ci]");
+      if (!b) return;
+      var it = items[+b.getAttribute("data-ci")];
+      closeCtx();
+      it[2]();
+    });
+    box.addEventListener("keydown", function (e) {
+      var bs = [].slice.call(box.querySelectorAll("button")),
+        k = bs.indexOf(document.activeElement);
+      if (e.key === "ArrowDown") bs[(k + 1) % bs.length].focus();
+      else if (e.key === "ArrowUp") bs[(k - 1 + bs.length) % bs.length].focus();
+      else if (e.key === "Escape") closeCtx();
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    var first = box.querySelector("button");
+    if (first) first.focus({ preventScroll: true });
+    track("samples_menu", { to: m.kind });
+    return true;
+  }
+  function inSamples(t) {
+    return t && t.closest && (t.closest("[data-sx-page]") || (sheet && sheet.contains(t)));
+  }
+  document.addEventListener("contextmenu", function (e) {
+    if (!inSamples(e.target)) return;
+    if (showCtx(e.target, e.clientX, e.clientY)) e.preventDefault();
+  });
+  // appui long au doigt : 500 ms, annulé si le doigt bouge ; le clic qui suit est avalé
+  (function () {
+    var tm = null,
+      x0 = 0,
+      y0 = 0,
+      fired = false;
+    document.addEventListener("pointerdown", function (e) {
+      if (e.pointerType !== "touch" || !inSamples(e.target) || e.target.closest(".sx-wheel, .sx-bar")) return;
+      x0 = e.clientX;
+      y0 = e.clientY;
+      fired = false;
+      var tg = e.target;
+      clearTimeout(tm);
+      tm = setTimeout(function () {
+        tm = null;
+        if (showCtx(tg, x0, y0)) {
+          fired = true;
+          if (navigator.vibrate) navigator.vibrate(8);
+        }
+      }, 500);
+    });
+    document.addEventListener("pointermove", function (e) {
+      if (tm && Math.abs(e.clientX - x0) + Math.abs(e.clientY - y0) > 10) {
+        clearTimeout(tm);
+        tm = null;
+      }
+    });
+    ["pointerup", "pointercancel"].forEach(function (n) {
+      document.addEventListener(n, function () {
+        clearTimeout(tm);
+        tm = null;
+      });
+    });
+    document.addEventListener(
+      "click",
+      function (e) {
+        if (fired) {
+          fired = false;
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      },
+      true,
+    );
+  })();
+  // clavier : Maj+F10 ou touche Menu sur l'élément qui a le focus
+  document.addEventListener("keydown", function (e) {
+    if (!(e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))) return;
+    var el = document.activeElement;
+    if (!inSamples(el)) return;
+    var r = el.getBoundingClientRect();
+    if (showCtx(el, r.left + 12, r.bottom, true)) e.preventDefault();
+  });
+
   window.InfraSamples = {
     render: render,
     load: load,

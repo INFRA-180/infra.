@@ -410,3 +410,7 @@
 .sx-next .sx-hook { position: absolute; left: 0; top: -30px; width: 22px; height: 22px; color: rgba(255, 255, 255, .5); }
 .sx-next .sx-hook svg { width: 22px; height: 22px; }
 .sx-leg [data-smp-jump="1"] b { font-weight: 700; color: #fff; }
+
+/* ---------- Clic droit / appui long (T55) : le menu du site ; pas de menu iOS sur les images ---------- */
+.sx-li, .smp-al, .sx-acov, .sx-art, .sx-next, .smp-row { -webkit-touch-callout: none; }
+.ta-menu.sx-ctx button svg { width: 20px; height: 20px; }

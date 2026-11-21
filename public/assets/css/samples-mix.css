@@ -414,3 +414,14 @@
 /* ---------- Clic droit / appui long (T55) : le menu du site ; pas de menu iOS sur les images ---------- */
 .sx-li, .smp-al, .sx-acov, .sx-art, .sx-next, .smp-row { -webkit-touch-callout: none; }
 .ta-menu.sx-ctx button svg { width: 20px; height: 20px; }
+
+/* ---------- A cappella : les chansons d'origine (T15) ---------- */
+.sx-vlist { border-top: 1px solid rgba(17, 17, 17, .08); }
+.sx-vrow { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid rgba(17, 17, 17, .08); }
+.sx-vmain { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 0; border: 0; background: none; font: inherit; color: var(--ink, #111); text-align: left; cursor: pointer; -webkit-touch-callout: none; }
+.sx-vmain img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex: none; background: rgba(17, 17, 17, .06); }
+.sx-vmain small u { text-decoration: none; color: var(--ink, #111); font-weight: 600; }
+.sx-src { flex: none; width: 44px; height: 44px; display: grid; place-items: center; color: rgba(17, 17, 17, .45); }
+.sx-src:hover, .sx-src:focus-visible { color: var(--ink, #111); }
+.sx-src svg { width: 22px; height: 22px; }
+.sx-vrow .sx-src:last-child { margin-right: -11px; }

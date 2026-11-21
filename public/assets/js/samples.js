@@ -791,8 +791,9 @@
       tabsHtml(pref.sec) +
       "</div>" +
       (mix ? mixHead(pool) : "") +
-      '<ul class="smp-grid">' +
-      data.albums
+      (voixSec ? voixList() : "") +
+      (voixSec ? "" : '<ul class="smp-grid">') +
+      (voixSec ? [] : data.albums)
         .map(function (a, i) {
           var n = mix
             ? chainOf(a.items).length
@@ -821,11 +822,57 @@
           );
         })
         .join("") +
-      "</ul>";
+      (voixSec ? "" : "</ul>");
     panel.innerHTML = '<div class="sx-page" data-sx-page>' + html + "</div>";
     if (window.InfraSamplesUI && window.InfraSamplesUI.afterRender)
       window.InfraSamplesUI.afterRender(panel);
   }
+  // ---------- A cappella : les chansons d'origine (INFRA, 20-21/11, T15) ----------
+  // Les vraies chansons dont INFRA a pris la voix : pochette, titre, artiste · année, « sa voix dans
+  // TON MORCEAU à 0:31 », YouTube et Spotify (recherche : les données n'ont pas encore les liens Spotify).
+  var YT_IC =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4" fill="currentColor"/><path d="M10 9.2v5.6l4.8-2.8z" fill="#fff"/></svg>';
+  var SP_IC =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="currentColor"/><path d="M7 9.6c3.4-1 7.2-.7 10.2 1M7.6 12.6c2.8-.8 5.8-.5 8.3.9M8.3 15.4c2.2-.6 4.4-.3 6.4.7" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  function voices() {
+    return all().filter(keep(false, "only"));
+  }
+  function voixList() {
+    return (
+      '<div class="sx-vlist">' +
+      voices()
+        .map(function (i, k) {
+          var q = encodeURIComponent([i.a, i.t].filter(Boolean).join(" "));
+          return (
+            '<div class="sx-vrow"><button type="button" class="sx-vmain" data-smp-voice="' +
+            k +
+            '"><img src="' +
+            itemCover(i) +
+            '" alt="" loading="lazy" decoding="async"><span class="sx-litx"><b dir="auto">' +
+            esc(i.t) +
+            '</b><small dir="auto">' +
+            esc(i.a || "Artiste à compléter") +
+            (i.an ? " · " + esc(i.an) : "") +
+            " · sa voix dans <u>" +
+            esc(i.track) +
+            "</u>" +
+            (isFinite(i.at) ? " " + entre(i.at) : "") +
+            '</small></span></button><a class="sx-src" href="' +
+            esc(ytUrl(i)) +
+            '" target="_blank" rel="noopener" title="Écouter sur YouTube" aria-label="Écouter sur YouTube">' +
+            YT_IC +
+            '</a><a class="sx-src" href="https://open.spotify.com/search/' +
+            q +
+            '" target="_blank" rel="noopener" title="Chercher sur Spotify" aria-label="Chercher sur Spotify">' +
+            SP_IC +
+            "</a></div>"
+          );
+        })
+        .join("") +
+      "</div>"
+    );
+  }
+
   // ---------- Page d'un album (INFRA, 21/11, proposition A validée, T38-T50) ----------
   // Forme de la vraie page album du site : « ‹ Samples », pochette, titre, ligne d'infos, pictos en haut
   // à droite (▶ · Mix · aléatoire · années). Liste dans l'ordre du son : d'abord les samples (les
@@ -841,7 +888,7 @@
   );
   var BACK_IC = svg('<path d="M15 5l-7 7 7 7"/>', LINE);
   function entre(at) {
-    return isFinite(at) && at > 0 ? "à " + mmss(at) : "dès le début";
+    return isFinite(at) && at >= 0.5 ? "à " + mmss(at) : "dès le début";
   }
   function itemCover(i) {
     return i.c
@@ -3821,10 +3868,15 @@
         mix
           ? "Tout le Mix"
           : pref.sec === "voix"
-            ? "Toutes les voix"
+            ? "Les chansons d’origine"
             : "Tous les samples",
         "all",
       );
+    }
+    var vo = t.closest("[data-smp-voice]");
+    if (vo) {
+      var vl = voices();
+      return open(vl.slice(), "Les chansons d’origine", "all", null, "only", false, vl[+vo.getAttribute("data-smp-voice")]);
     }
     var cur =
       albumView != null && !(sheet && sheet.contains(t))
@@ -4075,6 +4127,20 @@
         items: [
           ["Lire maintenant", IC.play, function () { play(q); }],
           ["Ouvrir sur YouTube", IC.yt, function () { openTab(ytUrl(q.chain ? q.chain[0] : q)); }],
+        ],
+      };
+    }
+    if ((el = t.closest("[data-smp-voice]"))) {
+      var vi = voices()[+el.getAttribute("data-smp-voice")];
+      if (!vi) return null;
+      return {
+        head: [vi.t, who(vi)],
+        kind: "voix",
+        items: [
+          ["Écouter", IC.play, function () { el.click(); }],
+          ["Ouvrir sur YouTube", IC.yt, function () { openTab(ytUrl(vi)); }],
+          ["Écouter " + vi.track + (isFinite(vi.at) ? " " + entre(vi.at) : ""), IC.hook, function () { goToTrack(vi); }],
+          ["Copier le lien", IC.link, function () { copyLink(); }],
         ],
       };
     }

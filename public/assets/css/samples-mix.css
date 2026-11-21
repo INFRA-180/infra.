@@ -246,10 +246,12 @@
 /* ---------- Lecteur : la pochette suivante glisse au rythme du fondu ---------- */
 .sx-xf { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity var(--sx-xf-fade) ease; }
 .sx-xf.on { opacity: 1; }
-.sx-xf img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; clip-path: inset(0 0 0 100%); }
-.sx-xf.go img { clip-path: inset(0 0 0 0); transition: clip-path var(--sx-xf-dur, 5s) var(--sx-xf-ease); }
-.sx-xf-edge { position: absolute; inset: 0; transform: translateX(100%); }
-.sx-xf.go .sx-xf-edge { transform: translateX(0); transition: transform var(--sx-xf-dur, 5s) var(--sx-xf-ease); }
+/* INFRA, 21/11 (T28, T61) : plus de picto d'effet ni de volet qui glisse ; la pochette suivante entre en
+   simple fondu, au rythme de la transition, et la petite pochette de ton morceau s'allume en même temps. */
+.sx-xf img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+.sx-xf.go img { opacity: 1; transition: opacity var(--sx-xf-dur, 5s) ease-in-out; }
+.sx-xf-edge { display: none; }
+.sx-main.has-next:has(.sx-xf.go) .sx-next img { filter: none; opacity: 1; transition: filter var(--sx-xf-dur, 5s) ease-in-out, opacity var(--sx-xf-dur, 5s) ease-in-out; }
 .sx-xf-fx {
   position: absolute;
   left: 0;
@@ -425,3 +427,6 @@
 .sx-src:hover, .sx-src:focus-visible { color: var(--ink, #111); }
 .sx-src svg { width: 22px; height: 22px; }
 .sx-vrow .sx-src:last-child { margin-right: -11px; }
+
+/* « À suivre » : plus de picto d'effet entre chaque ligne (T28) ; le réglage reste dans le menu des options. */
+.sx-fs .sx-xfm { display: none; }

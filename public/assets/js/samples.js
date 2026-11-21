@@ -426,7 +426,7 @@
   }
   var LINE =
     ' fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"';
-  var PLAY = svg('<path d="M7 4.5v15l13-7.5z" fill="currentColor"/>');
+  var PLAY = svg('<path d="M8 5v14l11-7z" fill="currentColor"/>');
   var PAUSE = svg(
     '<path fill="currentColor" d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z"/>',
   );
@@ -616,45 +616,36 @@
   // Barre de pictos collée en haut (T bis 5 et 7, 20/11) : vinyle · deux ondes croisées · micro. Le choisi
   // est plein, son nom dessous ; les autres en trait gris, sans nom ; aucun fond ni rond derrière.
   // Style : samples-mix.css ; touches 1/2/3 et glisser entre sections : samples-mix-ui.js.
-  var TAB_DIM = ' width="26" height="26"';
+  // Pictos des onglets (INFRA, 21/11, T52-T55) : ciseaux · infini · micro, au trait seulement comme
+  // tout le site (le choisi passe du gris au noir, rien n'est rempli), même encombrement, trait 1,8.
+  var TAB_LINE =
+    ' width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
   var TABS = [
     {
       k: "samples",
       name: "Samples",
       hint: "Les morceaux d’origine, en playlist",
       line: svg(
-        '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5.8a6.2 6.2 0 0 1 6.2 6.2"/>',
-        TAB_DIM + LINE,
-      ),
-      full: svg(
-        '<defs><mask id="sx-m-vinyl"><rect width="24" height="24" fill="#fff"/><circle cx="12" cy="12" r="2.3" fill="#000"/><path d="M12 5.8a6.2 6.2 0 0 1 6.2 6.2" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round"/></mask></defs><circle cx="12" cy="12" r="9.95" fill="currentColor" mask="url(#sx-m-vinyl)"/>',
-        TAB_DIM,
+        '<circle cx="6.7" cy="7.5" r="2.4"/><circle cx="6.7" cy="16.5" r="2.4"/><path d="M8.74 8.76 19.7 15.5M8.74 15.24 19.7 8.5"/>',
+        TAB_LINE,
       ),
     },
     {
       k: "mix",
       name: "Mix",
-      hint: "Le passage samplé, puis ton morceau là où il entre",
+      hint: "Les samples enchaînés",
       line: svg(
-        '<path d="M2.5 7c6 0 7 10 19 10"/><path d="M2.5 17c6 0 7-10 19-10"/>',
-        TAB_DIM + LINE,
-      ),
-      full: svg(
-        '<path d="M2.5 7c6 0 7 10 19 10"/><path d="M2.5 17c6 0 7-10 19-10"/>',
-        TAB_DIM + LINE.replace('stroke-width="1.9"', 'stroke-width="3"'),
+        '<path d="M12 12c-2.2-2.9-3.1-4.5-4.5-4.5a4.5 4.5 0 0 0 0 9c1.4 0 2.3-1.6 4.5-4.5s3.1-4.5 4.5-4.5a4.5 4.5 0 0 1 0 9c-1.4 0-2.3-1.6-4.5-4.5z"/>',
+        TAB_LINE,
       ),
     },
     {
       k: "voix",
       name: "A cappella",
-      hint: "Les voix que tu as reprises, seules",
+      hint: "Les chansons d’origine",
       line: svg(
-        '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>',
-        TAB_DIM + LINE,
-      ),
-      full: svg(
-        '<rect x="8.6" y="2.6" width="6.8" height="11.8" rx="3.4" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" stroke-width="2.4"/>',
-        TAB_DIM + LINE,
+        '<rect x="9.5" y="3" width="5" height="10.5" rx="2.5"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/>',
+        TAB_LINE,
       ),
     },
   ];
@@ -692,7 +683,7 @@
           ") · " +
           t.hint +
           '"><span class="sx-tab-ic">' +
-          (on ? t.full : t.line) +
+          t.line +
           "</span>" +
           (on
             ? '<span class="sx-tab-name" aria-hidden="true">' +
@@ -702,7 +693,6 @@
           "</button>"
         );
       }).join("") +
-      (sec === "mix" ? moreBtn() : "") +
       "</div>"
     );
   }
@@ -739,22 +729,15 @@
         .join("") +
       '<span class="sx-stack-play">' +
       PLAY +
-      "</span></button>" +
-      '<div class="sx-mixinfo"><button type="button" class="sx-mixtitle" data-smp-all tabindex="-1" aria-hidden="true"><b>Tout le Mix</b><small>' +
-      pool.length +
+      '</span></button><button type="button" class="sx-opts" data-sx-mixopts aria-haspopup="menu" aria-label="Options du Mix" title="Options du Mix · ' +
+      order.length +
       " enchaînements" +
       (bpms.length
-        ? " · " +
-          Math.min.apply(null, bpms) +
-          " → " +
-          Math.max.apply(null, bpms) +
-          " BPM"
+        ? " · " + Math.min.apply(null, bpms) + " → " + Math.max.apply(null, bpms) + " BPM"
         : "") +
-      '</small></button><div class="sx-mixrow"><span class="sx-sorts">' +
-      sortBtns(sort, "all") +
-      '</span><button type="button" class="sx-opts" data-sx-mixopts aria-haspopup="menu" aria-label="Options du Mix" title="Options du Mix">' +
+      '">' +
       (ui && ui.optsLine ? ui.optsLine() : "") +
-      "</button></div></div></div>"
+      "</button></div>"
     );
   }
   function render(panel) {
@@ -777,20 +760,26 @@
     var mix = pref.sec === "mix";
     var voixSec = pref.sec === "voix";
     var pool = mix ? chainOf(all()) : all().filter(keep(mix, secVoix()));
+    // Ligne du haut (INFRA, 21/11, T46-T53) : à gauche ▶ (puis BPM et aléatoire), à droite les pictos,
+    // tout centré sur la même ligne ; plus de texte (« Tout écouter · N samples » en info-bulle).
+    var allLabel = mix
+      ? "Tout le Mix · " + pool.length + " enchaînements"
+      : voixSec
+        ? "Toutes les chansons d’origine · " + pool.length
+        : "Tout écouter · " + pool.length + " samples";
     var html =
+      '<div class="sx-head" data-sx-head><div class="sx-allrow"><button type="button" class="sx-all" data-smp-all title="' +
+      allLabel +
+      '" aria-label="' +
+      allLabel +
+      '"><span class="sx-allic">' +
+      PLAY +
+      "</span></button>" +
+      (voixSec ? "" : sortBtns(sortFor(mix, "all"), "all")) +
+      "</div>" +
       tabsHtml(pref.sec) +
-      (mix
-        ? mixHead(pool)
-        : '<div class="sx-allrow"><button type="button" class="sx-all" data-smp-all><span class="sx-allic">' +
-          PLAY +
-          "</span><span><b>" +
-          (voixSec ? "Toutes les voix" : "Tous les samples") +
-          "</b><small>" +
-          pool.length +
-          (voixSec ? " voix" : " samples") +
-          "</small></span></button>" +
-          sortBtns(sortFor(mix, "all"), "all") +
-          "</div>") +
+      "</div>" +
+      (mix ? mixHead(pool) : "") +
       '<ul class="smp-grid">' +
       data.albums
         .map(function (a, i) {

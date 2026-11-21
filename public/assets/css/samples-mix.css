@@ -6,7 +6,7 @@
 :root {
   /* Barre de pictos */
   --sx-tab-cell: 44px;          /* cible tactile (44 pt) */
-  --sx-tab-icon: 26px;          /* dessin du picto, Mac (28 sur iPhone, plus bas) */
+  --sx-tab-icon: 22px;          /* dessin du picto (INFRA 21/11 : 22, comme les autres pictos du site) */
   --sx-tab-gap: 24px;           /* écart entre deux pictos */
   --sx-tab-off: .35;            /* gris des pictos non choisis (charte : 35 %) */
   --sx-tab-label: 11px;         /* nom sous le picto choisi */
@@ -45,24 +45,40 @@
   --sx-menu-off: .35;           /* options grisées (« Pas encore sur iPhone ») */
 }
 @media (max-width: 639px) {
-  :root { --sx-tab-icon: 28px; --sx-stack: 104px; }
+  :root { --sx-stack: 104px; }
 }
 /* ================================================================================================= */
 
-/* ---------- Barre de pictos ---------- */
-.sx-tabs {
+/* ---------- Ligne du haut : ▶ BPM aléatoire à gauche, pictos à droite (INFRA, 21/11, T46-T55) ---------- */
+.sx-head {
   position: sticky;
   top: var(--sx-bar-top);
   z-index: 15;
   display: flex;
-  align-items: flex-start;
-  gap: var(--sx-tab-gap);
-  /* le dessin du 1er picto part de la même ligne que la grille (case de 44, dessin centré) */
-  margin: 0 calc((var(--sx-tab-icon) - var(--sx-tab-cell)) / 2) 8px;
-  padding: 4px 0 12px;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 32px;
+  padding: 4px 0 8px;
   background: var(--sx-bar-bg);
   -webkit-backdrop-filter: saturate(1.4) blur(16px);
   backdrop-filter: saturate(1.4) blur(16px);
+}
+.sx-head .sx-allrow { display: flex; align-items: center; gap: 0; margin: 0; }
+.sx-head .sx-all { width: 44px; min-height: 44px; padding: 0; justify-content: flex-start; }
+.sx-head .sx-allic { width: 22px; height: 22px; color: var(--sx-play, #e0353b); }
+.sx-head .sx-allic svg { width: 22px; height: 22px; }
+.sx-head .sx-ic { width: 44px; height: 44px; }
+.sx-head .sx-ic + .sx-ic { margin-left: 0; }
+.sx-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--sx-tab-gap);
+  margin: 0 calc((var(--sx-tab-icon) - var(--sx-tab-cell)) / 2) 0 auto;
+}
+.sx-tabs .sx-tab:last-child .sx-tab-name { left: auto; right: calc((var(--sx-tab-cell) - var(--sx-tab-icon)) / 2); transform: none; }
+@media (max-width: 639px) {
+  .sx-head { gap: 8px; }
+  :root { --sx-tab-gap: 4px; }
 }
 .sx-tab {
   position: relative;
@@ -113,11 +129,11 @@
 .sx-more[hidden] { display: none; }
 
 /* glisser entre sections (iPhone) : le contenu suit le doigt, la barre reste */
-.sx-page > :not(.sx-tabs) { transform: translateX(var(--sx-swipe-x, 0px)); transition: transform .22s ease; }
-.sx-page.sx-swiping > :not(.sx-tabs) { transition: none; }
+.sx-page > :not(.sx-head) { transform: translateX(var(--sx-swipe-x, 0px)); transition: transform .22s ease; }
+.sx-page.sx-swiping > :not(.sx-head) { transition: none; }
 
 /* ---------- Page Mix ---------- */
-.sx-mixhead { display: flex; align-items: center; gap: 20px; margin: 4px 0 24px; }
+.sx-mixhead { display: flex; align-items: center; gap: 24px; margin: 0 0 32px; }
 .sx-stack {
   position: relative;
   flex: none;
@@ -164,7 +180,7 @@
 .sx-mixrow { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
 .sx-sorts { display: flex; align-items: center; }
 .sx-opts {
-  margin-left: auto;
+  margin-left: 0;
   min-height: 44px;
   display: inline-flex;
   align-items: center;

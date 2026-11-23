@@ -37,7 +37,14 @@ import {
   resolveCoverUrl,
   syncMediaSessionMetadata
 } from "./media-artwork.js";
-import { getRandomIndex, startTrack, syncPlaylistContext, trackAudioRuntimeEvent } from "./playback.js";
+import {
+  getCurrentPlaylistIndexSafe,
+  getRandomIndex,
+  startTrack,
+  syncPlaylistContext,
+  trackAudioRuntimeEvent
+} from "./playback.js";
+import { savePlaybackQueueContext } from "./album-continuity.js";
 
 function purgeAdminUi() {
   // Public mode must not rely on CSS to hide admin UI. Remove it from the DOM.
@@ -96,6 +103,8 @@ function createFavoritesUiApi() {
     syncAudioUi,
     getRandomIndex,
     startTrack,
+    getCurrentPlaylistIndexSafe,
+    savePlaybackQueueContext,
     resolveCoverUrl,
     srcMatches,
     getMediaSessionFallbackArtwork,

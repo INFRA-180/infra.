@@ -35,7 +35,7 @@ expect(codeTest(/data-bib-js/, home), "home-catalog.js ne charge plus la bibliot
 // Les onglets sont des boutons : la navigation interne ne les intercepte pas
 expect(!codeTest(/<a[^>]+data-bib-tab/, index), "un onglet est un lien");
 // Lecture d'une liste : même chemin que les favoris, liste non limitée à un album
-expect(codeTest(/window\.InfraLibraryPlayback = \{ playPaths: startLibraryPlaybackAt \}/, fav), "point d'entrée de lecture absent");
+expect(codeTest(/window\.InfraLibraryPlayback = \{ playPaths: startLibraryPlaybackAt, queuePaths: queueLibraryPaths \}/, fav), "point d'entrée de lecture absent");
 const hook = fav.slice(codeIndexOf(fav, "function startLibraryPlaybackAt"), codeIndexOf(fav, "window.InfraLibraryPlayback"));
 expect(codeTest(/audioState\.playlistKind = "playlist"/, hook), "la liste doit être de type playlist (sinon limitée à un album)");
 expect(codeTest(/startTrack\(index,/, hook) && codeTest(/userGesture: true/, hook), "lecture non lancée dans le geste");

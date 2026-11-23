@@ -58,6 +58,10 @@
     const clearRadioQueue = method(ctx, "clearRadioQueue");
     const persistHomePlayMode = method(ctx, "persistHomePlayMode");
     const syncPlaylistContext = method(ctx, "syncPlaylistContext");
+    const getCurrentPlaylistIndexSafe = method(ctx, "getCurrentPlaylistIndexSafe", function () {
+      return -1;
+    });
+    const savePlaybackQueueContext = method(ctx, "savePlaybackQueueContext");
     const syncMediaSessionMetadata = method(ctx, "syncMediaSessionMetadata");
     const syncAudioUi = method(ctx, "syncAudioUi");
     const getRandomIndex = method(ctx, "getRandomIndex", function () {
@@ -1201,8 +1205,36 @@
       startTrack(index, { seamless: true, immediatePlay: true, userGesture: true, surface: "library_row" });
       return true;
     }
+    // 23/11/2026 (menus du clic droit) : « Lire ensuite » (juste après le titre en cours) et « Ajouter à la
+    // file » (à la fin). Rien en cours : la lecture démarre. Même règle que le glisser d'« À suivre » :
+    // le titre en cours ne bouge pas, l'aléatoire s'arrête (l'ordre voulu prime).
+    function queueLibraryPaths(paths, where) {
+      const list = audioState.playlist;
+      const current = getCurrentPlaylistIndexSafe();
+      if (!Array.isArray(list) || !list.length || current < 0) return startLibraryPlaybackAt(paths, 0) ? "started" : false;
+      const tracks = [];
+      const seen = new Set();
+      (Array.isArray(paths) ? paths : []).forEach(function (srcLike) {
+        const path = normalizeFavoritePath(srcLike, runtime.baseUrl.href);
+        if (!path || seen.has(path)) return;
+        const meta = getTrackMetaByAssetPath(path, runtime.baseUrl.href);
+        if (!meta || !meta.src) return;
+        seen.add(path);
+        tracks.push(Object.assign({}, meta, { src: meta.src || resolveManagedAudioSrc(path, runtime.baseUrl.href) }));
+      });
+      if (!tracks.length) return false;
+      const at = where === "end" ? list.length : current + 1;
+      list.splice.apply(list, [at, 0].concat(tracks));
+      if (audioState.homeMode === "radio" && list === audioState.radioQueue) audioState.radioQueueCursor = current;
+      else if (audioState.shuffleOn) audioState.shuffleOn = false;
+      syncPlaylistContext(list, { preserveRecent: true });
+      savePlaybackQueueContext();
+      trackAudioRuntimeEvent("queue_insert", { where: where === "end" ? "end" : "next", count: tracks.length });
+      syncAudioUi();
+      return "queued";
+    }
     if (typeof window !== "undefined" && window) {
-      window.InfraLibraryPlayback = { playPaths: startLibraryPlaybackAt };
+      window.InfraLibraryPlayback = { playPaths: startLibraryPlaybackAt, queuePaths: queueLibraryPaths };
       // Accueil V5 (maquette validée par INFRA le 09/11/2026) : les favoris dans l'ordre de l'onglet Favoris.
       window.InfraHomeFavorites = {
         list: function () {

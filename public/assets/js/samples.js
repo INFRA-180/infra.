@@ -3979,6 +3979,19 @@
     });
   }
 
+  // 23/11/2026 : clic droit › « Samples de l'album » depuis tout le site (carte, page, ligne d'album).
+  function openAlbum(albumTitle) {
+    ensureCtx();
+    return load().then(function () {
+      var a = data.albums.filter(function (x) {
+        return same(x.title, albumTitle);
+      })[0];
+      if (!a || !albumItems(a).length) return false;
+      openAlbumAt(a, 0, false);
+      return true;
+    });
+  }
+
   // ---------- Clic droit (Mac) et appui long (iPhone) sur tout ce qui se touche (INFRA, 21/11, T55) ----------
   // Même menu que le reste du site (.ta-menu de track-actions.js) : sur ordinateur à côté du pointeur,
   // sur iPhone en feuille du bas. Chaque élément a ses actions ; partout ailleurs, rien (menu du navigateur).
@@ -4289,6 +4302,7 @@
     render: render,
     load: load,
     openTrack: openTrack,
+    openAlbum: openAlbum,
     same: same,
     close: close,
     // Options du Mix (20/11) : voir DOCS/LOTS/AGENTS_MIX_20261120/CODE_A_MOTEUR.md

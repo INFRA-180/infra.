@@ -191,6 +191,7 @@
 
   function closeMenu() {
     if (!menu) return;
+    document.removeEventListener("touchmove", blockScrollBehindMenu, { capture: true });
     menu.scrim.remove();
     menu.box.remove();
     if (menu.row) menu.row.classList.remove("ta-held");
@@ -243,6 +244,7 @@
     }
     if (row.matches(ROW_SELECTOR)) row.classList.add("ta-held");
     menu = { scrim, box, row, invoker: row.matches("button") ? row : row.querySelector("button") || row };
+    document.addEventListener("touchmove", blockScrollBehindMenu, { capture: true, passive: false });
     scrim.addEventListener("pointerdown", function (e) { e.preventDefault(); swallowAnyUntil = Date.now() + 500; closeMenu(); });
     scrim.addEventListener("contextmenu", function (e) { e.preventDefault(); closeMenu(); });
     box.addEventListener("click", function (e) {
@@ -294,9 +296,10 @@
     if (awaitRelease) { awaitRelease = false; swallowClickUntil = Date.now() + 150; }
   }, { capture: true, passive: true });
   // Menu ouvert pendant que le doigt est encore posé : il ne fait plus défiler la liste derrière.
-  document.addEventListener("touchmove", function (e) {
+  // 23/11/2026 : écouteur posé seulement menu ouvert (non passif en permanence, il retardait tout défilement).
+  function blockScrollBehindMenu(e) {
     if (menu && !menu.box.contains(e.target)) e.preventDefault();
-  }, { capture: true, passive: false });
+  }
   document.addEventListener("pointercancel", cancelPress, { capture: true, passive: true });
   window.addEventListener("scroll", cancelPress, { capture: true, passive: true });
   // Le relâchement de l'appui long ne lance pas le morceau

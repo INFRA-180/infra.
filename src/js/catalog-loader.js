@@ -221,6 +221,21 @@
       return { apps: safeApps, albums: safeAlbums, clips: safeClips };
     }
 
+    // 23/11/2026 : un catalogue en ligne plus ancien (ex. celui du 18/11) peut garder les liens Google Drive
+    // d'avant les téléchargements Cloudflare. Le lien de téléchargement livré avec le site fait foi s'il existe.
+    function preferCurrentAlbumDownloads(catalog) {
+      if (!catalog || catalog === fallbackCatalog) return catalog;
+      const current = new Map();
+      (sanitizeCatalog(fallbackCatalog).albums || []).forEach(function (entry) {
+        if (entry.page && entry.download && entry.download.url) current.set(entry.page, entry.download);
+      });
+      (catalog.albums || []).forEach(function (entry) {
+        const download = current.get(entry.page);
+        if (download) entry.download = download;
+      });
+      return catalog;
+    }
+
     function buildQuickActions(catalog) {
       const list = [];
       const pushOpen = function (entry) {
@@ -495,7 +510,7 @@
           payload = fallbackCatalog;
         }
 
-        const safe = sanitizeCatalog(payload);
+        const safe = preferCurrentAlbumDownloads(sanitizeCatalog(payload));
         catalogState.data = safe;
         catalogState.quickActions = buildQuickActions(safe);
         return safe;

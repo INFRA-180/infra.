@@ -1761,7 +1761,6 @@
       const persistRoot = getSpaPersistRoot();
 
       normalizeCoverElementsForBase(doc, sourceUrl || window.location.href);
-      if (doc.title) document.title = doc.title;
 
       const bodyClassName = sanitizeSpaBodyClassName(doc.body ? doc.body.className : document.body.className);
       const isAlbumPage = doc.body && doc.body.classList && doc.body.classList.contains("album-screen");
@@ -1792,6 +1791,11 @@
           })
         );
       }
+
+      // 23/11/2026 : pendant l'attente de la pochette, une autre navigation a pu partir (album A touché,
+      // puis B). Une page périmée ne remplace jamais la page demandée ensuite ; l'appelant voit le jeton changé.
+      if (Number.isFinite(opts.navToken) && spaState.navToken !== opts.navToken) return null;
+      if (doc.title) document.title = doc.title;
 
       const startedAt = getAudioTelemetryNow();
       trackAudioRuntimeEvent("spa_swap_start", Object.assign({}, telemetry || {}));
@@ -2088,6 +2092,7 @@
           trackAudioRuntimeEvent("spa_render_start", cachedSpaTelemetry);
           try {
             await renderSpaDocument(cachedDoc, url.href, cachedSpaTelemetry, {
+              navToken,
               liveHomeCapture,
               restoreScroll: opts.restoreScroll,
               resetScroll: opts.scroll !== false,
@@ -2233,6 +2238,7 @@
       trackAudioRuntimeEvent("spa_render_start", spaTelemetry);
       try {
         await renderSpaDocument(doc, url.href, spaTelemetry, {
+          navToken,
           liveHomeCapture,
           restoreScroll: opts.restoreScroll,
           resetScroll: opts.scroll !== false,

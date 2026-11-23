@@ -3122,12 +3122,26 @@
   function getBuf(name) {
     var e = eng.bufs[name];
     if (!e) {
+      // 23/11/2026 : délai maximum (réseau bloqué = l'extrait ne reste plus « en chargement » sans fin ;
+      // l'échec vide l'entrée et la lecture repasse par le secours existant).
+      var ac = typeof AbortController === "function" ? new AbortController() : null;
+      var limit = ac ? setTimeout(function () { ac.abort(); }, 20000) : 0;
       e = eng.bufs[name] = {
-        p: fetch(xUrl(name), { mode: "cors", credentials: "omit" })
+        p: fetch(xUrl(name), { mode: "cors", credentials: "omit", signal: ac ? ac.signal : undefined })
           .then(function (r) {
             if (!r.ok) throw new Error("extrait " + r.status);
             return r.arrayBuffer();
           })
+          .then(
+            function (ab) {
+              clearTimeout(limit);
+              return ab;
+            },
+            function (err) {
+              clearTimeout(limit);
+              throw err;
+            }
+          )
           .then(decode)
           .then(function (b) {
             e.buf = b;

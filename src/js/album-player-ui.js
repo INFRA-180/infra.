@@ -246,7 +246,13 @@
     function setRowPlaying(track, isPlaying, isStarting, isCurrent) {
       const active = Boolean(isPlaying || isStarting);
       const current = Boolean(isCurrent || active);
-      track.button.innerHTML = current ? createEqualizerHtml("track-eq") : track.trackNumber || "";
+      // 23/11/2026 : on ne redessine que si l'état change (sinon l'égaliseur animé repartait à zéro
+      // à chaque événement audio : lecture, pause, chargement, volume).
+      const face = current ? "eq" : "n";
+      if (track.button.dataset.face !== face) {
+        track.button.innerHTML = current ? createEqualizerHtml("track-eq") : track.trackNumber || "";
+        track.button.dataset.face = face;
+      }
       track.button.classList.toggle("is-playing", active);
       track.button.classList.toggle("is-current", current);
       track.button.classList.toggle("is-starting", Boolean(isStarting));
@@ -275,7 +281,11 @@
       if (ui.albumPlayBtn) {
         const sameCollection = ui.playlistKind !== "playlist" || isCurrentPagePlaylistActive(ui.playlist);
         const albumPlaying = sameCollection && uiIndex >= 0 && (isPlaying || audioState.trackStartInFlight);
-        ui.albumPlayBtn.innerHTML = albumPlaying ? PLAYER_ICON_STOP : PLAYER_ICON_PLAY;
+        const albumFace = albumPlaying ? "stop" : "play";
+        if (ui.albumPlayBtn.dataset.face !== albumFace) {
+          ui.albumPlayBtn.innerHTML = albumPlaying ? PLAYER_ICON_STOP : PLAYER_ICON_PLAY;
+          ui.albumPlayBtn.dataset.face = albumFace;
+        }
         ui.albumPlayBtn.classList.toggle("is-on", albumPlaying);
         const collection = ui.playlistKind === "playlist" ? "la playlist" : "l’album";
         ui.albumPlayBtn.setAttribute(

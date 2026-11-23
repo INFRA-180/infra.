@@ -950,9 +950,11 @@
         : 0;
 
       if (!audioState.nowPlayingSeeking) {
-        if (transport.overlayCurrent) transport.overlayCurrent.textContent = currentValue;
-        if (transport.overlayDuration) transport.overlayDuration.textContent = remainingValue;
-        if (transport.overlayFill) transport.overlayFill.style.width = `${percent}%`;
+        // 23/11/2026 : seulement ce qui change (même raison que le mini-lecteur).
+        if (transport.overlayCurrent && transport.overlayCurrent.textContent !== currentValue) transport.overlayCurrent.textContent = currentValue;
+        if (transport.overlayDuration && transport.overlayDuration.textContent !== remainingValue) transport.overlayDuration.textContent = remainingValue;
+        const width = `${percent}%`;
+        if (transport.overlayFill && transport.overlayFill.style.width !== width) transport.overlayFill.style.width = width;
       }
       if (transport.overlayProgress) transport.overlayProgress.disabled = !(hasSource && hasDuration);
     }

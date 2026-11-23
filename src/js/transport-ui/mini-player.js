@@ -69,10 +69,13 @@ export function createMiniPlayer(R) {
     const duration = hasDuration ? formatTrackDuration(audio.duration) : "0:00";
     const percent = hasDuration ? Math.max(0, Math.min(100, (audio.currentTime / audio.duration) * 100)) : 0;
 
+    // 23/11/2026 : appelé ~11 fois par seconde pendant la lecture ; on n'écrit que ce qui change
+    // (le temps change une fois par seconde) pour ne pas réveiller les observateurs de la page pour rien.
     if (!audioState.miniPlayerSeeking) {
-      if (transport.miniCurrent) transport.miniCurrent.textContent = currentTime;
-      if (transport.miniDuration) transport.miniDuration.textContent = duration;
-      if (transport.miniFill) transport.miniFill.style.width = `${percent}%`;
+      if (transport.miniCurrent && transport.miniCurrent.textContent !== currentTime) transport.miniCurrent.textContent = currentTime;
+      if (transport.miniDuration && transport.miniDuration.textContent !== duration) transport.miniDuration.textContent = duration;
+      const width = `${percent}%`;
+      if (transport.miniFill && transport.miniFill.style.width !== width) transport.miniFill.style.width = width;
     }
     if (transport.miniProgress) transport.miniProgress.disabled = !hasDuration;
     syncTransportPictureInPictureProgress();

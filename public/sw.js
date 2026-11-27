@@ -1,4 +1,4 @@
-const VERSION = "infra-shell-20261127-audio487";
+const VERSION = "infra-shell-20261127-audio488";
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const LIVE_CATALOG_CACHE = `${VERSION}-catalog`;
@@ -47,14 +47,14 @@ const HTML_NETWORK_INFLIGHT = new Map();
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./assets/css/styles.css?v=audiofix487-20261127",
-  "./assets/js/bibliotheque.js?v=bibliotheque-v73-20261127",
-  "./assets/js/app.js?v=audiofix487-20261127",
+  "./assets/css/styles.css?v=audiofix488-20261127",
+  "./assets/js/bibliotheque.js?v=bibliotheque-v74-20261127",
+  "./assets/js/app.js?v=audiofix488-20261127",
   "./assets/fonts/antique-olive-nord.woff2",
   "./manifest.webmanifest",
-  "./data/catalog.json?v=audiofix487-20261127",
-  "./data/track-durations.json?v=audiofix487-20261127",
-  "./data/tracks.json?v=audiofix487-20261127",
+  "./data/catalog.json?v=audiofix488-20261127",
+  "./data/track-durations.json?v=audiofix488-20261127",
+  "./data/tracks.json?v=audiofix488-20261127",
   "./data/playlists.json?v=playlist-collage-20260802",
   "./assets/css/playlists.css?v=playlist-collage-20260802",
   "./assets/branding/infra-logo-white-photoroom-title.png",
@@ -74,16 +74,16 @@ const SHELL_ASSETS = [
 // audio. A missing admin/QR/Sphragis file must therefore never invalidate the
 // complete shell installation.
 const OPTIONAL_SHELL_ASSETS = [
-  "./assets/js/scripts.admin.js?v=audiofix487-20261127",
+  "./assets/js/scripts.admin.js?v=audiofix488-20261127",
   // Onglet Samples hors ligne (finition 19/11) : mêmes adresses que celles demandées par la page
-  "./assets/js/samples.js?v=audiofix487-20261127",
-  "./assets/js/samples-mix-core.js?v=audiofix487-20261127",
-  "./assets/js/samples-mix-ui.js?v=audiofix487-20261127",
-  "./assets/css/samples-mix.css?v=audiofix487-20261127",
-  "./data/samples.json?v=audiofix487-20261127",
+  "./assets/js/samples.js?v=audiofix488-20261127",
+  "./assets/js/samples-mix-core.js?v=audiofix488-20261127",
+  "./assets/js/samples-mix-ui.js?v=audiofix488-20261127",
+  "./assets/css/samples-mix.css?v=audiofix488-20261127",
+  "./data/samples.json?v=audiofix488-20261127",
   // la Bibliothèque demande playlists.json avec l'étiquette de version du site (les pages de playlists,
   // avec playlist-collage) : les deux adresses sont gardées pour le hors ligne
-  "./data/playlists.json?v=audiofix487-20261127",
+  "./data/playlists.json?v=audiofix488-20261127",
   "./assets/vendor/qr-creator.min.js?v=1.0.0",
   "./sphragis/",
   "./sphragis/index.html",

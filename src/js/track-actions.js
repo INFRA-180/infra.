@@ -164,7 +164,7 @@
     // Couleurs du site lui-même (fond et encre de la page), aucune bordure : seulement une ombre douce.
     style.textContent = `
       .ta-scrim { position: fixed; inset: 0; z-index: 2147483000; background: transparent; }
-      .ta-scrim.is-sheet { background: rgba(0,0,0,.28); }
+
       .ta-menu { position: fixed; z-index: 2147483001; min-width: 220px; max-width: min(300px, calc(100vw - 32px)); padding: 6px;
         border-radius: 12px; background: var(--ta-bg, #fff); color: var(--ta-ink, #111); box-shadow: 0 10px 34px rgba(0,0,0,.16);
         font: 400 14px/1.3 "Avenir Next", "Avenir", Arial, sans-serif; }
@@ -179,7 +179,37 @@
       .ta-menu button { display: grid; grid-template-columns: 24px 1fr; gap: 12px; align-items: center; width: 100%; min-height: 40px;
         padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
       .ta-menu.is-sheet button { min-height: 52px; padding: 0; font-size: 16px; }
-      .ta-menu button:hover, .ta-menu button:focus-visible { background: rgba(127,127,127,.12); outline: none; }
+      /* 27/11 (INFRA, iPhone : « bug de sélection ») : le doigt encore posé à l'ouverture laissait l'entrée
+         dessous grisée (survol collant d'iOS). Survol seulement avec une vraie souris ; au doigt, rien. */
+      .ta-menu button:focus-visible { background: rgba(127,127,127,.12); outline: none; }
+      @media (hover: hover) and (pointer: fine) { .ta-menu button:hover { background: rgba(127,127,127,.12); } }
+      .ta-menu button:focus:not(:focus-visible) { outline: none; }
+      .ta-menu, .ta-scrim { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+      /* Appui long façon Apple : la ligne s'enfonce un peu pendant l'appui, puis se détache (plus grande,
+         ombre, coins arrondis) au-dessus du fond flouté ; elle se recolle à sa place en fermant. */
+      .ta-pressing { transform: scale(.975); transition: transform .38s cubic-bezier(.2,.8,.2,1); }
+      .ta-lift { position: fixed; z-index: 2147483001; margin: 0 !important; pointer-events: none; box-sizing: border-box;
+        background: var(--ta-bg, #fff); color: var(--ta-ink, #111); border-radius: 12px; overflow: hidden;
+        transform-origin: 50% 50%; transition: transform .32s cubic-bezier(.2,.8,.2,1.1), box-shadow .32s ease, opacity .2s ease;
+        box-shadow: 0 0 0 rgba(0,0,0,0); }
+      .ta-lift-track { display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+        font: 400 15px/1.25 "Avenir Next", "Avenir", Arial, sans-serif; }
+      .ta-lift-track img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex: none; }
+      .ta-lift-track div { min-width: 0; }
+      .ta-lift-track b { display: block; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ta-lift-track span { display: block; font-size: 13px; opacity: .55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ta-lift.is-up { box-shadow: 0 14px 40px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.08); }
+      .ta-lift-hidden { visibility: hidden; }
+      .ta-menu.has-lift .ta-head { display: none; }
+      .ta-menu.is-sheet.has-lift { padding-top: 12px; }
+      .ta-scrim.is-sheet { background: rgba(0,0,0,.18); -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1);
+        animation: ta-fade .22s ease both; }
+      @keyframes ta-fade { from { opacity: 0; } to { opacity: 1; } }
+      .ta-menu.is-sheet { animation: ta-rise .28s cubic-bezier(.2,.8,.2,1) both; }
+      @keyframes ta-rise { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) {
+        .ta-pressing { transform: none; } .ta-lift { transition: opacity .15s; } .ta-scrim.is-sheet, .ta-menu.is-sheet { animation: none; }
+      }
       .ta-menu .ta-credit { padding: 8px 8px 10px; font-size: 13px; line-height: 1.35; }
       .ta-menu.is-sheet .ta-credit { padding: 8px 0 10px; font-size: 15px; }
       .ta-menu .ta-credit b { font-weight: 600; } .ta-menu .ta-credit span { opacity: .55; }
@@ -215,7 +245,98 @@
     document.head.appendChild(style);
   }
 
-  function closeMenu() {
+  // ---------- Décollage (27/11/2026) ----------
+  let lift = null; // { el, clone }
+  let liftNext = null; // élément touché à l'appui long, décollé à l'ouverture du menu
+  function liftRow(el, box, pageBg, pageInk) {
+    if (lift && lift.el === el) { placeLift(box); return; }
+    dropLift(true);
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    // Morceau : aperçu propre (pochette, titre, album), comme Musique d'Apple ; une ligne copiée hors de sa
+    // liste perdait sa mise en page. Carte d'album ou de playlist : copiée telle quelle.
+    const t = el.matches(ROW_SELECTOR) ? trackOf(el) : null;
+    let clone;
+    if (t) {
+      const album = albumBySlug(t.slug);
+      clone = document.createElement("div");
+      clone.className = "ta-lift ta-lift-track";
+      clone.innerHTML = (album && album.cover ? `<img src="${esc(siteRoot() + album.cover)}" alt="">` : "") + "<div><b></b><span></span></div>";
+      clone.querySelector("b").textContent = t.title;
+      clone.querySelector("span").textContent = t.album;
+    } else {
+      clone = el.cloneNode(true);
+      clone.querySelectorAll("audio, video, iframe, [id]").forEach(function (n) { if (/^(AUDIO|VIDEO|IFRAME)$/.test(n.tagName)) n.remove(); else n.removeAttribute("id"); });
+      clone.removeAttribute("id");
+      clone.classList.remove("ta-pressing", "ta-held");
+      clone.classList.add("ta-lift");
+    }
+    clone.setAttribute("aria-hidden", "true");
+    clone.style.left = r.left + "px";
+    clone.style.top = r.top + "px";
+    clone.style.width = r.width + "px";
+    const h = t ? Math.max(64, r.height) : r.height;
+    clone.style.height = h + "px";
+    if (t) clone.style.top = r.top - (h - r.height) / 2 + "px";
+    clone.style.setProperty("--ta-bg", pageBg);
+    clone.style.setProperty("--ta-ink", pageInk);
+    clone.style.transformOrigin = "50% 0";
+    clone.style.transform = "scale(.975)";
+    document.body.appendChild(clone);
+    el.classList.remove("ta-pressing");
+    el.classList.add("ta-lift-hidden");
+    lift = { el, clone, top: t ? r.top - (h - r.height) / 2 : r.top, height: h };
+    placeLift(box);
+  }
+  function placeLift(box, settled) {
+    if (!lift) return;
+    const isSheet = box && box.classList.contains("is-sheet");
+    if (!isSheet) { applyLift(0, 1.03); return; }
+    // Téléphone : l'élément reste à sa place si la feuille ne le cache pas ; sinon il monte juste au-dessus,
+    // et s'il est trop grand pour tenir (carte de playlist), il se réduit comme l'aperçu d'Apple.
+    const bottomMax = sheetTopOf(box) - 20;
+    const topMin = 12 + safeTop();
+    let scale = 1.03;
+    if (lift.height * scale > bottomMax - topMin) scale = Math.max(0.45, (bottomMax - topMin) / lift.height);
+    let top = Math.min(lift.top, bottomMax - lift.height * scale);
+    top = Math.max(topMin, top);
+    applyLift(top - lift.top, scale);
+    if (!settled) window.setTimeout(function () { if (lift && menu && menu.box === box) placeLift(box, true); }, 320);
+  }
+  // Safari iPhone : on prend le plus haut des deux (zone visible ou position annoncée de la feuille).
+  function sheetTopOf(box) {
+    const vv = window.visualViewport;
+    const visibleBottom = vv ? Math.min(window.innerHeight, vv.offsetTop + vv.height) : window.innerHeight;
+    return Math.min(box.getBoundingClientRect().top, window.innerHeight - box.offsetHeight, visibleBottom - box.offsetHeight);
+  }
+  function applyLift(dy, scale) {
+    if (!lift) return;
+    lift.dy = Math.round(dy);
+    requestAnimationFrame(function () {
+      if (!lift) return;
+      lift.clone.classList.add("is-up");
+      lift.clone.style.transformOrigin = "50% 0";
+      lift.clone.style.transform = `translateY(${lift.dy}px) scale(${scale.toFixed(3)})`;
+    });
+  }
+  function safeTop() {
+    return 36; // sous la barre d'état (iPhone, app installée)
+  }
+  function dropLift(now) {
+    if (!lift) return;
+    const l = lift;
+    lift = null;
+    if (now) { l.clone.remove(); l.el.classList.remove("ta-lift-hidden"); return; }
+    l.clone.classList.remove("is-up");
+    l.clone.style.transform = "none";
+    window.setTimeout(function () {
+      l.el.classList.remove("ta-lift-hidden");
+      l.clone.remove();
+    }, 260);
+  }
+
+  function closeMenu(rebuilding) {
+    if (!rebuilding) dropLift(false);
     if (!menu) return;
     document.removeEventListener("touchmove", blockScrollBehindMenu, { capture: true });
     menu.scrim.remove();
@@ -464,7 +585,7 @@
   }
 
   function showMenu(t, row, x, y, viaKeyboard, items, asSheet) {
-    closeMenu();
+    closeMenu(true);
     injectStyle();
     const sheet = window.matchMedia && window.matchMedia("(max-width: 639px)").matches && !viaKeyboard && asSheet;
     const body = getComputedStyle(document.body);
@@ -501,7 +622,11 @@
       box.style.left = left + "px";
       box.style.top = top + "px";
     }
-    if (row.matches && row.matches(ROW_SELECTOR)) row.classList.add("ta-held");
+    const touched = liftNext && (liftNext === row || (row.contains && row.contains(liftNext)) || (liftNext.contains && liftNext.contains(row)));
+    if (touched || (lift && lift.el === row)) liftRow(lift && lift.el === row ? row : liftNext, box, box.style.getPropertyValue("--ta-bg") || "#fff", box.style.getPropertyValue("--ta-ink") || "#111");
+    else if (row.matches && row.matches(ROW_SELECTOR)) row.classList.add("ta-held"); // souris : simple marque
+    if (lift) box.classList.add("has-lift"); // l'aperçu montre déjà titre et album : pas de doublon (charte)
+    liftNext = null;
     menu = { scrim, box, row, invoker: row.matches("button, a") ? row : row.querySelector("button, a") || row };
     document.addEventListener("touchmove", blockScrollBehindMenu, { capture: true, passive: false });
     scrim.addEventListener("pointerdown", function (e) { e.preventDefault(); swallowAnyUntil = Date.now() + 500; closeMenu(); });
@@ -538,16 +663,28 @@
     const row = targetFrom(e.target);
     // Au doigt : lignes, albums et playlists en liste ; le lecteur garde ses propres gestes.
     if (!row || row.kind === "mini" || row.kind === "now" || e.target.closest(".bib-heart, [data-bib-trackheart], [data-bib-favheart], [data-favorite-drag], [data-favorite-select]")) return;
-    press = { id: e.pointerId, x: e.clientX, y: e.clientY, row, timer: window.setTimeout(function () {
-      if (!press) return;
-      swallowClickUntil = Date.now() + 5000;
-      awaitRelease = true;
-      try { if (navigator.vibrate) navigator.vibrate(8); } catch (_e) { /* pas de vibration */ }
-      openMenu(press.row, press.x, press.y, false);
-      press = null;
-    }, LONG_PRESS_MS) };
+    const el = row.el;
+    press = { id: e.pointerId, x: e.clientX, y: e.clientY, row, el,
+      // la ligne s'enfonce doucement si le doigt reste posé (après 120 ms : un simple toucher ne bouge rien)
+      sink: window.setTimeout(function () { if (press && press.el === el) el.classList.add("ta-pressing"); }, 120),
+      timer: window.setTimeout(function () {
+        if (!press) return;
+        swallowClickUntil = Date.now() + 5000;
+        awaitRelease = true;
+        try { if (navigator.vibrate) navigator.vibrate(8); } catch (_e) { /* pas de vibration */ }
+        liftNext = el;
+        window.setTimeout(function () { if (liftNext === el && !menu) { liftNext = null; el.classList.remove("ta-pressing"); } }, 2500);
+        openMenu(press.row, press.x, press.y, false);
+        press = null;
+      }, LONG_PRESS_MS) };
   }, { capture: true, passive: true });
-  function cancelPress() { if (press) { window.clearTimeout(press.timer); press = null; } }
+  function cancelPress() {
+    if (!press) return;
+    window.clearTimeout(press.timer);
+    window.clearTimeout(press.sink);
+    if (press.el && liftNext !== press.el) press.el.classList.remove("ta-pressing");
+    press = null;
+  }
   document.addEventListener("pointermove", function (e) {
     if (press && e.pointerId === press.id && Math.hypot(e.clientX - press.x, e.clientY - press.y) > MOVE_TOLERANCE_PX) cancelPress();
   }, { capture: true, passive: true });

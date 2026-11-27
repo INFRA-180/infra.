@@ -5,7 +5,8 @@
 // - Acapella (19/11, INFRA : « fais une playlist acapella pour départager les deux ») : les voix seules ;
 // - Mix : le passage samplé par INFRA (lu dans le projet Ableton), puis son morceau là où le sample entre :
 //   entrée pile à l'endroit du sample (fondu de 0,35 s), 1 minute de morceau, puis fondu croisé avec le
-//   sample suivant ; entre deux samples d'un même morceau, fondu croisé d'1 s.
+//   sample suivant ; entre deux samples d'un même morceau, fondu croisé d'1 s. Depuis le 27/11 (M3), ton
+//   morceau est joué par le même moteur Web Audio que les samples (lecteur du site en pause pendant le Mix).
 // Lecteur simple : titre de ce qu'on entend en haut, une vraie barre (sample | morceau), précédent ·
 // lecture/pause · suivant, pictos sans rond ni carré (INFRA, 19/11). Ordre au choix partout : par BPM,
 // aléatoire ou dans l'ordre des morceaux (picto à côté de « Tout » et à droite du titre), retenu par écran.
@@ -43,13 +44,17 @@
     out: 0,
     item: null,
     end: 0,
-    outroUntil: 0,
-    from: 0,
+    from: 0, // seconde de ton morceau où il entre (début de sa minute)
+    tv: null, // voix de ton morceau préparée (flux lancé muet) pendant le sample
+    prepped: false, // ton morceau est en préparation (extrait téléchargé ou flux lancé)
+    fixed: false, // flux préparé recalé (une fois, 2 s avant l'entrée)
+    inArmed: false, // entrée de ton morceau programmée
+    inWait: null, // entrée de ton morceau en attente de son (réseau) : { plan, t0 }
+    outArmed: false, // sortie de ton morceau (sample suivant) programmée
   };
   var TRACK = 60,
     OVERLAP = 2, // sortie de ton morceau vers le sample suivant (fondu croisé)
     XF = 0.35, // entrée : sample → ton morceau, quasi coupe (évite le clic), à plein volume
-    LEAD = 3,
     SEGXF = 1, // 19/11 (INFRA : « fais la transition entre les deux samples ») : fondu croisé entre deux parties
     SEGPRE = 4, // la partie suivante se prépare, muette, dans un 2e lecteur caché, SEGPRE s avant
     SORTS = ["bpm", "bpmdown", "shuffle", "album"],
@@ -177,6 +182,7 @@
                 bpm: Array.isArray(it.bpm) ? it.bpm : null,
                 tb: Number(it.tb) || 0,
                 x: xList(it.x),
+                tx: txOf(it.tx),
                 c: it.c === 1,
               });
             });
@@ -208,6 +214,12 @@
           return [String(e[0]), Number(e[1]), Number(e[2])];
         })
       : null;
+  }
+  // Extrait de ton morceau (M3, 27/11/2026) : [nomFichier, t0 (seconde du morceau où il commence), durée],
+  // la minute jouée par le Mix (entrée − 4 s → entrée + 64 s), sous streams/samples/t/ sur R2.
+  function txOf(t) {
+    var x = xList(Array.isArray(t) && Array.isArray(t[0]) ? t : [t]);
+    return x ? x[0] : null;
   }
   function duoOk(i) {
     return (
@@ -309,19 +321,16 @@
       before = item.segs[duo.k];
     if (!sg) return;
     if (eng.on) {
-      // extraits : fondu croisé de SEGXF s centré sur la fin de la partie (marge des extraits)
-      var v = eng.cur,
-        when = v && v.item === item ? ctxAt(v, before.s1 - SEGXF / 2) : null;
+      // extraits (M5) : durée et effet du Mix, centrés sur la fin de la partie (plafonnés par les marges)
+      var v = eng.cur && eng.cur.item === item && !eng.cur.track ? eng.cur : null,
+        plan = planOf("seg", item, item, { dur: SEGXF, k: k, voice: v, cause: "auto" });
+      if (v)
+        plan.when = plan.want = Math.max(eng.ctx.currentTime + 0.02, ctxAt(v, before.s1 - plan.dur / 2));
       duo.k = k;
       duo.end = sg.s1;
       duo.armed = false;
       duo.segAt = Date.now();
-      engStart(
-        item,
-        k,
-        Math.max(sg.x[1], sg.s0 - SEGXF / 2),
-        planOf("seg", item, item, { dur: SEGXF, when: when, k: k }),
-      );
+      engStart(item, k, Math.max(sg.x[1], sg.s0 - plan.dur / 2), plan);
       paintNow();
       track("samples_part", { k: k, n: item.segs.length });
       return;
@@ -1462,7 +1471,8 @@
     }
     if (!first) return;
     ensureCtx(); // dans le geste : indispensable sur iPhone
-    if (st.mix) unlockAudio();
+    // M3 : ton morceau passe par le moteur (lecteur du lot) ; le lecteur du site n'est plus débloqué ni
+    // joué pendant le Mix (B7 disparaît avec lui).
     sheet.hidden = false;
     document.documentElement.classList.add("smp-open");
     requestAnimationFrame(function () {
@@ -1496,7 +1506,7 @@
     var f = frame();
     if (f) f.removeAttribute("src");
     dropNext();
-    stopDuo(true);
+    stopDuo();
     engStop(0.25);
     evFlush(); // l'interface sait que la transition en cours s'arrête
     clockClear();
@@ -1521,7 +1531,7 @@
     document.documentElement.classList.remove("smp-open");
   }
   function trackPhase() {
-    return st.mix && (duo.phase === "track" || duo.phase === "mixin");
+    return st.mix && duo.phase === "track";
   }
   // plan : transition préparée par planOf() (instant sur l'horloge audio, durée, effet), pour un
   // enchaînement automatique ; sinon passage manuel (fondu SMPXF), saut ou premier son.
@@ -1533,34 +1543,27 @@
       hadVoice = !!(eng.on && eng.cur && !eng.paused),
       prevItem = st.list[st.pos];
     dropNext();
-    stopDuo(!fadeIn && trackPhase());
-    var fade = fadeIn && canFade();
+    stopDuo();
     if (fadeIn) {
-      // morceau → sample : le morceau sort pendant que le sample entre (iPhone : coupe nette)
+      // ton morceau → sample suivant : passage programmé (durée et effet du Mix) ; ton morceau sort par
+      // son gain dans le moteur, avec l'effet, iPhone compris (M3)
       plan = plan || planOf("out", prevItem, item);
-      duo.outroUntil = Date.now() + plan.dur * 1000 + 1500;
-      // extrait : il entre par son propre gain (moteur, dans engStart) ; ton morceau sort par le volume
-      transition(
-        fade ? { set: setAudioVolume } : null,
-        useE || !fade
-          ? null
-          : {
-              yt: true,
-              set: function (v) {
-                setVideoVolume(v * 100);
-              },
+      if (!useE) {
+        // sample suivant sur YouTube : il monte par son volume pendant que le moteur s'éteint
+        transition(
+          { all: true },
+          {
+            yt: true,
+            set: function (v) {
+              setVideoVolume(v * 100);
             },
-        plan,
-      );
-      // B6 : iPhone (volume bloqué) : ton morceau s'arrête quand le sample part vraiment (avant : 0,9 s
-      // à plein volume par-dessus, puis coupe).
-      var cut = function () {
-        pauseMusic();
-        setAudioVolume(1);
-      };
-      if (fade) clockAt(plan.when + plan.dur + 0.1, cut);
-      else if (useE) duo.cutOnLive = { cut: cut, at: plan.when + Math.min(0.3, plan.dur / 2) };
-      else clockAt(plan.when + 0.9, cut); // YouTube : comme avant
+          },
+          plan,
+        );
+        eng.on = false;
+        eng.paused = false;
+        eng.hold = null;
+      }
     }
     st.pos = st.list.indexOf(item);
     var start = offset || 0,
@@ -1603,30 +1606,15 @@
             k: loc0.k,
           }),
       );
-      var co = duo.cutOnLive;
-      duo.cutOnLive = null;
-      if (co) {
-        // le sample entrant en flux : coupe à son premier son ; sinon à l'instant prévu (8 s au plus)
-        var nv = eng.cur,
-          once = function () {
-            if (!co) return;
-            var c0 = co;
-            co = null;
-            c0.cut();
-          };
-        if (nv && nv.el && !nv.live) onLive(nv, once);
-        else clockAt(co.at, once);
-        clockAt(now() + 8, once);
-      }
       paint(fresh);
       return;
     }
-    engStop(0.3);
+    if (!fadeIn) engStop(0.3);
     if (fresh || !st.ready) {
       st.ready = false;
       f.src = embed(vid, start, endS);
     } else if (st.mix) {
-      setVideoVolume(fade ? 0 : 100);
+      setVideoVolume(fadeIn ? 0 : 100);
       send("loadVideoById", [
         { videoId: vid, startSeconds: start, endSeconds: endS },
       ]);
@@ -1951,9 +1939,17 @@
       };
     var S = cur.S || Math.max(1, cur.s1 - cur.s0),
       t;
-    if (trackPhase()) {
-      var a = audioEl();
-      t = S + clamp(a ? a.currentTime - duo.from : 0, 0, TRACK);
+    if (duo.phase === "end") t = S + TRACK;
+    else if (trackPhase()) {
+      // ton morceau (M3) : position de sa voix dans le moteur (ou de la pause)
+      var tv = eng.cur,
+        pos =
+          tv && tv.track
+            ? ytNow(tv)
+            : eng.hold && eng.hold.k < 0
+              ? eng.hold.t
+              : duo.from;
+      t = S + clamp(pos - duo.from, 0, TRACK);
     } else {
       var sg = cur.segs
         ? cur.segs[duo.k || 0]
@@ -1963,11 +1959,9 @@
     return { S: S, T: S + TRACK, t: t };
   }
   function isPlaying() {
-    if (trackPhase()) {
-      var a = audioEl();
-      return !!(a && !a.paused);
-    }
-    if (eng.on) return !eng.paused && (!!eng.cur || eng.loading);
+    if (st.ended) return false;
+    if (eng.on || trackPhase())
+      return !eng.paused && (!!eng.cur || !!eng.loading || !!duo.inWait || !!duo.ending);
     return yt.state === 1 || yt.state === 3;
   }
   function paintBar() {
@@ -2112,58 +2106,39 @@
       }
       return paintBar();
     }
-    if (duo.phase === "pre") cancelPre();
     dropNext();
     var S = cur.S || Math.max(1, cur.s1 - cur.s0);
     if (t < S) {
       var loc = locate(cur, t);
-      if (duo.phase === "sample" && loc.k === (duo.k || 0) && eng.on) {
+      if (duo.phase === "sample" && loc.k === (duo.k || 0) && eng.on && !duo.inArmed) {
         engSeek(cur, t);
         duo.armed = false;
-      } else if (duo.phase === "sample" && loc.k === (duo.k || 0)) {
+      } else if (duo.phase === "sample" && loc.k === (duo.k || 0) && !eng.on) {
         var sg = cur.segs ? cur.segs[loc.k] : { s0: cur.s0 };
         send("seekTo", [sg.s0 + loc.local, true]);
         yt.time = sg.s0 + loc.local;
         duo.armed = false;
-      } else play(cur, false, false, t); // retour dans le sample : ton morceau s'arrête, le sample reprend
+      } else play(cur, false, false, t); // retour dans le sample : ton morceau sort, le sample reprend
     } else {
       var off = clamp(t - S, 0, TRACK - 1);
-      if (duo.phase === "sample") {
-        // saut direct dans ton morceau
-        if (eng.on) engHush(0.3);
-        send("pauseVideo");
-        startTrack(cur, entryOf(cur), off, "track", TRACK - off);
-      } else {
-        var a = audioEl();
-        if (a)
-          try {
-            a.currentTime = duo.from + off;
-          } catch (_e) {}
-        if (a && !a.paused) scheduleOut(TRACK - off);
-      }
+      if (trackPhase()) seekTrack(cur, duo.from + off);
+      else jumpToTrack(cur, entryOf(cur) + off); // saut direct dans ton morceau
     }
     paintBar();
   }
   function toggle() {
     setCause("resume");
     if (st.cued) return play(st.list[st.pos], true);
-    if (trackPhase()) {
-      var a = audioEl();
-      if (!a) return;
-      if (a.paused) {
-        resumeMusic();
-        scheduleOut(Math.max(1, TRACK - (a.currentTime - duo.from)));
-      } else {
-        clearOut();
-        pauseMusic();
-      }
-    } else if (eng.on) {
-      if (isPlaying()) {
-        if (duo.phase === "pre") cancelPre();
-        engPause();
-      } else engResume();
+    if (st.ended) {
+      // M7 : fin de la liste : lecture repart du début
+      st.ended = false;
+      duo.phase = "";
+      var first = shownList()[0];
+      if (first) play(first);
+    } else if (eng.on || trackPhase()) {
+      if (isPlaying()) engPause();
+      else engResume();
     } else if (isPlaying()) {
-      if (duo.phase === "pre") cancelPre();
       send("pauseVideo");
     } else send("playVideo");
     track("samples_toggle", { mode: st.mix ? "mix" : "samples" });
@@ -2209,9 +2184,7 @@
     } else if (m.event === "onStateChange") state = m.info;
     if (state != null && isFinite(state)) yt.state = Number(state);
     var inTrack = trackPhase();
-    var inOutro = Date.now() < duo.outroUntil;
-    var inPre = duo.phase === "pre";
-    if (state === 1 && !inTrack && !inOutro && !inPre) pauseMusic();
+    if (state === 1 && !inTrack) pauseMusic();
     var settling = Date.now() - (duo.segAt || 0) < 1200;
     if (st.mix && duo.phase === "sample" && !isLastSeg()) {
       // fin d'une partie : partie suivante (minuterie précise, ou fin de vidéo)
@@ -2231,17 +2204,13 @@
       }
       if (!settling && (state === 0 || state === 2) && tp >= duo.end - 0.6)
         nextSeg();
-    } else if (st.mix && (duo.phase === "sample" || inPre) && !settling) {
+    } else if (st.mix && duo.phase === "sample" && !settling) {
+      // dernière partie d'un sample YouTube : ton morceau se prépare, puis entre à la fin
       var tm = yt.time;
-      if (
-        duo.phase === "sample" &&
-        isFinite(tm) &&
-        tm >= duo.end - XF - LEAD &&
-        tm < duo.end - XF
-      )
-        preroll();
-      if (isFinite(tm) && tm >= duo.end - XF) mixIn();
-      else if (state === 0 || (state === 2 && tm >= duo.end - 0.6)) mixIn();
+      if (isFinite(tm) && tm < duo.end - XF && duo.end - XF - tm < PRELEAD)
+        prepTrack(now() + (duo.end - XF - tm));
+      if (isFinite(tm) && tm >= duo.end - XF) mixIn(now());
+      else if (state === 0 || (state === 2 && tm >= duo.end - 0.6)) mixIn(now());
     } else if (!st.mix && state === 0) step(1);
     if (m.event === "onError") {
       track("samples_unavailable", {});
@@ -2303,24 +2272,9 @@
     var toggleBtn = $(".global-transport.is-playing [data-transport-toggle]");
     if (toggleBtn && typeof toggleBtn.click === "function") toggleBtn.click();
   }
-  function resumeMusic() {
-    ownSite();
-    var toggleBtn = $(
-      ".global-transport:not(.is-playing) [data-transport-toggle]",
-    );
-    if (toggleBtn && typeof toggleBtn.click === "function")
-      return toggleBtn.click();
-    var a = audioEl();
-    if (a && a.paused)
-      try {
-        var p = a.play();
-        if (p && p.catch) p.catch(function () {});
-      } catch (_e) {}
-  }
-  // La musique INFRA repart (hors Mix) : le sample se met en pause.
-  // B7 (audit A1) : le déblocage du lecteur à l'ouverture (unlockAudio, muet) et nos propres reprises ne
-  // comptent pas ; avant, ils mettaient le sample en pause dès l'ouverture.
-  // B4 : ton morceau repris de l'extérieur (écran verrouillé, casque) : la fin de sa minute est reprogrammée.
+
+  // La musique du site repart pendant les Samples ou le Mix (son bouton, l'écran verrouillé, le casque) :
+  // le sample ou ton morceau se met en pause, un seul son à la fois. Nos propres gestes ne comptent pas.
   document.addEventListener(
     "play",
     function (e) {
@@ -2329,205 +2283,120 @@
         e.target.tagName !== "AUDIO" ||
         !sheet ||
         sheet.hidden ||
-        duo.phase === "mixin" ||
-        duo.phase === "pre"
+        siteOwned()
       )
         return;
-      if (trackPhase()) {
-        if (siteOwned()) return;
-        var a = audioEl();
-        if (a) scheduleOut(Math.max(1, TRACK - (a.currentTime - duo.from)));
-        track("samples_lock", { cause: "site_play", ctx: eng.ctx ? eng.ctx.state : "none" });
-        return;
-      }
-      if (siteOwned() || unlocking) return;
-      if (eng.on) {
-        if (eng.cur || eng.loading) engPause();
+      if (eng.on || trackPhase()) {
+        if (eng.cur || eng.loading || duo.inWait) {
+          engPause();
+          track("samples_lock", { cause: "site_play", ctx: ctxState() });
+        }
       } else send("pauseVideo");
     },
     true,
   );
-  // B4 : ton morceau mis en pause de l'extérieur pendant sa minute : le Mix le sait et ne repart plus seul
-  // (avant, la fin de minute programmée relançait le sample suivant au retour).
-  document.addEventListener(
-    "pause",
-    function (e) {
-      if (
-        !e.target ||
-        e.target.tagName !== "AUDIO" ||
-        !sheet ||
-        sheet.hidden ||
-        !trackPhase() ||
-        siteOwned() ||
-        e.target.ended
-      )
-        return;
-      clearOut();
-      track("samples_lock", { cause: "site_pause", ctx: eng.ctx ? eng.ctx.state : "none" });
-    },
-    true,
-  );
-  document.addEventListener(
-    "keydown",
-    function (e) {
-      if (!sheet || sheet.hidden) return;
-      var tag = e.target && e.target.tagName;
-      if (e.key === " " || e.key === "ArrowRight" || e.key === "ArrowLeft")
-        ensureCtx();
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        close();
-      } else if (e.key === " " && tag !== "INPUT" && tag !== "TEXTAREA") {
-        e.preventDefault();
-        e.stopPropagation();
-        toggle();
-      } else if (
-        (e.key === "ArrowRight" || e.key === "ArrowLeft") &&
-        !(e.target && e.target.closest && e.target.closest("[data-smp-bar]"))
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.key === "ArrowRight") step(1);
-        else prev();
-      }
-    },
-    true,
-  );
 
-  // ---------- Mix : sample → morceau ----------
-  // Attentes de chargement (pas de son) ; tout ce qui s'entend passe par clockAt / clockRamp.
-  function later(fn, ms) {
-    duo.timers.push(setTimeout(fn, ms));
+  // ---------- Mix : sample → ton morceau → sample suivant (M3, 27/11/2026) ----------
+  // Ton morceau n'est plus joué par le lecteur du site (volume bloqué sur iPhone, lancé 3 s avant depuis
+  // le début du fichier : trou ou coupe, « des fois ça bug ») mais par le moteur des samples, comme une
+  // voix de plus :
+  // - sa minute (entrée − 4 s → entrée + 64 s) est un extrait préparé sur R2 (champ tx de samples.json),
+  //   téléchargé et décodé pendant le sample : départ à l'échantillon près ;
+  // - sans extrait (ou s'il échoue) : le fichier R2 du morceau, lu en flux par un lecteur du lot (branché
+  //   dans Web Audio), lancé muet PRELEAD s avant son entrée et recalé 2 s avant ;
+  // - mêmes fondus et effets que les samples, iPhone compris ; une seule horloge, une seule transition().
+  // Le lecteur du site reste en pause pendant tout le Mix (sa file, son volume et son préchargement ne sont
+  // plus touchés).
+  var PRELEAD = 10, // ton morceau se prépare au plus tôt 10 s avant son entrée
+    TRACK_WAIT = 8, // s : attente maximale de ton morceau à l'entrée (réseau), puis repli ou suivant
+    TBASE = "https://infra180-api.pages.dev/audio/";
+  function ctxState() {
+    return eng.ctx ? eng.ctx.state : "none";
   }
-  // Fin de la minute de ton morceau, comptée sur l'horloge audio.
-  function scheduleOut(sec) {
-    clearOut();
-    duo.out = clockAt(now() + sec, mixOut, "out");
+  // Où ton morceau entre : la seconde où le sample y apparaît (ou, si l'entrée est en fondu, le moment
+  // où le son devient fort : champ « go » mesuré sur ton fichier audio).
+  function entryOf(i) {
+    return Math.max(0, isFinite(i.go) ? i.go : i.at);
   }
-  function clearOut() {
-    if (duo.out && typeof duo.out === "object") duo.out.dead = true;
-    duo.out = 0;
+  function useTx(i) {
+    return !!(i && i.tx && !(i.noTx && Date.now() < i.noTx));
   }
-  function stopDuo(pauseTrack) {
+  function trackUrl(src) {
+    return TBASE + String(src).split("/").map(encodeURIComponent).join("/");
+  }
+  // La « partie » ton morceau, comme une partie de sample : x = [fichier, début, durée] en secondes du
+  // morceau ; s0 = entrée, s1 = fin de la minute.
+  function trackSeg(i) {
+    var e = entryOf(i),
+      tx = useTx(i) ? i.tx : null;
+    if (i._ts && i._ts.tx === tx && i._ts.s0 === e) return i._ts;
+    i._ts = tx
+      ? {
+          track: true,
+          tx: tx,
+          x: tx,
+          key: "t/" + tx[0],
+          url: XBASE + "t/" + encodeURIComponent(tx[0]) + ".m4a",
+          s0: e,
+          s1: e + TRACK,
+          from: 0,
+          ci: 0,
+        }
+      : {
+          track: true,
+          tx: null,
+          stream: true,
+          x: ["morceau", 0, 36000],
+          key: "",
+          url: trackUrl(i.src),
+          s0: e,
+          s1: e + TRACK,
+          from: 0,
+          ci: 0,
+        };
+    return i._ts;
+  }
+  function segOf(item, k) {
+    return k < 0 ? trackSeg(item) : segsOf(item)[k];
+  }
+  // Marge de ton morceau après sa minute (extrait : 4 s ; flux : tout le reste du morceau).
+  function trackMarginAfter(i) {
+    var sg = trackSeg(i);
+    return sg.stream ? 60 : Math.max(0, sg.x[1] + sg.x[2] - sg.s1);
+  }
+  function stopDuo() {
     duo.timers.forEach(clearTimeout);
     duo.timers = [];
     clockClear("duo");
-    clearOut();
-    dropPlaying();
-    // Audit du 19/11 : ton morceau préparé muet (« pre ») ne doit jamais s'entendre, et fermer pendant sa
-    // sortie (fondu vers le sample suivant) doit aussi l'arrêter — avant, il continuait à plein volume.
-    var wasPre = duo.phase === "pre",
-      outro = Date.now() < duo.outroUntil;
-    if (wasPre || (pauseTrack && (trackPhase() || outro))) pauseMusic();
     duo.phase = "";
-    duo.outroUntil = 0;
+    duo.inArmed = false;
+    duo.outArmed = false;
+    duo.inWait = null;
+    duo.prepped = false;
+    duo.fixed = false;
+    duo.ending = false;
+    dropTv();
+    st.ended = false;
     var c = sheet && $("[data-smp-cov]", sheet);
     if (c) {
       c.classList.remove("on");
       c.style.transitionDuration = "";
     }
-    var a = audioEl();
-    if (!a) return;
-    a.muted = false;
-    // B8 : saut pendant que ton morceau sort (fondu vers le sample suivant) : son fondu en cours vient
-    // d'être effacé ; avant, son volume repassait à 1 jusqu'à la pause (remontée brutale). Il finit de
-    // sortir en 0,3 s, puis s'arrête.
-    if (outro && !pauseTrack && !a.paused && canFade()) {
-      var t8 = now();
-      duo.outroUntil = Date.now() + 450; // le sample qui entre ne coupe pas cette fin
-      clockRamp(setAudioVolume, a.volume, 0, t8, 0.3, "tail", true);
-      clockAt(
-        t8 + 0.35,
-        function () {
-          pauseMusic();
-          setAudioVolume(1);
-        },
-        "tail",
-      );
-    } else if (a.volume < 1) a.volume = 1;
   }
-  function startTrack(i, from, offset, phase, seconds) {
-    var lib = window.InfraLibraryPlayback;
-    if (!lib || typeof lib.playPaths !== "function" || !i.src) {
-      if (phase !== "pre") step(1);
-      return false;
+  // Ton morceau préparé mais pas joué : il s'arrête (sans jamais s'être fait entendre).
+  function dropTv() {
+    var tv = duo.tv;
+    duo.tv = null;
+    if (tv && tv.prep && !tv.done && eng.ctx) {
+      tv.prep = false;
+      fadeOutVoice(tv, eng.ctx.currentTime, 0.02, true);
     }
-    duo.phase = phase;
-    duo.from = from;
-    var target = Math.max(0, from + (offset || 0));
-    var a = audioEl();
-    var seek = function () {
-      var el = audioEl();
-      // seulement tant qu'on est dans la phase de départ : une fois le morceau entré (« mixin »), la seconde
-      // visée de la préparation (entrée − 3 s) ne doit plus être réappliquée (réseau lent : entrée 3 s trop tôt).
-      if (
-        el &&
-        duo.phase === phase &&
-        Math.abs(el.currentTime - target) > 0.4
-      ) {
-        try {
-          el.currentTime = target;
-        } catch (_e) {}
-      }
-    };
-    // Saut direct (« track ») : muet le temps de se caler, pour ne pas entendre le début du morceau.
-    var hush = phase === "track";
-    var unhush = function () {
-      var el = audioEl();
-      if (hush && el && duo.phase === "track") el.muted = false;
-      hush = false;
-    };
-    if (a) {
-      if (hush) a.muted = true;
-      onNextPlaying(a, function () {
-        seek();
-        setTimeout(unhush, 150);
-      });
-      // Morceau qui finit avant la minute (PHI, MIEL…) : on passe tout de suite au sample suivant.
-      if (!a.__smpEnded) {
-        a.__smpEnded = true;
-        a.addEventListener("ended", function () {
-          if (st.mix && trackPhase() && sheet && !sheet.hidden) {
-            clearOut();
-            mixOut();
-          }
-        });
-      }
-    }
-    ownSite();
-    if (!lib.playPaths([i.src], 0)) {
-      dropPlaying();
-      if (phase !== "pre") step(1);
-      return false;
-    }
-    later(function () {
-      seek();
-      setTimeout(unhush, 150);
-    }, 1200);
-    paintNow();
-    if (seconds != null) scheduleOut(seconds);
-    return true;
-  }
-  function setAudioVolume(v) {
-    var el = audioEl();
-    if (el)
-      try {
-        el.volume = clamp(v, 0, 1);
-      } catch (_e) {}
   }
   function setVideoVolume(v) {
     send("setVolume", [Math.round(v)]);
   }
-  // Transition (retouchée le 19/11, INFRA : « pas très bien ») :
-  // - avant, le morceau était lancé au moment du fondu : il chargeait, démarrait au début puis sautait
-  //   ~1 s plus tard à la bonne seconde → un raté audible en plein fondu ;
-  // - maintenant il est lancé MUET LEAD s plus tôt, déjà calé ; au fondu on le recale au dixième puis
-  //   on ouvre le son en fondu à puissance égale (pas de creux au milieu) ;
-  // - iPhone : le volume ne se règle pas depuis une page → pas de chevauchement à plein volume, mais
-  //   une coupe nette et calée (le morceau prend la place du sample).
-  // - 19/11 (INFRA : « exactement commencer le sample… la musique, elle soit forte ») : ton morceau
-  //   n'entre plus 5 s avant en fondu lent, mais PILE à la seconde où le sample y apparaît, à plein
-  //   volume, en XF s (le temps d'éviter un clic).
+  // YouTube : le volume des lecteurs ne se règle pas sur iPhone (fondu entre deux lecteurs YouTube
+  // seulement si possible ; on le teste sur le lecteur du site, réglé puis remis aussitôt).
   var fadeOk = null;
   function canFade() {
     if (fadeOk !== null) return fadeOk;
@@ -2543,168 +2412,295 @@
     } catch (_e) {}
     return fadeOk;
   }
-  // Où ton morceau entre : la seconde où le sample y apparaît (ou, si l'entrée est en fondu, le moment
-  // où le son devient fort : champ « go » mesuré sur ton fichier audio).
-  function entryOf(i) {
-    return Math.max(0, isFinite(i.go) ? i.go : i.at);
-  }
-  function preroll() {
-    if (duo.phase !== "sample") return;
+  // Pendant la dernière partie du sample : ton morceau se prépare pour entrer à l'instant T (horloge
+  // audio) : extrait téléchargé et décodé, sinon flux lancé muet, calé pour être à son entrée en T.
+  function prepTrack(T) {
     var i = duo.item;
-    var a = audioEl();
-    if (a) a.muted = true;
-    if (!startTrack(i, entryOf(i), -LEAD, "pre", null)) {
-      if (a) a.muted = false;
-      duo.phase = "sample";
+    if (!i || duo.prepped || duo.phase !== "sample" || !eng.ctx || !i.src) return;
+    if (Date.now() - (duo.prepFail || 0) < 2000) return;
+    var sg = trackSeg(i);
+    if (!sg.stream) {
+      duo.prepped = true;
+      getBuf(sg.key, sg.url).catch(function () {
+        // extrait absent (pas encore publié, réseau) : le flux prend le relais
+        if (trackSeg(i) === sg) txFailed(i);
+        if (duo.item === i) duo.prepped = false;
+      });
       return;
     }
-    // l'entrée est calée sur l'horloge audio : instant exact de l'extrait, sinon temps YouTube
-    var v = eng.on && eng.cur && eng.cur.item === i ? eng.cur : null;
+    if (eng.ctx.state !== "running") return;
+    var c = eng.ctx,
+      lead = Math.max(0, T - c.currentTime),
+      tv = startStreamVoice(
+        i,
+        -1,
+        Math.max(0, sg.s0 - lead),
+        c.currentTime,
+        function () {
+          if (duo.tv === tv) duo.tv = null;
+          trackFailed(i, tv);
+        },
+        sg,
+      );
+    if (!tv) return;
+    duo.prepped = true;
+    duo.fixed = false;
+    tv.prep = true;
+    duo.tv = tv;
+  }
+  // Flux préparé : 2 s avant l'entrée, on le recale s'il a dérivé (démarrage lent) ; il est muet.
+  function fixTv(T) {
+    var tv = duo.tv;
+    if (!tv || !tv.live || duo.fixed || !tv.el) return;
+    duo.fixed = true;
+    var want = tv.sg.s0 - (T - eng.ctx.currentTime),
+      d = want - ytNow(tv);
+    if (Math.abs(d) > 0.25 && want >= tv.x0)
+      try {
+        tv.el.currentTime = want - tv.x0;
+      } catch (_e) {}
+  }
+  // Entrée de ton morceau à l'instant T : « pile et fort » (XF s, sans effet), quel que soit le réglage.
+  function mixIn(T, cause) {
+    if (duo.phase !== "sample" || duo.inArmed) return;
+    var i = duo.item;
+    if (!i) return;
+    duo.inArmed = true;
+    if (!eng.ctx || !i.src) return trackFailed(i);
+    T = Math.max(eng.ctx.currentTime + 0.02, T || 0);
+    var plan = planOf("in", i, i, { dur: XF, when: T, cause: cause || "auto" });
+    plan.pre = trackReady(i);
+    duo.inWait = { plan: plan, t0: Date.now() };
+    track("samples_mix_in", { bpm: bpmOf(i), pre: plan.pre, fade: true });
+    inTry();
+  }
+  function trackReady(i) {
+    var sg = trackSeg(i);
+    if (!sg.stream) {
+      var b = eng.bufs[sg.key];
+      return !!(b && b.buf);
+    }
+    return !!(duo.tv && duo.tv.item === i && duo.tv.live && !duo.tv.done);
+  }
+  // Ton morceau entre dès qu'il a du son, au plus tôt à l'instant prévu. Sinon (B2) le sample continue
+  // (marge de son extrait) et on réessaie à chaque tour du moteur ; extrait lent (2,5 s) : le flux prend le
+  // relais ; TRACK_WAIT s au plus, puis le morceau suivant.
+  function inTry() {
+    var w = duo.inWait;
+    if (!w || duo.phase !== "sample" || !eng.ctx || eng.paused) return;
+    var i = duo.item,
+      c = eng.ctx,
+      plan = w.plan,
+      sg = trackSeg(i),
+      T = Math.max(c.currentTime + 0.02, plan.when),
+      waited = (Date.now() - w.t0) / 1000;
+    if (c.state !== "running") return; // contexte arrêté : on attend qu'il reparte
+    var b = !sg.stream && eng.bufs[sg.key];
+    if (b && b.buf) {
+      dropTv();
+      return trackIn(startVoice(b.buf, i, -1, sg.s0, T, sg), plan, T);
+    }
+    var tv = duo.tv && duo.tv.item === i && !duo.tv.done ? duo.tv : null;
+    if (tv && tv.live) {
+      // flux préparé : là où il doit être en T (sinon recalé, il est encore muet)
+      var want = tv.sg.s0 - (T - c.currentTime);
+      if (Math.abs(ytNow(tv) - want) > 0.3 && want >= tv.x0)
+        try {
+          tv.el.currentTime = want - tv.x0;
+        } catch (_e) {}
+      return trackIn(tv, plan, T);
+    }
+    if (!sg.stream && !b) {
+      duo.prepped = false;
+      prepTrack(T);
+    } else if (!tv && (sg.stream || waited > 2.5)) {
+      // pas de flux préparé (saut, sample court) ou extrait trop lent : flux lancé maintenant, à l'entrée
+      var ss = sg.stream ? sg : streamSeg(sg);
+      tv = startStreamVoice(
+        i,
+        -1,
+        sg.s0,
+        c.currentTime,
+        function () {
+          if (duo.tv === tv) duo.tv = null;
+          trackFailed(i, tv);
+        },
+        ss,
+      );
+      if (tv) {
+        tv.prep = true;
+        duo.tv = tv;
+      }
+    }
+    if (waited > TRACK_WAIT) trackFailed(i);
+  }
+  // Même extrait, lu en flux (repli quand son téléchargement traîne).
+  function streamSeg(sg) {
+    return Object.assign({}, sg, { stream: true, key: "" });
+  }
+  function trackIn(tv, plan, T) {
+    var i = duo.item,
+      yts = !eng.on; // sample joué par YouTube
+    duo.inWait = null;
+    tv.prep = false;
+    if (duo.tv === tv) duo.tv = null;
+    transition(
+      yts
+        ? {
+            yt: true,
+            set: function (v) {
+              setVideoVolume(v * 100);
+            },
+          }
+        : { all: true, except: tv, main: eng.cur !== tv ? eng.cur : null },
+      { v: tv },
+      plan,
+      T,
+    );
+    eng.on = true;
+    eng.paused = false;
+    eng.hold = null;
+    eng.armed = false;
+    eng.cur = tv;
+    var c = sheet && $("[data-smp-cov]", sheet);
+    if (c) c.style.transitionDuration = "0.5s";
     clockAt(
-      v ? ctxAt(v, duo.end - XF) : now() + Math.max(0, duo.end - XF - yt.time),
-      mixIn,
+      T,
+      function () {
+        if (duo.item !== i) return;
+        duo.phase = "track";
+        duo.from = tv.sg.s0;
+        duo.outArmed = false;
+        paintNow();
+        engPreload(i, -1);
+      },
+      "duo",
+    );
+    if (yts)
+      clockAt(
+        T + XF + 0.1,
+        function () {
+          send("pauseVideo");
+          setVideoVolume(100);
+        },
+        "duo",
+      );
+  }
+  // Saut direct dans ton morceau (barre, « Aller à ton morceau ») depuis le sample.
+  function jumpToTrack(i, from) {
+    duo.inWait = null;
+    duo.inArmed = true;
+    var plan = planOf("seek", i, i, { dur: 0.3 }),
+      tv = duo.tv && duo.tv.item === i && duo.tv.live && !duo.tv.done ? duo.tv : null;
+    if (!eng.on) send("pauseVideo");
+    duo.phase = "track";
+    duo.from = entryOf(i);
+    duo.outArmed = false;
+    if (tv) {
+      try {
+        tv.el.currentTime = Math.max(0, from - tv.x0);
+      } catch (_e) {}
+      tv.prep = false;
+      duo.tv = null;
+      transition({ all: true, except: tv, main: eng.cur }, { v: tv }, plan);
+      eng.on = true;
+      eng.paused = false;
+      eng.cur = tv;
+    } else {
+      dropTv();
+      engStart(i, -1, from, plan);
+    }
+    paintNow();
+  }
+  // Glisser dans ton morceau pendant qu'il joue.
+  function seekTrack(i, t) {
+    duo.outArmed = false;
+    var v = eng.cur;
+    if (eng.paused) {
+      eng.hold = { item: i, k: -1, t: t, name: trackSeg(i).key };
+      return;
+    }
+    if (v && v.track && v.el && v.live && t >= v.x0)
+      try {
+        v.el.currentTime = t - v.x0;
+        return;
+      } catch (_e) {}
+    engStart(i, -1, t, planOf("seek", null, null, { dur: 0.06 }));
+  }
+  // Ton morceau ne joue pas (extrait et flux en échec, réseau coupé) : on passe au son suivant.
+  function txFailed(i) {
+    i.noTx = Date.now() + 120000; // 2 minutes : le flux du morceau prend le relais
+    i._ts = null;
+  }
+  function trackFailed(i, v) {
+    if (duo.item !== i || !sheet || sheet.hidden) return;
+    track("samples_audio_fail", { mode: "mix" });
+    if (v && v.sg && v.sg.tx && !v.sg.stream && trackSeg(i).tx) {
+      // l'extrait a échoué : le flux du morceau (même minute) prend le relais
+      txFailed(i);
+      if (duo.phase === "sample" && duo.inWait) {
+        duo.prepped = false;
+        return;
+      }
+    }
+    if (duo.phase === "sample" && !duo.inArmed) {
+      // échec pendant la préparation : on repréparera dans 2 s (l'entrée attendra au plus TRACK_WAIT s)
+      duo.prepped = false;
+      duo.prepFail = Date.now();
+      return;
+    }
+    if (duo.phase === "sample" && duo.inWait && (Date.now() - duo.inWait.t0) / 1000 <= TRACK_WAIT)
+      return; // inTry réessaie (flux) jusqu'à TRACK_WAIT
+    duo.inWait = null;
+    dropTv();
+    var cur = st.list[st.pos],
+      next = nextOf(cur);
+    setCause("fail");
+    if (next) play(next);
+    else endOfList(eng.cur, eng.ctx ? eng.ctx.currentTime : 0);
+  }
+  // Ton morceau pendant sa minute : la sortie vers le sample suivant (durée et effet du Mix, centrée sur la
+  // fin de la minute) est programmée LOOK s avant sur l'horloge audio.
+  function trackTick(v) {
+    if (duo.phase !== "track" || duo.outArmed || eng.paused || eng.cur !== v) return;
+    var cur = st.list[st.pos],
+      next = nextOf(cur),
+      tp = ytNow(v),
+      end = duo.from + TRACK,
+      plan = next ? planOf("out", cur, next, { voice: v, cause: "auto" }) : null,
+      start = next ? end - plan.dur / 2 : end;
+    if (start - tp > LOOK) return;
+    duo.outArmed = true;
+    if (!next) return endOfList(v, ctxAt(v, end));
+    plan.when = plan.want = Math.max(eng.ctx.currentTime + 0.02, ctxAt(v, start));
+    play(next, false, true, 0, plan);
+  }
+  // M7 : fin de la liste : ton morceau s'éteint en 3 s par son gain (iPhone compris), puis le lecteur
+  // s'arrête proprement ; lecture repart du début de la liste.
+  function endOfList(v, T) {
+    var c = eng.ctx,
+      t = Math.max(c ? c.currentTime : 0, T || 0),
+      plan = planOf("end", st.list[st.pos], null, { dur: 3, when: t, cause: "auto" });
+    transition(v ? { v: v } : { all: true }, null, plan, t);
+    duo.ending = true; // le bouton reste sur « pause » pendant le fondu de fin
+    clockAt(
+      t + 3.05,
+      function () {
+        duo.ending = false;
+        duo.phase = "end";
+        st.ended = true;
+        eng.cur = null;
+        eng.paused = true;
+        eng.hold = null;
+        paintNow();
+      },
+      "duo",
     );
   }
-  function cancelPre() {
-    duo.timers.forEach(clearTimeout);
-    duo.timers = [];
-    clockClear("duo");
-    dropPlaying();
-    pauseMusic();
-    var a = audioEl();
-    if (a) a.muted = false;
-    duo.phase = "sample";
-  }
-  function mixIn() {
-    if (duo.phase !== "sample" && duo.phase !== "pre") return;
-    var i = duo.item,
-      pre = duo.phase === "pre",
-      fade = canFade(),
-      base = entryOf(i);
-    if (!pre) {
-      // pas eu le temps de pré-charger (saut, sample court) : lancé muet, son ouvert une fois calé
-      var a0 = audioEl();
-      if (a0) a0.muted = true;
-      if (!startTrack(i, base, 0, "mixin", null)) return;
-    }
-    duo.phase = "mixin";
-    var c = $("[data-smp-cov]", sheet);
-    if (c) c.style.transitionDuration = "0.5s";
-    // sample → morceau : toujours « pile et fort » (XF s, sans effet), quel que soit le réglage du Mix
-    var plan = planOf("in", i, i, { dur: XF, when: now(), pre: pre });
-    var open = function () {
-      var el = audioEl();
-      if (!el) return;
-      if (Math.abs(el.currentTime - base) > 0.1)
-        try {
-          el.currentTime = base;
-        } catch (_e) {}
-      // extrait : vrai fondu de sortie par le gain (iPhone compris) ; ton morceau entre comme avant
-      var out = eng.on
-        ? { all: true }
-        : fade
-          ? {
-              set: function (v) {
-                setVideoVolume(v * 100);
-              },
-            }
-          : null;
-      if (fade) {
-        setAudioVolume(0);
-        el.muted = false;
-        transition(out, { set: setAudioVolume }, plan);
-      } else {
-        el.muted = false;
-        if (!eng.on) send("pauseVideo");
-        transition(out, { site: true }, plan);
-      }
-      paintNow();
-    };
-    var after = function () {
-      clockAt(plan.when + (fade ? XF : 0) + 0.1, function () {
-        send("pauseVideo");
-        setVideoVolume(100);
-        setAudioVolume(1);
-        if (duo.phase === "mixin") duo.phase = "track";
-      });
-      scheduleOut(TRACK);
-    };
-    if (pre) {
-      open();
-      after();
-    } else {
-      // B2 : avant, attente fixe de 1,3 s puis son ouvert même si ton morceau n'avait pas démarré
-      // (silence). Le sample continue (marge de son extrait) jusqu'à ce que ton morceau joue vraiment ;
-      // 6 s au plus.
-      var t0 = Date.now(),
-        poll = function () {
-          var el = audioEl();
-          if (duo.phase !== "mixin") return;
-          if ((el && !el.paused && el.readyState >= 3) || Date.now() - t0 > 6000) {
-            plan.when = now();
-            open();
-            after();
-          } else later(poll, 100);
-        };
-      later(poll, 150);
-    }
-    track("samples_mix_in", { bpm: bpmOf(i), pre: pre, fade: fade });
-  }
-  // Fin de la minute : le sample suivant entre pendant que le morceau sort (durée et effet du Mix).
-  function mixOut() {
-    var list = shownList(),
-      cur = st.list[st.pos],
-      next = list[list.indexOf(cur) + 1];
-    if (!next) {
-      var t = now(),
-        f6 = canFade();
-      // B6 : iPhone (volume bloqué) : fin nette au lieu de 3,2 s à plein volume puis coupe
-      if (f6) clockRamp(setAudioVolume, 1, 0, t, 3, "duo", true);
-      clockAt(t + (f6 ? 3.2 : 0), function () {
-        pauseMusic();
-        setAudioVolume(1);
-      });
-      return;
-    }
-    play(next, false, true, 0, planOf("out", cur, next));
-  }
-  // iPhone : le lecteur INFRA doit avoir été touché pendant le geste pour pouvoir repartir seul ensuite.
-  var unlocking = false;
-  function unlockAudio() {
-    var a = audioEl();
-    if (!a || !a.paused || !a.currentSrc) return;
-    unlocking = true; // B7 : ce « play » muet n'est pas un geste de l'utilisateur
-    ownSite();
-    var done = function () {
-      setTimeout(function () {
-        unlocking = false;
-      }, 50);
-    };
-    try {
-      a.muted = true;
-      var p = a.play();
-      var undo = function () {
-        ownSite();
-        a.pause();
-        a.muted = false;
-        done();
-      };
-      if (p && typeof p.then === "function")
-        p.then(undo, function () {
-          a.muted = false;
-          done();
-        });
-      else undo();
-    } catch (_e) {
-      a.muted = false;
-      done();
-    }
-  }
-
   // ---------- Horloge audio (20/11) : tout ce qui s'entend est calé sur ctx.currentTime ----------
-  // Ton morceau (<audio> du site) et YouTube ne passent pas par Web Audio : leur volume est réglé par
-  // petits pas lus sur la même horloge (20 ms). Si le contexte audio est arrêté (onglet caché, iPhone
-  // « interrupted »), chaque tâche retombe sur l'heure murale pour ne jamais rester bloquée.
+  // Samples et ton morceau (M3) sont des voix Web Audio ; seul YouTube (sample sans extrait) a un volume
+  // réglé par petits pas lus sur la même horloge (20 ms). Si le contexte audio est arrêté (onglet caché,
+  // iPhone « interrupted »), chaque tâche retombe sur l'heure murale pour ne jamais rester bloquée.
   var clk = { jobs: [], iv: 0 };
   function ctxNow() {
     var c = eng.ctx;
@@ -2865,6 +2861,7 @@
     return Math.max(0, m);
   }
   var MIXED = { smp: 1, out: 1 },
+    FXOUT = { smp: 1, out: 1 }, // effet aussi sur le son qui sort (M3 : ton morceau compris)
     EMIT = { smp: 1, out: 1, in: 1, seg: 1, skip: 1 },
     planSeq = 0;
   // Durée et effet réellement joués pour un passage. kind : « smp » (sample → sample), « out » (ton
@@ -2882,27 +2879,42 @@
       var eIn = !!to && useEng(to),
         eOut = false,
         m = 60;
-      tOut = kind === "out" ? Number(from && from.tb) || 0 : smpTempo(from);
-      tIn = smpTempo(to);
-      if (kind === "smp" && from && useEng(from)) {
-        var ls = segsOf(from);
-        m = marginAfter(ls[ls.length - 1], o.voice);
-        eOut = true;
+      if (kind === "seg") {
+        // parties d'un même sample (ou deux samples d'un même morceau) : marges des deux extraits
+        var ss = segsOf(from),
+          kk = o.k != null ? o.k : (duo.k || 0) + 1,
+          a = ss[kk - 1],
+          b = ss[kk];
+        tOut = smpTempo(from.chain ? from.chain[a ? a.ci : 0] : from);
+        tIn = smpTempo(from.chain ? from.chain[b ? b.ci : 0] : from);
+        eOut = eIn = useEng(from);
+        m = eIn ? Math.min(marginAfter(a, o.voice), marginBefore(b)) : SEGXF / 2;
+      } else {
+        tOut = kind === "out" ? Number(from && from.tb) || 0 : smpTempo(from);
+        tIn = smpTempo(to);
+        if (kind === "smp" && from && useEng(from)) {
+          var ls = segsOf(from);
+          m = marginAfter(ls[ls.length - 1], o.voice);
+          eOut = true;
+        }
+        // ton morceau → sample (M3) : ton morceau est dans le moteur, sa marge est celle de son extrait
+        if (kind === "out" && from) {
+          m = Math.min(m, trackMarginAfter(from));
+          eOut = true;
+        }
+        if (eIn) m = Math.min(m, marginBefore(segsOf(to)[0]));
+        else if (to) m = Math.min(m, OVERLAP / 2); // YouTube : fondu court, comme avant
       }
-      if (eIn) m = Math.min(m, marginBefore(segsOf(to)[0]));
-      else if (to) m = Math.min(m, OVERLAP / 2); // YouTube : fondu court, comme avant
-      // iPhone : ton morceau est coupé net ; le sample entre comme avant (OVERLAP s au plus)
-      if (kind === "out" && !canFade()) m = Math.min(m, OVERLAP / 2);
       dur = C.transitionSeconds(opt.dur, tOut, m);
       // Extrait sans marge suffisante (la moitié des passages, 20/11) : jamais moins que le fondu validé
-      // d'avant (SMPXF / OVERLAP, qui rogne déjà au bord de l'extrait), sauf « Aucune ».
-      var base = kind === "smp" ? SMPXF : OVERLAP;
+      // d'avant (SMPXF, OVERLAP, SEGXF), sauf « Aucune ».
+      var base = kind === "smp" ? SMPXF : kind === "seg" ? SEGXF : OVERLAP;
       if (opt.dur !== "none" && dur < base) dur = base;
       fx = C.resolveEffect(opt.fx, tOut, tIn);
       if (dur < 0.1) {
         dur = C.NONE_S || 0.03;
         fx = "cut";
-      } else if (fx !== "fade" && !(kind === "smp" ? eOut : eIn)) fx = "fade";
+      } else if (fx !== "fade" && !(kind === "smp" ? eOut : eIn || eOut)) fx = "fade";
     }
     var when = o.when != null ? o.when : now();
     return {
@@ -2938,23 +2950,31 @@
   function transition(from, to, plan, at) {
     var T = Math.max(now(), at || plan.when || 0),
       D = plan.dur;
-    if (from && from.all) engHush(D, T);
-    else if (from && from.v) {
-      if (plan.kind === "smp") applyFx(from.v, plan, "out", T);
+    if (from && from.all) {
+      if (from.except) fadeOthers(from.except, from.main, plan, T, D);
+      else engHush(D, T);
+    } else if (from && from.v) {
+      if (FXOUT[plan.kind]) applyFx(from.v, plan, "out", T);
       fadeOutVoice(from.v, T, D);
-      // B3 : voix en flux remplacée avant son premier son : celle qu'elle devait remplacer sort aussi
-      var pv = from.v.prev;
-      from.v.prev = null;
-      if (pv && !pv.done && (!to || pv !== to.v)) fadeOutVoice(pv, T, D);
     } else if (from && from.set) clockRamp(from.set, 1, 0, T, D);
     if (to && to.v) {
       setCurve(to.v, 0, 1, T, D);
-      if (plan.kind === "smp") applyFx(to.v, plan, "swap", T);
+      if (plan.kind === "smp" || plan.kind === "seg") applyFx(to.v, plan, "swap", T);
       else if (plan.kind === "out") applyFx(to.v, plan, "in", T);
     } else if (to && to.set) clockRamp(to.set, 0, 1, T, D);
     emit(plan, T);
     passLog(plan, T, to);
     return plan;
+  }
+  // Toutes les voix entendues sortent, sauf l'entrante et ton morceau préparé (muet) ; l'effet du passage
+  // est posé sur le son principal qui sort (main).
+  function fadeOthers(nv, main, plan, T, D) {
+    if (!eng.ctx) return;
+    eng.voices.slice().forEach(function (o) {
+      if (o === nv || o.prep) return;
+      if (o === main && !o.done && FXOUT[plan.kind]) applyFx(o, plan, "out", T);
+      fadeOutVoice(o, T, D, true);
+    });
   }
   // ---------- Télémétrie des passages (M1, 27/11/2026) ----------
   // Un « samples_pass » par passage, envoyé quand le nouveau son part vraiment (lecture en flux : à son
@@ -2994,7 +3014,9 @@
       passN++;
       var c = eng.ctx,
         gap = 0;
-      if (c && eng.lastEnd > 0 && !othersAudible(v, start)) gap = Math.max(0, start - eng.lastEnd);
+      // silence entendu entre deux sons (une reprise après pause ou le premier son n'en ont pas)
+      if (c && eng.lastEnd > 0 && plan.kind !== "resume" && plan.kind !== "first" && !othersAudible(v, start))
+        gap = Math.max(0, start - eng.lastEnd);
       track("samples_pass", {
         kind: plan.kind,
         cause: plan.cause,
@@ -3231,8 +3253,8 @@
   var XBASE =
       "https://infra180-api.pages.dev/audio/assets/music/streams/samples/",
     SMPXF = 2, // fondu croisé entre deux samples
-    MAXBUF = 3, // extraits décodés gardés en mémoire
-    POOL = 3, // lecteurs <audio> pour la lecture en flux, tous débloqués pendant le geste
+    MAXBUF = 4, // extraits décodés gardés en mémoire (dont la minute de ton morceau, M3)
+    POOL = 4, // lecteurs <audio> pour la lecture en flux (dont ton morceau, M3), tous débloqués dans le geste
     LOOK = 1.2; // avance (s) avec laquelle une transition est programmée sur l'horloge audio
   var eng = {
     ctx: null,
@@ -3259,12 +3281,28 @@
     } catch (_e) {}
     var AC = audioCtor();
     if (!AC) return null;
-    if (!eng.ctx)
+    if (!eng.ctx) {
       try {
         eng.ctx = new AC();
       } catch (_e) {
         return null;
       }
+      // M6 : coupure du contexte venue de l'extérieur (appel, Siri, verrouillage) notée ; au retour, les
+      // passages en retard et la position sont relus tout de suite.
+      var c0 = eng.ctx,
+        last = c0.state;
+      c0.onstatechange = function () {
+        var s = c0.state;
+        if (s === last || !sheet || sheet.hidden) return (last = s);
+        last = s;
+        if (!eng.ownSuspend) track("samples_lock", { cause: "ctx", ctx: s });
+        if (s === "running")
+          setTimeout(function () {
+            clockTick();
+            engTick();
+          }, 0);
+      };
+    }
     if (eng.ctx.state !== "running") {
       try {
         var p = eng.ctx.resume();
@@ -3332,7 +3370,7 @@
   }
   // fetch → arrayBuffer → decodeAudioData ; au plus MAXBUF extraits gardés (le plus ancien sort, sauf
   // celui qu'on entend ou qu'on reprendra après une pause). Pas de Range : le service worker laisse passer.
-  function getBuf(name) {
+  function getBuf(name, url) {
     var e = eng.bufs[name];
     if (!e) {
       // 23/11/2026 : délai maximum (réseau bloqué = l'extrait ne reste plus « en chargement » sans fin ;
@@ -3340,7 +3378,7 @@
       var ac = typeof AbortController === "function" ? new AbortController() : null;
       var limit = ac ? setTimeout(function () { ac.abort(); }, 20000) : 0;
       e = eng.bufs[name] = {
-        p: fetch(xUrl(name), { mode: "cors", credentials: "omit", signal: ac ? ac.signal : undefined })
+        p: fetch(url || xUrl(name), { mode: "cors", credentials: "omit", signal: ac ? ac.signal : undefined })
           .then(function (r) {
             if (!r.ok) throw new Error("extrait " + r.status);
             return r.arrayBuffer();
@@ -3436,12 +3474,26 @@
     el.crossOrigin = "anonymous";
     el.preload = "auto";
     el.setAttribute("playsinline", "");
-    var e = { el: el, busy: false, node: null };
+    var e = { el: el, busy: false, node: null, v: null, own: false };
     try {
       e.node = eng.ctx.createMediaElementSource(el);
     } catch (_e) {
       return null;
     }
+    // B4 : lecteur mis en pause de l'extérieur (casque, écran verrouillé, autre app) : le Mix se met en
+    // pause et ne repart plus tout seul. Nos propres pauses (fin d'une voix) sont marquées « own ».
+    el.addEventListener("pause", function () {
+      if (e.own) {
+        e.own = false;
+        return;
+      }
+      var v = e.v;
+      if (!e.busy || !v || v.done || v !== eng.cur || el.ended || eng.paused || !sheet || sheet.hidden)
+        return;
+      engPause();
+      track("samples_lock", { cause: "el_pause", ctx: ctxState() });
+      setTimeout(paintBar, 30);
+    });
     eng.pool.push(e);
     return e;
   }
@@ -3470,9 +3522,9 @@
     });
   }
   // Voix muette (gain 0) : c'est transition() qui l'ouvre, avec la durée et l'effet du passage.
-  function startStreamVoice(item, k, ytFrom, when, onFail) {
+  function startStreamVoice(item, k, ytFrom, when, onFail, sgIn) {
     var c = eng.ctx,
-      sg = segsOf(item)[k],
+      sg = sgIn || segOf(item, k),
       e = poolEl();
     if (!e) return null;
     e.busy = true;
@@ -3486,6 +3538,8 @@
     e.node.connect(nd.hp);
     var release = function () {
       clearTimeout(stopT);
+      e.v = null;
+      if (!el.paused) e.own = true;
       try {
         el.pause();
       } catch (_e) {}
@@ -3503,7 +3557,8 @@
       item: item,
       k: k,
       sg: sg,
-      name: sg.x[0],
+      track: !!sg.track,
+      name: sg.key || sg.x[0],
       x0: sg.x[1],
       len: sg.x[2],
       off: off,
@@ -3549,7 +3604,8 @@
       if (ms > 1500)
         track("samples_audio_slow", { delta_ms: ms, mode: st.mix ? "mix" : "samples" });
     };
-    el.src = xUrl(sg.x[0]) + (off > 0.05 ? "#t=" + off.toFixed(2) : "");
+    e.v = v;
+    el.src = (sg.url || xUrl(sg.x[0])) + (off > 0.05 ? "#t=" + off.toFixed(2) : "");
     try {
       if (off > 0.05) el.currentTime = off;
     } catch (_e) {}
@@ -3562,9 +3618,9 @@
     eng.voices.push(v);
     return v;
   }
-  function startVoice(buf, item, k, ytFrom, when) {
+  function startVoice(buf, item, k, ytFrom, when, sgIn) {
     var c = eng.ctx,
-      sg = segsOf(item)[k],
+      sg = sgIn || segOf(item, k),
       nd = voiceNodes(c),
       s = c.createBufferSource();
     s.buffer = buf;
@@ -3576,7 +3632,8 @@
       item: item,
       k: k,
       sg: sg,
-      name: sg.x[0],
+      track: !!sg.track,
+      name: sg.key || sg.x[0],
       x0: sg.x[1],
       len: buf.duration,
       off: clamp(ytFrom - sg.x[1], 0, Math.max(0, buf.duration - 0.05)),
@@ -3633,28 +3690,38 @@
   // noStream : lecture en flux refusée (autoplay iPhone, réseau) → on repasse par le tampon décodé.
   function engStart(item, k, ytFrom, plan, noStream) {
     var gen = ++eng.gen,
-      sg = segsOf(item)[k];
+      sg = segOf(item, k),
+      key = sg.key || sg.x[0];
     eng.on = true;
     eng.paused = false;
     eng.hold = null;
+    st.ended = false;
     ensureCtx();
-    var ready = eng.bufs[sg.x[0]] && eng.bufs[sg.x[0]].buf;
+    pauseMusic(); // le lecteur du site reste en pause pendant les Samples et le Mix
+    var ready = !sg.stream && eng.bufs[key] && eng.bufs[key].buf;
     if (ready) plan.pre = true; // extrait déjà en mémoire : départ à l'instant prévu
-    if (!ready && !noStream && eng.ctx && eng.ctx.state === "running") {
+    if (!ready && (sg.stream || !noStream) && eng.ctx && eng.ctx.state === "running") {
       var at0 = Math.max(eng.ctx.currentTime + 0.02, plan.when || 0),
         lead = at0 - eng.ctx.currentTime; // passage programmé à l'avance : le flux part d'autant plus tôt
       if (lead > 0.05) ytFrom = Math.max(sg.x[1], ytFrom - lead);
       // Rapport terrain 20/11 (§ 3a, bug 3) : un refus passager ne bascule plus l'extrait sur YouTube
       // pour toute la session ; on réessaie aussitôt par le tampon (fetch + décodage, sans <audio>).
-      var sv = startStreamVoice(item, k, ytFrom, at0, function (v) {
-        if (gen !== eng.gen) return;
-        track("samples_audio_retry", { mode: st.mix ? "mix" : "samples" });
-        engStart(item, k, Math.max(ytFrom, ytNow(v)), plan, true);
-      });
+      var sv = startStreamVoice(
+        item,
+        k,
+        ytFrom,
+        at0,
+        function (v) {
+          if (gen !== eng.gen) return;
+          if (k < 0 && sg.stream) return trackFailed(item, v);
+          track("samples_audio_retry", { mode: st.mix ? "mix" : "samples" });
+          engStart(item, k, Math.max(ytFrom, ytNow(v)), plan, true);
+        },
+        sg,
+      );
       if (sv) {
-        // B3 : avant, le fondu était joué tout de suite, alors que l'élément <audio> n'avait pas encore de
-        // son (réseau lent, saut) : silence puis entrée brutale. Le son en cours continue jusqu'au premier
-        // son de celui-ci (« playing »), puis le passage se joue ; 8 s au plus.
+        // B3 : le son en cours continue jusqu'au premier son de celui-ci (« playing »), puis le passage se
+        // joue (avant : fondu joué tout de suite, dans le vide, puis entrée brutale) ; 8 s au plus.
         var prevCur = eng.cur && !eng.cur.done ? eng.cur : null,
           fired = false,
           fire = function () {
@@ -3662,19 +3729,17 @@
             fired = true;
             sv.prev = null;
             transition(
-              prevCur && !prevCur.done ? { v: prevCur } : null,
+              { all: true, except: sv, main: prevCur },
               { v: sv },
               plan,
               Math.max(eng.ctx.currentTime + 0.02, plan.when || 0),
             );
           };
-        sv.prev = prevCur; // si un autre son la remplace avant son départ, celle-ci sort aussi
+        sv.prev = prevCur; // s'il échoue avant son premier son, celui-ci redevient le son en cours
         eng.cur = sv;
         eng.armed = false;
         onLive(sv, fire);
         setTimeout(fire, 8000);
-        if (!trackPhase() && Date.now() >= duo.outroUntil && duo.phase !== "pre")
-          pauseMusic();
         // le flux d'abord : le préchargement du suivant attend que ce son soit bien parti (réseau lent)
         var g0 = gen;
         setTimeout(function () {
@@ -3684,23 +3749,24 @@
         return;
       }
     }
+    if (sg.stream) {
+      // ton morceau sans extrait et aucun lecteur disponible (contexte arrêté) : on réessaie au tour suivant
+      eng.loading = false;
+      if (k < 0) trackFailed(item);
+      return;
+    }
     eng.loading = true;
     var t0 = Date.now();
-    getBuf(sg.x[0]).then(
+    getBuf(key, sg.url).then(
       function (buf) {
         if (gen !== eng.gen || !sheet || sheet.hidden) return;
         eng.loading = false;
         var at = Math.max(eng.ctx.currentTime + 0.02, plan.when || 0),
-          nv = startVoice(buf, item, k, ytFrom, at);
-        transition(eng.cur ? { v: eng.cur } : null, { v: nv }, plan, at);
+          main = eng.cur,
+          nv = startVoice(buf, item, k, ytFrom, at, sg);
+        transition({ all: true, except: nv, main: main }, { v: nv }, plan, at);
         eng.cur = nv;
         eng.armed = false;
-        if (
-          !trackPhase() &&
-          Date.now() >= duo.outroUntil &&
-          duo.phase !== "pre"
-        )
-          pauseMusic();
         if (Date.now() - t0 > 1500)
           track("samples_audio_slow", { delta_ms: Date.now() - t0, mode: st.mix ? "mix" : "samples" });
         engPreload(item, k);
@@ -3709,6 +3775,10 @@
       function () {
         if (gen !== eng.gen) return;
         eng.loading = false;
+        if (k < 0) {
+          txFailed(item);
+          return engStart(item, k, ytFrom, plan);
+        }
         engFail(item, k);
       },
     );
@@ -3716,7 +3786,15 @@
   // Précharge ce qui vient après : la partie suivante, sinon le premier extrait du son suivant.
   function engPreload(item, k) {
     var segs = segsOf(item),
-      nxt = segs[k + 1];
+      nxt = k >= 0 ? segs[k + 1] : null;
+    if (k >= 0 && !nxt && st.mix && item.src) {
+      // dernière partie du sample : la minute de ton morceau d'abord (M3, B1), puis le sample suivant
+      var ts = trackSeg(item);
+      if (!ts.stream)
+        getBuf(ts.key, ts.url).catch(function () {
+          if (trackSeg(item) === ts) txFailed(item);
+        });
+    }
     if (!nxt) {
       var list = shownList(),
         n = list[list.indexOf(item) + 1];
@@ -3727,6 +3805,7 @@
   // Extrait introuvable (404, réseau) : cet item repasse par YouTube, comme avant — 2 minutes au premier
   // échec (le réseau revient), puis pour la session au deuxième.
   function engFail(item, k) {
+    if (k < 0) return trackFailed(item);
     track("samples_audio_fail", { mode: st.mix ? "mix" : "samples" });
     item.xFails = (item.xFails || 0) + 1;
     item.noX = item.xFails >= 2 ? Infinity : Date.now() + 120000;
@@ -3738,6 +3817,15 @@
   function engPause() {
     var v = eng.cur;
     if (v) eng.hold = { item: v.item, k: v.k, t: ytNow(v), name: v.name };
+    if (duo.phase === "sample" && duo.inArmed && (!v || !v.track)) {
+      // pause pendant l'attente de ton morceau : il sera repréparé à la reprise
+      duo.inArmed = false;
+      duo.inWait = null;
+    }
+    if (duo.phase === "sample") {
+      duo.prepped = false;
+      dropTv();
+    }
     engHush(0.08);
     eng.paused = true;
     yt.state = 2;
@@ -3747,9 +3835,15 @@
     var h = eng.hold,
       cur = st.list[st.pos];
     if (h && h.item === cur) {
-      if (st.mix) {
+      if (h.k < 0) {
+        // ton morceau reprend là où il était
+        duo.phase = "track";
+        duo.outArmed = false;
+      } else if (st.mix) {
+        duo.phase = "sample";
         duo.k = h.k;
         duo.end = segsOf(cur)[h.k].s1;
+        duo.inArmed = false;
       }
       engStart(h.item, h.k, h.t, planOf("resume", null, null, { dur: 0.08 }));
     } else if (cur) play(cur, false, false, 0);
@@ -3773,12 +3867,23 @@
   function engEnded(v) {
     eng.cur = null;
     if (st.mix) {
+      if (v.track) {
+        // ton morceau finit avant sa minute (PHI, MIEL…), ou sortie pas programmée à temps (arrière-plan)
+        if (duo.phase === "track" && !duo.outArmed) {
+          duo.outArmed = true;
+          var cur = st.list[st.pos],
+            next = nextOf(cur);
+          if (next) play(next, false, true, 0, planOf("out", cur, next, { cause: "ended" }));
+          else endOfList(null, eng.ctx.currentTime);
+        }
+        return;
+      }
       if (duo.phase === "sample" && !isLastSeg()) {
         if (!eng.armed) {
           eng.armed = true;
           nextSeg();
         }
-      } else if (duo.phase === "sample" || duo.phase === "pre") mixIn();
+      } else if (duo.phase === "sample") mixIn(eng.ctx.currentTime, "ended");
       return;
     }
     if (!eng.armed) engAuto(v);
@@ -3822,54 +3927,55 @@
   }
   // Toutes les 100 ms : position, puis transitions programmées à l'avance sur l'horloge audio.
   function engTick() {
-    if (!eng.on || !eng.ctx || !sheet || sheet.hidden) return;
+    if (!eng.ctx || !sheet || sheet.hidden) return;
+    if (duo.inWait) inTry();
+    if (!eng.on) return;
     var v = eng.cur;
     if (eng.paused || !v || v.item !== st.list[st.pos]) return;
+    if (v.track) return trackTick(v);
     var tp = ytNow(v),
       sg = v.sg,
       last = v.k >= segsOf(v.item).length - 1;
     yt.time = tp;
     yt.state = 1;
     if (st.mix) {
-      if (duo.phase !== "sample" && duo.phase !== "pre") return;
+      if (duo.phase !== "sample") return;
       if (!last) {
-        if (!eng.armed && sg.s1 - tp < SEGXF / 2 + LOOK) {
+        if (!eng.armed && sg.s1 - tp < segDur(v) / 2 + LOOK) {
           eng.armed = true;
           nextSeg();
         }
         return;
       }
-      if (
-        duo.phase === "sample" &&
-        tp >= duo.end - XF - LEAD &&
-        tp < duo.end - XF
-      )
-        preroll();
-      if (tp >= duo.end - XF) mixIn();
+      if (duo.inArmed) return;
+      // dernière partie : ton morceau se prépare, se recale, puis entre pile à la fin du sample
+      var T = ctxAt(v, duo.end - XF),
+        left = T - eng.ctx.currentTime;
+      if (left < PRELEAD) prepTrack(T);
+      if (left < 2.5) fixTv(T);
+      if (left < LOOK) mixIn(T);
       return;
     }
     if (eng.armed) return;
     if (!last) {
-      if (sg.s1 - tp < SEGXF / 2 + LOOK) {
+      var sd = segDur(v);
+      if (sg.s1 - tp < sd / 2 + LOOK) {
         eng.armed = true;
         var nk = v.k + 1,
-          ns = segsOf(v.item)[nk];
-        engStart(
-          v.item,
-          nk,
-          Math.max(ns.x[1], ns.s0 - SEGXF / 2),
-          planOf("seg", v.item, v.item, {
-            dur: SEGXF,
-            when: ctxAt(v, sg.s1 - SEGXF / 2),
-            k: nk,
-          }),
-        );
+          ns = segsOf(v.item)[nk],
+          pl = planOf("seg", v.item, v.item, { dur: SEGXF, k: nk, voice: v, cause: "auto" });
+        pl.when = pl.want = Math.max(eng.ctx.currentTime + 0.02, ctxAt(v, sg.s1 - pl.dur / 2));
+        engStart(v.item, nk, Math.max(ns.x[1], ns.s0 - pl.dur / 2), pl);
         track("samples_part", { k: nk, n: segsOf(v.item).length });
       }
       return;
     }
     // dernier passage : la transition est armée LOOK s avant son début (au plus 6 s avant la jointure)
     if (sg.s1 - tp < 6 + LOOK && sg.s1 - tp < autoDur(v) / 2 + LOOK) engAuto(v);
+  }
+  // Durée du prochain passage entre deux parties (pour l'armer à temps).
+  function segDur(v) {
+    return planOf("seg", v.item, v.item, { dur: SEGXF, k: v.k + 1, voice: v }).dur;
   }
   // Retour sur la page (iPhone : contexte « interrupted » après verrouillage ou arrière-plan) : on relance.
   // B5 / M6 : « interrupted » reste parfois bloqué (WebKit 281955, 283419) : suspend() puis resume() ;
@@ -3892,14 +3998,22 @@
     };
     if (c.state !== "running")
       try {
+        eng.ownSuspend = true;
         var p =
           c.state === "interrupted" && typeof c.suspend === "function"
             ? c.suspend().then(function () {
                 return c.resume();
               })
             : c.resume();
-        if (p && p.then) p.then(again, noop);
-      } catch (_e) {}
+        var done = function () {
+          eng.ownSuspend = false;
+          again();
+        };
+        if (p && p.then) p.then(done, done);
+        else eng.ownSuspend = false;
+      } catch (_e) {
+        eng.ownSuspend = false;
+      }
     again();
     if (away > 1000) track("samples_resync", { late_ms: away, dropped: 0 });
   });
@@ -3914,8 +4028,8 @@
       defaults: { dur: C.DEFAULTS.dur, fx: C.DEFAULTS.fx },
       durations: C.DURATIONS.slice(),
       effects: C.EFFECTS.slice(),
-      // iPhone : ton morceau ne se fond pas (coupe nette) ; les effets restent sur le sample
-      trackFades: canFade(),
+      // M3 : ton morceau passe par le moteur : fondus et effets partout, iPhone compris
+      trackFades: true,
     };
   }
   function setOptions(o) {
@@ -3940,9 +4054,7 @@
     var C = core();
     if (kind === "fx") return !!normOpt(value, C.EFFECTS);
     if (kind !== "dur") return false;
-    var d = normOpt(value, C.DURATIONS);
-    if (!d) return false;
-    return d === "none" || pref.sec !== "mix" || canFade();
+    return !!normOpt(value, C.DURATIONS); // M5 : plus rien de grisé sur iPhone
   }
   // Ce qu'on entend maintenant (aucune donnée privée), pour l'interface ; null si le lecteur est fermé.
   function current() {
@@ -3975,7 +4087,7 @@
     var next = nextOf(cur);
     if (!next) return null;
     var p = st.mix
-      ? planOf("out", cur, next)
+      ? planOf("out", cur, next, { voice: eng.cur && eng.cur.track ? eng.cur : null })
       : planOf("smp", cur, next, {
           voice: eng.cur && eng.cur.item === cur ? eng.cur : null,
         });
@@ -4003,7 +4115,9 @@
       b = barState(),
       was = isPlaying();
     if (!b || !b.T) return null;
-    var t = st.mix ? b.T - 6 : b.T - (nt ? nt.dur / 2 : 0) - 6;
+    var t = st.mix
+      ? b.T - Math.max(6, (nt ? nt.dur / 2 : 0) + 3) // un peu avant le début du passage
+      : b.T - (nt ? nt.dur / 2 : 0) - 6;
     setCause("try");
     seekTo(Math.max(0, t));
     // Mix : le saut dans ton morceau le lance déjà ; Samples en pause : on reprend à la nouvelle place
@@ -4611,6 +4725,14 @@
         yt: yt.time,
         phase: duo.phase,
         k: duo.k,
+        // ton morceau (M3) : préparé, en attente, source
+        track: {
+          prepared: !!duo.tv,
+          waiting: !!duo.inWait,
+          tx: !!(duo.item && useTx(duo.item)),
+          from: duo.from,
+          ended: !!st.ended,
+        },
         voices: eng.voices.map(function (v) {
           return {
             name: v.name,
@@ -4631,6 +4753,10 @@
       clockTick: clockTick,
       now: now,
       planOf: planOf,
+      trackSeg: trackSeg,
+      supports: supports,
+      getOptions: getOptions,
+      setOptions: setOptions,
       eng: eng,
       duo: duo,
       st: st,

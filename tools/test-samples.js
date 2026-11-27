@@ -337,6 +337,33 @@ function loadEngine(opts) {
   assert.strictEqual(E.events.filter((e) => e[0] === "samples_resync").length, 1, "B5 : pas de samples_resync à l'heure");
 }
 
+{
+  // M3 : ton morceau dans le moteur. Partie « morceau » : extrait préparé (tx) sinon flux du fichier R2.
+  const E = loadEngine();
+  const item = { src: "assets/music/streams/v1/album/01-titre é.m4a", at: 70, go: NaN, tb: 120, tx: ["album_01-titre_700", 66, 68] };
+  const ts = E.t.trackSeg(item);
+  assert.strictEqual(ts.track, true);
+  assert.strictEqual(ts.stream, undefined, "M3 : extrait préparé → tampon décodé");
+  assert.strictEqual(ts.s0, 70, "M3 : entrée = at");
+  assert.strictEqual(ts.s1, 130, "M3 : une minute");
+  assert(/\/streams\/samples\/t\/album_01-titre_700\.m4a$/.test(ts.url), "M3 : extrait sous streams/samples/t/");
+  item.noTx = Date.now() + 60000;
+  item.tx = ["album_01-titre_700", 66, 68];
+  const ts2 = E.t.trackSeg({ src: item.src, at: 70, go: 72, tx: null });
+  assert.strictEqual(ts2.stream, true, "M3 : sans extrait → flux");
+  assert.strictEqual(ts2.s0, 72, "M3 : entrée au moment fort (go)");
+  assert(ts2.url.startsWith("https://infra180-api.pages.dev/audio/assets/music/streams/v1/album/"), "M3 : fichier R2 du morceau");
+  assert(ts2.url.endsWith("01-titre%20%C3%A9.m4a"), "M3 : chemin encodé");
+  // plus rien de grisé sur iPhone (le volume de ton morceau passe par le moteur)
+  for (const d of E.t.getOptions().durations) assert.strictEqual(E.t.supports("dur", d), true, `M3 : durée ${d} grisée`);
+  assert.strictEqual(E.t.getOptions().trackFades, true, "M3 : fondus de ton morceau partout");
+  // ton morceau → sample : plafonné par la marge de son extrait (4 s après la minute)
+  const smp = { y: "aaaaaaaaaaa", s0: 10, s1: 20, at: 70, tb: 120, x: [["aaaaaaaaaaa_100-200", 6, 18]] };
+  E.t.pref.mixo = { dur: "auto", fx: "reverb" };
+  const p = E.t.planOf("out", { src: item.src, at: 70, tb: 120, tx: ["t", 66, 68] }, smp);
+  assert(p.dur <= 8 + 1e-9 && p.dur >= 2, `M3 : durée de sortie ${p.dur} hors marges`);
+}
+
 // ---------- bilan ----------
 if (errors.length) {
   console.error(`Samples checks FAILED (${errors.length}) :\n- ${errors.slice(0, 30).join("\n- ")}`);

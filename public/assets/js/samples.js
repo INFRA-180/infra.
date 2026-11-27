@@ -3959,7 +3959,8 @@
     return n(x) === n(y);
   }
   // Afficher les samples d'un morceau (avec les voix), pour le futur clic droit › Afficher les samples.
-  function openTrack(albumTitle, trackTitle) {
+  // startIndex (Crédits, 27/11) : le sample touché passe en premier ; sinon l'ordre d'entrée dans le morceau.
+  function openTrack(albumTitle, trackTitle, startIndex) {
     ensureCtx(); // encore dans le geste (clic droit › Afficher les samples)
     return load().then(function () {
       // Le grand lecteur écrit titres et albums en majuscules (« HE 4.0026 », « V-23Π56 ») : comparaison sans casse.
@@ -3971,9 +3972,11 @@
         return same(i.track, trackTitle);
       });
       if (!items.length) return false;
-      var sec = pref.sec;
-      pref.sec = "samples";
-      open(items, trackTitle, "track", a, true);
+      var sec = pref.sec,
+        start = items[startIndex] || null;
+      // une voix ne s'enchaîne pas avec le morceau (mode Samples) : elle s'écoute seule, comme dans Acapella
+      pref.sec = start && start.v ? "voix" : "samples";
+      open(items, trackTitle, "track", a, true, false, start);
       pref.sec = sec;
       return true;
     });

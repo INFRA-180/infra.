@@ -300,8 +300,8 @@
     );
     if (ctx.samples && ctx.samples.length) {
       items.push(["sample", ctx.samples.length > 1 ? "Afficher les samples" : "Afficher le sample", function () { goToSample(t); }]);
-      items.push(["credits", "Crédits", function (box) { showCredits(t, ctx.samples, box, ctx.back); }, "keep"]);
     }
+    items.push(["credits", "Crédits", function () { openCredits("track", t.slug, t.n); }]);
     if (album && !onPage(album.page)) items.push(["album", "Aller à l'album", function () { goTo(`${siteRoot()}${album.page}`); }]);
     items.push("-", ["dl", "Télécharger le morceau", function () { download(t); }]);
     if (album) items.push(["dl", "Télécharger l'album", function () { downloadAlbum(album.slug, album.title); }]);
@@ -310,9 +310,8 @@
   }
 
   function openTrackMenu(row, t, x, y, viaKeyboard, extraTop) {
-    const reopen = function () { openTrackMenu(row, t, x, y, viaKeyboard, extraTop); };
     const build = function (list) {
-      return (extraTop || []).concat(trackItems(t, row, { samples: list, back: reopen, current: Boolean(extraTop) }));
+      return (extraTop || []).concat(trackItems(t, row, { samples: list, current: Boolean(extraTop) }));
     };
     showMenu(t, row, x, y, viaKeyboard, build(null), x !== null);
     const shown = menu;
@@ -335,6 +334,7 @@
     ];
     if (!onPage(album.page)) items.push(["album", "Ouvrir l'album", function () { goTo(`${siteRoot()}${album.page}`); }]);
     if (withSamples) items.push(["sample", "Samples de l'album", function () { openSamplesAlbum(album.title); }]);
+    items.push(["credits", "Crédits de l'album", function () { openCredits("album", album.slug); }]);
     items.push("-", ["dl", "Télécharger l'album", function () { downloadAlbum(album.slug, album.title); }]);
     const url = `${siteRoot()}${album.page}`;
     items.push("-", ["share", "Partager…", function () { shareUrl(album.title, url, el); }], ["link", "Copier le lien", function () { copyLink(url); }]);
@@ -633,6 +633,27 @@
     });
     return samplesJs;
   }
+  // Crédits (V25 validée le 27/11/2026) : panneau chargé à la demande (credits.js).
+  let creditsJs = null;
+  function creditsApi() {
+    if (window.InfraCredits) return Promise.resolve(window.InfraCredits);
+    if (creditsJs) return creditsJs;
+    creditsJs = new Promise(function (resolve, reject) {
+      const s = document.createElement("script");
+      s.src = `${siteRoot()}assets/js/credits.js?v=${encodeURIComponent(window.INFRA_BUILD_TAG || "")}`;
+      s.async = true;
+      s.onload = function () { window.InfraCredits ? resolve(window.InfraCredits) : reject(new Error("credits")); };
+      s.onerror = function () { creditsJs = null; reject(new Error("credits")); };
+      document.head.appendChild(s);
+    });
+    return creditsJs;
+  }
+  function openCredits(kind, a, b) {
+    creditsApi()
+      .then(function (api) { return kind === "album" ? api.openAlbum(a) : api.openTrack(a, b); })
+      .then(function (ok) { if (!ok) say("Crédits indisponibles pour le moment"); })
+      .catch(function () { say(navigator.onLine === false ? "Crédits indisponibles hors ligne" : "Crédits indisponibles pour le moment"); });
+  }
   function samplesOf(t) {
     // Les samples de ce morceau (avec les voix), dans l'ordre où ils entrent ; [] si aucun ou hors ligne.
     const wait = new Promise(function (resolve) { window.setTimeout(function () { resolve(null); }, 2500); });
@@ -660,19 +681,6 @@
     return { slug: match[1], n: positionOf(favPath, match), title: title ? title.textContent.trim() : "Morceau",
       album: album ? album.textContent.trim() : "" };
   }
-  function showCredits(t, list, box, back) {
-    const lines = list.map(function (i) {
-      const who = [i.a, i.t].filter(Boolean).join(" — ");
-      const extra = [i.an, i.v ? "voix" : ""].filter(Boolean).join(" · ");
-      return `<div class="ta-credit"><b></b>${extra ? " <span></span>" : ""}</div>`.replace("<b></b>", "<b>" + esc(who) + "</b>")
-        .replace("<span></span>", "<span>" + esc(extra) + "</span>");
-    }).join("");
-    box.innerHTML = `<div class="ta-head"><b></b><span>Arrangé, mixé, masterisé et produit par INFRA.</span></div>` +
-      `<div class="ta-credit"><span>Samples</span></div><div class="ta-credits">${lines}</div>` +
-      `<button type="button" role="menuitem" data-ta-back>${ICON.back}<span>Retour</span></button>`;
-    box.querySelector(".ta-head b").textContent = t.title;
-    box.querySelector("[data-ta-back]").addEventListener("click", function (e) { e.stopPropagation(); (back || openNowPlayingMenu)(); });
-  }
   function esc(text) {
     return String(text == null ? "" : text).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
   }
@@ -696,8 +704,8 @@
       const items = [];
       if (list.length) {
         items.push(["sample", list.length > 1 ? "Aller vers les samples" : "Aller vers le sample", function () { goToSample(t); }]);
-        items.push(["credits", "Crédits", function (box) { showCredits(t, list, box, function () { openNowPlayingMenu(px, py); }); }, "keep"]);
       }
+      items.push(["credits", "Crédits", function () { openCredits("track", t.slug, t.n); }]);
       if (album) items.push(["album", "Aller à l'album", function () {
         const close = document.querySelector("#infraNowPlayingOverlay [data-now-playing-close]");
         if (close) close.click();

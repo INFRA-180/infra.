@@ -16,9 +16,9 @@
 
   // ---------- Réglages (à ajuster après validation de la maquette) ----------
   var CFG = {
-    defaults: { dur: "auto", fx: "fade" }, // T bis 2 et 10 : Auto + Fondu
-    // Auto = 4 mesures au tempo du morceau qui se termine, bornées (l'agent son peut aussi plafonner à
-    // ce que l'extrait permet ; l'événement samples:transition donne alors la vraie durée en secondes).
+    defaults: { dur: "4", fx: "fade" }, // T12 (27/11) : 4 mesures (l'ancien « Auto ») + Fondu
+    // Durée en mesures (T12) au tempo du morceau qui se termine ; l'agent son plafonne à ce que l'extrait
+    // permet et l'événement samples:transition donne la vraie durée en secondes (repli ci-dessous sinon).
     autoBars: 4,
     autoMin: 4,
     autoMax: 12,
@@ -36,11 +36,16 @@
     xfEndFade: 250 // ms : disparition du calque de transition à la fin
   };
   var SECS = ["samples", "mix", "voix"];
+  // T12 (validé, 27/11) : Aucune · 2 · 4 mesures ; 8 · 16 quand les extraits seront recoupés.
   var DUR = [
     ["none", "Aucune"],
-    ["5", "5 s"],
-    ["auto", "Auto"]
+    ["2", "2"],
+    ["4", "4"]
   ];
+  var DUR_LONG = { none: "Aucune", 2: "2 mesures", 4: "4 mesures" };
+  function durName(v) {
+    return DUR_LONG[v] || label(DUR, v);
+  }
   var FX = [
     ["fade", "Fondu"],
     ["reverb", "Reverb"],
@@ -172,7 +177,7 @@
       '<span class="sx-opts-ic">' +
       svg(FX_ICON[o.fx], 18) +
       "</span><span>" +
-      label(DUR, o.dur) +
+      durName(o.dur) +
       " · " +
       label(FX, o.fx) +
       '</span><span class="sx-opts-go" aria-hidden="true">›</span>'
@@ -243,7 +248,7 @@
       );
     };
     return (
-      '<div class="sxm-h">Durée</div><div class="sxm-dur" role="group" aria-label="Durée de transition">' +
+      '<div class="sxm-h">Durée en mesures</div><div class="sxm-dur" role="group" aria-label="Durée de transition, en mesures">' +
       dur +
       '</div><div class="sxm-h">Effet</div><div class="sxm-fx" role="group" aria-label="Effet de transition">' +
       fx +
@@ -483,12 +488,13 @@
   function durSeconds(d) {
     var dur = d.dur,
       n = Number(dur);
-    if (typeof dur === "number" || (dur !== "auto" && isFinite(n) && dur !== "" && dur !== null))
-      return Math.max(0, n || 0);
+    if (typeof dur === "number") return Math.max(0, n || 0);
     if (dur === "none") return 0;
-    var bpm = Number(d.fromBpm);
+    // choix en mesures (« 2 », « 4 ») si l'événement ne donne pas les secondes
+    var bars = dur === "2" ? 2 : CFG.autoBars,
+      bpm = Number(d.fromBpm);
     if (!(bpm > 0)) return CFG.autoNoBpm;
-    return Math.max(CFG.autoMin, Math.min(CFG.autoMax, (CFG.autoBars * 4 * 60) / bpm));
+    return Math.max(CFG.autoMin, Math.min(CFG.autoMax, (bars * 4 * 60) / bpm));
   }
   function coverUrl(c) {
     if (!c) return "";
@@ -568,7 +574,7 @@
     var o = opts(),
       icon = svg(FX_ICON[o.fx], 16),
       rows = ol.querySelectorAll("li"),
-      title = label(DUR, o.dur) + " · " + (FX_LONG[o.fx] || label(FX, o.fx));
+      title = durName(o.dur) + " · " + (FX_LONG[o.fx] || label(FX, o.fx));
     for (var k = 1; k < rows.length; k++) {
       if (!rows[k].querySelector(".smp-row") || !rows[k - 1].querySelector(".smp-row")) continue;
       var li = document.createElement("li");

@@ -139,31 +139,31 @@ vm.runInNewContext(fs.readFileSync(corePath, "utf8"), sandbox.window);
 assert(sandbox.window.InfraSamplesMixCore, "InfraSamplesMixCore doit être exposé en global");
 assert.strictEqual(typeof sandbox.window.InfraSamplesMixCore.transitionSeconds, "function");
 
-// durée
+// durée en mesures (T12, 27/11/2026) : Aucune · 2 · 4
+assert.deepStrictEqual(core.DURATIONS, ["none", "2", "4"], "T12 : Aucune · 2 · 4 mesures");
 near(core.transitionSeconds("none", 120), 0.03, "Aucune ≈ 0,03 s");
 near(core.transitionSeconds("none", 120, 0), 0.03, "Aucune n'est jamais plafonnée");
-near(core.transitionSeconds("5", 120), 5, "5 s");
-near(core.transitionSeconds("5"), 5, "5 s sans BPM");
-near(core.autoSeconds(120), 8, "Auto à 120 BPM = 4 mesures = 8 s");
-near(core.autoSeconds(160), 6, "Auto à 160 BPM = 6 s");
-near(core.autoSeconds(60), 12, "Auto bornée à 12 s");
-near(core.autoSeconds(300), 4, "Auto bornée à 4 s");
-near(core.autoSeconds(0), 8, "Auto sans BPM = 8 s");
-near(core.autoSeconds(undefined), 8, "Auto BPM inconnu = 8 s");
-near(core.transitionSeconds("auto", 160), 6, "Auto 160 BPM, marge 4 s");
-near(core.transitionSeconds("auto", 70), 8, "Auto 70 BPM (13,7 s → 12 s) plafonnée à 2 × 4 s");
-near(core.transitionSeconds("auto"), 8, "Auto sans BPM");
-near(core.transitionSeconds("5", 120, 2), 4, "5 s plafonnée par une marge de 2 s");
-near(core.transitionSeconds("auto", 80, 6), 12, "marge 6 s (extraits refaits) : Auto 80 BPM = 12 s");
-near(core.transitionSeconds(undefined, 120), 8, "défaut = Auto");
+near(core.transitionSeconds("2", 120), 4, "2 mesures à 120 BPM = 4 s");
+near(core.transitionSeconds("4", 120), 8, "4 mesures à 120 BPM = 8 s");
+near(core.transitionSeconds("4", 160), 6, "4 mesures à 160 BPM = 6 s");
+near(core.transitionSeconds("2", 160), 3, "2 mesures à 160 BPM = 3 s");
+near(core.transitionSeconds("2"), 4, "2 mesures sans BPM (compté à 120)");
+near(core.transitionSeconds("4", 70), 8, "4 mesures à 70 BPM (13,7 s) plafonnées à 2 × 4 s");
+near(core.transitionSeconds("2", 120, 1), 2, "2 mesures plafonnées par une marge de 1 s");
+near(core.transitionSeconds("4", 80, 6), 12, "marge 6 s (extraits refaits) : 4 mesures à 80 BPM = 12 s");
+near(core.transitionSeconds(undefined, 120), 8, "défaut = 4 mesures");
+near(core.transitionSeconds("auto", 120), 8, "ancien « Auto » retenu → 4 mesures");
+near(core.transitionSeconds("5", 120), 4, "ancien « 5 s » retenu → 2 mesures");
+near(core.barSeconds(1, 60), 4, "1 mesure à 60 BPM = 4 s");
+near(core.autoSeconds(120), 8, "autoSeconds (ancienne règle) gardée");
 for (const bpm of [0, 40, 63, 90, 120, 158, 400]) {
   for (const choice of core.DURATIONS) {
     const d = core.transitionSeconds(choice, bpm);
     assert(d >= core.NONE_S && d <= 2 * core.EXTRACT_MARGIN_S, `${choice} @ ${bpm} : ${d} hors bornes`);
   }
 }
-near(core.transitionFor("sample_to_track", "5", 120), 0.35, "sample → morceau reste 0,35 s");
-near(core.transitionFor("track_to_sample", "5", 120), 5, "morceau → sample suit le réglage");
+near(core.transitionFor("sample_to_track", "4", 120), 0.35, "sample → morceau reste 0,35 s");
+near(core.transitionFor("track_to_sample", "2", 120), 4, "morceau → sample suit le réglage");
 near(core.transitionFor("sample_to_sample", "none", 120), 0.03, "sample → sample suit le réglage");
 
 // Hasard qui écoute
@@ -180,7 +180,7 @@ assert.strictEqual(core.resolveEffect("listen", 90, 120), "echo");
 assert.strictEqual(core.resolveEffect("reverb", 90, 120), "reverb");
 assert.strictEqual(core.resolveEffect("inconnu", 90, 120), "fade", "effet inconnu → défaut");
 assert.deepStrictEqual(core.EFFECTS, ["fade", "reverb", "echo", "bass", "listen"]);
-assert.deepStrictEqual({ ...core.DEFAULTS }, { dur: "auto", fx: "fade" });
+assert.deepStrictEqual({ ...core.DEFAULTS }, { dur: "4", fx: "fade" });
 
 // fondu à puissance égale
 for (let i = 0; i <= 100; i += 1) {
@@ -284,7 +284,9 @@ function loadEngine(opts) {
       events.push([name, data]);
     },
     location: { origin: "http://localhost" },
-    InfraSamplesMixCore: core
+    InfraSamplesMixCore: core,
+    // constructeur présent (les extraits sont « jouables ») ; aucun contexte n'est créé par ces tests
+    AudioContext: function () {}
   };
   const sandbox = {
     window: win,
@@ -359,9 +361,55 @@ function loadEngine(opts) {
   assert.strictEqual(E.t.getOptions().trackFades, true, "M3 : fondus de ton morceau partout");
   // ton morceau → sample : plafonné par la marge de son extrait (4 s après la minute)
   const smp = { y: "aaaaaaaaaaa", s0: 10, s1: 20, at: 70, tb: 120, x: [["aaaaaaaaaaa_100-200", 6, 18]] };
-  E.t.pref.mixo = { dur: "auto", fx: "reverb" };
+  E.t.pref.mixo = { dur: "4", fx: "reverb" };
   const p = E.t.planOf("out", { src: item.src, at: 70, tb: 120, tx: ["t", 66, 68] }, smp);
   assert(p.dur <= 8 + 1e-9 && p.dur >= 2, `M3 : durée de sortie ${p.dur} hors marges`);
+}
+{
+  // M5 : durée et effet du Mix à chaque passage qui s'y prête ; sample → morceau reste net.
+  const E = loadEngine();
+  const mk = (y, s0, s1, x0, xd, extra) => Object.assign({ y, s0, s1, at: 10, tb: 120, x: [[y + "_1-2", x0, xd]] }, extra || {});
+  const a = mk("aaaaaaaaaaa", 10, 30, 6, 28, { bpm: [120, 120] });
+  const b = mk("bbbbbbbbbbb", 50, 70, 46, 28, { bpm: [120, 120] });
+  // deux samples d'un même morceau joués à la suite (parties) : marges 4 s des deux côtés
+  const item = Object.assign({}, a, {
+    chain: [a, b],
+    segs: [
+      { y: a.y, s0: 10, s1: 30, ci: 0, from: 0, x: a.x[0] },
+      { y: b.y, s0: 50, s1: 70, ci: 1, from: 20, x: b.x[0] }
+    ]
+  });
+  E.t.pref.mixo = { dur: "4", fx: "echo" };
+  let p = E.t.planOf("seg", item, item, { k: 1 });
+  assert.strictEqual(p.fx, "echo", "M5 : effet aussi entre deux samples d'un même morceau");
+  near(p.dur, 8, "M5 : 4 mesures à 120 BPM entre deux parties (marges 4 s)");
+  E.t.pref.mixo = { dur: "2", fx: "bass" };
+  p = E.t.planOf("seg", item, item, { k: 1 });
+  near(p.dur, 4, "M5 : 2 mesures entre deux parties");
+  assert.strictEqual(p.fx, "bass");
+  E.t.pref.mixo = { dur: "none", fx: "reverb" };
+  p = E.t.planOf("seg", item, item, { k: 1 });
+  assert.strictEqual(p.fx, "cut", "M5 : Aucune = coupe");
+  // parties qui se suivent dans le même son : jointure sans couture, jamais d'effet
+  const c = mk("ccccccccccc", 10, 20, 6, 30);
+  const cont = Object.assign({}, c, {
+    chain: [c],
+    segs: [
+      { y: c.y, s0: 10, s1: 20, ci: 0, from: 0, x: c.x[0] },
+      { y: c.y, s0: 20, s1: 30, ci: 0, from: 10, x: ["ccccccccccc_2-3", 16, 18] }
+    ]
+  });
+  E.t.pref.mixo = { dur: "4", fx: "reverb" };
+  p = E.t.planOf("seg", cont, cont, { k: 1 });
+  assert(p.dur < 0.2 && p.fx === "fade", "M5 : parties contiguës sans effet");
+  // sample → ton morceau : toujours 0,35 s, sans effet ; ancien réglage retenu « auto » → 4 mesures
+  E.t.pref.mixo = { dur: "auto", fx: "reverb" };
+  p = E.t.planOf("in", a, a, { dur: 0.35 });
+  assert(Math.abs(p.dur - 0.35) < 1e-9 && p.fx === "fade", "M5 : sample → morceau net");
+  assert.strictEqual(E.t.getOptions().dur, "4", "M5 : ancien « Auto » lu comme 4 mesures");
+  E.t.pref.mixo = { dur: "5", fx: "fade" };
+  assert.strictEqual(E.t.getOptions().dur, "2", "M5 : ancien « 5 s » lu comme 2 mesures");
+  assert.deepStrictEqual(E.t.getOptions().durations, ["none", "2", "4"]);
 }
 
 // ---------- bilan ----------

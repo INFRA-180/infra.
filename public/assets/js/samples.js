@@ -2793,19 +2793,20 @@
     });
   }
 
-  // ---------- Options du Mix (T bis, validé par INFRA le 20/11) ----------
-  // Durée : Aucune · 5 s · Auto (4 mesures) ; effet : Fondu (défaut) · Reverb · Écho · Basses · Hasard
-  // qui écoute. Pour sample → sample (Samples, A cappella) et morceau → sample (Mix) ; sample → morceau
-  // reste à XF s, « pile et fort ». Les effets ne touchent que la sortie du sample (ton morceau n'y passe
-  // pas). Les règles (durée, hasard) viennent de samples-mix-core.js s'il est chargé, sinon du repli.
+  // ---------- Options du Mix (T bis, validé par INFRA le 20/11 ; T12 le 27/11) ----------
+  // Durée en mesures : Aucune · 2 · 4 (défaut 4, l'ancien « Auto ») ; effet : Fondu (défaut) · Reverb ·
+  // Écho · Basses · Hasard qui écoute. Pour sample → sample, parties d'un même sample et ton morceau →
+  // sample suivant (M5) ; sample → morceau reste à XF s, « pile et fort ». Depuis M3, l'effet touche aussi
+  // ton morceau quand il sort. Les règles (durée, hasard) viennent de samples-mix-core.js s'il est chargé,
+  // sinon du repli.
   var CORE0 = {
-    DURATIONS: ["none", "5", "auto"],
+    DURATIONS: ["none", "2", "4"],
     EFFECTS: ["fade", "reverb", "echo", "bass", "listen"],
-    DEFAULTS: { dur: "auto", fx: "fade" },
+    DEFAULTS: { dur: "4", fx: "fade" },
     NONE_S: 0.03,
     transitionSeconds: function (c, bpm, m) {
       if (c === "none") return 0.03;
-      var w = c === "5" ? 5 : bpm > 0 ? clamp(960 / bpm, 4, 12) : 8;
+      var w = ((c === "2" ? 2 : 4) * 240) / (bpm > 0 ? bpm : 120);
       return Math.max(0.03, Math.min(w, 2 * (m >= 0 ? m : 4)));
     },
     resolveEffect: function (fx, a, b) {
@@ -2821,7 +2822,12 @@
   var ALIAS = {
     aucune: "none",
     0: "none",
-    "5s": "5",
+    // T12 (27/11) : durées en mesures ; anciens réglages retenus sur l'appareil
+    5: "2",
+    "5s": "2",
+    auto: "4",
+    "2mesures": "2",
+    "4mesures": "4",
     fondu: "fade",
     basses: "bass",
     filtre: "bass",
@@ -2860,8 +2866,11 @@
     if (v && v.len) m = Math.min(m, v.x0 + v.len - sg.s1);
     return Math.max(0, m);
   }
-  var MIXED = { smp: 1, out: 1 },
-    FXOUT = { smp: 1, out: 1 }, // effet aussi sur le son qui sort (M3 : ton morceau compris)
+  // M5 (27/11) : durée et effet du Mix à chaque passage qui s'y prête : sample → sample (smp), ton morceau
+  // → sample suivant (out), parties d'un même sample ou samples d'un même morceau (seg). Sample → ton
+  // morceau (in) reste net (0,35 s, T bis 3) ; saut, glisser, reprise : fondus courts sans effet.
+  var MIXED = { smp: 1, out: 1, seg: 1 },
+    FXOUT = { smp: 1, out: 1, seg: 1 }, // effet aussi sur le son qui sort (M3 : ton morceau compris)
     EMIT = { smp: 1, out: 1, in: 1, seg: 1, skip: 1 },
     planSeq = 0;
   // Durée et effet réellement joués pour un passage. kind : « smp » (sample → sample), « out » (ton
@@ -2878,6 +2887,7 @@
     if (MIXED[kind]) {
       var eIn = !!to && useEng(to),
         eOut = false,
+        seamless = false,
         m = 60;
       if (kind === "seg") {
         // parties d'un même sample (ou deux samples d'un même morceau) : marges des deux extraits
@@ -2889,6 +2899,8 @@
         tIn = smpTempo(from.chain ? from.chain[b ? b.ci : 0] : from);
         eOut = eIn = useEng(from);
         m = eIn ? Math.min(marginAfter(a, o.voice), marginBefore(b)) : SEGXF / 2;
+        // deux parties qui se suivent dans le même son : même musique, pas de passage à faire entendre
+        if (a && b && a.y === b.y && Math.abs(b.s0 - a.s1) < 0.3) seamless = true;
       } else {
         tOut = kind === "out" ? Number(from && from.tb) || 0 : smpTempo(from);
         tIn = smpTempo(to);
@@ -2915,6 +2927,10 @@
         dur = C.NONE_S || 0.03;
         fx = "cut";
       } else if (fx !== "fade" && !(kind === "smp" ? eOut : eIn || eOut)) fx = "fade";
+      if (seamless) {
+        dur = 0.12; // jointure sans couture : la musique continue, rien à faire entendre
+        fx = "fade";
+      }
     }
     var when = o.when != null ? o.when : now();
     return {
@@ -4753,6 +4769,7 @@
       clockTick: clockTick,
       now: now,
       planOf: planOf,
+      seekTo: seekTo,
       trackSeg: trackSeg,
       supports: supports,
       getOptions: getOptions,

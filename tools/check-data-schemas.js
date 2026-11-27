@@ -123,7 +123,8 @@ if (samples) {
         if (!Array.isArray(it.x) || it.x.length !== parts.length) fail(`${where}.x : un extrait par passage attendu`);
         else
           it.x.forEach((x, n) => {
-            if (!Array.isArray(x) || !/^[\w-]{11}_\d+-\d+$/.test(String(x[0])) || !num(x[1]) || !(num(x[2]) && x[2] > 0)) {
+            // 27/11/2026 (D1) : « _v2 » = extrait refait sous un nouveau nom (R2 n'écrase jamais un extrait publié)
+            if (!Array.isArray(x) || !/^[\w-]{11}_\d+-\d+(_v\d+)?$/.test(String(x[0])) || !num(x[1]) || !(num(x[2]) && x[2] > 0)) {
               fail(`${where}.x[${n}] : [nom, début, durée] attendu`);
             }
           });

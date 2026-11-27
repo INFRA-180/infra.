@@ -24,6 +24,7 @@ a de **beaux Crédits** (qui, où, quand, samples écoutables, sons, effets).
 | R7 | Connexions | fait : liens de téléchargement à jour (v476), ménage R2 protège les samples (`_private` `e8ce2e0`), délai des extraits (v476) |
 | R8 | « Les 20 raps, tu les classes en voix » (23/11) | **fait v479** |
 | R9 | Extraits : « raccourcir ou passer, le plus simple » (23/11) | **passé** (rien changé) ; à revoir si une plainte arrive |
+| R10 | iPhone, appui long sur un morceau : « animation comme quoi le truc se détache » + « bug de sélection » (27/11) | **en ligne v487** (`701c7ff`) : décollage façon Apple, faux « sélectionné » supprimé ; vérifié simulateur iPhone. Fin du message d'INFRA coupée (« Quand je reste appuyé sur… ») → à compléter |
 
 **Reporté** : adresse du Worker en une seule source (9 endroits, gain faible, risque) ; 49 samples sans artiste ;
 faux positifs Spotify (5, à retirer de la playlist avec la connexion d'INFRA) ; ALEXANDRIA + D 2.0141 n°8 sans projet relu (à relire avec `inventaire.py` + `credits_data.py`, puis `build-credits.py`) ; image des plugins (question ouverte) ; page « Retrait sur demande » (non demandée).

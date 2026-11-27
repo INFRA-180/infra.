@@ -1,7 +1,7 @@
 ---
 date: 2026-11-23
 type: LOT
-état: en cours — lots 1, 2, 5, 6 en ligne ; maquette V25 à valider
+état: fait — Crédits en ligne v480 (27/11)
 agent: Claude (session « Crédits et clics droits »)
 ---
 
@@ -15,7 +15,7 @@ a de **beaux Crédits** (qui, où, quand, samples écoutables, sons, effets).
 
 | # | Demande d'INFRA (23/11) | État |
 |---|---|---|
-| R1 | Section / page **Crédits** belle (morceau et album) | maquette **V25** prête (`DOCS/maquettes/MAQUETTE_V25_20261123.md`), attend l'avis d'INFRA |
+| R1 | Section / page **Crédits** belle (morceau et album) | V25 **validée** (27/11 « Go, reporte V25 ») → **en ligne v480** (`6dbf2d8`) : `public/assets/js/credits.js`, `data/credits.json` (outil `_private/tools/credits/build-credits.py`) |
 | R2 | **Chaque clic droit fait quelque chose** | **en ligne v477** (`6c64169`) |
 | R3 | Clic droit musique → sample ; album → pareil ; **playlists** (INFRA 23/11 : « important dans tout le site ») | **en ligne v477** |
 | R4 | Politique des samples | fait : 23 raps → voix, 29 voix au vrai artiste, 2 inversés (**v479**, `e3e2c1a`) ; extraits : « le plus simple » → gardés tels quels (risque noté ci-dessous) |
@@ -26,8 +26,7 @@ a de **beaux Crédits** (qui, où, quand, samples écoutables, sons, effets).
 | R9 | Extraits : « raccourcir ou passer, le plus simple » (23/11) | **passé** (rien changé) ; à revoir si une plainte arrive |
 
 **Reporté** : adresse du Worker en une seule source (9 endroits, gain faible, risque) ; 49 samples sans artiste ;
-faux positifs Spotify (5, à retirer de la playlist avec la connexion d'INFRA) ; outil `build-credits` → après
-validation V25 ; page « Retrait sur demande » (non demandée).
+faux positifs Spotify (5, à retirer de la playlist avec la connexion d'INFRA) ; ALEXANDRIA + D 2.0141 n°8 sans projet relu (à relire avec `inventaire.py` + `credits_data.py`, puis `build-credits.py`) ; image des plugins (question ouverte) ; page « Retrait sur demande » (non demandée).
 
 ## Constats vérifiés par l'agent principal
 

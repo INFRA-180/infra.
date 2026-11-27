@@ -1916,6 +1916,7 @@
         h = eng.hold,
         xk = -1,
         xt = 0;
+      if (st.ended) return { S: 0, T: XT, t: XT }; // M7 : fin de la liste, barre pleine
       if (v && v.item === cur) {
         xk = v.k;
         xt = ytNow(v);
@@ -2675,8 +2676,9 @@
     plan.when = plan.want = Math.max(eng.ctx.currentTime + 0.02, ctxAt(v, start));
     play(next, false, true, 0, plan);
   }
-  // M7 : fin de la liste : ton morceau s'éteint en 3 s par son gain (iPhone compris), puis le lecteur
-  // s'arrête proprement ; lecture repart du début de la liste.
+  // M7 : fin de la liste : le dernier son (ton morceau dans le Mix) s'éteint en 3 s par son gain (iPhone
+  // compris), puis le lecteur s'arrête proprement : barre pleine, bouton « lecture » ; lecture repart du
+  // début de la liste. Rien ne repart tout seul.
   function endOfList(v, T) {
     var c = eng.ctx,
       t = Math.max(c ? c.currentTime : 0, T || 0),
@@ -3916,8 +3918,8 @@
     var next = nextOf(v.item),
       t = eng.ctx.currentTime;
     if (!next) {
-      if (eng.cur === v)
-        fadeOutVoice(v, Math.max(t, ctxAt(v, v.sg.s1 - 0.5)), 1);
+      // M7 : fin de la liste (A cappella) : même fin propre que le Mix, lecture repart du début
+      if (eng.cur === v) endOfList(v, Math.max(t, ctxAt(v, v.sg.s1 - 0.5)));
       return;
     }
     if (!useEng(next)) {

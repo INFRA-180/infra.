@@ -2660,7 +2660,7 @@
     else endOfList(eng.cur, eng.ctx ? eng.ctx.currentTime : 0);
   }
   // Ton morceau pendant sa minute : la sortie vers le sample suivant (durée et effet du Mix, centrée sur la
-  // fin de la minute) est programmée LOOK s avant sur l'horloge audio.
+  // fin de la minute) est programmée look() s avant sur l'horloge audio.
   function trackTick(v) {
     if (duo.phase !== "track" || duo.outArmed || eng.paused || eng.cur !== v) return;
     var cur = st.list[st.pos],
@@ -2669,7 +2669,7 @@
       end = duo.from + TRACK,
       plan = next ? planOf("out", cur, next, { voice: v, cause: "auto" }) : null,
       start = next ? end - plan.dur / 2 : end;
-    if (start - tp > LOOK) return;
+    if (start - tp > look()) return;
     duo.outArmed = true;
     if (!next) return endOfList(v, ctxAt(v, end));
     plan.when = plan.want = Math.max(eng.ctx.currentTime + 0.02, ctxAt(v, start));
@@ -3271,7 +3271,8 @@
     SMPXF = 2, // fondu croisé entre deux samples
     MAXBUF = 4, // extraits décodés gardés en mémoire (dont la minute de ton morceau, M3)
     POOL = 4, // lecteurs <audio> pour la lecture en flux (dont ton morceau, M3), tous débloqués dans le geste
-    LOOK = 1.2; // avance (s) avec laquelle une transition est programmée sur l'horloge audio
+    LOOK = 1.2, // avance (s) avec laquelle une transition est programmée sur l'horloge audio
+    LOOK_HIDDEN = 4.5; // page cachée (écran verrouillé, autre app) : minuteurs ralentis, on programme plus tôt
   var eng = {
     ctx: null,
     bufs: {},
@@ -3957,7 +3958,7 @@
     if (st.mix) {
       if (duo.phase !== "sample") return;
       if (!last) {
-        if (!eng.armed && sg.s1 - tp < segDur(v) / 2 + LOOK) {
+        if (!eng.armed && sg.s1 - tp < segDur(v) / 2 + look()) {
           eng.armed = true;
           nextSeg();
         }
@@ -3969,13 +3970,13 @@
         left = T - eng.ctx.currentTime;
       if (left < PRELEAD) prepTrack(T);
       if (left < 2.5) fixTv(T);
-      if (left < LOOK) mixIn(T);
+      if (left < look()) mixIn(T);
       return;
     }
     if (eng.armed) return;
     if (!last) {
       var sd = segDur(v);
-      if (sg.s1 - tp < sd / 2 + LOOK) {
+      if (sg.s1 - tp < sd / 2 + look()) {
         eng.armed = true;
         var nk = v.k + 1,
           ns = segsOf(v.item)[nk],
@@ -3987,7 +3988,13 @@
       return;
     }
     // dernier passage : la transition est armée LOOK s avant son début (au plus 6 s avant la jointure)
-    if (sg.s1 - tp < 6 + LOOK && sg.s1 - tp < autoDur(v) / 2 + LOOK) engAuto(v);
+    if (sg.s1 - tp < 6 + look() && sg.s1 - tp < autoDur(v) / 2 + look()) engAuto(v);
+  }
+  // M6 : avance de programmation des passages. Page cachée (iPhone verrouillé, autre app, onglet en
+  // arrière-plan) : les minuteurs ne passent plus que toutes les secondes (ou moins) ; les passages sont
+  // alors posés plus tôt sur l'horloge audio, qui, elle, continue de tourner.
+  function look() {
+    return document.visibilityState === "hidden" ? LOOK_HIDDEN : LOOK;
   }
   // Durée du prochain passage entre deux parties (pour l'armer à temps).
   function segDur(v) {
@@ -4000,6 +4007,8 @@
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") {
       hiddenAt = Date.now();
+      // M6 : avant que les minuteurs ralentissent, le prochain passage proche est posé sur l'horloge audio
+      if (sheet && !sheet.hidden) engTick();
       return;
     }
     if (document.visibilityState !== "visible" || !eng.ctx || !sheet || sheet.hidden)

@@ -222,6 +222,22 @@ const samplesJs = fs.readFileSync(path.join(pub, "assets/js/samples.js"), "utf8"
 for (const m of samplesJs.matchAll(/track\(\s*"(samples_[a-z_]+)"/g)) {
   assert(raw.has(m[1]) && direct.has(m[1]), `télémétrie : ${m[1]} envoyé par samples.js mais jeté`);
 }
+// M1 (27/11/2026) : samples_pass, samples_lock, samples_resync envoient seulement des champs gardés
+// (sinon le journal les perd en silence, comme fx et dur_s avant le 20/11).
+const keptFields = new Set([...core.TELEMETRY.strings, ...core.TELEMETRY.numbers, ...core.TELEMETRY.booleans, "mode", "state", "delta_ms"]);
+for (const ev of ["samples_pass", "samples_lock", "samples_resync"]) {
+  assert(core.TELEMETRY.events.includes(ev), `télémétrie : ${ev} absent du cœur du Mix`);
+  const calls = [...samplesJs.matchAll(new RegExp(`track\\(\\s*"${ev}",\\s*\\{([\\s\\S]*?)\\}\\);`, "g"))];
+  if (ev === "samples_pass") assert(calls.length >= 1, "samples_pass doit être envoyé par samples.js");
+  for (const c of calls) {
+    for (const k of c[1].matchAll(/^\s*([a-z_]+):/gm)) {
+      assert(keptFields.has(k[1]), `télémétrie : ${ev}.${k[1]} n'est dans aucune liste gardée`);
+    }
+  }
+}
+for (const f of ["kind", "cause", "buf", "ctx", "late_ms", "gap_ms", "vis"]) {
+  assert(keptFields.has(f), `samples_pass : champ ${f} attendu dans TELEMETRY`);
+}
 
 // ---------- bilan ----------
 if (errors.length) {

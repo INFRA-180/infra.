@@ -1407,6 +1407,7 @@
         },
       },
       {
+        yt: true,
         set: function (v) {
           sendTo(nf, "setVolume", [Math.round(v * 100)]);
         },
@@ -1473,7 +1474,10 @@
       st.pos = st.list.indexOf(first);
       paint(true);
       paintNow();
-    } else play(first, true);
+    } else {
+      setCause("open");
+      play(first, true);
+    }
     clearInterval(ticker);
     ticker = setInterval(paintBar, 250);
     clearInterval(eng.tick);
@@ -1541,6 +1545,7 @@
         useE || !fade
           ? null
           : {
+              yt: true,
               set: function (v) {
                 setVideoVolume(v * 100);
               },
@@ -1611,6 +1616,7 @@
     paint(fresh);
   }
   function step(d) {
+    setCause(d > 0 ? "skip" : "prev");
     var list = shownList();
     var cur = list.indexOf(st.list[st.pos]);
     var next = list[cur + d];
@@ -1619,6 +1625,7 @@
   }
   // Précédent : revient au début du son en cours s'il a joué plus de 3 s, sinon son précédent.
   function prev() {
+    setCause("prev");
     var b = barState();
     if (b && b.t > 3) return seekTo(0);
     step(-1);
@@ -2053,6 +2060,7 @@
       if (st.drag == null) return;
       var t = st.drag;
       st.drag = null;
+      setCause("seek");
       seekTo(t);
       track("samples_seek", { mode: st.mix ? "mix" : "samples" });
     }
@@ -2066,6 +2074,7 @@
       if (!b || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
       e.preventDefault();
       e.stopPropagation();
+      setCause("seek");
       seekTo(clamp(b.t + (e.key === "ArrowRight" ? 5 : -5), 0, b.T));
     });
   }
@@ -2116,6 +2125,7 @@
     paintBar();
   }
   function toggle() {
+    setCause("resume");
     if (st.cued) return play(st.list[st.pos], true);
     if (trackPhase()) {
       var a = audioEl();
@@ -2505,7 +2515,7 @@
     if (c) c.style.transitionDuration = "0.5s";
     // sample → morceau : toujours « pile et fort » (XF s, sans effet), quel que soit le réglage du Mix
     var wait = pre ? 0 : 1.3,
-      plan = planOf("in", i, i, { dur: XF, when: now() + wait });
+      plan = planOf("in", i, i, { dur: XF, when: now() + wait, pre: pre });
     var open = function () {
       var el = audioEl();
       if (!el) return;
@@ -2530,7 +2540,7 @@
       } else {
         el.muted = false;
         if (!eng.on) send("pauseVideo");
-        transition(out, null, plan);
+        transition(out, { site: true }, plan);
       }
       paintNow();
     };
@@ -2765,10 +2775,14 @@
         fx = "cut";
       } else if (fx !== "fade" && !(kind === "smp" ? eOut : eIn)) fx = "fade";
     }
+    var when = o.when != null ? o.when : now();
     return {
       id: ++planSeq,
       kind: kind,
-      when: o.when != null ? o.when : now(),
+      when: when,
+      want: when, // instant prévu (télémétrie : retard réel du nouveau son)
+      cause: o.cause || null, // auto, skip, prev, seek… (posée par le geste, sinon « auto »)
+      pre: !!o.pre,
       dur: dur,
       fx: fx,
       picked: MIXED[kind] ? opt.fx : "fade",
@@ -2806,7 +2820,71 @@
       else if (plan.kind === "out") applyFx(to.v, plan, "in", T);
     } else if (to && to.set) clockRamp(to.set, 0, 1, T, D);
     emit(plan, T);
+    passLog(plan, T, to);
     return plan;
+  }
+  // ---------- Télémétrie des passages (M1, 27/11/2026) ----------
+  // Un « samples_pass » par passage, envoyé quand le nouveau son part vraiment (lecture en flux : à son
+  // « playing ») : type, cause (geste ou auto), effet et durée joués, retard sur l'instant prévu, silence
+  // entendu, son préparé ou non, source (tampon, flux, YouTube, lecteur du site), état du contexte audio,
+  // page visible. Aucun titre, aucune adresse. Au plus PASS_MAX par page, pour ne pas chasser les autres
+  // événements du journal (48 par session).
+  var userCause = { c: "", at: 0 },
+    passN = 0,
+    PASS_MAX = 30;
+  function setCause(c) {
+    userCause.c = c;
+    userCause.at = Date.now();
+  }
+  function takeCause() {
+    var c = Date.now() - userCause.at < 4000 ? userCause.c : "";
+    userCause.c = "";
+    return c;
+  }
+  function round1(x) {
+    return Math.round((Number(x) || 0) * 10) / 10;
+  }
+  // Une autre voix s'entend-elle encore à l'instant t (horloge audio) ?
+  function othersAudible(v, t) {
+    return eng.voices.some(function (o) {
+      return o !== v && !o.prep && gainAt(o, t) > 0.05;
+    });
+  }
+  function passLog(plan, T, to) {
+    if (plan.logged) return;
+    plan.logged = true;
+    if (!plan.cause) plan.cause = takeCause() || "auto";
+    if (passN >= PASS_MAX) return;
+    var v = to && to.v,
+      buf = v ? (v.el ? "stream" : "buf") : to && to.yt ? "yt" : to && (to.set || to.site) ? "site" : "none";
+    var send = function (start) {
+      passN++;
+      var c = eng.ctx,
+        gap = 0;
+      if (c && eng.lastEnd > 0 && !othersAudible(v, start)) gap = Math.max(0, start - eng.lastEnd);
+      track("samples_pass", {
+        kind: plan.kind,
+        cause: plan.cause,
+        fx: plan.fx,
+        dur_s: round1(plan.dur),
+        late_ms: Math.round(Math.max(0, start - plan.want) * 1000),
+        gap_ms: Math.round(gap * 1000),
+        pre: !!plan.pre,
+        buf: buf,
+        ctx: c ? c.state : "none",
+        vis: document.visibilityState !== "hidden",
+      });
+    };
+    if (v && v.el && !v.live)
+      onLive(v, function () {
+        send(Math.max(T, v.liveT || 0));
+      });
+    else send(T);
+  }
+  // Voix en flux : fn quand le son arrive vraiment (« playing »), une seule fois.
+  function onLive(v, fn) {
+    if (v.live) return fn();
+    (v.liveCbs = v.liveCbs || []).push(fn);
   }
   // Événements DOM « samples:transition » (detail : phase start | end, fx joué, dur, BPM, pochette).
   var evEnd = null;
@@ -3034,6 +3112,7 @@
     armed: false,
     gen: 0,
     tick: 0,
+    lastEnd: 0, // instant (horloge audio) où le dernier son entendu s'est tu
   };
   function noop() {}
   function audioCtor() {
@@ -3324,6 +3403,13 @@
     var tStart = Date.now();
     el.onplaying = function () {
       el.onplaying = null;
+      v.live = true;
+      v.liveT = c.currentTime;
+      (v.liveCbs || []).splice(0).forEach(function (fn) {
+        try {
+          fn();
+        } catch (_e) {}
+      });
       var ms = Date.now() - tStart;
       if (ms > 1500)
         track("samples_audio_slow", { delta_ms: ms, mode: st.mix ? "mix" : "samples" });
@@ -3360,6 +3446,7 @@
       len: buf.duration,
       off: clamp(ytFrom - sg.x[1], 0, Math.max(0, buf.duration - 0.05)),
       at: when,
+      live: true, // tampon décodé : le son part à l'instant prévu
       gv: { from: 0, to: 0, when: 0, dur: 0.02 }, // muette jusqu'à son départ
     };
     s.onended = function () {
@@ -3380,6 +3467,7 @@
       if (r && r.to === 0 && r.when + r.dur <= when + dur) return; // déjà plus court
     }
     v.done = true;
+    if (gainAt(v, when) > 0.05) eng.lastEnd = Math.max(eng.lastEnd || 0, when + Math.max(0.02, dur));
     setCurve(v, gainAt(v, when), 0, when, dur);
     try {
       v.s.stop(when + Math.max(0.02, dur) + 0.05);
@@ -3416,6 +3504,7 @@
     eng.hold = null;
     ensureCtx();
     var ready = eng.bufs[sg.x[0]] && eng.bufs[sg.x[0]].buf;
+    if (ready) plan.pre = true; // extrait déjà en mémoire : départ à l'instant prévu
     if (!ready && !noStream && eng.ctx && eng.ctx.state === "running") {
       var at0 = Math.max(eng.ctx.currentTime + 0.02, plan.when || 0);
       // Rapport terrain 20/11 (§ 3a, bug 3) : un refus passager ne bascule plus l'extrait sur YouTube
@@ -3488,6 +3577,7 @@
     item.noX = item.xFails >= 2 ? Infinity : Date.now() + 120000;
     engStop(0.1);
     if (!sheet || sheet.hidden || st.list[st.pos] !== item) return;
+    setCause("fail");
     play(item, true, false, st.mix ? segsOf(item)[k].from : 0);
   }
   function engPause() {
@@ -3737,6 +3827,7 @@
       was = isPlaying();
     if (!b || !b.T) return null;
     var t = st.mix ? b.T - 6 : b.T - (nt ? nt.dur / 2 : 0) - 6;
+    setCause("try");
     seekTo(Math.max(0, t));
     // Mix : le saut dans ton morceau le lance déjà ; Samples en pause : on reprend à la nouvelle place
     if (!st.mix && !was) toggle();
@@ -3826,7 +3917,10 @@
       return close();
     if (!t.closest) return;
     var row = t.closest("[data-smp-i]");
-    if (row) return play(st.list[Number(row.getAttribute("data-smp-i"))]);
+    if (row) {
+      setCause("pick");
+      return play(st.list[Number(row.getAttribute("data-smp-i"))]);
+    }
     if (t.closest("[data-smp-prev]")) return prev();
     if (t.closest("[data-smp-next]")) return step(1);
     if (t.closest("[data-smp-pp]")) return toggle();
@@ -3840,6 +3934,7 @@
       if (!cj) return;
       var to = jump.getAttribute("data-smp-jump");
       track("samples_jump", { to: to === "1" ? "track" : "sample" });
+      setCause("jump");
       if (to === "1") return seekTo(cj.S || Math.max(1, cj.s1 - cj.s0));
       var ci = Number(to.slice(1)) || 0,
         first = (cj.segs || []).filter(function (sg) {

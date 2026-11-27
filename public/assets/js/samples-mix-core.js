@@ -38,11 +38,15 @@
       "samples_mix_fx", // { fx, dur_s, bpm_gap }
       "samples_mix_try", // { fx, dur_s }
       "samples_tab_swipe", // { tab, direction }
-      "samples_voice_mark" // { at }
+      "samples_voice_mark", // { at }
+      // M1 (27/11/2026) : un événement par passage, envoyé quand le nouveau son part.
+      "samples_pass", // { kind, cause, fx, dur_s, late_ms, gap_ms, pre, buf, ctx, vis }
+      "samples_lock", // { cause, ctx } : pause ou coupure venue de l'extérieur
+      "samples_resync" // { late_ms, dropped } : retour d'arrière-plan
     ],
-    strings: ["sec", "sort", "scope", "to", "fx", "opt", "choice", "tab", "mode", "direction"],
-    numbers: ["n", "k", "bpm", "at", "bpm_gap", "dur_s"],
-    booleans: ["pre", "fade"]
+    strings: ["sec", "sort", "scope", "to", "fx", "opt", "choice", "tab", "mode", "direction", "kind", "cause", "buf", "ctx"],
+    numbers: ["n", "k", "bpm", "at", "bpm_gap", "dur_s", "late_ms", "gap_ms", "dropped"],
+    booleans: ["pre", "fade", "vis"]
   });
 
   function num(v) {

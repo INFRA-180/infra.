@@ -200,8 +200,8 @@
 .sx-opts-ic svg { width: 18px; height: 18px; display: block; }
 .sx-opts-go { font-size: 16px; line-height: 1; }
 @media (max-width: 639px) {
-  .sx-mixhead { flex-direction: column; align-items: stretch; gap: 12px; }
-  .sx-stack { align-self: flex-start; }
+  /* 27/11 (D7) : pile et réglages côte à côte, plus de grand vide */
+  .sx-mixhead { gap: 16px; margin-bottom: 24px; }
 }
 
 /* ---------- Menu ⋯ du Mix (sur la base du menu « ta-menu » du site) ---------- */
@@ -397,7 +397,7 @@
 .sx-top .sx-tools { margin-left: auto; }
 .sx-tag { display: block; margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: rgba(255, 255, 255, .72); }
 .sx-tag:empty { display: none; }
-.sx-tag .sx-yr { margin-left: 6px; padding: 1px 6px; border: 1px solid var(--sx-red); border-radius: 5px; color: var(--sx-red); letter-spacing: .04em; font-variant-numeric: tabular-nums; border-bottom-style: solid; }
+.sx-tag .sx-yr { margin-left: 6px; padding: 0; border: 0; border-bottom: 1px dotted currentColor; border-radius: 0; color: var(--sx-red); letter-spacing: .04em; font-variant-numeric: tabular-nums; } /* 27/11 (D4) : aucun cadre */
 /* la suivante : ton morceau, en bas à droite, plus petite et grisée ; la toucher y va */
 /* en diagonale : le sample en haut à gauche, plus grand ; ton morceau en bas à droite, plus petit.
    Même hauteur que la pochette seule : titre, barre et commandes restent visibles. */
@@ -417,16 +417,37 @@
 .sx-li, .smp-al, .sx-acov, .sx-art, .sx-next, .smp-row { -webkit-touch-callout: none; }
 .ta-menu.sx-ctx button svg { width: 20px; height: 20px; }
 
-/* ---------- A cappella : les chansons d'origine (T15) ---------- */
-.sx-vlist { border-top: 1px solid rgba(17, 17, 17, .08); }
-.sx-vrow { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid rgba(17, 17, 17, .08); }
-.sx-vmain { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 0; border: 0; background: none; font: inherit; color: var(--ink, #111); text-align: left; cursor: pointer; -webkit-touch-callout: none; }
-.sx-vmain img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex: none; background: rgba(17, 17, 17, .06); }
-.sx-vmain small u { text-decoration: none; color: var(--ink, #111); font-weight: 600; }
-.sx-src { flex: none; width: 44px; height: 44px; display: grid; place-items: center; color: rgba(17, 17, 17, .45); }
-.sx-src:hover, .sx-src:focus-visible { color: var(--ink, #111); }
-.sx-src svg { width: 22px; height: 22px; }
-.sx-vrow .sx-src:last-child { margin-right: -11px; }
-
 /* « À suivre » : plus de picto d'effet entre chaque ligne (T28) ; le réglage reste dans le menu des options. */
 .sx-fs .sx-xfm { display: none; }
+
+/* ---------- 27/11 (U3) : les deux pochettes échangent leur place au passage sample ↔ ton morceau ---------- */
+.sx-next.back .sx-hook { transform: rotate(180deg); }
+.sx-main.sx-swap > .sx-art { animation: sx-swap-big .4s cubic-bezier(.2, .7, .2, 1); }
+.sx-main.sx-swap > .sx-next img { animation: sx-swap-small .4s cubic-bezier(.2, .7, .2, 1); }
+@keyframes sx-swap-big { from { transform: translate(30%, 30%) scale(.56); opacity: .5; } }
+@keyframes sx-swap-small { from { transform: translate(-60%, -60%) scale(1.8); opacity: .9; } }
+@media (prefers-reduced-motion: reduce) {
+  .sx-main.sx-swap > .sx-art, .sx-main.sx-swap > .sx-next img { animation: sx-swap-fade .15s; }
+  @keyframes sx-swap-fade { from { opacity: 0; } }
+}
+
+/* ---------- 27/11 (U2) : accueil Samples = le mur des samples, rangé par album ---------- */
+.sx-wall { display: grid; gap: 28px; contain: inline-size; }
+.sx-wh { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; margin: 0 0 10px; padding: 0; border: 0; border-bottom: 1px solid rgba(17, 17, 17, .08); background: none; font: inherit; color: var(--ink, #111); text-align: left; cursor: pointer; }
+.sx-wh img { width: 20px; height: 20px; border-radius: 3px; object-fit: cover; flex: none; }
+.sx-wh b { flex: 1; min-width: 0; font-size: 14px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sx-wh small { flex: none; font-size: 13px; color: rgba(17, 17, 17, .45); font-variant-numeric: tabular-nums; }
+.sx-wh:hover small, .sx-wh:focus-visible small { color: var(--ink, #111); }
+.sx-wl { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 16px 12px; }
+.sx-wt { display: block; width: 100%; min-width: 0; padding: 0; border: 0; background: none; font: inherit; color: var(--ink, #111); text-align: left; cursor: pointer; -webkit-touch-callout: none; }
+.sx-wt img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; background: rgba(17, 17, 17, .06); transition: transform .15s; }
+.sx-wt:hover img, .sx-wt:focus-visible img { transform: translateY(-2px); }
+.sx-wt:active img { transform: scale(.97); }
+.sx-wt b, .sx-wt small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sx-wt b { margin-top: 6px; font-size: 12px; font-weight: 700; }
+.sx-wt small { font-size: 11px; color: rgba(17, 17, 17, .45); }
+@media (max-width: 1099px) { .sx-wl { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@media (max-width: 639px) { .sx-wl { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 12px; } }
+
+/* 27/11 (D1) : sur iPhone, les longues lignes de la page album n'élargissent plus la page */
+.sx-alist { contain: inline-size; }

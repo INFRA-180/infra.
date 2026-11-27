@@ -1,9 +1,9 @@
 /* global module */
 // Cœur du Mix Samples (20/11/2026, lot T bis) : fonctions pures, sans DOM ni Web Audio.
 // Spécification testée par tools/test-samples.js ; le moteur (samples.js) peut s'y brancher
-// via window.InfraSamplesMixCore. Choix d'INFRA (T bis) : durée Aucune · 5 s · Auto,
-// effets Fondu · Reverb · Écho · Basses · Hasard qui écoute, défaut Auto + Fondu,
-// sample → morceau reste « pile et fort » (0,35 s).
+// via window.InfraSamplesMixCore. Choix d'INFRA : durée en mesures Aucune · 2 · 4 (T12, 27/11 ;
+// remplace Aucune · 5 s · Auto), effets Fondu · Reverb · Écho · Basses · Hasard qui écoute,
+// défaut 4 mesures + Fondu, sample → morceau reste « pile et fort » (0,35 s).
 (function (root, factory) {
   "use strict";
   var api = factory();
@@ -13,17 +13,19 @@
   "use strict";
 
   var NONE_S = 0.03; // « Aucune » : coupe propre, sans clic
-  var FIXED_S = 5; // « 5 s »
-  var AUTO_BARS = 4; // « Auto » : 4 mesures de 4 temps = 16 temps = 960 / BPM secondes
+  var FIXED_S = 5; // ancien « 5 s » (réglage retenu sur l'appareil → 2 mesures)
+  var AUTO_BARS = 4; // ancien « Auto » : 4 mesures de 4 temps = 16 temps = 960 / BPM secondes
+  var NO_BPM = 120; // tempo inconnu : les mesures sont comptées à 120 BPM
   var AUTO_MIN_S = 4;
   var AUTO_MAX_S = 12;
   var AUTO_NO_BPM_S = 8;
   var EXTRACT_MARGIN_S = 4; // marge des extraits R2 de chaque côté de s0 / s1 (aujourd'hui)
   var TO_TRACK_S = 0.35; // sample → ton morceau : entrée nette (XF de samples.js)
 
-  var DURATIONS = ["none", "5", "auto"];
+  var DURATIONS = ["none", "2", "4"]; // T12 : nombre de mesures (8 · 16 quand les extraits seront recoupés)
+  var LEGACY = { 5: "2", auto: "4" }; // anciens choix retenus sur l'appareil
   var EFFECTS = ["fade", "reverb", "echo", "bass", "listen"];
-  var DEFAULTS = Object.freeze({ dur: "auto", fx: "fade" });
+  var DEFAULTS = Object.freeze({ dur: "4", fx: "fade" });
 
   // Télémétrie du Mix : noms d'événements et champs compacts (aucun titre, aucune adresse).
   var TELEMETRY = Object.freeze({
@@ -38,11 +40,15 @@
       "samples_mix_fx", // { fx, dur_s, bpm_gap }
       "samples_mix_try", // { fx, dur_s }
       "samples_tab_swipe", // { tab, direction }
-      "samples_voice_mark" // { at }
+      "samples_voice_mark", // { at }
+      // M1 (27/11/2026) : un événement par passage, envoyé quand le nouveau son part.
+      "samples_pass", // { kind, cause, fx, dur_s, late_ms, gap_ms, pre, buf, ctx, vis }
+      "samples_lock", // { cause, ctx } : pause ou coupure venue de l'extérieur
+      "samples_resync" // { late_ms, dropped } : retour d'arrière-plan
     ],
-    strings: ["sec", "sort", "scope", "to", "fx", "opt", "choice", "tab", "mode", "direction"],
-    numbers: ["n", "k", "bpm", "at", "bpm_gap", "dur_s"],
-    booleans: ["pre", "fade"]
+    strings: ["sec", "sort", "scope", "to", "fx", "opt", "choice", "tab", "mode", "direction", "kind", "cause", "buf", "ctx"],
+    numbers: ["n", "k", "bpm", "at", "bpm_gap", "dur_s", "late_ms", "gap_ms", "dropped"],
+    booleans: ["pre", "fade", "vis"]
   });
 
   function num(v) {
@@ -61,14 +67,20 @@
     return clamp((AUTO_BARS * 4 * 60) / b, AUTO_MIN_S, AUTO_MAX_S);
   }
 
-  // Durée d'un fondu centré sur la jointure : il mange margin s de chaque côté au plus,
+  // Durée de n mesures de 4 temps au tempo donné (120 BPM si inconnu).
+  function barSeconds(bars, bpm) {
+    var b = num(bpm);
+    return ((Number(bars) || AUTO_BARS) * 4 * 60) / (b > 0 ? b : NO_BPM);
+  }
+  // Durée d'un fondu centré sur la jointure, en mesures (T12) : il mange margin s de chaque côté au plus,
   // donc jamais plus de 2 × margin (8 s avec les extraits actuels). « Aucune » n'est pas plafonnée.
   function transitionSeconds(choice, bpm, margin) {
     var c = String(choice == null ? DEFAULTS.dur : choice);
+    c = LEGACY[c] || c;
     if (c === "none") return NONE_S;
     var m = num(margin);
     if (!(m >= 0)) m = EXTRACT_MARGIN_S;
-    var want = c === "5" ? FIXED_S : autoSeconds(bpm);
+    var want = barSeconds(c === "2" ? 2 : 4, bpm);
     return Math.max(NONE_S, Math.min(want, 2 * m));
   }
 
@@ -125,10 +137,12 @@
     EXTRACT_MARGIN_S: EXTRACT_MARGIN_S,
     TO_TRACK_S: TO_TRACK_S,
     DURATIONS: DURATIONS.slice(),
+    LEGACY: Object.freeze(Object.assign({}, LEGACY)),
     EFFECTS: EFFECTS.slice(),
     DEFAULTS: DEFAULTS,
     TELEMETRY: TELEMETRY,
     autoSeconds: autoSeconds,
+    barSeconds: barSeconds,
     transitionSeconds: transitionSeconds,
     transitionFor: transitionFor,
     bpmGap: bpmGap,

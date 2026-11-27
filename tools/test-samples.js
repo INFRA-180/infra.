@@ -239,6 +239,104 @@ for (const f of ["kind", "cause", "buf", "ctx", "late_ms", "gap_ms", "vis"]) {
   assert(keptFields.has(f), `samples_pass : champ ${f} attendu dans TELEMETRY`);
 }
 
+// ---------- (d) moteur (samples.js chargé hors navigateur, horloge simulée) ----------
+// M2 (27/11/2026) : un faux document, une fausse horloge murale ; pas de Web Audio (l'horloge du moteur
+// retombe alors sur performance.now, comme un contexte suspendu). Le crochet _t n'existe que pour ce test.
+function loadEngine(opts) {
+  const o = opts || {};
+  const clock = { wall: 1000000 };
+  const events = [];
+  const listeners = {};
+  const fakeAudio = o.audio || null;
+  const doc = {
+    currentScript: null,
+    visibilityState: "visible",
+    baseURI: "http://localhost/",
+    documentElement: { classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } } },
+    addEventListener(type, fn) {
+      (listeners[type] = listeners[type] || []).push(fn);
+    },
+    removeEventListener() {},
+    querySelector() {
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+    getElementById(id) {
+      return id === "infraGlobalAudio" ? fakeAudio : null;
+    },
+    dispatchEvent() {
+      return true;
+    }
+  };
+  class FakeDate extends Date {
+    static now() {
+      return clock.wall;
+    }
+  }
+  const win = {
+    __INFRA_SAMPLES_TEST__: true,
+    addEventListener(type, fn) {
+      (listeners["w:" + type] = listeners["w:" + type] || []).push(fn);
+    },
+    InfraTrackEvent(name, data) {
+      events.push([name, data]);
+    },
+    location: { origin: "http://localhost" },
+    InfraSamplesMixCore: core
+  };
+  const sandbox = {
+    window: win,
+    document: doc,
+    navigator: {},
+    localStorage: { getItem: () => null, setItem() {} },
+    performance: { now: () => clock.wall },
+    Date: FakeDate,
+    setTimeout: () => 0,
+    clearTimeout() {},
+    setInterval: () => 0,
+    clearInterval() {},
+    requestAnimationFrame: () => 0,
+    CustomEvent: class {
+      constructor(type, init) {
+        this.type = type;
+        this.detail = init && init.detail;
+      }
+    },
+    URL,
+    URLSearchParams,
+    console
+  };
+  vm.runInNewContext(samplesJs, sandbox, { filename: "samples.js" });
+  const t = win.InfraSamples && win.InfraSamples._t;
+  assert(t, "samples.js : crochet de test _t absent");
+  return { t, clock, events, listeners, win, doc };
+}
+{
+  // B5 : tâches en retard (retour d'arrière-plan) : dans l'ordre de leur instant, événements d'interface jetés
+  const E = loadEngine();
+  const order = [];
+  const t0 = E.t.now();
+  E.t.clockAt(t0 + 2, () => order.push("tard"), "duo");
+  E.t.clockAt(t0 + 1, () => order.push("tôt"), "duo");
+  const ui = E.t.clockAt(t0 + 1.5, () => order.push("ui"), "ev");
+  ui.drop = true;
+  E.clock.wall += 30000; // 30 s gelé
+  E.t.clockTick();
+  assert.deepStrictEqual(order, ["tôt", "tard"], "B5 : tâches en retard dans l'ordre de leur instant, interface jetée");
+  const rs = E.events.filter((e) => e[0] === "samples_resync");
+  assert.strictEqual(rs.length, 1, "B5 : un seul samples_resync");
+  assert(rs[0][1].late_ms >= 28000 && rs[0][1].dropped === 1, "B5 : retard et tâches jetées notés");
+  // à l'heure : rien de jeté, aucun samples_resync
+  const ok = [];
+  E.t.clockAt(E.t.now() + 0.1, () => ok.push(1), "duo");
+  E.clock.wall += 120;
+  E.t.clockTick();
+  assert.deepStrictEqual(ok, [1]);
+  assert.strictEqual(E.events.filter((e) => e[0] === "samples_resync").length, 1, "B5 : pas de samples_resync à l'heure");
+}
+
 // ---------- bilan ----------
 if (errors.length) {
   console.error(`Samples checks FAILED (${errors.length}) :\n- ${errors.slice(0, 30).join("\n- ")}`);

@@ -58,12 +58,9 @@
   try {
     var saved = JSON.parse(localStorage.getItem("infra-samples") || "null");
     if (saved && typeof saved === "object") {
-      if (
-        saved.sec === "mix" ||
-        saved.sec === "samples" ||
-        saved.sec === "voix"
-      )
-        pref.sec = saved.sec;
+      // « Que des samples » (INFRA, 27/11, U9) : A cappella n'existe plus ; un ancien choix « voix »
+      // retombe sur Samples.
+      if (saved.sec === "mix" || saved.sec === "samples") pref.sec = saved.sec;
       pref.voix = saved.voix === true;
       if (saved.sort && typeof saved.sort === "object") pref.sort = saved.sort;
       // options du Mix (durée, effet), 20/11 : validées à la lecture par mixOpts()
@@ -641,15 +638,6 @@
         TAB_LINE,
       ),
     },
-    {
-      k: "voix",
-      name: "A cappella",
-      hint: "Les chansons d’origine",
-      line: svg(
-        '<rect x="9.5" y="3" width="5" height="10.5" rx="2.5"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/>',
-        TAB_LINE,
-      ),
-    },
   ];
   var DOTS = svg(
     '<circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/>',
@@ -664,7 +652,7 @@
   }
   function tabsHtml(sec) {
     return (
-      '<div class="sx-tabs" role="tablist" aria-label="Samples, Mix ou A cappella" data-sx-tabs>' +
+      '<div class="sx-tabs" role="tablist" aria-label="Samples ou Mix" data-sx-tabs>' +
       TABS.map(function (t, i) {
         var on = sec === t.k;
         return (
@@ -710,9 +698,11 @@
             : pool,
       covers = [],
       bpms = pool.map(bpmOf).filter(Boolean);
+    // pile = les pochettes des samples (maquette V2, 4_INTERFACE D6), plus celles des albums
     order.forEach(function (c) {
-      if (covers.length < 3 && c.cover && covers.indexOf(c.cover) < 0)
-        covers.push(c.cover);
+      var s0 = c.chain ? c.chain[0] : c,
+        u = s0.c ? "assets/samples/" + s0.y + ".webp" : c.cover;
+      if (covers.length < 3 && u && covers.indexOf(u) < 0) covers.push(u);
     });
     var ui = window.InfraSamplesUI;
     return (
@@ -742,6 +732,83 @@
       "</button></div>"
     );
   }
+  // Mix : grille des albums (page Mix validée telle quelle, T26).
+  function mixGrid() {
+    return (
+      '<ul class="smp-grid">' +
+      data.albums
+        .map(function (a, i) {
+          var n = chainOf(a.items).length;
+          if (!n) return "";
+          return (
+            '<li><button type="button" class="smp-al" data-smp-album="' +
+            i +
+            '" aria-label="Mix de ' +
+            esc(a.title) +
+            '"><span class="smp-cover"><img src="' +
+            esc(assetUrl(a.cover)) +
+            '" alt="" loading="lazy" decoding="async"><span class="smp-play">' +
+            PLAY +
+            '</span></span><b dir="auto">' +
+            esc(a.title) +
+            "</b><small>" +
+            n +
+            (n > 1 ? " enchaînements" : " enchaînement") +
+            "</small></button></li>"
+          );
+        })
+        .join("") +
+      "</ul>"
+    );
+  }
+  // Accueil Samples (INFRA, 27/11, U2 : « pas clair » → QCM : le mur des samples). Les pochettes des
+  // disques d'origine, rangées par album ; la ligne de l'album mène à sa page (forme A validée) ;
+  // toucher un sample = plein écran sur lui, puis la suite de l'album.
+  function wallHtml() {
+    return (
+      '<div class="sx-wall">' +
+      data.albums
+        .map(function (a, ai) {
+          var items = albumItems(a);
+          if (!items.length) return "";
+          return (
+            '<section class="sx-wg"><button type="button" class="sx-wh" data-smp-album="' +
+            ai +
+            '" aria-label="Les samples de ' +
+            esc(a.title) +
+            '"><img src="' +
+            esc(assetUrl(a.cover)) +
+            '" alt="" loading="lazy" decoding="async"><b dir="auto">' +
+            esc(a.title) +
+            "</b><small>" +
+            items.length +
+            " ›</small></button><ul class=\"sx-wl\">" +
+            items
+              .map(function (it) {
+                return (
+                  '<li><button type="button" class="sx-wt" data-smp-wall="' +
+                  ai +
+                  ":" +
+                  a.items.indexOf(it) +
+                  '" aria-label="' +
+                  esc(it.t + (it.a ? ", " + it.a : "")) +
+                  '"><img src="' +
+                  itemCover(it) +
+                  '" alt="" loading="lazy" decoding="async"><b dir="auto">' +
+                  esc(it.t) +
+                  '</b><small dir="auto">' +
+                  esc([it.a, it.an].filter(Boolean).join(" · ")) +
+                  "</small></button></li>"
+                );
+              })
+              .join("") +
+            "</ul></section>"
+          );
+        })
+        .join("") +
+      "</div>"
+    );
+  }
   function render(panel) {
     if (!panel) return;
     lastPanel = panel;
@@ -769,15 +836,12 @@
       return;
     }
     var mix = pref.sec === "mix";
-    var voixSec = pref.sec === "voix";
-    var pool = mix ? chainOf(all()) : all().filter(keep(mix, secVoix()));
+    var pool = mix ? chainOf(all()) : all().filter(keep(false, false));
     // Ligne du haut (INFRA, 21/11, T46-T53) : à gauche ▶ (puis BPM et aléatoire), à droite les pictos,
     // tout centré sur la même ligne ; plus de texte (« Tout écouter · N samples » en info-bulle).
     var allLabel = mix
       ? "Tout le Mix · " + pool.length + " enchaînements"
-      : voixSec
-        ? "Toutes les chansons d’origine · " + pool.length
-        : "Tout écouter · " + pool.length + " samples";
+      : "Tout écouter · " + pool.length + " samples";
     var html =
       '<div class="sx-head" data-sx-head><div class="sx-allrow"><button type="button" class="sx-all" data-smp-all title="' +
       allLabel +
@@ -786,93 +850,15 @@
       '"><span class="sx-allic">' +
       PLAY +
       "</span></button>" +
-      (voixSec ? "" : sortBtns(sortFor(mix, "all"), "all")) +
+      sortBtns(sortFor(mix, "all"), "all") +
       "</div>" +
       tabsHtml(pref.sec) +
       "</div>" +
-      (mix ? mixHead(pool) : "") +
-      (voixSec ? voixList() : "") +
-      (voixSec ? "" : '<ul class="smp-grid">') +
-      (voixSec ? [] : data.albums)
-        .map(function (a, i) {
-          var n = mix
-            ? chainOf(a.items).length
-            : a.items.filter(keep(mix, secVoix())).length;
-          if (!n) return "";
-          var label = mix
-            ? n + (n > 1 ? " enchaînements" : " enchaînement")
-            : voixSec
-              ? n + " voix"
-              : n + (n > 1 ? " samples" : " sample");
-          return (
-            '<li><button type="button" class="smp-al" data-smp-album="' +
-            i +
-            '" aria-label="' +
-            (mix ? "Mix de " : voixSec ? "Voix de " : "Samples de ") +
-            esc(a.title) +
-            '"><span class="smp-cover"><img src="' +
-            esc(assetUrl(a.cover)) +
-            '" alt="" loading="lazy" decoding="async"><span class="smp-play">' +
-            PLAY +
-            '</span></span><b dir="auto">' +
-            esc(a.title) +
-            "</b><small>" +
-            label +
-            "</small></button></li>"
-          );
-        })
-        .join("") +
-      (voixSec ? "" : "</ul>");
+      (mix ? mixHead(pool) + mixGrid() : wallHtml());
     panel.innerHTML = '<div class="sx-page" data-sx-page>' + html + "</div>";
     if (window.InfraSamplesUI && window.InfraSamplesUI.afterRender)
       window.InfraSamplesUI.afterRender(panel);
   }
-  // ---------- A cappella : les chansons d'origine (INFRA, 20-21/11, T15) ----------
-  // Les vraies chansons dont INFRA a pris la voix : pochette, titre, artiste · année, « sa voix dans
-  // TON MORCEAU à 0:31 », YouTube et Spotify (recherche : les données n'ont pas encore les liens Spotify).
-  var YT_IC =
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4" fill="currentColor"/><path d="M10 9.2v5.6l4.8-2.8z" fill="#fff"/></svg>';
-  var SP_IC =
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="currentColor"/><path d="M7 9.6c3.4-1 7.2-.7 10.2 1M7.6 12.6c2.8-.8 5.8-.5 8.3.9M8.3 15.4c2.2-.6 4.4-.3 6.4.7" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>';
-  function voices() {
-    return all().filter(keep(false, "only"));
-  }
-  function voixList() {
-    return (
-      '<div class="sx-vlist">' +
-      voices()
-        .map(function (i, k) {
-          var q = encodeURIComponent([i.a, i.t].filter(Boolean).join(" "));
-          return (
-            '<div class="sx-vrow"><button type="button" class="sx-vmain" data-smp-voice="' +
-            k +
-            '"><img src="' +
-            itemCover(i) +
-            '" alt="" loading="lazy" decoding="async"><span class="sx-litx"><b dir="auto">' +
-            esc(i.t) +
-            '</b><small dir="auto">' +
-            esc(i.a || "Artiste à compléter") +
-            (i.an ? " · " + esc(i.an) : "") +
-            " · sa voix dans <u>" +
-            esc(i.track) +
-            "</u>" +
-            (isFinite(i.at) ? " " + entre(i.at) : "") +
-            '</small></span></button><a class="sx-src" href="' +
-            esc(ytUrl(i)) +
-            '" target="_blank" rel="noopener" title="Écouter sur YouTube" aria-label="Écouter sur YouTube">' +
-            YT_IC +
-            '</a><a class="sx-src" href="https://open.spotify.com/search/' +
-            q +
-            '" target="_blank" rel="noopener" title="Chercher sur Spotify" aria-label="Chercher sur Spotify">' +
-            SP_IC +
-            "</a></div>"
-          );
-        })
-        .join("") +
-      "</div>"
-    );
-  }
-
   // ---------- Page d'un album (INFRA, 21/11, proposition A validée, T38-T50) ----------
   // Forme de la vraie page album du site : « ‹ Samples », pochette, titre, ligne d'infos, pictos en haut
   // à droite (▶ · Mix · aléatoire · années). Liste dans l'ordre du son : d'abord les samples (les
@@ -1019,6 +1005,10 @@
     if (!yp) return;
     yp.el.remove();
     document.removeEventListener("pointerdown", yp.out, true);
+    // A7 (audit 27/11) : la ligne surlignée par le sélecteur ne reste pas rose
+    Array.prototype.forEach.call(document.querySelectorAll(".sel[data-smp-item]"), function (l) {
+      l.classList.remove("sel");
+    });
     var back = yp.anchor;
     yp = null;
     if (back && back.focus) back.focus({ preventScroll: true });
@@ -1205,6 +1195,8 @@
       if (yp && !yp.el.contains(e.target)) closeYears();
     };
     document.addEventListener("pointerdown", yp.out, true);
+    // rempli AVANT d'être mesuré (audit 27/11, A3 : il sortait de l'écran à droite)
+    paint(false);
     // place : sous l'année touchée, toujours dans l'écran ; sur iPhone, en feuille du bas
     if (window.innerWidth >= 640 && anchor && anchor.getBoundingClientRect) {
       var r = anchor.getBoundingClientRect(),
@@ -1213,7 +1205,6 @@
       el.style.left = clamp(r.left, 12, window.innerWidth - w - 12) + "px";
       el.style.top = clamp(r.bottom + 6, 12, window.innerHeight - hh - 12) + "px";
     } else el.classList.add("sheet");
-    paint(false);
     wh.focus({ preventScroll: true });
     track("samples_years", { n: W.ys.length });
   }
@@ -1722,8 +1713,14 @@
         '" alt="" loading="lazy" decoding="async"><span><b dir="auto">' +
         esc(i.t) +
         (st.mix ? " → " + esc(i.track) : "") +
-        '</b><small dir="auto">' +
-        esc(sub.filter(Boolean).join(" · ") + (i.v ? " · voix" : "")) +
+        // A6 (audit 27/11) : chaque morceau de texte isolé, un album arabe n'inverse plus la ligne
+        "</b><small>" +
+        sub
+          .filter(Boolean)
+          .map(function (x) {
+            return "<bdi>" + esc(x) + "</bdi>";
+          })
+          .join(" · ") +
         "</small></span>" +
         '<span class="sx-rb" title="BPM">' +
         (bpmOf(i) || "") +
@@ -1843,14 +1840,28 @@
             esc(smp.an) +
             "</span>"
           : "");
-    var nx = $(".sx-next", sheet);
-    nx.hidden = inTrack || !st.mix;
-    $(".sx-main", sheet).classList.toggle("has-next", !nx.hidden);
+    // Deux pochettes, toujours (INFRA, 27/11, U3) : en grand ce qu'on entend, en petit l'autre. Au passage
+    // sample → morceau, elles échangent leur place (le sample devient la petite, flèche retournée ; la
+    // toucher fait réécouter le sample), puis l'inverse au sample suivant. Même hauteur : plus de saut (A4).
+    var nx = $(".sx-next", sheet),
+      main = $(".sx-main", sheet),
+      wasBack = nx.classList.contains("back");
+    nx.hidden = !st.mix;
+    main.classList.toggle("has-next", !nx.hidden);
     if (!nx.hidden) {
       var nc = $("[data-smp-nextcov]", sheet),
-        ns = assetUrl(cur.cover);
+        ns = inTrack ? smpCover(smp, cur) : assetUrl(cur.cover);
       if (nc.getAttribute("src") !== ns) nc.setAttribute("src", ns);
-      nx.setAttribute("aria-label", "Puis " + cur.track);
+      nx.classList.toggle("back", inTrack);
+      nx.setAttribute("data-smp-jump", inTrack ? "s" + (cur.segs && cur.segs[duo.k || 0] ? cur.segs[duo.k || 0].ci : 0) : "1");
+      var nl = inTrack ? "Réécouter le sample · " + smp.t : "Puis " + cur.track;
+      nx.setAttribute("aria-label", nl);
+      nx.title = nl;
+      if (wasBack !== inTrack && sheet.classList.contains("on")) {
+        main.classList.remove("sx-swap");
+        void main.offsetWidth; // relance l'animation d'échange
+        main.classList.add("sx-swap");
+      }
     }
     // Spotify et Apple Music : recherche du sample entendu
     var q = encodeURIComponent([smp.a, smp.t].filter(Boolean).join(" "));
@@ -3859,7 +3870,7 @@
     var sec = t.closest("[data-smp-sec]");
     if (sec) {
       var want = sec.getAttribute("data-smp-sec");
-      pref.sec = want === "mix" || want === "voix" ? want : "samples";
+      pref.sec = want === "mix" ? "mix" : "samples";
       save();
       track("samples_section", { sec: pref.sec });
       return rerender();
@@ -3886,11 +3897,6 @@
             : "Tous les samples",
         "all",
       );
-    }
-    var vo = t.closest("[data-smp-voice]");
-    if (vo) {
-      var vl = voices();
-      return open(vl.slice(), "Les chansons d’origine", "all", null, "only", false, vl[+vo.getAttribute("data-smp-voice")]);
     }
     var cur =
       albumView != null && !(sheet && sheet.contains(t))
@@ -3920,6 +3926,15 @@
       if (t.closest("[data-smp-ashuf]")) {
         setSort(false, "album", "shuffle");
         return openAlbumAt(cur, null);
+      }
+    }
+    var wt = t.closest("[data-smp-wall]");
+    if (wt && data) {
+      var wk = wt.getAttribute("data-smp-wall").split(":"),
+        wa = data.albums[+wk[0]];
+      if (wa) {
+        track("samples_album", { sec: "wall" });
+        return openAlbumAt(wa, wa.items[+wk[1]]);
       }
     }
     var al = t.closest("[data-smp-album]");
@@ -4134,7 +4149,8 @@
     if ((el = t.closest(".sx-art, .sx-next")) && st.list[st.pos]) {
       var c = st.list[st.pos],
         smp = curSample() || c,
-        trackSide = el.classList.contains("sx-next") || trackPhase(),
+        // la petite pochette montre ton morceau pendant le sample, le sample pendant ton morceau (U3)
+        trackSide = el.classList.contains("sx-next") ? !trackPhase() : trackPhase(),
         img = trackSide ? assetUrl(c.cover) : smpCover(smp, c);
       return {
         head: trackSide ? [c.track, c.album] : [smp.t, who(smp)],
@@ -4157,20 +4173,6 @@
         items: [
           ["Lire maintenant", IC.play, function () { play(q); }],
           ["Ouvrir sur YouTube", IC.yt, function () { openTab(ytUrl(q.chain ? q.chain[0] : q)); }],
-        ],
-      };
-    }
-    if ((el = t.closest("[data-smp-voice]"))) {
-      var vi = voices()[+el.getAttribute("data-smp-voice")];
-      if (!vi) return null;
-      return {
-        head: [vi.t, who(vi)],
-        kind: "voix",
-        items: [
-          ["Écouter", IC.play, function () { el.click(); }],
-          ["Ouvrir sur YouTube", IC.yt, function () { openTab(ytUrl(vi)); }],
-          ["Écouter " + vi.track + (isFinite(vi.at) ? " " + entre(vi.at) : ""), IC.hook, function () { goToTrack(vi); }],
-          ["Copier le lien", IC.link, function () { copyLink(); }],
         ],
       };
     }

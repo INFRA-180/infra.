@@ -35,7 +35,7 @@
     swipeFollow: 0.5, // le contenu suit le doigt à moitié
     xfEndFade: 250 // ms : disparition du calque de transition à la fin
   };
-  var SECS = ["samples", "mix", "voix"];
+  var SECS = ["samples", "mix"]; // 27/11 (U9) : plus d’A cappella
   var DUR = [
     ["none", "Aucune"],
     ["5", "5 s"],

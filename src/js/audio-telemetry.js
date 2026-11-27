@@ -31,6 +31,10 @@
     "samples_year",
     "samples_menu",
     "samples_audio_retry",
+    // Moteur Samples (M1, 27/11/2026) : un passage, une pause venue de l'extérieur, un retour d'arrière-plan.
+    "samples_pass",
+    "samples_lock",
+    "samples_resync",
     "script_error",
     "album_switch",
     "audio_network_result",
@@ -150,6 +154,10 @@
     "samples_year",
     "samples_menu",
     "samples_audio_retry",
+    // Moteur Samples (M1, 27/11/2026) : un passage, une pause venue de l'extérieur, un retour d'arrière-plan.
+    "samples_pass",
+    "samples_lock",
+    "samples_resync",
     "external_resume_recovery_failed",
     "fullscreen_viewport",
     "mini_player_visibility",
@@ -247,7 +255,12 @@
     "fx",
     "opt",
     "choice",
-    "tab"
+    "tab",
+    // Passage du Mix (M1, 27/11/2026) : type, cause, source du son, état du contexte audio.
+    "kind",
+    "cause",
+    "buf",
+    "ctx"
   ]);
   const TELEMETRY_NUMBER_FIELDS = new Set([
     "timestamp_ms",
@@ -510,7 +523,11 @@
     "bpm",
     "at",
     "bpm_gap",
-    "dur_s"
+    "dur_s",
+    // Passage du Mix (M1, 27/11/2026) : retard du nouveau son, silence entendu, tâches jetées.
+    "late_ms",
+    "gap_ms",
+    "dropped"
   ]);
   const TELEMETRY_BOOLEAN_FIELDS = new Set([
     "fine_event",
@@ -601,7 +618,8 @@
     "single_route_invariant",
     // Samples / Mix (20/11/2026) : morceau préchargé, fondu possible.
     "pre",
-    "fade"
+    "fade",
+    "vis"
   ]);
 
   function now() {

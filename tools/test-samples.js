@@ -316,17 +316,26 @@ function loadEngine(opts) {
     location: { origin: "http://localhost" },
     InfraSamplesMixCore: core,
     // constructeur présent (les extraits sont « jouables ») ; aucun contexte n'est créé par ces tests
-    AudioContext: function () {}
+    // (sauf F1 : faux contexte passé par o.AudioContext)
+    AudioContext: o.AudioContext || function () {}
   };
+  const timers = [];
   const sandbox = {
     window: win,
     document: doc,
-    navigator: {},
+    navigator: o.navigator || {},
     localStorage: { getItem: () => null, setItem() {} },
     performance: { now: () => clock.wall },
     Date: FakeDate,
-    setTimeout: () => 0,
+    // F1 : minuteurs gardés quand le test les demande (o.timers), lancés à la main par runTimers()
+    setTimeout: o.timers
+      ? (fn, ms) => {
+          timers.push({ fn, at: clock.wall + (ms || 0) });
+          return timers.length;
+        }
+      : () => 0,
     clearTimeout() {},
+    Audio: o.Audio,
     setInterval: () => 0,
     clearInterval() {},
     requestAnimationFrame: () => 0,
@@ -343,7 +352,176 @@ function loadEngine(opts) {
   vm.runInNewContext(samplesJs, sandbox, { filename: "samples.js" });
   const t = win.InfraSamples && win.InfraSamples._t;
   assert(t, "samples.js : crochet de test _t absent");
-  return { t, clock, events, listeners, win, doc };
+  const runTimers = (ms) => {
+    clock.wall += ms || 0;
+    for (let guard = 0; guard < 100; guard++) {
+      const due = timers.filter((x) => !x.done && x.at <= clock.wall);
+      if (!due.length) break;
+      due.forEach((x) => {
+        x.done = true;
+        x.fn();
+      });
+    }
+  };
+  return { t, clock, events, listeners, win, doc, runTimers };
+}
+
+// F1 (28/11/2026) : faux Web Audio, juste assez pour suivre les branchements et l'état du contexte.
+function fakeAudio(opts) {
+  const o = opts || {};
+  const made = [];
+  class Param {
+    constructor(v) {
+      this.value = v;
+      this.calls = [];
+    }
+    setValueAtTime(v, t) {
+      this.calls.push(["set", v, t]);
+      this.value = v;
+    }
+    linearRampToValueAtTime(v, t) {
+      this.calls.push(["lin", v, t]);
+    }
+    exponentialRampToValueAtTime(v, t) {
+      this.calls.push(["exp", v, t]);
+    }
+    cancelScheduledValues(t) {
+      this.calls.push(["cancel", t]);
+    }
+  }
+  if (o.hold !== false)
+    Param.prototype.cancelAndHoldAtTime = function (t) {
+      this.calls.push(["hold", t]);
+    };
+  class Node {
+    constructor(kind) {
+      this.kind = kind;
+      this.out = [];
+    }
+    connect(n) {
+      this.out.push(n);
+      return n;
+    }
+    disconnect() {
+      this.out = [];
+    }
+  }
+  class Ctx {
+    constructor(init) {
+      this.init = init;
+      this.state = "suspended";
+      this.currentTime = 5;
+      this.sampleRate = 8000;
+      this.destination = new Node("dest");
+      made.push(this);
+    }
+    resume() {
+      if (o.resume === "never") return new Promise(() => {});
+      this.state = "running";
+      return Promise.resolve();
+    }
+    suspend() {
+      this.state = "suspended";
+      return Promise.resolve();
+    }
+    close() {
+      this.state = "closed";
+      return Promise.resolve();
+    }
+    createGain() {
+      return Object.assign(new Node("gain"), { gain: new Param(1) });
+    }
+    createBiquadFilter() {
+      return Object.assign(new Node("biquad"), { frequency: new Param(350), Q: new Param(1) });
+    }
+    createDynamicsCompressor() {
+      const n = new Node("limiter");
+      ["threshold", "knee", "ratio", "attack", "release"].forEach((k) => (n[k] = new Param(0)));
+      return n;
+    }
+    createConvolver() {
+      return new Node("convolver");
+    }
+    createDelay() {
+      return Object.assign(new Node("delay"), { delayTime: new Param(0) });
+    }
+    createBuffer(ch, n) {
+      const data = Array.from({ length: ch }, () => new Float32Array(n));
+      return { numberOfChannels: ch, duration: n / 8000, getChannelData: (c) => data[c] };
+    }
+    createBufferSource() {
+      return Object.assign(new Node("src"), { start() {}, stop() {} });
+    }
+    createMediaElementSource() {
+      return new Node("media");
+    }
+  }
+  const Audio = class {
+    constructor() {
+      this.paused = true;
+    }
+    setAttribute() {}
+    removeAttribute() {}
+    addEventListener() {}
+    removeEventListener() {}
+    play() {
+      return { then() {} };
+    }
+    pause() {}
+  };
+  return { Ctx, Audio, made };
+}
+{
+  // F1 : contexte « playback », limiteur en fin de chaîne, retours d'effets sur un bus à part, horloge
+  // audio même contexte suspendu, garde de resume() (jamais bloqué), recréation au geste suivant.
+  const A = fakeAudio({ resume: "never" });
+  const E = loadEngine({ AudioContext: A.Ctx, Audio: A.Audio, timers: true });
+  const c = E.t.ensureCtx(true);
+  assert(c, "F1 : contexte créé");
+  assert.strictEqual(c.init && c.init.latencyHint, "playback", "F1 : latencyHint playback");
+  const b = E.t.bus();
+  assert(b.lim && b.out.out.includes(b.lim) && b.lim.out.includes(c.destination), "F1 : bus.out → limiteur → sortie");
+  assert.strictEqual(b.lim.threshold.value, -1, "F1 : limiteur à −1 dB");
+  assert.strictEqual(b.lim.ratio.value, 20, "F1 : ratio 20");
+  assert(b.fx.out.includes(b.out), "F1 : retours d'effets → bus.out");
+  assert.strictEqual(E.t.now(), 5, "F3 : instant d'un passage sur l'horloge audio, même contexte suspendu");
+  assert.strictEqual(E.t.eng.ownSuspend, true, "F1 : reprise en cours = la nôtre");
+  E.runTimers(1600);
+  assert.strictEqual(E.t.eng.ownSuspend, false, "F1 : ownSuspend jamais bloqué (resume sans réponse)");
+  assert.strictEqual(E.t.eng.stuck, true, "F1 : contexte bloqué noté");
+  assert(E.events.some((e) => e[0] === "samples_lock" && e[1].cause === "resume_stuck"), "F1 : blocage journalisé");
+  const c2 = E.t.ensureCtx(true);
+  assert(c2 && c2 !== c && c.state === "closed", "F1 : nouveau contexte au geste suivant");
+  assert.strictEqual(E.t.eng.stuck, false);
+  // sans geste : jamais recréé
+  E.runTimers(1600);
+  assert.strictEqual(E.t.ensureCtx(), c2, "F1 : hors geste, le contexte n'est pas recréé");
+}
+{
+  // F1 : cancelAndHoldAtTime pour les fondus quand il existe, repli sinon.
+  for (const hold of [true, false]) {
+    const A = fakeAudio({ hold });
+    const E = loadEngine({ AudioContext: A.Ctx, Audio: A.Audio, timers: true });
+    const c = E.t.ensureCtx(true);
+    const g = c.createGain();
+    const v = { g, gv: { from: 0, to: 1, when: 0, dur: 1 } };
+    E.t.setCurve(v, 1, 0, 6, 2);
+    const kinds = g.gain.calls.map((x) => x[0]);
+    assert.strictEqual(kinds[0], hold ? "hold" : "cancel", `F1 : fondu ${hold ? "avec" : "sans"} cancelAndHoldAtTime`);
+    assert(kinds.includes("lin"), "F1 : paliers du fondu posés");
+  }
+}
+{
+  // F1 : Media Session du Mix (lecture, pause, suivant, précédent, position), rendue au site à la fermeture.
+  const handlers = {};
+  const nav = { mediaSession: { setActionHandler: (a, fn) => (handlers[a] = fn), metadata: null, playbackState: "none" } };
+  const E = loadEngine({ navigator: nav });
+  E.t.msHandlers(true);
+  for (const a of ["play", "pause", "nexttrack", "previoustrack", "seekto"])
+    assert.strictEqual(typeof handlers[a], "function", `F1 : bouton ${a} du Mix`);
+  E.t.msHandlers(false);
+  assert.strictEqual(handlers.seekto, null, "F1 : Mix fermé → position rendue");
+  assert.strictEqual(typeof handlers.nexttrack, "function", "F1 : Mix fermé → suivant repasse au lecteur du site");
 }
 {
   // B5 : tâches en retard (retour d'arrière-plan) : dans l'ordre de leur instant, événements d'interface jetés

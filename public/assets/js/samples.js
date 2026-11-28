@@ -1462,7 +1462,9 @@
     }
     if (!first) return;
     if (st.mix) loadMixData(); // F1 : volume égal (fichier absent : rien ne change)
-    ensureCtx(); // dans le geste : indispensable sur iPhone
+    ensureCtx(true); // dans le geste : indispensable sur iPhone
+    // F3 : eng.lastEnd restait celui de la fermeture d'avant : le silence se compte depuis l'ouverture
+    if (eng.ctx) eng.lastEnd = eng.ctx.currentTime;
     // M3 : ton morceau passe par le moteur (lecteur du lot) ; le lecteur du site n'est plus débloqué ni
     // joué pendant le Mix (B7 disparaît avec lui).
     sheet.hidden = false;
@@ -1509,9 +1511,11 @@
       // lecteur fermé : l'horloge audio s'arrête (rouverte dans le prochain geste)
       if (eng.ctx && sheet && sheet.hidden && eng.ctx.state === "running")
         try {
-          eng.ctx.suspend();
+          var sp = eng.ctx.suspend();
+          if (sp && sp.catch) sp.catch(noop);
         } catch (_e) {}
     }, 600);
+    msOff(); // F1 : écran verrouillé et casque repassent au lecteur du site
     st.ready = false;
     st.cued = false;
     st.pos = -1;
@@ -2015,6 +2019,7 @@
       pp.innerHTML = on ? PAUSE : PLAY;
       pp.setAttribute("aria-label", on ? "Pause" : "Lecture");
     }
+    msSync(false);
   }
   // Mix : longueurs des morceaux de barre (parties du sample, puis ton morceau), 3 px entre eux.
   function barLens() {
@@ -2517,8 +2522,11 @@
     var tv = duo.tv && duo.tv.item === i && !duo.tv.done ? duo.tv : null;
     if (tv && tv.live) {
       // flux préparé : là où il doit être en T (sinon recalé, il est encore muet)
-      var want = tv.sg.s0 - (T - c.currentTime);
-      if (Math.abs(ytNow(tv) - want) > 0.3 && want >= tv.x0)
+      var want = tv.sg.s0 - (T - c.currentTime),
+        drift = Math.abs(ytNow(tv) - want);
+      // bug 13 : recalé seulement s'il reste du temps avant l'entrée (sinon le lecteur recharge pendant que
+      // le gain s'ouvre : trou) ; à l'entrée même, un petit écart passe, un grand se recale
+      if (drift > 0.3 && want >= tv.x0 && (T - c.currentTime > 1 || drift > 1.5))
         try {
           tv.el.currentTime = want - tv.x0;
         } catch (_e) {}
@@ -2634,11 +2642,32 @@
       eng.hold = { item: i, k: -1, t: t, name: trackSeg(i).key };
       return;
     }
-    if (v && v.track && v.el && v.live && t >= v.x0)
-      try {
-        v.el.currentTime = t - v.x0;
-        return;
-      } catch (_e) {}
+    if (v && v.track && v.el && v.live && t >= v.x0 && eng.ctx) {
+      // F1 (bug 12) : en flux, on baisse en 40 ms, on cherche, puis on remonte quand le lecteur est prêt
+      // (« seeked ») : plus de déclic ni de trou brutal
+      var el = v.el,
+        n = eng.ctx.currentTime,
+        upDone = false,
+        up = function () {
+          if (upDone) return;
+          upDone = true;
+          el.removeEventListener("seeked", up);
+          if (eng.cur !== v || v.done || eng.paused || !eng.ctx) return;
+          setCurve(v, 0, 1, eng.ctx.currentTime + 0.02, 0.06);
+        };
+      setCurve(v, gainAt(v, n), 0, n, 0.04);
+      setTimeout(function () {
+        if (eng.cur !== v || v.done) return;
+        try {
+          el.addEventListener("seeked", up);
+          el.currentTime = t - v.x0;
+        } catch (_e) {
+          return up();
+        }
+        setTimeout(up, 1500); // « seeked » jamais reçu : on remonte quand même
+      }, 50);
+      return;
+    }
     engStart(i, -1, t, planOf("seek", null, null, { dur: 0.06 }));
   }
   // Ton morceau ne joue pas (extrait et flux en échec, réseau coupé) : on passe au son suivant.
@@ -2721,9 +2750,13 @@
     var c = eng.ctx;
     return c && c.state === "running" ? c.currentTime : null;
   }
+  // F3 (28/11, silence au 1er glisser) : un passage préparé pendant que le contexte repart (réouverture
+  // après close() → suspend()) prenait l'heure murale (performance.now) comme instant de départ : le
+  // premier son partait sur la mauvaise horloge, des secondes trop tard. Tout instant d'un passage est
+  // maintenant compté sur l'horloge audio dès qu'elle existe, même arrêtée.
   function now() {
-    var t = ctxNow();
-    return t != null ? t : performance.now() / 1000;
+    if (eng.ctx) return eng.ctx.currentTime;
+    return performance.now() / 1000;
   }
   function clockJob(j, t, grp) {
     j.t = t;
@@ -3426,19 +3459,123 @@
   function audioCtor() {
     return window.AudioContext || window.webkitAudioContext || null;
   }
+  // F1 : latencyHint « playback » (tampons plus grands, moins de calcul ; tout est programmé à l'avance),
+  // repli sans option si le navigateur la refuse.
+  function newCtx(AC) {
+    try {
+      return new AC({ latencyHint: "playback" });
+    } catch (_e) {}
+    try {
+      return new AC();
+    } catch (_e) {
+      return null;
+    }
+  }
+  // F1 : resume() peut ne jamais répondre sur iPhone (WebKit 281566, 291892). Garde de 1,5 s : eng.ownSuspend
+  // n'est jamais bloqué ; si le contexte ne repart pas, le Mix se met en pause (une touche relance) et le
+  // contexte est recréé au geste suivant (dernier recours). cycle : suspend() puis resume() (« interrupted »).
+  var RESUME_GUARD = 1500;
+  function resumeCtx(cycle) {
+    var c = eng.ctx;
+    if (!c || c.state === "running" || c.state === "closed") return;
+    var tok = (eng.resTok = (eng.resTok || 0) + 1);
+    eng.ownSuspend = true; // la reprise est la nôtre : pas de faux « samples_lock »
+    eng.resuming = true;
+    var end = function () {
+      if (tok !== eng.resTok) return;
+      eng.ownSuspend = false;
+      eng.resuming = false;
+    };
+    var done = function () {
+      if (tok !== eng.resTok) return;
+      setTimeout(end, 50); // après le « statechange » qui suit la promesse
+      if (c.state === "running") {
+        eng.stuck = false;
+        clockTick();
+        engTick();
+        paintBar();
+      }
+    };
+    try {
+      var p =
+        cycle && c.state === "interrupted" && typeof c.suspend === "function"
+          ? c.suspend().then(function () {
+              return c.resume();
+            })
+          : c.resume();
+      if (p && p.then) p.then(done, done);
+      else setTimeout(done, 0);
+    } catch (_e) {
+      setTimeout(done, 0);
+    }
+    setTimeout(function () {
+      if (tok !== eng.resTok || eng.ctx !== c) return;
+      end();
+      // page cachée (appel, écran verrouillé) : l'iPhone peut garder le contexte arrêté ; on attend le retour
+      if (c.state === "running" || document.visibilityState === "hidden") return;
+      eng.stuck = true;
+      track("samples_lock", { cause: "resume_stuck", ctx: c.state });
+      // B15 : bouton sur « pause » mais silence : le Mix se met en pause, une seule touche relance
+      if (sheet && !sheet.hidden && (eng.on || trackPhase()) && isPlaying()) {
+        engPause();
+        paintBar();
+      }
+    }, RESUME_GUARD);
+  }
+  // Dernier recours (dans un geste) : contexte jamais reparti → nouveau contexte. Les lecteurs du lot sont
+  // liés à l'ancien (createMediaElementSource) : refaits ; les extraits décodés sont gardés.
+  function renewCtx() {
+    var old = eng.ctx;
+    if (!old) return;
+    eng.stuck = false;
+    eng.gen++;
+    clockClear();
+    evFlush();
+    duo.inWait = null;
+    duo.inArmed = false;
+    duo.prepped = false;
+    duo.tv = null;
+    eng.voices.slice().forEach(function (v) {
+      try {
+        if (v.el) {
+          v.el.onended = v.el.onerror = v.el.onplaying = null;
+          v.el.pause();
+        } else v.s.stop();
+      } catch (_e) {}
+      unplug(v);
+    });
+    eng.voices = [];
+    eng.cur = null;
+    eng.loading = false;
+    (eng.pool || []).forEach(function (e) {
+      try {
+        e.own = true;
+        e.el.pause();
+        e.el.removeAttribute("src");
+      } catch (_e) {}
+    });
+    eng.pool = [];
+    eng.bus = null;
+    eng.ctx = null;
+    eng.lastEnd = 0;
+    try {
+      old.onstatechange = null;
+      old.close();
+    } catch (_e) {}
+    track("samples_lock", { cause: "ctx_new", ctx: old.state });
+  }
   // À appeler DANS le geste (clic, touche) : sur iPhone, l'AudioContext ne démarre qu'ainsi.
-  function ensureCtx() {
+  // gesture : vrai geste de l'utilisateur (le seul moment où un contexte bloqué peut être recréé).
+  function ensureCtx(gesture) {
     try {
       if (navigator.audioSession) navigator.audioSession.type = "playback"; // ignore le bouton silencieux
     } catch (_e) {}
     var AC = audioCtor();
     if (!AC) return null;
+    if (eng.ctx && gesture && (eng.stuck || eng.ctx.state === "closed")) renewCtx();
     if (!eng.ctx) {
-      try {
-        eng.ctx = new AC();
-      } catch (_e) {
-        return null;
-      }
+      eng.ctx = newCtx(AC);
+      if (!eng.ctx) return null;
       // M6 : coupure du contexte venue de l'extérieur (appel, Siri, verrouillage) notée ; au retour, les
       // passages en retard et la position sont relus tout de suite.
       var c0 = eng.ctx,
@@ -3456,10 +3593,7 @@
       };
     }
     if (eng.ctx.state !== "running") {
-      try {
-        var p = eng.ctx.resume();
-        if (p && p.catch) p.catch(noop);
-      } catch (_e) {}
+      resumeCtx(false);
       try {
         // un son vide joué pendant le geste déverrouille la sortie (anciens iOS)
         var s = eng.ctx.createBufferSource();
@@ -3856,7 +3990,14 @@
     pauseMusic(); // le lecteur du site reste en pause pendant les Samples et le Mix
     var ready = !sg.stream && eng.bufs[key] && eng.bufs[key].buf;
     if (ready) plan.pre = true; // extrait déjà en mémoire : départ à l'instant prévu
-    if (!ready && (sg.stream || !noStream) && eng.ctx && eng.ctx.state === "running") {
+    // le flux part aussi pendant que le contexte repart (réouverture : resume() en cours) ; avant, le
+    // premier son attendait le téléchargement complet de l'extrait (F3, silence au 1er glisser)
+    if (
+      !ready &&
+      (sg.stream || !noStream) &&
+      eng.ctx &&
+      (eng.ctx.state === "running" || (eng.resuming && eng.ctx.state === "suspended"))
+    ) {
       var at0 = Math.max(eng.ctx.currentTime + 0.02, plan.when || 0),
         lead = at0 - eng.ctx.currentTime; // passage programmé à l'avance : le flux part d'autant plus tôt
       if (lead > 0.05) ytFrom = Math.max(sg.x[1], ytFrom - lead);
@@ -4175,26 +4316,140 @@
       engTick();
       paintBar();
     };
-    if (c.state !== "running")
-      try {
-        eng.ownSuspend = true;
-        var p =
-          c.state === "interrupted" && typeof c.suspend === "function"
-            ? c.suspend().then(function () {
-                return c.resume();
-              })
-            : c.resume();
-        var done = function () {
-          eng.ownSuspend = false;
-          again();
-        };
-        if (p && p.then) p.then(done, done);
-        else eng.ownSuspend = false;
-      } catch (_e) {
-        eng.ownSuspend = false;
-      }
+    if (c.state !== "running") resumeCtx(true); // F1 : avec garde (resume() peut ne jamais répondre)
     again();
     if (away > 1000) track("samples_resync", { late_ms: away, dropped: 0 });
+    msSync(true); // F1 : la Media Session du Mix reprend la main (le site la repose au retour)
+  });
+  // F1 : PWA rouverte depuis le cache (pageshow) ; toucher n'importe où pendant que le contexte est
+  // arrêté : relance dans le geste (contexte recréé s'il ne répondait plus).
+  window.addEventListener("pageshow", function (e) {
+    if (e && e.persisted && eng.ctx && sheet && !sheet.hidden && eng.ctx.state !== "running")
+      resumeCtx(true);
+  });
+  // ---------- Media Session du lecteur Samples / Mix (F1, 28/11/2026) ----------
+  // Écran verrouillé, casque, centre de contrôle : titre du son entendu (sample ou ton morceau), pochette,
+  // lecture/pause, suivant/précédent et position pilotent le Mix tant que son lecteur est ouvert. À la
+  // fermeture : les infos du lecteur du site reviennent, ses boutons repassent à son lecteur (il repose
+  // ses propres commandes au morceau suivant). Rien dans app.js.
+  var ms = { on: false, saved: null, savedState: "", at: 0, hAt: 0, key: "", state: "" };
+  function msApi() {
+    try {
+      return navigator.mediaSession || null;
+    } catch (_e) {
+      return null;
+    }
+  }
+  function msSet(m, action, fn) {
+    try {
+      m.setActionHandler(action, fn);
+    } catch (_e) {}
+  }
+  function msHandlers(mix) {
+    var m = msApi();
+    if (!m || typeof m.setActionHandler !== "function") return;
+    if (mix) {
+      msSet(m, "play", function () {
+        if (!isPlaying()) toggle();
+      });
+      msSet(m, "pause", function () {
+        if (isPlaying()) toggle();
+      });
+      msSet(m, "nexttrack", function () {
+        step(1);
+      });
+      msSet(m, "previoustrack", function () {
+        prev();
+      });
+      msSet(m, "seekto", function (d) {
+        var b = barState();
+        if (!b || !d || !isFinite(d.seekTime)) return;
+        setCause("seek");
+        seekTo(clamp(d.seekTime, 0, b.T));
+      });
+      return;
+    }
+    var site = function (sel, want) {
+      return function () {
+        var a = audioEl();
+        if (want != null && a && a.paused !== want) return; // play : seulement s'il est en pause, etc.
+        var b = document.querySelector(sel);
+        if (b && typeof b.click === "function") b.click();
+      };
+    };
+    msSet(m, "play", site("[data-transport-toggle]", true));
+    msSet(m, "pause", site("[data-transport-toggle]", false));
+    msSet(m, "nexttrack", site("[data-transport-next]"));
+    msSet(m, "previoustrack", site("[data-transport-prev]"));
+    msSet(m, "seekto", null);
+  }
+  function msSync(force) {
+    var m = msApi();
+    if (!m || !sheet || sheet.hidden) return;
+    var c = current();
+    if (!c) return;
+    if (!ms.on) {
+      ms.on = true;
+      try {
+        ms.saved = m.metadata || null;
+        ms.savedState = m.playbackState || "";
+      } catch (_e) {}
+      ms.key = "";
+      force = true;
+    }
+    var state = c.playing ? "playing" : "paused",
+      key = [c.title, c.artist, c.cover].join("|"),
+      t = Date.now();
+    if (!force && key === ms.key && state === ms.state && t - ms.at < 1000) return;
+    ms.at = t;
+    // le site repose ses commandes à son retour (visibilité, son lecteur) : on les reprend, sans excès
+    if (force || t - ms.hAt > 5000) {
+      ms.hAt = t;
+      msHandlers(true);
+    }
+    if (key !== ms.key && typeof window.MediaMetadata === "function") {
+      ms.key = key;
+      try {
+        m.metadata = new window.MediaMetadata({
+          title: c.title || "",
+          artist: c.artist || "",
+          album: (c.mode === "mix" ? "Mix · " : "Samples · ") + (c.track || ""),
+          artwork: c.cover ? [{ src: c.cover, sizes: "512x512" }] : [],
+        });
+      } catch (_e) {}
+    }
+    if (state !== ms.state || force) {
+      ms.state = state;
+      try {
+        m.playbackState = state;
+      } catch (_e) {}
+    }
+    var b = barState();
+    if (b && b.T > 0 && typeof m.setPositionState === "function")
+      try {
+        m.setPositionState({ duration: b.T, position: clamp(b.t, 0, b.T), playbackRate: 1 });
+      } catch (_e) {}
+  }
+  function msOff() {
+    var m = msApi();
+    if (!m || !ms.on) return;
+    ms.on = false;
+    ms.key = ms.state = "";
+    try {
+      m.metadata = ms.saved;
+      m.playbackState = ms.savedState || "paused";
+    } catch (_e) {}
+    ms.saved = null;
+    msHandlers(false);
+  }
+  ["touchend", "click"].forEach(function (type) {
+    document.addEventListener(
+      type,
+      function () {
+        if (sheet && !sheet.hidden && eng.ctx && eng.ctx.state !== "running") ensureCtx(true);
+      },
+      true,
+    );
   });
 
   // ---------- API pour l'interface (page Mix, menu ⋯ du lecteur) ----------
@@ -4285,7 +4540,7 @@
   function previewTransition() {
     var cur = st.list[st.pos];
     if (!sheet || sheet.hidden || !cur) return null;
-    ensureCtx();
+    ensureCtx(true);
     if (st.cued) {
       toggle();
       return null;
@@ -4381,7 +4636,7 @@
     });
   }
   function onSheetClick(e) {
-    ensureCtx();
+    ensureCtx(true);
     var t = e.target;
     if (t === sheet || (t.closest && t.closest("[data-smp-close]")))
       return close();
@@ -4530,7 +4785,7 @@
   // Afficher les samples d'un morceau (avec les voix), pour le futur clic droit › Afficher les samples.
   // startIndex (Crédits, 27/11) : le sample touché passe en premier ; sinon l'ordre d'entrée dans le morceau.
   function openTrack(albumTitle, trackTitle, startIndex) {
-    ensureCtx(); // encore dans le geste (clic droit › Afficher les samples)
+    ensureCtx(true); // encore dans le geste (clic droit › Afficher les samples)
     return load().then(function () {
       // Le grand lecteur écrit titres et albums en majuscules (« HE 4.0026 », « V-23Π56 ») : comparaison sans casse.
       var a = data.albums.filter(function (x) {
@@ -4553,7 +4808,7 @@
 
   // 23/11/2026 : clic droit › « Samples de l'album » depuis tout le site (carte, page, ligne d'album).
   function openAlbum(albumTitle) {
-    ensureCtx();
+    ensureCtx(true);
     return load().then(function () {
       var a = data.albums.filter(function (x) {
         return same(x.title, albumTitle);
@@ -4927,6 +5182,11 @@
       trackSeg: trackSeg,
       setMixData: setMixData,
       levelOf: levelOf,
+      ensureCtx: ensureCtx,
+      resumeCtx: resumeCtx,
+      bus: bus,
+      setCurve: setCurve,
+      msHandlers: msHandlers,
       mixInfo: mixInfo,
       supports: supports,
       getOptions: getOptions,

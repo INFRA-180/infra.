@@ -361,6 +361,10 @@
   function bpmOf(i) {
     return i && i.tb ? Math.round(i.tb) : 0;
   }
+  // Tempo du sample original : bpm = [sample, morceau] quand ils diffèrent de plus de 2 ; sinon celui du morceau.
+  function smpBpm(i) {
+    return i && i.bpm && Number(i.bpm[0]) ? Math.round(i.bpm[0]) : bpmOf(i);
+  }
   function byTempo(list, desc) {
     return list
       .map(function (i, k) {
@@ -1642,9 +1646,6 @@
       "here",
       "shuffle",
     );
-    var bpmBox = $("[data-smp-bpm]", sheet);
-    bpmBox.hidden = !bpmOf(cur);
-    bpmBox.firstChild.textContent = bpmOf(cur) || "";
     // barre : un segment (Samples) ou deux (Mix : sample | morceau)
     // barre : Samples = un morceau ; Mix = chaque partie du (des) sample(s), puis ton morceau
     var segsM = cur.segs || [{ s0: cur.s0, s1: cur.s1, ci: 0, from: 0 }],
@@ -1878,6 +1879,13 @@
         main.classList.add("sx-swap");
       }
     }
+    // BPM de ce qu'on entend (INFRA, 28/11) : le sample original (ex. The Ballad 87), puis ton morceau
+    // (ARROSE 97) au passage, et retour au sample. Tempo du sample inconnu ou égal à 2 près : celui du morceau.
+    var bpmBox = $("[data-smp-bpm]", sheet),
+      bv = inTrack ? bpmOf(cur) : smpBpm(smp) || bpmOf(cur);
+    bpmBox.hidden = !bv;
+    bpmBox.firstChild.textContent = bv || "";
+    bpmBox.title = inTrack ? "Tempo de " + cur.track : "Tempo du sample";
     // Spotify et Apple Music : recherche du sample entendu
     var q = encodeURIComponent([smp.a, smp.t].filter(Boolean).join(" "));
     $("[data-smp-sp]", sheet).href = "https://open.spotify.com/search/" + q;

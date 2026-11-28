@@ -311,11 +311,7 @@
     if (!m) return;
     try {
       if (d || f) {
-        var next = opts();
-        if (d) next.dur = d;
-        if (f) next.fx = f;
-        m.setOptions(d ? { dur: d } : { fx: f });
-        track("samples_mix_opt", { dur: next.dur, fx: next.fx });
+        m.setOptions(d ? { dur: d } : { fx: f }); // F3 : samples_mix_opt envoyé par le moteur (opt, choice)
         menu.box.innerHTML = menuHtml(); // reste ouvert : on voit le choix
         var again = menu.box.querySelector(d ? '[data-sxm-dur="' + d + '"]' : '[data-sxm-fx="' + f + '"]');
         if (again && document.activeElement === document.body) again.focus();
@@ -325,7 +321,8 @@
       if (a === "reset") {
         m.resetOptions();
         var o = opts();
-        track("samples_mix_opt", { dur: o.dur, fx: o.fx, reset: 1 });
+        // F3 : seulement des champs gardés par le journal (dur et reset étaient jetés : événement vide)
+        track("samples_mix_opt", { opt: "reset", choice: String(o.dur), fx: o.fx });
         menu.box.innerHTML = menuHtml();
         refreshLines();
         return;

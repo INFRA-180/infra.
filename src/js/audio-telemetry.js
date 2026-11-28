@@ -173,6 +173,19 @@
   const LEGACY_DB_NAME = "infra_audio_telemetry_v1";
   const SESSION_SCHEMA_VERSION = 4;
   const SESSION_EVENT_CAP = 48;
+  // Mix (F3, 28/11/2026) : gardés en priorité, au plus 36 places sur 48 (le reste pour le site et les gestes).
+  const SESSION_MIX_PRIORITY_CAP = 36;
+  const SESSION_MIX_PRIORITY_EVENTS = new Set([
+    "samples_open",
+    "samples_pass",
+    "samples_mix_in",
+    "samples_mix_fx",
+    "samples_mix_opt",
+    "samples_audio_fail",
+    "samples_audio_slow",
+    "samples_audio_retry",
+    "samples_resync"
+  ]);
   const SESSION_STORE_CAP = 4;
   const SESSION_TTL_MS = 72 * 60 * 60 * 1000;
   const SESSION_ENVELOPE_MAX_BYTES = 32 * 1024;
@@ -793,6 +806,16 @@
     for (let index = events.length - 1; index >= 0 && keep.size < SESSION_EVENT_CAP; index -= 1) {
       const event = events[index];
       if (event && ["audio_interruption", "error"].includes(event.event)) keep.add(index);
+    }
+    // Mix (F3, 28/11/2026) : les passages et réglages du Mix passent avant les gestes répétés (glisser,
+    // pause, verrouillage), qui chassaient le début de l'écoute (23 événements perdus le 27/11).
+    for (
+      let index = events.length - 1;
+      index >= 0 && keep.size < SESSION_MIX_PRIORITY_CAP;
+      index -= 1
+    ) {
+      const event = events[index];
+      if (event && SESSION_MIX_PRIORITY_EVENTS.has(event.event)) keep.add(index);
     }
     for (let index = events.length - 1; index >= 0 && keep.size < SESSION_EVENT_CAP; index -= 1) {
       keep.add(index);

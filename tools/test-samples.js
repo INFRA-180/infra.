@@ -642,6 +642,42 @@ function fakeAudio(opts) {
   assert(!fs.existsSync(path.join(pub, "data/samples-mix.example.json")), "F1 : l'exemple de test reste hors de public/");
 }
 
+{
+  // F3 (28/11/2026) : plafond du journal — les passages du Mix ne sont plus chassés par les gestes répétés.
+  const pick = (re) => {
+    const m = telemetry.match(re);
+    assert(m, `audio-telemetry.js : ${re} introuvable`);
+    return m[0];
+  };
+  const src = [
+    pick(/const SESSION_EVENT_CAP = \d+;/),
+    pick(/const SESSION_MIX_PRIORITY_CAP = \d+;/),
+    pick(/const SESSION_MIX_PRIORITY_EVENTS = new Set\(\[[\s\S]*?\]\);/),
+    pick(/function capSessionEvents\(input\) \{[\s\S]*?\n  \}\n/)
+  ].join("\n");
+  const cap = new Function(`${src}; return capSessionEvents;`)();
+  const evs = [];
+  for (let i = 0; i < 20; i++) evs.push({ event: "samples_pass", i });
+  for (let i = 0; i < 60; i++) evs.push({ event: i % 2 ? "samples_seek" : "samples_lock", i });
+  const kept = cap(evs);
+  assert.strictEqual(kept.length, 48, "F3 : plafond 48 inchangé");
+  assert.strictEqual(kept.filter((e) => e.event === "samples_pass").length, 20, "F3 : tous les passages gardés");
+  // et le site garde de la place : au plus 36 places prioritaires
+  const many = Array.from({ length: 80 }, (_, i) => ({ event: i < 60 ? "samples_pass" : "audio_play", i }));
+  assert(cap(many).filter((e) => e.event === "audio_play").length >= 12, "F3 : 12 places au moins pour le reste");
+  // mode et champs gardés : samples_pass envoie n, choice, bpm_gap (J4) ; le mode suit la section
+  const E = loadEngine();
+  E.t.pref.sec = "mix";
+  E.t.setOptions({ fx: "echo" });
+  const opt = E.events.find((e) => e[0] === "samples_mix_opt");
+  assert(opt && opt[1].mode === "mix" && opt[1].opt === "fx" && opt[1].choice === "echo", "F3 : mode « mix » et choix notés");
+  assert(/n: passN,\s*choice: plan\.picked/.test(samplesJs), "F3 : samples_pass numéroté, effet choisi noté");
+  const ui = fs.readFileSync(path.join(pub, "assets/js/samples-mix-ui.js"), "utf8");
+  for (const m of ui.matchAll(/track\("samples_mix_opt", \{([^}]*)\}\)/g))
+    for (const k of m[1].matchAll(/([a-z_]+):/g))
+      assert(keptFields.has(k[1]), `F3 : samples_mix_opt.${k[1]} (page Mix) serait jeté`);
+}
+
 // ---------- bilan ----------
 if (errors.length) {
   console.error(`Samples checks FAILED (${errors.length}) :\n- ${errors.slice(0, 30).join("\n- ")}`);

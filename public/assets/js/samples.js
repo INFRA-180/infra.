@@ -394,10 +394,14 @@
     }
     return a;
   }
+  // F3 (28/11) : le mode (mix / samples / voix) accompagne chaque événement ; sans lui, la télémétrie
+  // y mettait le mode du lecteur du site (« album » partout).
   function track(name, extra) {
     try {
-      if (typeof window.InfraTrackEvent === "function")
-        window.InfraTrackEvent(name, extra || {});
+      var x = extra || {};
+      if (x.mode == null && /^samples_/.test(name))
+        x.mode = pref.sec === "mix" ? "mix" : pref.sec === "voix" ? "voix" : "samples";
+      if (typeof window.InfraTrackEvent === "function") window.InfraTrackEvent(name, x);
     } catch (_e) {}
   }
   function clamp(v, a, b) {
@@ -2183,7 +2187,11 @@
       st.drag = null;
       setCause("seek");
       seekTo(t);
-      track("samples_seek", { mode: st.mix ? "mix" : "samples" });
+      // F3 : rafales de glissers (3-4 en 6 s) : un seul événement par 2 s (le passage « seek » reste noté)
+      if (Date.now() - (st.seekLogAt || 0) > 2000) {
+        st.seekLogAt = Date.now();
+        track("samples_seek", { mode: st.mix ? "mix" : "samples" });
+      }
     }
     bar.addEventListener("pointerup", end);
     bar.addEventListener("pointercancel", function () {
@@ -3202,6 +3210,11 @@
         buf: buf,
         ctx: c ? c.state : "none",
         vis: document.visibilityState !== "hidden",
+        // F3 (J4) : numéro du passage, effet choisi par l'utilisateur, écart de tempo
+        n: passN,
+        choice: plan.picked || "",
+        bpm_gap:
+          plan.fromTempo && plan.toTempo ? Math.round(Math.abs(plan.fromTempo - plan.toTempo)) : -1,
       });
     };
     if (v && v.el && !v.live)

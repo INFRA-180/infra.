@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "target_lufs": -14,
+  "items": {
+    "D 2.0141|MARJOLAINE|4nag_GD6J5I": { "g": 4.5, "tg": -2, "sg": [92, 1.25, 0.8], "tgd": [92, 0.6, 0.9], "out": 68 },
+    "ALBUM|TITRE|aaaaaaaaaaa": { "g": 30, "tg": -40 },
+    "ALBUM|TITRE|bbbbbbbbbbb": { "g": "faux" }
+  }
+}

@@ -442,6 +442,28 @@ function loadEngine(opts) {
   assert.deepStrictEqual(E.t.getOptions().durations, ["none", "2", "4"]);
 }
 
+{
+  // F1 (28/11/2026) : volume égal lu dans samples-mix.json (exemple de test dans tools/fixtures, jamais dans public/).
+  const E = loadEngine();
+  const smp = { album: "D 2.0141", track: "MARJOLAINE", y: "4nag_GD6J5I" };
+  assert.strictEqual(E.t.levelOf(smp, { ci: 0 }), 1, "F1 : sans fichier, niveau inchangé");
+  const mixEx = JSON.parse(fs.readFileSync(path.join(root, "tools/fixtures/samples-mix.example.json"), "utf8"));
+  E.t.setMixData(mixEx);
+  near(E.t.levelOf(smp, { ci: 0 }), Math.pow(10, 4.5 / 20), "F1 : g appliqué à la voix du sample");
+  near(E.t.levelOf(smp, { track: true }), Math.pow(10, -2 / 20), "F1 : tg appliqué à la minute de ton morceau");
+  const chain = Object.assign({}, smp, { chain: [{ album: "ALBUM", track: "TITRE", y: "zzzzzzzzzzz" }, smp] });
+  near(E.t.levelOf(chain, { ci: 1 }), Math.pow(10, 4.5 / 20), "F1 : enchaînement → niveau du sample entendu");
+  assert.strictEqual(E.t.levelOf(chain, { ci: 0 }), 1, "F1 : sample inconnu → niveau inchangé");
+  const hot = { album: "ALBUM", track: "TITRE", y: "aaaaaaaaaaa" };
+  near(E.t.levelOf(hot, { ci: 0 }), Math.pow(10, 6 / 20), "F1 : gain borné à +6 dB");
+  near(E.t.levelOf(hot, { track: true }), Math.pow(10, -12 / 20), "F1 : gain borné à −12 dB");
+  assert.strictEqual(E.t.levelOf({ album: "ALBUM", track: "TITRE", y: "bbbbbbbbbbb" }, { ci: 0 }), 1, "F1 : valeur fausse ignorée");
+  assert.deepStrictEqual(E.t.mixInfo(smp).sg, [92, 1.25, 0.8], "F1 : grilles gardées pour les transitions");
+  E.t.setMixData({ version: 2, items: mixEx.items });
+  assert.strictEqual(E.t.levelOf(smp, { ci: 0 }), 1, "F1 : version inconnue ignorée");
+  assert(!fs.existsSync(path.join(pub, "data/samples-mix.example.json")), "F1 : l'exemple de test reste hors de public/");
+}
+
 // ---------- bilan ----------
 if (errors.length) {
   console.error(`Samples checks FAILED (${errors.length}) :\n- ${errors.slice(0, 30).join("\n- ")}`);

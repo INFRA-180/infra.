@@ -1461,6 +1461,7 @@
       first = shownList()[0];
     }
     if (!first) return;
+    if (st.mix) loadMixData(); // F1 : volume égal (fichier absent : rien ne change)
     ensureCtx(); // dans le geste : indispensable sur iPhone
     // M3 : ton morceau passe par le moteur (lecteur du lot) ; le lecteur du site n'est plus débloqué ni
     // joué pendant le Mix (B7 disparaît avec lui).
@@ -1498,6 +1499,7 @@
     if (f) f.removeAttribute("src");
     dropNext();
     stopDuo();
+    muteFx(); // F1 (bug 9) : aucune queue d'écho ou de reverb gelée par la suspension
     engStop(0.25);
     evFlush(); // l'interface sait que la transition en cours s'arrête
     clockClear();
@@ -3131,39 +3133,110 @@
   }
 
   // ---------- Bus de sortie et effets ----------
-  // voix : source → passe-haut (10 Hz, transparent ; « Basses » le fait monter) → gain → bus.in → bus.out
-  // → sortie. Les effets reçoivent un envoi pris avant le gain de la voix et reviennent dans bus.out.
+  // voix : source → niveau (volume égal, F1) → passe-haut (10 Hz, transparent ; « Basses » le fait monter)
+  // → gain → bus.in → bus.out → limiteur → sortie. Les effets reçoivent un envoi pris avant le gain de la
+  // voix et reviennent par bus.fx (coupé à la pause et à la fermeture) dans bus.out.
+  // F1 (28/11) : limiteur en fin de chaîne (deux voix + reverb pouvaient dépasser le maximum : craquement).
   function bus() {
     var c = eng.ctx;
     if (!c) return null;
     if (eng.bus && eng.bus.c === c) return eng.bus;
-    var b = { c: c, in: c.createGain(), out: c.createGain(), rev: null };
+    var b = { c: c, in: c.createGain(), out: c.createGain(), fx: c.createGain(), rev: null, lim: null };
     b.in.connect(b.out);
-    b.out.connect(c.destination);
+    b.fx.connect(b.out);
+    try {
+      var l = c.createDynamicsCompressor();
+      l.threshold.value = -1; // dB : ne travaille que sur les crêtes
+      l.knee.value = 0;
+      l.ratio.value = 20;
+      l.attack.value = 0.003;
+      l.release.value = 0.1;
+      b.out.connect(l);
+      l.connect(c.destination);
+      b.lim = l;
+    } catch (_e) {
+      b.out.connect(c.destination);
+    }
     eng.bus = b;
     return b;
   }
-  // Reverb : réponse générée (bruit stéréo qui décroît, 2,4 s), créée une seule fois.
-  function reverbIn() {
+  // Retours d'effets (écho, reverb) : coupés en 50 ms (pause, fermeture : plus de queue qui traîne),
+  // rouverts au prochain son.
+  function fxGate(on, t) {
+    var b = eng.bus;
+    if (!b || b.c !== eng.ctx || !b.fxOff === !!on) return;
+    b.fxOff = !on;
+    var gp = b.fx.gain,
+      n = b.c.currentTime;
+    t = Math.max(n, t || 0);
+    holdParam(gp, n, gp.value);
+    gp.setValueAtTime(gp.value, t);
+    gp.linearRampToValueAtTime(on ? 1 : 0, t + (on ? 0.02 : 0.05));
+  }
+  // Fige un paramètre à sa valeur réelle à l'instant t (F1 : cancelAndHoldAtTime, Safari 14.1+) ; sinon
+  // (Firefox, anciens Safari) : la valeur calculée v.
+  function holdParam(p, t, v) {
+    if (typeof p.cancelAndHoldAtTime === "function")
+      try {
+        p.cancelAndHoldAtTime(t);
+        return true;
+      } catch (_e) {}
+    p.cancelScheduledValues(t);
+    if (v != null) p.setValueAtTime(v, t);
+    return false;
+  }
+  // Graine fixe (F1) : la reverb sonne pareil à chaque écoute (avant : tirée au hasard à chaque session).
+  function seeded(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a = (a + 0x6d2b79f5) >>> 0;
+      var t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  // Reverb : réponse générée (bruit stéréo qui décroît, 2,4 s), créée une seule fois ; branchée sur le
+  // bus pendant les passages Reverb seulement (F1, bug 23 : plus de calcul permanent sur iPhone).
+  function reverbIn(until) {
     var b = bus();
     if (!b) return null;
+    var c = b.c;
     if (!b.rev) {
-      var c = b.c,
-        n = Math.round(c.sampleRate * 2.4),
-        ir = c.createBuffer(2, n, c.sampleRate);
+      var n = Math.round(c.sampleRate * 2.4),
+        ir = c.createBuffer(2, n, c.sampleRate),
+        rnd = seeded(0x1a2b3c);
       for (var ch = 0; ch < 2; ch++) {
         var d = ir.getChannelData(ch);
         for (var i = 0; i < n; i++)
-          d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+          d[i] = (rnd() * 2 - 1) * Math.pow(1 - i / n, 3);
       }
-      var cv = c.createConvolver(),
-        r = c.createGain();
+      var cv = c.createConvolver();
       cv.buffer = ir;
-      r.gain.value = 0.8;
-      cv.connect(r);
-      r.connect(b.out);
       b.rev = cv;
+      b.revOut = c.createGain();
+      b.revOut.gain.value = 0.8;
+      b.revOn = false;
     }
+    if (!b.revOn) {
+      b.rev.connect(b.revOut);
+      b.revOut.connect(b.fx);
+      b.revOn = true;
+    }
+    // débranchée quand la queue (2,4 s) est éteinte après le dernier passage Reverb
+    b.revUntil = Math.max(b.revUntil || 0, (until || c.currentTime) + 3);
+    var off = function () {
+      if (!b.revOn || eng.bus !== b) return;
+      // contexte arrêté (horloge gelée) : on revérifie plus tard
+      if (c.currentTime < b.revUntil - 0.05) return (b.revT = setTimeout(off, 1000));
+      try {
+        b.revOut.disconnect();
+        b.rev.disconnect();
+      } catch (_e) {}
+      b.revOn = false;
+    };
+    clearTimeout(b.revT);
+    b.revT = setTimeout(off, Math.max(0, b.revUntil - c.currentTime) * 1000 + 200);
     return b.rev;
   }
   // Écho : retard calé sur le tempo (3/4 de temps), retour 0,45 (< 1) assombri par un passe-bas.
@@ -3188,7 +3261,7 @@
     lp.connect(fb);
     fb.connect(dl);
     lp.connect(out);
-    out.connect(b.out);
+    out.connect(b.fx);
     setTimeout(
       function () {
         [inp, dl, lp, fb, out].forEach(function (n) {
@@ -3218,7 +3291,7 @@
     try {
       if (fx === "bass") {
         var f = v.hp.frequency;
-        f.cancelScheduledValues(T);
+        holdParam(f, T); // F1 : un balayage en cours est figé, pas coupé net
         if (role === "out") {
           f.setValueAtTime(20, T);
           f.exponentialRampToValueAtTime(900, T + D);
@@ -3235,7 +3308,7 @@
       if (role === "swap") return;
       var dest =
         fx === "reverb"
-          ? reverbIn()
+          ? reverbIn(T + D)
           : fx === "echo"
             ? echoIn(role === "out" ? plan.fromTempo : plan.toTempo, T + D)
             : null;
@@ -3256,22 +3329,71 @@
     } catch (_e) {}
   }
   function unplug(v) {
-    [v.g, v.hp].concat(v.sends || []).forEach(function (n) {
+    [v.lv, v.g, v.hp].concat(v.sends || []).forEach(function (n) {
       try {
         if (n) n.disconnect();
       } catch (_e) {}
     });
   }
-  function voiceNodes(c) {
-    var hp = c.createBiquadFilter(),
+  // lin : niveau de la voix (volume égal, F1) ; les envois d'effets le suivent (pris après lui).
+  function voiceNodes(c, lin) {
+    var lv = c.createGain(),
+      hp = c.createBiquadFilter(),
       g = c.createGain();
+    lv.gain.value = lin > 0 ? lin : 1;
     hp.type = "highpass";
     hp.frequency.value = 10;
     hp.Q.value = 0.7071;
     g.gain.value = 0;
+    lv.connect(hp);
     hp.connect(g);
     g.connect(bus().in);
-    return { hp: hp, g: g };
+    return { lv: lv, hp: hp, g: g };
+  }
+
+  // ---------- Volume égal et grilles (F1, 28/11/2026) : public/data/samples-mix.json ----------
+  // { version: 1, target_lufs: -14, items: { "<album>|<titre>|<y>": { g, tg, sg, tgd, out } } } :
+  // g = gain (dB) des extraits du sample, tg = gain (dB) de la minute de ton morceau, bornés [−12, +6] ;
+  // sg / tgd / out : grilles et sortie conseillée (lues par les transitions, lot F4/F5). Chargé seulement
+  // quand le moteur du Mix sert ; fichier absent ou faux : aucun réglage (comportement d'avant).
+  var mixData = { p: null, items: null };
+  function setMixData(j) {
+    var out = {};
+    if (j && j.version === 1 && j.items && typeof j.items === "object")
+      Object.keys(j.items).forEach(function (k) {
+        var e = j.items[k];
+        if (e && typeof e === "object") out[k] = e;
+      });
+    mixData.items = out;
+    return out;
+  }
+  function loadMixData() {
+    if (mixData.p) return mixData.p;
+    mixData.p = getJson("samples-mix.json").then(setMixData, function () {
+      return setMixData(null);
+    });
+    return mixData.p;
+  }
+  // Fiche d'un sample (son album, son morceau, son identifiant YouTube) ; null si inconnue.
+  function mixInfo(s) {
+    var m = mixData.items;
+    return (m && s && m[s.album + "|" + s.track + "|" + s.y]) || null;
+  }
+  function dbGain(db) {
+    db = Number(db);
+    return isFinite(db) ? Math.pow(10, clamp(db, -12, 6) / 20) : 1;
+  }
+  // Niveau d'une voix : partie de sample (g du sample entendu) ou minute de ton morceau (tg du premier
+  // sample de l'enchaînement, celui dont l'extrait tx est joué).
+  function levelOf(item, sg) {
+    if (!item || !mixData.items) return 1;
+    if (sg && sg.track) {
+      var it = mixInfo(item);
+      return it ? dbGain(it.tg) : 1;
+    }
+    var s = item.chain && sg ? item.chain[sg.ci || 0] || item : item,
+      e = mixInfo(s);
+    return e ? dbGain(e.g) : 1;
   }
 
   // ---------- Extraits audio (Cloudflare R2) : moteur Web Audio ----------
@@ -3473,8 +3595,9 @@
     var n = Math.max(16, Math.ceil(dur * 8)); // fondus longs (Mix) : paliers de 1/8 s au plus
     when = Math.max(now, when);
     var nowV = gainAt(v, now);
-    gp.cancelScheduledValues(0);
-    gp.setValueAtTime(nowV, now);
+    // F1 : la valeur réelle du gain à cet instant est figée par le navigateur (cancelAndHoldAtTime) ; le
+    // repli recalcule la valeur en JS (petit saut possible si le fil principal est en retard).
+    holdParam(gp, now, nowV);
     gp.setValueAtTime(from, Math.max(now, when));
     for (var k = 1; k <= n; k++)
       gp.linearRampToValueAtTime(shape(from, to, k / n), when + (dur * k) / n);
@@ -3559,13 +3682,13 @@
     if (!e) return null;
     e.busy = true;
     var el = e.el,
-      nd = voiceNodes(c),
+      nd = voiceNodes(c, levelOf(item, sg)),
       off = Math.max(0, ytFrom - sg.x[1]),
       stopT = null;
     try {
       e.node.disconnect();
     } catch (_e) {}
-    e.node.connect(nd.hp);
+    e.node.connect(nd.lv);
     var release = function () {
       clearTimeout(stopT);
       e.v = null;
@@ -3582,6 +3705,7 @@
     };
     var v = {
       el: el,
+      lv: nd.lv,
       g: nd.g,
       hp: nd.hp,
       item: item,
@@ -3651,12 +3775,13 @@
   function startVoice(buf, item, k, ytFrom, when, sgIn) {
     var c = eng.ctx,
       sg = sgIn || segOf(item, k),
-      nd = voiceNodes(c),
+      nd = voiceNodes(c, levelOf(item, sg)),
       s = c.createBufferSource();
     s.buffer = buf;
-    s.connect(nd.hp);
+    s.connect(nd.lv);
     var v = {
       s: s,
+      lv: nd.lv,
       g: nd.g,
       hp: nd.hp,
       item: item,
@@ -3727,6 +3852,7 @@
     eng.hold = null;
     st.ended = false;
     ensureCtx();
+    fxGate(true, plan.when); // effets rouverts (coupés à la pause ou à la fermeture)
     pauseMusic(); // le lecteur du site reste en pause pendant les Samples et le Mix
     var ready = !sg.stream && eng.bufs[key] && eng.bufs[key].buf;
     if (ready) plan.pre = true; // extrait déjà en mémoire : départ à l'instant prévu
@@ -3844,6 +3970,20 @@
     setCause("fail");
     play(item, true, false, st.mix ? segsOf(item)[k].from : 0);
   }
+  // Envois vers les effets coupés et retours fermés (pause, fermeture) : aucune queue après l'arrêt.
+  function muteFx() {
+    if (!eng.ctx) return;
+    var n = eng.ctx.currentTime;
+    eng.voices.forEach(function (v) {
+      (v.sends || []).forEach(function (s) {
+        try {
+          holdParam(s.gain, n, s.gain.value);
+          s.gain.linearRampToValueAtTime(0, n + 0.04);
+        } catch (_e) {}
+      });
+    });
+    fxGate(false);
+  }
   function engPause() {
     var v = eng.cur;
     if (v) eng.hold = { item: v.item, k: v.k, t: ytNow(v), name: v.name };
@@ -3856,6 +3996,7 @@
       duo.prepped = false;
       dropTv();
     }
+    muteFx(); // F1 (bug 8) : l'écho et la reverb se taisent avec la musique
     engHush(0.08);
     eng.paused = true;
     yt.state = 2;
@@ -4784,6 +4925,9 @@
       planOf: planOf,
       seekTo: seekTo,
       trackSeg: trackSeg,
+      setMixData: setMixData,
+      levelOf: levelOf,
+      mixInfo: mixInfo,
       supports: supports,
       getOptions: getOptions,
       setOptions: setOptions,

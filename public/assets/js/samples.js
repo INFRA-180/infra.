@@ -2676,6 +2676,7 @@
   function trackIn(tv, plan, T) {
     var i = duo.item,
       yts = !eng.on; // sample joué par YouTube
+    eng.gen++; // bug 10 : les rappels de la partie de sample en cours (flux lent) ne coupent plus ton morceau
     duo.inWait = null;
     tv.prep = false;
     if (duo.tv === tv) duo.tv = null;
@@ -2740,6 +2741,7 @@
       } catch (_e) {}
       tv.prep = false;
       duo.tv = null;
+      eng.gen++; // bug 10
       transition({ all: true, except: tv, main: eng.cur }, { v: tv }, plan);
       eng.on = true;
       eng.paused = false;
@@ -4159,7 +4161,15 @@
         eng.cur = sv;
         eng.armed = false;
         onLive(sv, fire);
-        setTimeout(fire, 8000);
+        // bug 11 : toujours aucun son à 8 s (réseau) : plus de fondu dans le vide ; le tampon décodé prend le
+        // relais (le son d'avant continue jusqu'à lui)
+        setTimeout(function () {
+          if (fired || gen !== eng.gen) return;
+          if (sv.live || sg.stream) return fire(); // ton morceau sans extrait : pas de tampon possible
+          fired = true;
+          track("samples_audio_retry", { mode: st.mix ? "mix" : "samples" });
+          engStart(item, k, ytFrom, plan, true);
+        }, 8000);
         // le flux d'abord : le préchargement du suivant attend que ce son soit bien parti (réseau lent)
         var g0 = gen;
         setTimeout(function () {

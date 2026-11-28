@@ -362,6 +362,10 @@
   function bpmOf(i) {
     return i && i.tb ? Math.round(i.tb) : 0;
   }
+  // Tempo du sample original : bpm = [sample, morceau] quand ils diffèrent de plus de 2 ; sinon celui du morceau.
+  function smpBpm(i) {
+    return i && i.bpm && Number(i.bpm[0]) ? Math.round(i.bpm[0]) : bpmOf(i);
+  }
   function byTempo(list, desc) {
     return list
       .map(function (i, k) {
@@ -702,14 +706,23 @@
   }
   // Page Mix (T bis 6) : pile des 3 prochaines pochettes (toucher = lancer « Tout le Mix »), le nombre
   // d'enchaînements et l'écart de tempo, BPM / aléatoire (V1), ligne des réglages « ≈ Auto · Fondu › ».
+  // Pile du Mix (INFRA, 28/11) : l'ordre tiré au hasard est gardé jusqu'au lancement (plus de pochettes qui
+  // changent à chaque affichage), et la pochette du dessus est le premier son joué.
+  var mixPile = null;
   function mixHead(pool) {
     var sort = sortFor(true, "all"),
-      order =
-        sort === "bpm" || sort === "bpmdown"
-          ? byTempo(pool, sort === "bpmdown")
-          : sort === "shuffle"
-            ? shuffle(pool)
-            : pool,
+      key = sort + "|" + pool.length;
+    if (!mixPile || mixPile.key !== key)
+      mixPile = {
+        key: key,
+        order:
+          sort === "bpm" || sort === "bpmdown"
+            ? byTempo(pool, sort === "bpmdown")
+            : sort === "shuffle"
+              ? shuffle(pool)
+              : pool,
+      };
+    var order = mixPile.order,
       covers = [],
       bpms = pool.map(bpmOf).filter(Boolean);
     // pile = les pochettes des samples (maquette V2, 4_INTERFACE D6), plus celles des albums
@@ -1454,7 +1467,14 @@
     if (st.mix) st.list = list = chainOf(list, pref.sec === "samples");
     st.voix = voix == null ? secVoix() : voix;
     st.sort = sortFor(pref.sec === "mix", scope);
-    reshuffle(null);
+    // le son demandé (pochette du dessus de la pile, tuile du mur…) passe en tête de l'aléatoire
+    reshuffle(
+      start
+        ? list.filter(function (c) {
+            return c === start || (c.chain && c.chain.indexOf(start) >= 0);
+          })[0] || null
+        : null,
+    );
     var sl = shownList(),
       first = start
         ? sl.filter(function (c) {
@@ -1725,9 +1745,6 @@
       "here",
       "shuffle",
     );
-    var bpmBox = $("[data-smp-bpm]", sheet);
-    bpmBox.hidden = !bpmOf(cur);
-    bpmBox.firstChild.textContent = bpmOf(cur) || "";
     // barre : un segment (Samples) ou deux (Mix : sample | morceau)
     // barre : Samples = un morceau ; Mix = chaque partie du (des) sample(s), puis ton morceau
     var segsM = cur.segs || [{ s0: cur.s0, s1: cur.s1, ci: 0, from: 0 }],
@@ -1762,7 +1779,8 @@
               '" title="Revenir au début de ce sample" style="flex:' +
               len +
               '" dir="auto">' +
-              esc(chain.length > 1 ? c.t : "Sample") +
+              // titre du sample, pas le mot « Sample » (INFRA, 28/11) : « For Penny | ANDREÏ MARKOV »
+              esc(c.t || "Sample") +
               "</button>"
             );
           })
@@ -1969,6 +1987,13 @@
         main.classList.add("sx-swap");
       }
     }
+    // BPM de ce qu'on entend (INFRA, 28/11) : le sample original (ex. The Ballad 87), puis ton morceau
+    // (ARROSE 97) au passage, et retour au sample. Tempo du sample inconnu ou égal à 2 près : celui du morceau.
+    var bpmBox = $("[data-smp-bpm]", sheet),
+      bv = inTrack ? bpmOf(cur) : smpBpm(smp) || bpmOf(cur);
+    bpmBox.hidden = !bv;
+    bpmBox.firstChild.textContent = bv || "";
+    bpmBox.title = inTrack ? "Tempo de " + cur.track : "Tempo du sample";
     // Spotify et Apple Music : recherche du sample entendu
     var q = encodeURIComponent([smp.a, smp.t].filter(Boolean).join(" "));
     $("[data-smp-sp]", sheet).href = "https://open.spotify.com/search/" + q;
@@ -4838,7 +4863,10 @@
       return rerender();
     }
     if (t.closest("[data-smp-all]")) {
-      var mix = pref.sec === "mix";
+      var mix = pref.sec === "mix",
+        top = mix && mixPile && mixPile.order[0];
+      if (top && top.chain) top = top.chain[0];
+      mixPile = null; // prochain retour sur la page : nouvelle pile
       return open(
         mix ? all() : all().filter(keep(mix, secVoix())),
         mix
@@ -4847,6 +4875,10 @@
             ? "Les chansons d’origine"
             : "Tous les samples",
         "all",
+        null,
+        null,
+        null,
+        top || null,
       );
     }
     var cur =

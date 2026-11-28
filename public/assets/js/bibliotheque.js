@@ -15,7 +15,7 @@
   window.__infraBibliotheque = true;
   var scriptUrl = document.currentScript && document.currentScript.src;
 
-  var VIEWS = ["accueil", "albums", "playlists", "samples", "titres", "favoris"];
+  var VIEWS = ["accueil", "albums", "playlists", "samples", "titres", "favoris", "credits"];
   var SORTS = { site: "Ordre du site", az: "A → Z", duree: "Durée", titres: "Nombre de titres" };
   var HOME_ALBUMS = 12; // 12 sur un écran très large (6 par rangée) ; 10 ailleurs (CSS, maquette V19)
   var store = {
@@ -234,6 +234,7 @@
     if (state.q) renderTracksView();
     else if (state.view === "titres") renderTracksView();
     else if (state.view === "samples") renderSamplesView();
+    else if (state.view === "credits") renderCreditsView();
     else clearPanel();
   }
 
@@ -598,6 +599,43 @@
       })
       .catch(function () {
         p.innerHTML = '<p class="bib-empty">Les samples n\'ont pas pu être chargés.</p>';
+      });
+  }
+
+  // Onglet Crédits (maquette V26, validée par INFRA le 28/11/2026) : credits.js, chargé au premier besoin.
+  var creditsJs = null;
+  function loadCreditsJs() {
+    if (window.InfraCredits) return Promise.resolve(window.InfraCredits);
+    if (creditsJs) return creditsJs;
+    creditsJs = new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = scriptUrl
+        ? new URL("credits.js?v=" + (window.INFRA_BUILD_TAG || ""), scriptUrl).href
+        : "assets/js/credits.js";
+      s.async = true;
+      s.onload = function () {
+        if (window.InfraCredits) resolve(window.InfraCredits);
+        else reject(new Error("credits"));
+      };
+      s.onerror = function () {
+        creditsJs = null;
+        reject(new Error("credits"));
+      };
+      document.head.appendChild(s);
+    });
+    return creditsJs;
+  }
+  function renderCreditsView() {
+    var p = panel();
+    if (!p) return;
+    if (!p.querySelector(".icr-page")) p.innerHTML = '<p class="bib-empty">Chargement…</p>';
+    loadCreditsJs()
+      .then(function (api) {
+        if (state.view === "credits" && !state.q) return api.renderPage(panel());
+      })
+      .catch(function () {
+        var q = panel();
+        if (q) q.innerHTML = '<p class="bib-empty">Les crédits n\'ont pas pu être chargés.</p>';
       });
   }
 

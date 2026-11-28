@@ -18,11 +18,11 @@ const home = read("src/js/home-catalog.js");
 const fav = read("src/js/favorites-ui.js");
 const styles = read("public/assets/css/styles.css");
 
-// Accueil : phrase retirée, six onglets dans l'ordre validé (V5 : « Apps & clips » retiré ; Samples ajouté
-// après Playlists, maquette Samples v2 validée par INFRA le 18/11/2026), recherche
+// Accueil : phrase retirée, sept onglets dans l'ordre validé (V5 : « Apps & clips » retiré ; Samples ajouté
+// après Playlists, maquette Samples v2 validée par INFRA le 18/11/2026 ; Crédits en dernier, V26 validée le 28/11/2026), recherche
 expect(!codeTest(/class="hero-sub"/, index), "la phrase sous le logo est revenue");
 const tabs = [...index.matchAll(/data-bib-tab="([a-z]+)"/g)].map((m) => m[1]);
-expect(tabs.join(",") === "accueil,albums,playlists,samples,titres,favoris", "onglets attendus : " + tabs.join(","));
+expect(tabs.join(",") === "accueil,albums,playlists,samples,titres,favoris,credits", "onglets attendus : " + tabs.join(","));
 expect(codeTest(/data-bib-search/, index) && codeTest(/data-bib-searchbtn/, index), "recherche absente");
 // Ordre du HTML gardé pour l'outil de mise à jour du catalogue ; ordre visuel en CSS
 expect(codeIndexOf(index, 'data-module-id="albums"') < codeIndexOf(index, 'data-module-id="playlists"'), "l'ordre du HTML a changé");

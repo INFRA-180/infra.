@@ -1,5 +1,7 @@
 // Crédits d'un morceau, d'un album, d'un artiste samplé (maquette V25 validée par INFRA le 27/11/2026 : « Go, reporte V25 »).
 // Morceau : résumé puis détail (samples ouverts avec ▶, Sons et Chaîne repliés). Album : livret (morceaux en accordéon).
+// V26 (28/11/2026, validée par INFRA) : « INFRA » + rôles, session (début date et heure, Ableton, tempo, lieu, pistes),
+// voix (a cappella en texte + lien vers l’original), instruments joués, chaîne de mastering.
 // Ordinateur : panneau à droite ; téléphone : feuille du bas. Chargé à la demande par track-actions.js.
 // Données : data/credits.json (projets Ableton relus, rien de privé) + data/samples.json (une seule source des samples).
 (function () {
@@ -7,7 +9,10 @@
   if (window.InfraCredits) return;
 
   var BUILD = window.INFRA_BUILD_TAG || "";
+  var MOIS_L = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  var JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
   var MOIS = ["janv.", "févr.", "mars", "avril", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+  var ROLE_ORDER = ["Production", "Arrangement", "Mixage", "Mastering"];
   var CAT_ORDER = ["Instruments", "Égaliseurs", "Compression", "Limiteurs", "Saturation et bande", "Espace", "Modulation", "Filtres", "Outils", "Autres"];
   var VCOL = { FabFilter: "#f2a33a", "Universal Audio": "#8d8d8d", Soundtoys: "#e2474b", Arturia: "#3d7be0", "Analog Obsession": "#6aa36f",
     "Plugin Alliance": "#c9a227", Ableton: "#9a9a9a", Sonnox: "#5aa6d8", Cableguys: "#9a62d6", "SIR Audio Tools": "#5fbfb0" };
@@ -69,6 +74,17 @@
     var n = function (v) { return String(v || "").normalize("NFC").trim().toLocaleUpperCase("fr"); };
     return n(a) === n(b);
   }
+  function quand(h) {
+    // « 2026-08-23 20:22 » → « dimanche 23 août 2026 · 20 h 22 » (heure de Paris, lue dans le projet)
+    var m = /^(\d{4})-(\d\d)-(\d\d)(?: (\d\d):(\d\d))?/.exec(h || "");
+    if (!m) return "";
+    var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return JOURS[d.getUTCDay()] + " " + Number(m[3]) + " " + MOIS_L[+m[2] - 1] + " " + m[1] + (m[4] ? " · " + Number(m[4]) + "\u00a0h\u00a0" + m[5] : "");
+  }
+  function court(h) {
+    var m = /^(\d{4})-(\d\d)-(\d\d)(?: (\d\d):(\d\d))?/.exec(h || "");
+    return m ? m[3] + "/" + m[2] + "/" + m[1] + (m[4] ? " · " + Number(m[4]) + "\u00a0h\u00a0" + m[5] : "") : "";
+  }
   function moisAn(d) { return d ? MOIS[Number(d.slice(5, 7)) - 1] + " " + d.slice(0, 4) : ""; }
   function periode(a, b) { var x = moisAn(a), y = moisAn(b); return !x ? "" : !y || x === y ? x : x + " → " + y; }
   function plural(n, w) { return n + " " + w + (n > 1 ? "s" : ""); }
@@ -113,6 +129,28 @@
       ".icr h1{margin:0;font:800 26px/1.08 'Avenir Next','Avenir',Arial,sans-serif;overflow-wrap:anywhere}",
       ".icr .m{opacity:.6;font-size:13px;margin-top:4px}",
       ".icr .roles{opacity:.72;font-size:13px}",
+      ".icr .who{margin:0 0 4px}",
+      ".icr .who b{display:block;font:800 20px/1.15 'Avenir Next','Avenir',Arial,sans-serif;letter-spacing:.01em}",
+      ".icr .who span{display:block;opacity:.72;font-size:13px;margin-top:2px}",
+      ".icr .kv{display:grid;grid-template-columns:132px minmax(0,1fr);gap:4px 12px;margin:0;font-size:13px}",
+      "@media (max-width:639px){.icr .kv{grid-template-columns:118px minmax(0,1fr)}}",
+      ".icr .kv dt{opacity:.5}",
+      ".icr .kv dd{margin:0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}",
+      ".icr .ext{display:inline-flex;align-items:center;min-height:32px;font-size:12px;font-weight:600;color:inherit;text-decoration:none}",
+      "@media (hover:hover){.icr .ext:hover{text-decoration:underline;text-underline-offset:2px}}",
+      ".icr .sxgo{min-height:32px;padding:0;font-size:12px;font-weight:600}",
+      ".icr.icr-page{position:static;inset:auto;z-index:auto;width:auto;height:auto;display:block;transform:none;transition:none;box-shadow:none;border-radius:0;background:transparent;color:inherit;padding:8px 0 32px}",
+      ".icr.icr-page h1{font-size:34px;margin:4px 0 12px}",
+      ".icr-page .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 32px}",
+      "@media (max-width:639px){.icr-page .cols{grid-template-columns:1fr}}",
+      ".icr-page .alg{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:16px 12px;margin-top:8px}",
+      "@media (max-width:639px){.icr-page .alg{grid-template-columns:repeat(3,minmax(0,1fr))}}",
+      ".icr-page .alg button{display:block;text-align:left;padding:0;font-size:12px;line-height:1.3;min-width:0}",
+      ".icr-page .alg img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;margin-bottom:6px;background:rgba(127,127,127,.2)}",
+      ".icr-page .alg span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}",
+      ".icr-page .line{font-size:13px;opacity:.8}",
+      ".icr .chain{display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;padding:2px 0 4px}",
+      ".icr .chain i{opacity:.35;font-style:normal;margin:0 6px}",
       ".icr .facts{opacity:.5;font-size:12px;margin-top:6px;font-variant-numeric:tabular-nums}",
       ".icr .sec{font-size:13px;letter-spacing:.1em;text-transform:uppercase;opacity:.5;font-weight:600;margin:26px 0 4px;min-height:32px;display:flex;align-items:center;gap:10px}",
       ".icr .song{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px;align-items:center;padding:8px 0}",
@@ -199,6 +237,7 @@
       if (e.pointerType === "mouse" && e.target.closest("[data-fx]")) hideFx();
     });
     root.querySelector(".icr-body").addEventListener("scroll", hideFx, { passive: true });
+    window.addEventListener("scroll", hideFx, { passive: true }); // page de l'onglet Crédits
     // Téléphone : tirer la feuille vers le bas depuis la poignée ou le haut la ferme
     var drag = null;
     root.addEventListener("pointerdown", function (e) {
@@ -288,8 +327,41 @@
   }
 
   // ---------- Morceaux de rendu (V25) ----------
-  function roles(facts) {
-    return '<div class="roles">' + esc(data.credits.roles) + '</div><div class="facts">' + facts.filter(Boolean).map(esc).join(" · ") + "</div>";
+  function who() {
+    return '<div class="who"><b>' + esc(data.credits.by || "INFRA") + "</b><span>" + esc(String(data.credits.roles || "").split(" · ").sort(function (a, b) {
+      return ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b);
+    }).join(" · ")) + "</span></div>";
+  }
+  function kv(rows) {
+    rows = rows.filter(function (r) { return r[1]; });
+    return rows.length ? '<h2 class="sec">Session</h2><dl class="kv">' + rows.map(function (r) { return "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>"; }).join("") + "</dl>" : "";
+  }
+  function pistesTxt(k) {
+    if (!k) return "";
+    return [k[0] ? k[0] + " audio" : "", k[1] ? k[1] + " MIDI" : "", k[2] ? plural(k[2], "retour") : ""].filter(Boolean).join(" · ");
+  }
+  function voixFold(vx) {
+    if (!vx || !vx.length) return "";
+    var who = [];
+    vx.forEach(function (v) { if (v[1] && who.indexOf(v[1]) < 0) who.push(v[1]); });
+    var body = vx.map(function (v) {
+      var link = v[2] ? '<a class="ext" href="https://www.youtube.com/watch?v=' + encodeURIComponent(v[2]) + '" target="_blank" rel="noopener noreferrer">Écouter l’original ↗</a>' : "";
+      return '<div class="song"><div style="min-width:0"><div class="t">« ' + esc(v[0]) + " »</div>" + (v[1] ? '<div class="x">' + esc(v[1]) + "</div>" : "") + link + "</div><span></span></div>";
+    }).join("");
+    return fold("Voix", vx.length + " a cappella" + (who.length ? " · " + who.slice(0, 3).map(esc).join(", ") : ""), body);
+  }
+  function instFold(list) {
+    if (!list || !list.length) return "";
+    var body = '<div class="fxl">' + list.map(function (x) { return '<span class="fx v">' + esc(x[0]) + (x[1] ? "<small>" + esc(x[1]) + "</small>" : "") + "</span>"; }).join("") + "</div>";
+    return fold("Instruments", list.map(function (x) { return esc(x[0]); }).join(" · "), body);
+  }
+  function masterBlock(m) {
+    var ids = (m || []).filter(function (id) { return data.credits.plugins[id]; });
+    if (!ids.length) return "";
+    return '<h2 class="sec">Chaîne de mastering</h2><div class="chain">' + ids.map(function (id) {
+      var pl = data.credits.plugins[id];
+      return fxButton({ id: id, name: pl[0], vst: pl[1], on: ["Master"] }, ["Master"]);
+    }).join("<i>→</i>") + "</div>";
   }
   function pics(x) {
     var out = [];
@@ -297,11 +369,13 @@
     if (x.bpm) out.push('<span class="pic" title="Tempo ' + x.bpm[0] + " → " + x.bpm[1] + ' BPM">' + IC.tempo + x.bpm[0] + "→" + x.bpm[1] + "</span>");
     return out.length ? '<div class="x">' + out.join("") + "</div>" : "";
   }
-  function songs(items, albumTitle, trackTitle) {
+  function songs(items, albumTitle, trackTitle, pro) {
     return items.map(function (x, i) {
       var artist = x.a ? '<button type="button" class="who-l" data-artist="' + esc(x.a) + '" title="Tous les samples de ' + esc(x.a) + ' chez INFRA">' + esc(x.a) + "</button>" : "";
       var sub = [artist, x.an ? esc(x.an) : "", x.v ? "voix" : ""].filter(Boolean).join(" · ");
-      return '<div class="song"><div style="min-width:0"><div class="t">' + esc(x.t) + "</div>" + (sub ? '<div class="x">' + sub + "</div>" : "") + pics(x) + "</div>" +
+      var title = pro ? "Contient un sample de « " + esc(x.t) + " »" : esc(x.t);
+      var go = pro ? '<button type="button" class="sxgo" data-sxgo data-al="' + esc(albumTitle) + '" data-tr="' + esc(trackTitle) + '">Voir dans Samples ›</button>' : "";
+      return '<div class="song"><div style="min-width:0"><div class="t">' + title + "</div>" + (sub ? '<div class="x">' + sub + "</div>" : "") + pics(x) + go + "</div>" +
         '<button type="button" class="lis" data-listen="' + i + '" data-al="' + esc(albumTitle) + '" data-tr="' + esc(trackTitle) + '" aria-label="Écouter ' + esc(x.t) + '" title="Écouter">' + IC.play + "</button></div>";
     }).join("");
   }
@@ -309,10 +383,10 @@
     return '<details class="fold"><summary><span style="min-width:0"><b>' + esc(title) + "</b><span>" + summary + "</span></span>" + IC.chev + "</summary>" + body + "</details>";
   }
   function soundsFold(c) {
-    var n = c.sp.reduce(function (k, s) { return k + s[2]; }, 0) + (c.u || 0);
+    var n = count(c.sp) + (c.u || 0);
     if (!n) return "";
     var labs = {};
-    c.sp.forEach(function (s) { (labs[s[0]] = labs[s[0]] || []).push(s); });
+    (c.sp || []).forEach(function (s) { (labs[s[0]] = labs[s[0]] || []).push(s); });
     var names = Object.keys(labs).sort(function (a, b) { return count(labs[b]) - count(labs[a]); });
     var body = names.map(function (l) {
       return '<div class="lab">' + esc(l) + "</div>" + labs[l].map(function (s) {
@@ -321,7 +395,7 @@
     }).join("") + (c.u ? '<div class="lab">Batterie</div><div class="it"><div class="x">' + plural(c.u, "son") + " d’origine inconnue</div></div>" : "");
     return fold("Sons", plural(n, "son") + (names.length ? " · " + plural(names.length, "créateur") : ""), body);
   }
-  function count(list) { return list.reduce(function (k, s) { return k + s[2]; }, 0); }
+  function count(list) { return (list || []).reduce(function (k, s) { return k + s[2]; }, 0); }
   function fxIndex(pistes, master) {
     var by = {};
     var all = (master && master.length ? [["Master", master]] : []).concat(pistes || []);
@@ -361,7 +435,7 @@
       '<div data-all hidden><div class="seg" role="tablist"><button type="button" role="tab" aria-selected="true" data-fxview="type">Par type</button>' +
       '<button type="button" role="tab" aria-selected="false" data-fxview="piste">' + esc(labelTrack || "Par piste") + "</button></div>" +
       '<div data-fxbox="type">' + byType + '</div><div data-fxbox="piste" hidden>' + byTrack + "</div></div>";
-    return fold("Chaîne", plural(all.length, "plugin") + (eds.length ? " · " + eds.slice(0, 3).map(esc).join(", ") : ""), body);
+    return fold(labelTrack === "Par morceau" ? "Plugins les plus utilisés" : "Plugins", plural(all.length, "plugin") + (eds.length ? " · " + eds.slice(0, 3).map(esc).join(", ") : ""), body);
   }
 
   // ---------- Vues ----------
@@ -376,10 +450,20 @@
         var items = album ? samplesOf(album.title, title) : [];
         var img = cover(album);
         var head = '<div class="crh"><img src="' + esc(img) + '" alt=""><div><h1>' + esc(title) + '</h1><div class="m">' + esc(album ? album.title : "") + "</div></div></div>";
-        var facts = [data.credits.lieu, c ? periode(c.s, c.e) : "", c && c.b ? c.b + " BPM" : "", "Tout sur ordinateur"];
-        return head + roles(facts) +
-          (items.length ? '<h2 class="sec">Samples <span>' + items.length + "</span></h2>" + songs(items, album.title, title) : "") +
-          (c ? soundsFold(c) + chainFold(c.p, c.m) : "");
+        var full = c && c.p;
+        var sess = kv([
+          ["Projet commencé", full ? quand(c.h) || quand(c.s) : ""],
+          ["Dernière session", full && c.he && c.he !== c.h ? quand(c.he) : ""],
+          ["Logiciel", full && c.v ? "Ableton Live " + c.v : ""],
+          ["Tempo", full && c.b ? c.b + " BPM" : ""],
+          ["Lieu", data.credits.lieu],
+          ["Pistes", full ? pistesTxt(c.k) : ""]
+        ]);
+        return head + who() + sess +
+          (items.length ? '<h2 class="sec">Samples <span>' + items.length + "</span></h2>" + songs(items, album.title, title, true) : "") +
+          voixFold(c && c.vx) +
+          (full ? instFold(c.in) + masterBlock(c.m) + soundsFold(c) + chainFold(c.p, c.m) : "") +
+          '<div class="gear">Écoute : ' + esc(data.credits.materiel) + "<br>Tout sur ordinateur, aucune prise de son.</div>";
       }
     };
   }
@@ -390,35 +474,38 @@
       html: function () {
         if (!album) return '<p class="empty">Album introuvable.</p>';
         var cs = album.tracks.map(function (_t, i) { return creditOf(slug, i + 1); });
-        var ok = cs.filter(Boolean);
+        var ok = cs.filter(function (c) { return c && c.p; });
         var st = ok.map(function (c) { return c.s; }).filter(Boolean).sort();
         var en = ok.map(function (c) { return c.e; }).filter(Boolean).sort();
+        var vers = [];
+        ok.forEach(function (c) { if (c.v && vers.indexOf(c.v) < 0) vers.push(c.v); });
+        vers.sort(function (a, b) { return a.localeCompare(b, "fr", { numeric: true }); });
         var rows = album.tracks.map(function (t, i) {
           var c = cs[i];
           var items = samplesOf(album.title, t.title);
-          var sons = c ? count(c.sp) + (c.u || 0) : 0;
-          var sum = [items.length ? plural(items.length, "sample") : "", sons ? plural(sons, "son") : ""].filter(Boolean).join(" · ") || "—";
+          var sons = c && c.p ? count(c.sp) + (c.u || 0) : 0;
+          var sum = [c && c.h ? "commencé le " + court(c.h) : "", items.length ? plural(items.length, "sample") : "", sons ? plural(sons, "son") : ""].filter(Boolean).join(" · ") || "—";
           var inside = (items.length ? songs(items, album.title, t.title) : "") +
             '<button type="button" class="go" data-track="' + esc(slug) + ":" + (i + 1) + '">Tout le détail ' + IC.chev + "</button>";
           return '<details class="acc"><summary><span class="i">' + String(i + 1).padStart(2, "0") + '</span><span style="min-width:0"><span class="t">' + esc(t.title) +
             '</span><span class="x">' + sum + "</span></span>" + IC.chev + '</summary><div class="in">' + inside + "</div></details>";
         }).join("");
         var labs = {};
-        ok.forEach(function (c) { c.sp.forEach(function (s) { labs[s[0]] = (labs[s[0]] || 0) + s[2]; }); });
+        ok.forEach(function (c) { (c.sp || []).forEach(function (s) { labs[s[0]] = (labs[s[0]] || 0) + s[2]; }); });
         var labNames = Object.keys(labs).sort(function (a, b) { return labs[b] - labs[a]; });
         var pistes = album.tracks.map(function (t, i) {
           var c = cs[i];
-          if (!c) return null;
+          if (!c || !c.p) return null;
           var ids = [];
           c.p.forEach(function (p) { p[1].forEach(function (id) { ids.push(id); }); });
-          return [t.title, ids.concat(c.m)];
+          return [t.title, ids.concat(c.m || [])];
         }).filter(Boolean);
         return '<div class="crh"><img src="' + esc(cover(album)) + '" alt=""><div><h1>' + esc(album.title) + '</h1><div class="m">Crédits · ' + plural(album.tracks.length, "titre") + "</div></div></div>" +
-          roles([data.credits.lieu, periode(st[0], en[en.length - 1]), "Tout sur ordinateur"]) +
+          who() + kv([["Période", periode(st[0], en[en.length - 1])], ["Logiciel", vers.length ? "Ableton Live " + (vers.length > 1 ? vers[0] + " → " + vers[vers.length - 1] : vers[0]) : ""], ["Lieu", data.credits.lieu]]) +
           '<h2 class="sec">Morceaux</h2>' + rows +
           (labNames.length ? fold("Créateurs des sons", plural(labNames.length, "créateur"), '<p class="top">' + labNames.map(function (l) { return "<b>" + esc(l) + "</b> " + labs[l]; }).join(" · ") + "</p>") : "") +
           chainFold(pistes, [], "Par morceau") +
-          '<div class="gear">' + esc(data.credits.materiel) + "</div>";
+          '<div class="gear">Écoute : ' + esc(data.credits.materiel) + "<br>Tout sur ordinateur, aucune prise de son.</div>";
       }
     };
   }
@@ -453,6 +540,10 @@
     if (t.closest("[data-icr-back]")) return back();
     var ar = t.closest("[data-artist]");
     if (ar) { track("credits_artist", {}); return show(artistView(ar.getAttribute("data-artist"))); }
+    var alb = t.closest("[data-album]");
+    if (alb) { track("credits_album", {}); return show(albumView(alb.getAttribute("data-album"))); }
+    var tab = t.closest("[data-goto-samples]");
+    if (tab) { var b = document.querySelector('[data-bib-tab="samples"]'); if (b) b.click(); return; }
     var tr = t.closest("[data-track]");
     if (tr) {
       var p = tr.getAttribute("data-track").split(":");
@@ -460,6 +551,8 @@
     }
     var lis = t.closest("[data-listen]");
     if (lis) return listen(lis);
+    var sx = t.closest("[data-sxgo]");
+    if (sx) return seeSamples(sx);
     var all = t.closest("[data-seeall]");
     if (all) {
       var box = all.parentElement.querySelector("[data-all]");
@@ -481,6 +574,15 @@
       return;
     }
     hideFx();
+  }
+  function seeSamples(b) {
+    track("credits_samples", {});
+    var go = function (s) { close(); return s.openTrack(b.getAttribute("data-al"), b.getAttribute("data-tr")); };
+    if (window.InfraSamples) return go(window.InfraSamples);
+    var s = document.createElement("script");
+    s.src = siteRoot() + "assets/js/samples.js?v=" + encodeURIComponent(BUILD);
+    s.onload = function () { if (window.InfraSamples) go(window.InfraSamples); };
+    document.head.appendChild(s);
   }
   function listen(b) {
     var api = window.InfraSamples;
@@ -521,6 +623,64 @@
     if (fxCard) { fxCard.remove(); fxCard = null; }
   }
 
+  // ---------- Onglet Crédits (V26, validée par INFRA le 28/11/2026) ----------
+  function pageHtml() {
+    var albums = data.tracks.albums || [];
+    var nTracks = 0, nSamples = 0, vers = [], years = [], use = {};
+    albums.forEach(function (a) {
+      nTracks += (a.tracks || []).length;
+      (a.tracks || []).forEach(function (t, i) {
+        var c = creditOf(a.slug, i + 1);
+        if (samplesOf(a.title, t.title).length) nSamples++;
+        if (!c || !c.p) return;
+        if (c.v && vers.indexOf(c.v) < 0) vers.push(c.v);
+        if (c.s) years.push(c.s.slice(0, 4));
+        var seen = {};
+        c.p.forEach(function (p) { p[1].forEach(function (id) { seen[id] = 1; }); });
+        (c.m || []).forEach(function (id) { seen[id] = 1; });
+        Object.keys(seen).forEach(function (id) { use[id] = (use[id] || 0) + 1; });
+      });
+    });
+    vers.sort(function (a, b) { return a.localeCompare(b, "fr", { numeric: true }); });
+    years.sort();
+    var labs = {};
+    (data.samples.albums || []).forEach(function (a) { (a.tracks || []).forEach(function (t) { (t.items || []).forEach(function (x) { if (x.a) labs[x.a] = 1; }); }); });
+    var top = Object.keys(use).filter(function (id) { return data.credits.plugins[id] && data.credits.plugins[id][1]; })
+      .sort(function (a, b) { return use[b] - use[a]; }).slice(0, 10).map(function (id) {
+        var pl = data.credits.plugins[id];
+        return fxButton({ id: id, name: pl[0], vst: 1, on: [] }, [plural(use[id], "morceau").replace("morceaus", "morceaux")]);
+      }).join("");
+    var grid = albums.map(function (a) {
+      return '<button type="button" data-album="' + esc(a.slug) + '" title="Crédits de ' + esc(a.title) + '"><img src="' + esc(cover(a)) + '" alt="" loading="lazy" decoding="async"><span>' + esc(a.title) + "</span></button>";
+    }).join("");
+    return '<h1>Crédits</h1>' +
+      '<div class="who"><b>' + esc(data.credits.by || "INFRA") + "</b><span>" + esc(ROLE_ORDER.join(" · ")) + " — " + nTracks + " morceaux, " + albums.length + " albums</span></div>" +
+      '<div class="cols"><div>' + kv([["Logiciel", vers.length ? "Ableton Live " + (vers.length > 1 ? vers[0] + " → " + vers[vers.length - 1] : vers[0]) : ""], ["Lieu", data.credits.lieu],
+        ["Écoute", data.credits.materiel], ["Depuis", years.length ? years[0] + " → aujourd’hui" : ""]]).replace(">Session<", ">Studio<") + "</div>" +
+      '<div><h2 class="sec">Plugins les plus utilisés</h2><div class="fxl">' + top + "</div></div></div>" +
+      '<h2 class="sec">Crédits par album</h2><div class="alg">' + grid + "</div>" +
+      '<h2 class="sec">Samples et voix</h2><div class="line">' + nSamples + " morceaux contiennent un sample · " + plural(Object.keys(labs).length, "artiste samplé").replace("artistes samplé", "artistes samplés") +
+      ' · <button type="button" class="sxgo" data-goto-samples>Voir dans Samples ›</button></div>';
+  }
+  function renderPage(el) {
+    if (!el) return Promise.resolve(false);
+    build();
+    if (!el.__icr) {
+      el.__icr = true;
+      el.addEventListener("click", function (e) { if (el.querySelector(".icr-page")) onClick(e); });
+      el.addEventListener("pointerover", function (e) { if (e.pointerType === "mouse" && el.querySelector(".icr-page")) { var b = e.target.closest("[data-fx]"); if (b) showFx(b); } });
+      el.addEventListener("pointerout", function (e) { if (e.pointerType === "mouse" && e.target.closest("[data-fx]")) hideFx(); });
+    }
+    return load().then(function () {
+      // On a pu changer d'onglet pendant le chargement : ne jamais écraser Samples ou une recherche.
+      if (document.body.getAttribute("data-bib-view") !== "credits" || document.body.classList.contains("bib-searching")) return false;
+      colors();
+      el.innerHTML = '<div class="icr icr-page">' + pageHtml() + "</div>";
+      track("credits_page", {});
+      return true;
+    });
+  }
+
   function open(viewMaker, kind) {
     return load().then(function () {
       stack = [];
@@ -535,6 +695,7 @@
     openTrack: function (slug, n) { return open(function () { return trackView(slug, Number(n)); }, "track"); },
     openAlbum: function (slug) { return open(function () { return albumView(slug); }, "album"); },
     openArtist: function (name) { return open(function () { return artistView(name); }, "artist"); },
+    renderPage: renderPage,
     close: close,
     load: load
   };

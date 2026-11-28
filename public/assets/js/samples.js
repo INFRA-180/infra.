@@ -2823,6 +2823,16 @@
       c = cur.chain ? cur.chain[ci] || cur : cur,
       src = C.trackToSample(c, tp);
     if (!isFinite(src)) return null;
+    // Trop près de la fin du sample : on recule de mesures entières pour l'entendre au moins 8 s, sinon il
+    // repartait aussitôt vers ton morceau (vu au navigateur, 28/11).
+    var bpm = c.bpm && Number(c.bpm[0]) ? Number(c.bpm[0]) : Number(c.tb) || 0,
+      bar = bpm > 0 ? 240 / bpm : 4,
+      last = cur.segs
+        .filter(function (sg) {
+          return sg.ci === ci;
+        })
+        .pop();
+    if (last) while (src > last.s1 - 8 && src - bar >= last.s0) src -= bar;
     for (var k = 0; k < cur.segs.length; k++) {
       var sg = cur.segs[k];
       if (sg.ci === ci && src >= sg.s0 && src < sg.s1 - 0.5) return sg.from + (src - sg.s0);

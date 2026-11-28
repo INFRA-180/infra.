@@ -16,7 +16,7 @@
 
   // ---------- Réglages (à ajuster après validation de la maquette) ----------
   var CFG = {
-    defaults: { dur: "4", fx: "fade" }, // T12 (27/11) : 4 mesures (l'ancien « Auto ») + Fondu
+    defaults: { dur: "4", fx: "auto" }, // F5 (28/11, INFRA Q3 A) : 4 mesures + Auto
     // Durée en mesures (T12) au tempo du morceau qui se termine ; l'agent son plafonne à ce que l'extrait
     // permet et l'événement samples:transition donne la vraie durée en secondes (repli ci-dessous sinon).
     autoBars: 4,
@@ -46,14 +46,17 @@
   function durName(v) {
     return DUR_LONG[v] || label(DUR, v);
   }
+  // F5 (28/11) : Auto par défaut (choisit la transition selon les tempos et le moment fort) ; Fondu, Reverb,
+  // Écho, Filtre au choix. « Hasard » a rejoint Auto, « Basses » est devenu Filtre.
   var FX = [
+    ["auto", "Auto"],
     ["fade", "Fondu"],
     ["reverb", "Reverb"],
     ["echo", "Écho"],
-    ["bass", "Basses"],
-    ["random", "Hasard"]
+    ["filter", "Filtre"]
   ];
-  var FX_LONG = { bass: "Filtre de basses", random: "Hasard qui écoute" };
+  var FX_LONG = { auto: "Auto, selon le tempo", filter: "Balayage de filtre" };
+  var FX_OLD = { listen: "auto", random: "auto", bass: "filter" };
 
   // ---------- Pictos (24 × 24, trait 1,9 comme ceux du lecteur) ----------
   var LINE =
@@ -79,8 +82,17 @@
       '<circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/><path d="M9 8.5a5 5 0 0 1 0 7"/><path d="M12.5 6a8.5 8.5 0 0 1 0 12" opacity=".65"/><path d="M16 3.5a12 12 0 0 1 0 17" opacity=".35"/>',
     // Écho : trois traits de plus en plus petits (des répétitions séparées)
     echo: '<path d="M5 4.5v15"/><path d="M11.5 7.5v9" opacity=".7"/><path d="M18 10v4" opacity=".4"/>',
-    // Filtre de basses : courbe plate à droite qui plonge à gauche (filtre d'Ableton)
+    // Filtre : courbe plate à droite qui plonge à gauche (filtre d'Ableton)
     bass: '<path d="M3 20c3.5 0 4.5-11 8.5-11H21"/>',
+    filter: '<path d="M3 20c3.5 0 4.5-11 8.5-11H21"/>',
+    // Auto : une étoile à quatre branches (choix intelligent), et une petite à côté
+    auto: '<path d="M10 3.5l1.8 5.2 5.2 1.8-5.2 1.8L10 17.5l-1.8-5.2L3 10.5l5.2-1.8z"/><path d="M18 15l.8 2.2 2.2.8-2.2.8L18 21l-.8-2.2-2.2-.8 2.2-.8z"/>',
+    // transitions jouées par Auto (calque pendant le passage)
+    blend: '<path d="M2.5 7c6 0 7 10 19 10"/><path d="M2.5 17c6 0 7-10 19-10"/><path d="M12 3.5v17" opacity=".45"/>',
+    wash: '<path d="M3 15c3-3 6 3 9 0s6 3 9 0"/><path d="M3 10c3-3 6 3 9 0s6 3 9 0" opacity=".6"/><path d="M3 5c3-3 6 3 9 0s6 3 9 0" opacity=".3"/>',
+    roll: '<path d="M4 12a5 5 0 0 1 8.5-3.5L14 10"/><path d="M14 6v4h-4"/><path d="M15 15h1.5M18.5 15H20M15 18.5h5" opacity=".7"/>',
+    brake: '<path d="M3 6c6 0 10 3 12 7s3 5 6 5"/><path d="M18 18h3v-3"/>',
+    cut: '<path d="M12 3.5v17"/>',
     // Hasard qui écoute : un dé (pas les flèches croisées, qui veulent déjà dire « ordre aléatoire »)
     random:
       '<rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="8.5" cy="8.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.1" fill="currentColor" stroke="none"/>'
@@ -144,8 +156,8 @@
     try {
       o = (m && m.getOptions()) || {};
     } catch (_e) {}
-    // Le moteur nomme le hasard « listen » ; l'interface, « random ».
-    if (o.fx === "listen") o.fx = "random";
+    // anciens noms retenus sur l'appareil (avant F5)
+    if (FX_OLD[o.fx]) o.fx = FX_OLD[o.fx];
     return {
       dur: label(DUR, o.dur) ? o.dur : CFG.defaults.dur,
       fx: label(FX, o.fx) ? o.fx : CFG.defaults.fx

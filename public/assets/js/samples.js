@@ -1589,7 +1589,7 @@
       }
     }
     st.pos = st.list.indexOf(item);
-    if (snap) holdView(snap, plan.when + plan.dur / 2);
+    if (snap) holdView(snap, plan.mid || plan.when + plan.dur / 2);
     var start = offset || 0,
       vid = item.y,
       endS = null;
@@ -1618,7 +1618,8 @@
         sg0 = segs[loc0.k],
         xf = plan ? plan.dur : !hadVoice ? 0 : offset ? 0.06 : SMPXF,
         from = sg0.s0 + loc0.local;
-      if (!offset && xf) from = Math.max(sg0.x[1], sg0.s0 - xf / 2); // marge de l'extrait
+      if (plan && plan.sched && !offset) from = plan.sched.inFrom; // F5 : départ calé (vraie marge)
+      else if (!offset && xf && !(plan && plan.exact)) from = Math.max(sg0.x[1], sg0.s0 - xf / 2); // marge de l'extrait
       yt.time = from;
       engStart(
         item,
@@ -2469,8 +2470,17 @@
   }
   // Où ton morceau entre : la seconde où le sample y apparaît (ou, si l'entrée est en fondu, le moment
   // où le son devient fort : champ « go » mesuré sur ton fichier audio).
+  // F5 (28/11) : calée sur le 1er temps de mesure le plus proche (grille tgd sûre, au plus 0,35 mesure),
+  // jamais avant le début de l'extrait tx + 0,5 s.
   function entryOf(i) {
-    return Math.max(0, isFinite(i.go) ? i.go : i.at);
+    var e = Math.max(0, isFinite(i.go) ? i.go : i.at),
+      C = core(),
+      g = (mixInfo(i) || {}).tgd;
+    if (g && typeof C.snapNear === "function") {
+      var d = C.snapNear(g, e, 0.35);
+      if (d >= 0 && (!i.tx || d >= i.tx[1] + 0.5)) e = d;
+    }
+    return e;
   }
   function useTx(i) {
     return !!(i && i.tx && !(i.noTx && Date.now() < i.noTx));
@@ -2571,7 +2581,7 @@
   }
   // Pendant la dernière partie du sample : ton morceau se prépare pour entrer à l'instant T (horloge
   // audio) : extrait téléchargé et décodé, sinon flux lancé muet, calé pour être à son entrée en T.
-  function prepTrack(T) {
+  function prepTrack(T, P) {
     var i = duo.item;
     if (!i || duo.prepped || duo.phase !== "sample" || !eng.ctx || !i.src) return;
     if (Date.now() - (duo.prepFail || 0) < 2000) return;
@@ -2591,7 +2601,7 @@
       tv = startStreamVoice(
         i,
         -1,
-        Math.max(0, sg.s0 - lead),
+        Math.max(0, (P != null ? P : sg.s0) - lead),
         c.currentTime,
         function () {
           if (duo.tv === tv) duo.tv = null;
@@ -2606,11 +2616,11 @@
     duo.tv = tv;
   }
   // Flux préparé : 2 s avant l'entrée, on le recale s'il a dérivé (démarrage lent) ; il est muet.
-  function fixTv(T) {
+  function fixTv(T, P) {
     var tv = duo.tv;
     if (!tv || !tv.live || duo.fixed || !tv.el) return;
     duo.fixed = true;
-    var want = tv.sg.s0 - (T - eng.ctx.currentTime),
+    var want = (P != null ? P : tv.sg.s0) - (T - eng.ctx.currentTime),
       d = want - ytNow(tv);
     if (Math.abs(d) > 0.25 && want >= tv.x0)
       try {
@@ -2618,14 +2628,15 @@
       } catch (_e) {}
   }
   // Entrée de ton morceau à l'instant T : « pile et fort » (XF s, sans effet), quel que soit le réglage.
-  function mixIn(T, cause) {
+  // F5 : plan calé (sched) donné par engTick ; sinon (fin d'extrait, YouTube) l'entrée nette d'avant.
+  function mixIn(T, cause, sp) {
     if (duo.phase !== "sample" || duo.inArmed) return;
     var i = duo.item;
     if (!i) return;
     duo.inArmed = true;
     if (!eng.ctx || !i.src) return trackFailed(i);
     T = Math.max(eng.ctx.currentTime + 0.02, T || 0);
-    var plan = planOf("in", i, i, { dur: XF, when: T, cause: cause || "auto" });
+    var plan = sp || planOf("in", i, i, { dur: XF, when: T, cause: cause || "auto" });
     plan.pre = trackReady(i);
     duo.inWait = { plan: plan, t0: Date.now() };
     track("samples_mix_in", { bpm: bpmOf(i), pre: plan.pre, fade: true });
@@ -2655,12 +2666,12 @@
     var b = !sg.stream && eng.bufs[sg.key];
     if (b && b.buf) {
       dropTv();
-      return trackIn(startVoice(b.buf, i, -1, sg.s0, T, sg), plan, T);
+      return trackIn(startVoice(b.buf, i, -1, inFromOf(plan, sg), T, sg), plan, T);
     }
     var tv = duo.tv && duo.tv.item === i && !duo.tv.done ? duo.tv : null;
     if (tv && tv.live) {
       // flux préparé : là où il doit être en T (sinon recalé, il est encore muet)
-      var want = tv.sg.s0 - (T - c.currentTime),
+      var want = inFromOf(plan, tv.sg) - (T - c.currentTime),
         drift = Math.abs(ytNow(tv) - want);
       // bug 13 : recalé seulement s'il reste du temps avant l'entrée (sinon le lecteur recharge pendant que
       // le gain s'ouvre : trou) ; à l'entrée même, un petit écart passe, un grand se recale
@@ -2679,7 +2690,7 @@
       tv = startStreamVoice(
         i,
         -1,
-        sg.s0,
+        inFromOf(plan, sg),
         c.currentTime,
         function () {
           if (duo.tv === tv) duo.tv = null;
@@ -2693,6 +2704,10 @@
       }
     }
     if (waited > TRACK_WAIT) trackFailed(i);
+  }
+  // Position de ton morceau au départ de son entrée (F5 : un peu avant l'entrée pour un fondu calé).
+  function inFromOf(plan, sg) {
+    return plan && plan.sched ? plan.sched.inFrom : sg.s0;
   }
   // Même extrait, lu en flux (repli quand son téléchargement traîne).
   function streamSeg(sg) {
@@ -2855,6 +2870,13 @@
       end = duo.from + TRACK,
       plan = next ? planOf("out", cur, next, { voice: v, cause: "auto" }) : null,
       start = next ? end - plan.dur / 2 : end;
+    if (plan && plan.sched) {
+      // F5 : passage calé (la sortie de ton morceau porte la durée, arrivée du sample sur un 1er temps)
+      placeSched(plan, v);
+      if (plan.first - eng.ctx.currentTime > look()) return;
+      duo.outArmed = true;
+      return play(next, false, true, 0, plan);
+    }
     if (start - tp > look()) return;
     duo.outArmed = true;
     if (!next) return endOfList(v, ctxAt(v, end));
@@ -2987,25 +3009,24 @@
   }
 
   // ---------- Options du Mix (T bis, validé par INFRA le 20/11 ; T12 le 27/11) ----------
-  // Durée en mesures : Aucune · 2 · 4 (défaut 4, l'ancien « Auto ») ; effet : Fondu (défaut) · Reverb ·
-  // Écho · Basses · Hasard qui écoute. Pour sample → sample, parties d'un même sample et ton morceau →
-  // sample suivant (M5) ; sample → morceau reste à XF s, « pile et fort ». Depuis M3, l'effet touche aussi
-  // ton morceau quand il sort. Les règles (durée, hasard) viennent de samples-mix-core.js s'il est chargé,
-  // sinon du repli.
+  // Durée en mesures : Aucune · 2 · 4 (défaut 4) ; effet (F5, 28/11) : Auto (défaut) · Fondu · Reverb ·
+  // Écho · Filtre. Sample → sample, ton morceau → sample suivant ET sample → ton morceau : passages calés
+  // (planOf → schedFor, transitions F5 plus bas) ; parties d'un même sample : fondu d'avant (M5) ; repli
+  // (YouTube, fin d'extrait) : entrée nette XF s. Les règles viennent de samples-mix-core.js s'il est
+  // chargé, sinon du repli (sans calage).
   var CORE0 = {
     DURATIONS: ["none", "2", "4"],
-    EFFECTS: ["fade", "reverb", "echo", "bass", "listen"],
-    DEFAULTS: { dur: "4", fx: "fade" },
+    EFFECTS: ["auto", "fade", "reverb", "echo", "filter"],
+    DEFAULTS: { dur: "4", fx: "auto" },
     NONE_S: 0.03,
     transitionSeconds: function (c, bpm, m) {
       if (c === "none") return 0.03;
       var w = ((c === "2" ? 2 : 4) * 240) / (bpm > 0 ? bpm : 120);
       return Math.max(0.03, Math.min(w, 2 * (m >= 0 ? m : 4)));
     },
-    resolveEffect: function (fx, a, b) {
-      if (fx !== "listen") return fx;
-      var g = a > 0 && b > 0 ? Math.abs(a - b) : NaN;
-      return !isFinite(g) || g < 4 ? "fade" : g <= 12 ? "bass" : "echo";
+    // repli sans samples-mix-core.js : pas de calage (schedule absent), Auto = Fondu
+    resolveEffect: function (fx) {
+      return fx === "auto" ? "fade" : fx;
     },
   };
   function core() {
@@ -3022,11 +3043,14 @@
     "2mesures": "2",
     "4mesures": "4",
     fondu: "fade",
+    // F5 (28/11) : « Basses » devient Filtre ; « Hasard » rejoint Auto (anciens réglages retenus)
+    bass: "filter",
     basses: "bass",
-    filtre: "bass",
-    hasard: "listen",
-    random: "listen",
-    "aléatoire": "listen",
+    filtre: "filter",
+    listen: "auto",
+    hasard: "auto",
+    random: "auto",
+    "aléatoire": "auto",
     "écho": "echo",
   };
   function normOpt(v, list) {
@@ -3034,6 +3058,8 @@
       .trim()
       .toLowerCase()
       .replace(/\s+/g, "");
+    if (list.indexOf(s) >= 0) return s; // « auto » est un effet (F5) et un ancien nom de durée
+    s = ALIAS[s] || s;
     s = ALIAS[s] || s;
     return list.indexOf(s) >= 0 ? s : null;
   }
@@ -3077,6 +3103,11 @@
       fx = "fade",
       tOut = 0,
       tIn = 0;
+    // F5 : sample → sample, ton morceau → sample et sample → ton morceau (voix du sample donnée) : calés
+    if (kind === "smp" || kind === "out" || (kind === "in" && o.voice && !(o.dur > 0))) {
+      var sp = schedFor(kind, from, to, o, opt, C);
+      if (sp) return sp;
+    }
     if (MIXED[kind]) {
       var eIn = !!to && useEng(to),
         eOut = false,
@@ -3115,7 +3146,8 @@
       // d'avant (SMPXF, OVERLAP, SEGXF), sauf « Aucune ».
       var base = kind === "smp" ? SMPXF : kind === "seg" ? SEGXF : OVERLAP;
       if (opt.dur !== "none" && dur < base) dur = base;
-      fx = C.resolveEffect(opt.fx, tOut, tIn);
+      // passage d'avant (parties, YouTube, repli) : Auto = Fondu, Filtre = l'ancien filtre de basses
+      fx = opt.fx === "auto" ? "fade" : opt.fx === "filter" ? "bass" : C.resolveEffect(opt.fx, tOut, tIn);
       if (dur < 0.1) {
         dur = C.NONE_S || 0.03;
         fx = "cut";
@@ -3145,6 +3177,137 @@
       ev: {},
     };
   }
+  // ---------- F5 (28/11/2026) : passages calés sur le temps ----------
+  // Entrées du calage (samples-mix-core.js schedule) : tempo et grille de chaque voix (samples-mix.json),
+  // jointure voulue, bornes des extraits. Auto choisit la transition (autoPick) ; sinon l'effet choisi
+  // s'applique dans les deux sens (INFRA, 28/11 : « faut qu'il y ait une transition reverb, si t'as
+  // choisi »). null : passage d'avant (YouTube, cœur absent).
+  function gridOf(e, k) {
+    var g = e && e[k];
+    return Array.isArray(g) && g.length >= 3 && Number(g[0]) > 0 ? g : null;
+  }
+  function confOf(g) {
+    return g ? Number(g[2]) || 0 : 0;
+  }
+  function tempoOf(g, base) {
+    return g && Number(g[2]) >= 0.5 ? Number(g[0]) : base;
+  }
+  function schedFor(kind, from, to, o, opt, C) {
+    if (typeof C.schedule !== "function" || !from || !to) return null;
+    var v = o.voice || null,
+      out = {},
+      inn = {};
+    if (kind === "out") {
+      if (!from.src || !useEng(to)) return null;
+      var ts = trackSeg(from),
+        ti = mixInfo(from) || {},
+        g = gridOf(ti, "tgd"),
+        end = (duo.item === from && duo.phase === "track" ? duo.from : ts.s0) + TRACK;
+      out.tempo = tempoOf(g, Number(from.tb) || 0);
+      out.grid = g;
+      // début de phrase conseillé (F4), s'il tombe dans les 4 dernières mesures de la minute
+      if (isFinite(ti.out) && g && ti.out <= end && ti.out >= end - (4 * 240) / g[0]) end = Number(ti.out);
+      out.end = end;
+      out.max = ts.stream ? end + 60 : ts.x[1] + ts.x[2];
+      out.min = ts.s0 + TRACK / 2;
+      out.buf = !ts.stream;
+    } else {
+      if (!useEng(from) || (kind === "smp" && !useEng(to)) || (kind === "in" && !to.src)) return null;
+      var ls = segsOf(from),
+        a = ls[ls.length - 1],
+        os = from.chain ? from.chain[a.ci] || from : from,
+        og = gridOf(mixInfo(os), "sg");
+      out.tempo = tempoOf(og, smpTempo(os));
+      out.grid = og;
+      out.end = a.s1;
+      out.max = a.x[1] + a.x[2];
+      out.min = a.s0 + (a.s1 - a.s0) / 2;
+      out.buf = true;
+    }
+    if (v && v.len && !v.el) out.max = Math.min(out.max, v.x0 + v.len);
+    if (v && v.el) out.buf = false; // flux : ni boucle ni freinage (pas de tampon)
+    if (kind === "in") {
+      var tsg = trackSeg(to),
+        tg = gridOf(mixInfo(to), "tgd");
+      inn.tempo = tempoOf(tg, Number(to.tb) || 0);
+      inn.grid = tg;
+      inn.at = tsg.s0;
+      inn.min = tsg.stream ? 0 : tsg.x[1];
+      inn.goBars = isFinite(to.go) && isFinite(to.at) ? ((to.go - to.at) * (inn.tempo || 120)) / 240 : 0;
+    } else {
+      var f = segsOf(to)[0],
+        is = to.chain ? to.chain[f.ci] || to : to,
+        ig = gridOf(mixInfo(is), "sg");
+      inn.tempo = tempoOf(ig, smpTempo(is));
+      inn.grid = ig;
+      inn.at = f.s0;
+      inn.min = f.x[1];
+      inn.goBars = 0;
+    }
+    var bars = opt.dur === "none" ? 0 : opt.dur === "2" ? 2 : 4,
+      m = C.tempoMatch(out.tempo, inn.tempo),
+      aligned = !!(m && m.ok && C.gridOk(out.grid) && C.gridOk(inn.grid)),
+      fx =
+        opt.fx === "auto"
+          ? C.autoPick({
+              kind: kind,
+              outTempo: out.tempo,
+              inTempo: inn.tempo,
+              outConf: confOf(out.grid),
+              inConf: confOf(inn.grid),
+              goBars: inn.goBars,
+              outBuf: out.buf,
+              last: o.last != null ? o.last : eng.lastAuto,
+            }).fx
+          : opt.fx,
+      S = C.schedule({
+        fx: fx,
+        bars: bars,
+        outTempo: out.tempo,
+        outGrid: out.grid,
+        outEnd: out.end,
+        outMax: out.max,
+        outMin: out.min,
+        inTempo: inn.tempo,
+        inGrid: inn.grid,
+        inAt: inn.at,
+        inMin: inn.min,
+        rate: aligned ? m.rate : 1,
+      }),
+      when = o.when != null ? o.when : now();
+    return {
+      id: ++planSeq,
+      kind: kind,
+      when: when,
+      want: when,
+      cause: o.cause || null,
+      pre: !!o.pre,
+      dur: S.span,
+      fx: S.fx,
+      picked: opt.fx,
+      opt: { dur: opt.dur, fx: opt.fx },
+      fromBpm: bpmOf(from),
+      toBpm: bpmOf(to),
+      fromTempo: out.tempo,
+      toTempo: inn.tempo,
+      toCover: kind === "in" ? assetUrl(to.cover) : coverOf(to, 0),
+      ev: {},
+      sched: S,
+    };
+  }
+  // Place un passage calé sur l'horloge audio d'après la voix qui sort (v) : R = instant où elle est à sa
+  // position de référence ; when = départ du son qui entre ; first = premier geste (pour l'armer à temps).
+  function placeSched(plan, v) {
+    var S = plan.sched,
+      c = eng.ctx;
+    if (!S || !c) return plan;
+    var R = v ? ctxAt(v, S.R) : c.currentTime + S.lead + 0.02;
+    plan.R = R;
+    plan.first = R - S.lead;
+    plan.when = plan.want = Math.max(c.currentTime + 0.02, R + S.inStart);
+    plan.mid = R + Math.max(0, S.gap); // le nouveau son domine (écran, F2)
+    return plan;
+  }
   function coverOf(item, k) {
     if (!useEng(item)) return assetUrl(item.cover);
     var sg = item.segs && item.segs[k || 0],
@@ -3159,6 +3322,8 @@
   function transition(from, to, plan, at) {
     var T = Math.max(now(), at || plan.when || 0),
       D = plan.dur;
+    if (plan.sched && to && to.v && from && !from.yt && !from.set && eng.ctx)
+      return schedTransition(from, to, plan, T);
     if (from && from.all) {
       if (from.except) fadeOthers(from.except, from.main, plan, T, D);
       else engHush(D, T);
@@ -3175,6 +3340,343 @@
     passLog(plan, T, to);
     return plan;
   }
+  // ---------- F5 : transitions calées (28/11/2026) ----------
+  // Un passage calé (plan.sched, samples-mix-core.js schedule) : R = instant de référence (le son qui sort
+  // est à sa position S.R), T = départ du son qui entre. Fin douce partout (INFRA, 28/11 : « faut pas que
+  // ce soit aussi brut ») : les voix qui sortent finissent en courbe à puissance égale jusqu'à −12 dB puis
+  // en rampe exponentielle (≤ 40 dB/s) jusqu'à −60 dB ; les queues d'écho et de nappe s'éteignent en rampe
+  // exponentielle sur 2 mesures ; les filtres reviennent au neutre en rampe ; rien n'est débranché avant
+  // −60 dB.
+  function schedTransition(from, to, plan, T) {
+    var S = plan.sched,
+      c = eng.ctx,
+      n = c.currentTime,
+      nv = to.v,
+      R = T - S.inStart,
+      main = from.v || from.main || null;
+    if (main && (main === nv || main.prep || main.done)) main = null;
+    eng.voices.slice().forEach(function (o) {
+      if (o === nv || o === main || o.prep) return;
+      if (!from.all && o !== from.v) return;
+      softOut(o, Math.max(n, R + Math.min(0, S.outStart)), clamp(S.outDur, 0.5, 4), true);
+    });
+    if (main) exitFx(main, plan, R);
+    enterFx(nv, plan, T, R);
+    if (plan.picked === "auto") eng.lastAuto = S.fx;
+    emit(plan, T);
+    passLog(plan, T, to);
+    return plan;
+  }
+  var SOFT_P = 0.839, // cos(SOFT_P · π/2) = 0,25 : −12 dB
+    SOFT_DBS = 40; // pente de la fin (dB/s) : < 1 dB par 20 ms
+  // Sortie douce d'une voix : puissance égale jusqu'à −12 dB (à when + 0,84 × dur), puis −60 dB en rampe
+  // exponentielle (au moins 1,2 s), puis silence ; la voix s'arrête après.
+  function softOut(v, when, dur, force) {
+    if (!v || !eng.ctx || (v.done && !force)) return;
+    var c = eng.ctx,
+      n = c.currentTime;
+    when = Math.max(n, when);
+    dur = Math.max(0.05, dur);
+    if (v.done) {
+      var r = v.gv;
+      if (r && r.to === 0 && (r.end || r.when + r.dur) <= when + dur) return; // déjà plus court
+    }
+    v.done = true;
+    var gp = v.g.gain,
+      g0 = gainAt(v, when),
+      g1 = g0 * 0.25,
+      t1 = when + SOFT_P * dur;
+    holdParam(gp, n, gainAt(v, n));
+    if (when > n + 0.001) gp.linearRampToValueAtTime(g0, when);
+    else gp.setValueAtTime(g0, when);
+    var end;
+    if (g0 <= 0.004) {
+      end = when + 0.05;
+      gp.linearRampToValueAtTime(0, end);
+      v.gv = { from: g0, to: 0, when: when, dur: 0.05, end: end };
+    } else {
+      var k,
+        steps = Math.max(12, Math.ceil(dur * SOFT_P * 8));
+      for (k = 1; k <= steps; k++)
+        gp.linearRampToValueAtTime(g0 * Math.cos(((k / steps) * SOFT_P * Math.PI) / 2), when + (SOFT_P * dur * k) / steps);
+      var tail = Math.max(dur * (1 - SOFT_P), (20 * Math.log10(g1 / 0.001)) / SOFT_DBS, 1.2);
+      end = t1 + tail;
+      gp.exponentialRampToValueAtTime(0.001, end);
+      gp.setValueAtTime(0, end + 0.01); // sous −60 dB : silence
+      v.gv = { from: g0, to: 0, when: when, dur: dur, soft: { t1: t1, v1: g1, t2: end }, end: end + 0.01 };
+    }
+    if (g0 > 0.05) eng.lastEnd = Math.max(eng.lastEnd || 0, when + dur);
+    try {
+      v.s.stop(end + 0.06);
+    } catch (_e) {}
+    if (eng.cur === v) eng.cur = null;
+  }
+  // Le son qui entre : montée à puissance égale (sinus : aucune marche finale), basses retenues jusqu'au
+  // 1er temps (échange des basses), filtre qui s'ouvre, vitesse calée puis retour progressif à 1 (F6).
+  function enterFx(nv, plan, T, R) {
+    var S = plan.sched;
+    setCurve(nv, 0, 1, T, S.inDur);
+    try {
+      var at = Math.max(T, R),
+        f = nv.hp && nv.hp.frequency;
+      if (S.fx === "blend" && f) {
+        holdParam(f, T, f.value);
+        f.setValueAtTime(220, T);
+        f.setValueAtTime(220, at);
+        f.exponentialRampToValueAtTime(10, at + Math.max(S.beat, 0.3)); // les basses arrivent en 1 temps
+      } else if (S.fx === "filter" && f) {
+        holdParam(f, T, f.value);
+        f.setValueAtTime(1200, T);
+        f.exponentialRampToValueAtTime(10, Math.max(T + 0.3, R + 0.5 * S.outDur));
+      } else if (S.fx === "reverb" && plan.kind !== "smp") applyFx(nv, plan, "in", T);
+      if (S.rate !== 1 && nv.s && nv.s.playbackRate) {
+        var pr = nv.s.playbackRate,
+          t1 = Math.max(T, R + S.rateHold),
+          t2 = t1 + S.rateBack;
+        holdParam(pr, T, 1);
+        pr.setValueAtTime(S.rate, T);
+        pr.setValueAtTime(S.rate, t1);
+        pr.linearRampToValueAtTime(1, t2);
+        nv.rt = { r: S.rate, t0: T, t1: t1, t2: t2 };
+      }
+    } catch (_e) {}
+  }
+  // Le son qui sort, selon la transition jouée.
+  function exitFx(v, plan, R) {
+    var S = plan.sched,
+      c = eng.ctx,
+      n = c.currentTime,
+      t = Math.max(n, R),
+      oT = Math.max(n, R + S.outStart),
+      fx = S.fx,
+      buf = !!(v.s && v.s.buffer);
+    if ((fx === "brake" || fx === "roll") && !buf) fx = "echo"; // flux : ni tampon à boucler ni vitesse
+    try {
+      if (fx === "fade") softOut(v, oT, S.outDur);
+      else if (fx === "reverb") {
+        applyFx(v, { fx: "reverb", dur: S.outDur, fromTempo: plan.fromTempo, toTempo: plan.toTempo }, "out", oT);
+        softOut(v, oT, S.outDur);
+      } else if (fx === "blend") {
+        var hf = v.hp.frequency;
+        holdParam(hf, t, hf.value);
+        hf.exponentialRampToValueAtTime(260, t + Math.max(S.beat, 0.3)); // il rend ses basses au 1er temps
+        softOut(v, t, S.outDur);
+      } else if (fx === "filter") {
+        var lf = v.lp.frequency;
+        holdParam(lf, oT, lf.value);
+        lf.setValueAtTime(20000, oT);
+        lf.exponentialRampToValueAtTime(280, oT + S.outDur);
+        softOut(v, oT + 0.35 * S.outDur, 0.65 * S.outDur);
+      } else if (fx === "echo") {
+        echoOut(v, plan, t);
+        fadeOutVoice(v, t, S.outDur); // coupe sur le temps : l'écho continue seul
+      } else if (fx === "wash") {
+        washOut(v, plan, t);
+        softOut(v, oT, S.outDur);
+      } else if (fx === "brake") brakeOut(v, plan, t);
+      else if (fx === "roll") {
+        rollOut(v, plan, t);
+        fadeOutVoice(v, t, 0.03); // la boucle reprend exactement ce son
+      } else fadeOutVoice(v, t, S.outDur);
+    } catch (_e) {
+      fadeOutVoice(v, t, 0.3, true);
+    }
+  }
+  // Nœuds d'un effet débranchés quand sa queue est sous −60 dB (horloge audio ; minuteur de secours).
+  function unplugAt(nodes, t) {
+    var c = eng.ctx;
+    setTimeout(
+      function () {
+        nodes.forEach(function (x) {
+          try {
+            if (x.stop) x.stop();
+          } catch (_e) {}
+          try {
+            x.disconnect();
+          } catch (_e) {}
+        });
+      },
+      Math.max(0, t - c.currentTime) * 1000 + 300,
+    );
+  }
+  // Écho de sortie calé au tempo du son qui sort : un temps, retour 0,6 assombri (passe-haut 400 Hz, passe-
+  // bas 5 kHz) ; l'envoi monte sur le dernier temps, le son est coupé sur le 1er temps, ses répétitions
+  // restent seules (2 ou 4 temps) puis s'éteignent en 2 mesures sous le son qui entre.
+  function echoOut(v, plan, R) {
+    var b = bus();
+    if (!b) return;
+    var S = plan.sched,
+      c = b.c,
+      inp = c.createGain(),
+      dl = c.createDelay(2),
+      hp = c.createBiquadFilter(),
+      lp = c.createBiquadFilter(),
+      fb = c.createGain(),
+      out = c.createGain(),
+      t0 = Math.max(c.currentTime, R - S.beat),
+      Td = R + S.gap,
+      tail = Math.max(1.2, 2 * S.bar);
+    dl.delayTime.value = clamp(S.beat, 0.2, 1.5);
+    hp.type = "highpass";
+    hp.frequency.value = 400;
+    lp.type = "lowpass";
+    lp.frequency.value = 5000;
+    fb.gain.value = 0.6;
+    out.gain.value = 0.85;
+    inp.connect(dl);
+    dl.connect(hp);
+    hp.connect(lp);
+    lp.connect(fb);
+    fb.connect(dl);
+    lp.connect(out);
+    out.connect(b.fx);
+    var g = sendFrom(v, inp);
+    g.setValueAtTime(0, t0);
+    g.linearRampToValueAtTime(1, Math.max(t0 + 0.02, R));
+    g.exponentialRampToValueAtTime(0.001, Math.max(t0 + 0.04, R) + 0.15);
+    g.setValueAtTime(0, Math.max(t0 + 0.04, R) + 0.16);
+    out.gain.setValueAtTime(0.85, Td);
+    out.gain.exponentialRampToValueAtTime(0.00085, Td + tail);
+    out.gain.setValueAtTime(0, Td + tail + 0.01);
+    unplugAt([inp, dl, hp, lp, fb, out], Td + tail);
+  }
+  // Reverb en nappe : réponse longue (4,5 s, −60 dB à la fin), passe-haut 250 Hz avant (les basses ne se
+  // noient pas) ; le son se noie sur une mesure, la nappe reste seule 1 ou 2 temps, puis le son qui entre
+  // tombe sur son 1er temps et la nappe s'éteint en 2 mesures.
+  function washOut(v, plan, R) {
+    var b = bus();
+    if (!b) return;
+    var S = plan.sched,
+      c = b.c;
+    if (!b.washIr) {
+      var len = Math.round(c.sampleRate * 4.5),
+        ir = c.createBuffer(2, len, c.sampleRate),
+        rnd = seeded(0x5eed42);
+      for (var ch = 0; ch < 2; ch++) {
+        var d = ir.getChannelData(ch);
+        for (var i = 0; i < len; i++) d[i] = (rnd() * 2 - 1) * Math.exp((-6.9 * i) / len);
+      }
+      b.washIr = ir;
+    }
+    var hp = c.createBiquadFilter(),
+      cv = c.createConvolver(),
+      wo = c.createGain(),
+      t0 = Math.max(c.currentTime, R - S.bar),
+      Td = R + S.gap,
+      tail = Math.max(1.2, 2 * S.bar);
+    hp.type = "highpass";
+    hp.frequency.value = 250;
+    cv.buffer = b.washIr;
+    wo.gain.value = 0.9;
+    hp.connect(cv);
+    cv.connect(wo);
+    wo.connect(b.fx);
+    var g = sendFrom(v, hp);
+    g.setValueAtTime(0, t0);
+    g.linearRampToValueAtTime(1, Math.max(t0 + 0.02, R));
+    g.exponentialRampToValueAtTime(0.001, Math.max(t0 + 0.04, R) + 0.3);
+    g.setValueAtTime(0, Math.max(t0 + 0.04, R) + 0.31);
+    wo.gain.setValueAtTime(0.9, Td);
+    wo.gain.exponentialRampToValueAtTime(0.0009, Td + tail);
+    wo.gain.setValueAtTime(0, Td + tail + 0.01);
+    unplugAt([hp, cv, wo], Math.max(Td + tail, R + 0.3 + 4.6));
+  }
+  // Freinage (arrêt de bande) : la vitesse du tampon tombe à presque 0 sur 1 ou 2 temps, un passe-bas
+  // descend avec, puis la voix s'éteint en douceur.
+  function brakeOut(v, plan, R) {
+    var S = plan.sched,
+      len = S.outDur,
+      pr = v.s.playbackRate,
+      lf = v.lp && v.lp.frequency;
+    holdParam(pr, R, pr.value);
+    pr.exponentialRampToValueAtTime(0.06, R + len);
+    if (lf) {
+      holdParam(lf, R, lf.value);
+      lf.exponentialRampToValueAtTime(300, R + len);
+    }
+    v.rt = null;
+    softOut(v, R + 0.45 * len, 0.55 * len);
+  }
+  // Boucle qui roule + montée de bruit : le dernier temps avant R est bouclé (1 → ½ → ¼ → ⅛ de temps), un
+  // passe-haut monte, un bruit filtré monte de 200 Hz à 9 kHz ; un demi-temps de silence, puis le son qui
+  // entre tombe sur son 1er temps (go de ton morceau).
+  var noiseBuf = null;
+  function rollOut(v, plan, R) {
+    var S = plan.sched,
+      c = eng.ctx,
+      b = bus(),
+      buf = v.s.buffer,
+      beat = S.beat,
+      len = S.roll || S.bar,
+      t = Math.max(c.currentTime + 0.01, R),
+      pos = v.off + played(v, t),
+      ls = Math.max(0, pos - beat),
+      level = v.lv ? v.lv.gain.value : 1,
+      rg = c.createGain(),
+      rhp = c.createBiquadFilter(),
+      Td = t + S.gap,
+      nodes = [rg, rhp];
+    rhp.type = "highpass";
+    rhp.frequency.value = 30;
+    rg.gain.value = 0;
+    rg.connect(rhp);
+    rhp.connect(b.fx); // par le bus des effets : coupé à la pause comme les queues
+    rg.gain.setValueAtTime(level, t);
+    rg.gain.setValueAtTime(level, t + len);
+    rg.gain.exponentialRampToValueAtTime(level * 0.03, Td);
+    rg.gain.exponentialRampToValueAtTime(level * 0.001, Td + 1.2);
+    rg.gain.setValueAtTime(0, Td + 1.21);
+    rhp.frequency.setValueAtTime(30, t);
+    rhp.frequency.exponentialRampToValueAtTime(2500, t + len);
+    var stages = [
+        [1, 0.5],
+        [0.5, 0.25],
+        [0.25, 0.125],
+        [0.125, 0.125],
+      ],
+      tt = t;
+    stages.forEach(function (q, i) {
+      var src = c.createBufferSource(),
+        d = len * q[1];
+      src.buffer = buf;
+      src.loop = true;
+      src.loopStart = ls;
+      src.loopEnd = Math.min(buf.duration, ls + beat * q[0]);
+      src.connect(rg);
+      src.start(tt, ls);
+      src.stop(i === stages.length - 1 ? Td + 1.3 : tt + d);
+      nodes.push(src);
+      tt += d;
+    });
+    if (!noiseBuf || noiseBuf.sampleRate !== c.sampleRate) {
+      var nl = c.sampleRate,
+        rnd = seeded(0x0f5eed);
+      noiseBuf = c.createBuffer(1, nl, c.sampleRate);
+      var nd = noiseBuf.getChannelData(0);
+      for (var i = 0; i < nl; i++) nd[i] = rnd() * 2 - 1;
+    }
+    var ns = c.createBufferSource(),
+      bp = c.createBiquadFilter(),
+      ng = c.createGain();
+    ns.buffer = noiseBuf;
+    ns.loop = true;
+    bp.type = "bandpass";
+    bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(200, t);
+    bp.frequency.exponentialRampToValueAtTime(9000, t + len);
+    ng.gain.setValueAtTime(0.03 * level, t);
+    ng.gain.exponentialRampToValueAtTime(0.25 * level, t + len);
+    ng.gain.exponentialRampToValueAtTime(0.00025 * level, Td);
+    ng.gain.setValueAtTime(0, Td + 0.01);
+    ns.connect(bp);
+    bp.connect(ng);
+    ng.connect(b.fx);
+    ns.start(t);
+    ns.stop(Td + 0.05);
+    nodes.push(ns, bp, ng);
+    unplugAt(nodes, Td + 1.3);
+  }
+
   // Toutes les voix entendues sortent, sauf l'entrante et ton morceau préparé (muet) ; l'effet du passage
   // est posé sur le son principal qui sort (main).
   function fadeOthers(nv, main, plan, T, D) {
@@ -3285,7 +3787,7 @@
       function () {
         plan.ev.started = true;
         fire("start");
-        if (MIXED[plan.kind])
+        if (MIXED[plan.kind] || plan.sched)
           track("samples_mix_fx", {
             fx: plan.fx,
             dur_s: Math.round(plan.dur * 10) / 10,
@@ -3502,8 +4004,10 @@
         // l'envoi monte pendant que le sample sort, puis se coupe : la queue reste seule
         g.setValueAtTime(0, T);
         g.linearRampToValueAtTime(top, T + D * 0.5);
-        g.setValueAtTime(top, Math.max(T + D * 0.5, T + D - 0.03));
-        g.linearRampToValueAtTime(0, T + D);
+        // F5 (« fin moins brute ») : l'envoi se referme en rampe exponentielle (0,3 s), plus en 30 ms
+        g.setValueAtTime(top, Math.max(T + D * 0.5, T + D - 0.3));
+        g.exponentialRampToValueAtTime(0.001, T + D);
+        g.setValueAtTime(0, T + D + 0.01);
       } else {
         // le sample sort de l'effet à mesure qu'il entre
         g.setValueAtTime(top, T);
@@ -3512,26 +4016,32 @@
     } catch (_e) {}
   }
   function unplug(v) {
-    [v.lv, v.g, v.hp].concat(v.sends || []).forEach(function (n) {
+    [v.lv, v.g, v.hp, v.lp].concat(v.sends || []).forEach(function (n) {
       try {
         if (n) n.disconnect();
       } catch (_e) {}
     });
   }
   // lin : niveau de la voix (volume égal, F1) ; les envois d'effets le suivent (pris après lui).
+  // F5 : un passe-bas (20 kHz, transparent) après le passe-haut, pour le balayage de filtre et le freinage.
   function voiceNodes(c, lin) {
     var lv = c.createGain(),
       hp = c.createBiquadFilter(),
+      lp = c.createBiquadFilter(),
       g = c.createGain();
     lv.gain.value = lin > 0 ? lin : 1;
     hp.type = "highpass";
     hp.frequency.value = 10;
     hp.Q.value = 0.7071;
+    lp.type = "lowpass";
+    lp.frequency.value = 20000;
+    lp.Q.value = 0.7071;
     g.gain.value = 0;
     lv.connect(hp);
-    hp.connect(g);
+    hp.connect(lp);
+    lp.connect(g);
     g.connect(bus().in);
-    return { lv: lv, hp: hp, g: g };
+    return { lv: lv, hp: hp, lp: lp, g: g };
   }
 
   // ---------- Volume égal et grilles (F1, 28/11/2026) : public/data/samples-mix.json ----------
@@ -3868,6 +4378,13 @@
   function gainAt(v, t) {
     var r = v.gv;
     if (!r) return 1;
+    if (r.soft) {
+      var q = r.soft;
+      if (t <= r.when) return r.from;
+      if (t < q.t1) return r.from * Math.cos((((t - r.when) / r.dur) * Math.PI) / 2);
+      if (t < q.t2) return q.v1 * Math.pow(0.001 / q.v1, (t - q.t1) / (q.t2 - q.t1));
+      return 0;
+    }
     if (t <= r.when) return r.from;
     if (t >= r.when + r.dur) return r.to;
     return shape(r.from, r.to, (t - r.when) / r.dur);
@@ -3891,11 +4408,47 @@
   function ytNow(v) {
     if (!v) return 0;
     if (v.el) return v.x0 + (v.el.readyState > 0 ? v.el.currentTime : v.off);
-    return v.x0 + v.off + Math.max(0, eng.ctx.currentTime - v.at);
+    return v.x0 + v.off + played(v, eng.ctx.currentTime);
   }
   function ctxAt(v, t) {
     if (v.el) return eng.ctx.currentTime + (t - ytNow(v));
-    return v.at + (t - v.x0 - v.off);
+    return v.rt ? unplayed(v, t - v.x0 - v.off) : v.at + (t - v.x0 - v.off);
+  }
+  // F6 (28/11) : vitesse calée d'un tampon pendant un passage (rt : r jusqu'à t1, retour linéaire à 1 en t2,
+  // posée à partir de t0) : secondes de source jouées entre son départ et t, et l'inverse.
+  function rateAt(rt, x) {
+    if (x < rt.t0) return 1;
+    if (x < rt.t1) return rt.r;
+    if (x < rt.t2) return rt.r + ((1 - rt.r) * (x - rt.t1)) / Math.max(1e-6, rt.t2 - rt.t1);
+    return 1;
+  }
+  function played(v, t) {
+    var a = v.at,
+      rt = v.rt;
+    if (t <= a) return 0;
+    if (!rt) return t - a;
+    var cuts = [a, rt.t0, rt.t1, rt.t2, t]
+        .filter(function (x) {
+          return x >= a && x <= t;
+        })
+        .sort(function (x, y) {
+          return x - y;
+        }),
+      sum = 0;
+    for (var i = 1; i < cuts.length; i++)
+      sum += ((rateAt(rt, cuts[i - 1] + 1e-9) + rateAt(rt, cuts[i] - 1e-9)) / 2) * (cuts[i] - cuts[i - 1]);
+    return sum;
+  }
+  function unplayed(v, d) {
+    if (d <= 0) return v.at + d;
+    var lo = v.at,
+      hi = v.at + d * 1.2 + 1;
+    for (var i = 0; i < 48; i++) {
+      var mid = (lo + hi) / 2;
+      if (played(v, mid) < d) lo = mid;
+      else hi = mid;
+    }
+    return (lo + hi) / 2;
   }
   // 19/11 (INFRA : « ça met énormément de temps à play ») : comme la bibliothèque, le premier son est lu
   // pendant qu'il arrive (élément <audio> branché dans Web Audio pour garder les fondus), au lieu
@@ -3992,6 +4545,7 @@
       lv: nd.lv,
       g: nd.g,
       hp: nd.hp,
+      lp: nd.lp,
       item: item,
       k: k,
       sg: sg,
@@ -4068,6 +4622,7 @@
       lv: nd.lv,
       g: nd.g,
       hp: nd.hp,
+      lp: nd.lp,
       item: item,
       k: k,
       sg: sg,
@@ -4095,7 +4650,7 @@
     if (!v || (v.done && !force)) return;
     if (v.done) {
       var r = v.gv;
-      if (r && r.to === 0 && r.when + r.dur <= when + dur) return; // déjà plus court
+      if (r && r.to === 0 && (r.end || r.when + r.dur) <= when + dur) return; // déjà plus court
     }
     v.done = true;
     if (gainAt(v, when) > 0.05) eng.lastEnd = Math.max(eng.lastEnd || 0, when + Math.max(0.02, dur));
@@ -4387,15 +4942,17 @@
       return;
     }
     var plan = planOf("smp", v.item, next, { voice: v, k: 0 });
-    plan.when = ctxAt(v, v.sg.s1 - plan.dur / 2);
+    if (plan.sched) placeSched(plan, v);
+    else plan.when = ctxAt(v, v.sg.s1 - plan.dur / 2);
     play(next, false, false, 0, plan);
   }
   // Durée du prochain passage sample → sample (pour l'armer à temps).
+  // F5 : avance (s avant la fin de la partie) du premier geste du passage calé, sinon la moitié du fondu.
   function autoDur(v) {
     var next = nextOf(v.item);
-    return next && useEng(next)
-      ? planOf("smp", v.item, next, { voice: v }).dur
-      : SMPXF;
+    if (!next || !useEng(next)) return SMPXF;
+    var p = planOf("smp", v.item, next, { voice: v });
+    return p.sched ? 2 * Math.max(0, v.sg.s1 - p.sched.R + p.sched.lead) : p.dur;
   }
   // Toutes les 100 ms : position, puis transitions programmées à l'avance sur l'horloge audio.
   function engTick() {
@@ -4423,12 +4980,16 @@
         return;
       }
       if (duo.inArmed) return;
-      // dernière partie : ton morceau se prépare, se recale, puis entre pile à la fin du sample
-      var T = ctxAt(v, duo.end - XF),
+      // dernière partie : ton morceau se prépare, se recale, puis entre (F5 : transition du Mix calée sur
+      // le 1er temps ; avant : pile à la fin du sample, 0,35 s)
+      var ip = planOf("in", duo.item, duo.item, { voice: v, cause: "auto" });
+      if (ip.sched) placeSched(ip, v);
+      var T = ip.sched ? ip.when : ctxAt(v, duo.end - XF),
+        P = ip.sched ? ip.sched.inFrom : null,
         left = T - eng.ctx.currentTime;
-      if (left < PRELEAD) prepTrack(T);
-      if (left < 2.5) fixTv(T);
-      if (left < look()) mixIn(T);
+      if (left < PRELEAD) prepTrack(T, P);
+      if (left < 2.5) fixTv(T, P);
+      if ((ip.sched ? ip.first : T) - eng.ctx.currentTime < look()) mixIn(T, null, ip.sched ? ip : null);
       return;
     }
     if (eng.armed) return;
@@ -4446,7 +5007,7 @@
       return;
     }
     // dernier passage : la transition est armée LOOK s avant son début (au plus 6 s avant la jointure)
-    if (sg.s1 - tp < 6 + look() && sg.s1 - tp < autoDur(v) / 2 + look()) engAuto(v);
+    if (sg.s1 - tp < autoDur(v) / 2 + look()) engAuto(v);
   }
   // M6 : avance de programmation des passages. Page cachée (iPhone verrouillé, autre app, onglet en
   // arrière-plan) : les minuteurs ne passent plus que toutes les secondes (ou moins) ; les passages sont
@@ -5352,6 +5913,14 @@
       clockTick: clockTick,
       now: now,
       planOf: planOf,
+      placeSched: placeSched,
+      transition: transition,
+      softOut: softOut,
+      startVoice: startVoice,
+      voiceNodes: voiceNodes,
+      ytNow: ytNow,
+      ctxAt: ctxAt,
+      entryOf: entryOf,
       seekTo: seekTo,
       trackSeg: trackSeg,
       setMixData: setMixData,

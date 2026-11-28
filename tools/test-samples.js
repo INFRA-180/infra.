@@ -196,21 +196,16 @@ near(core.transitionFor("sample_to_track", "4", 120), 0.35, "sample → morceau 
 near(core.transitionFor("track_to_sample", "2", 120), 4, "morceau → sample suit le réglage");
 near(core.transitionFor("sample_to_sample", "none", 120), 0.03, "sample → sample suit le réglage");
 
-// Hasard qui écoute
+// ancien « Hasard qui écoute » (gardé pour les anciens appels) ; F5 : Hasard rejoint Auto
 assert.strictEqual(core.listeningEffect(120, 120), "fade");
-assert.strictEqual(core.listeningEffect(120, 123.9), "fade");
-assert.strictEqual(core.listeningEffect(120, 124), "bass");
-assert.strictEqual(core.listeningEffect(130, 120), "bass");
-assert.strictEqual(core.listeningEffect(120, 132), "bass");
 assert.strictEqual(core.listeningEffect(120, 132.1), "echo");
-assert.strictEqual(core.listeningEffect(70, 140), "echo");
 assert.strictEqual(core.listeningEffect(0, 120), "fade", "tempo inconnu → fondu");
-assert.strictEqual(core.listeningEffect(undefined, 120), "fade");
-assert.strictEqual(core.resolveEffect("listen", 90, 120), "echo");
 assert.strictEqual(core.resolveEffect("reverb", 90, 120), "reverb");
-assert.strictEqual(core.resolveEffect("inconnu", 90, 120), "fade", "effet inconnu → défaut");
-assert.deepStrictEqual(core.EFFECTS, ["fade", "reverb", "echo", "bass", "listen"]);
-assert.deepStrictEqual({ ...core.DEFAULTS }, { dur: "4", fx: "fade" });
+assert.strictEqual(core.resolveEffect("bass", 90, 120), "filter", "F5 : ancien « Basses » → Filtre");
+assert.strictEqual(core.resolveEffect("inconnu", 120, 120.5, { outConf: 0.9, inConf: 0.9 }), "blend", "effet inconnu → Auto");
+assert.deepStrictEqual(core.EFFECTS, ["auto", "fade", "reverb", "echo", "filter"]);
+assert.deepStrictEqual({ ...core.DEFAULTS }, { dur: "4", fx: "auto" }, "F5 : Auto par défaut (INFRA Q3 A)");
+require("./test-samples-auto.js")(core);
 
 // fondu à puissance égale
 for (let i = 0; i <= 100; i += 1) {
@@ -370,10 +365,12 @@ function loadEngine(opts) {
 function fakeAudio(opts) {
   const o = opts || {};
   const made = [];
+  made.params = [];
   class Param {
     constructor(v) {
       this.value = v;
       this.calls = [];
+      made.params.push(this);
     }
     setValueAtTime(v, t) {
       this.calls.push(["set", v, t]);
@@ -429,7 +426,9 @@ function fakeAudio(opts) {
       return Promise.resolve();
     }
     createGain() {
-      return Object.assign(new Node("gain"), { gain: new Param(1) });
+      const gain = new Param(1);
+      gain.isGain = true;
+      return Object.assign(new Node("gain"), { gain });
     }
     createBiquadFilter() {
       return Object.assign(new Node("biquad"), { frequency: new Param(350), Q: new Param(1) });
@@ -450,7 +449,7 @@ function fakeAudio(opts) {
       return { numberOfChannels: ch, duration: n / 8000, getChannelData: (c) => data[c] };
     }
     createBufferSource() {
-      return Object.assign(new Node("src"), { start() {}, stop() {} });
+      return Object.assign(new Node("src"), { start() {}, stop() {}, playbackRate: new Param(1) });
     }
     createMediaElementSource() {
       return new Node("media");
@@ -567,7 +566,7 @@ function fakeAudio(opts) {
   // plus rien de grisé sur iPhone (le volume de ton morceau passe par le moteur)
   for (const d of E.t.getOptions().durations) assert.strictEqual(E.t.supports("dur", d), true, `M3 : durée ${d} grisée`);
   assert.strictEqual(E.t.getOptions().trackFades, true, "M3 : fondus de ton morceau partout");
-  // ton morceau → sample : plafonné par la marge de son extrait (4 s après la minute)
+  // ton morceau → sample (F5 : calé, la sortie porte la durée, jamais au-delà de son extrait)
   const smp = { y: "aaaaaaaaaaa", s0: 10, s1: 20, at: 70, tb: 120, x: [["aaaaaaaaaaa_100-200", 6, 18]] };
   E.t.pref.mixo = { dur: "4", fx: "reverb" };
   const p = E.t.planOf("out", { src: item.src, at: 70, tb: 120, tx: ["t", 66, 68] }, smp);
@@ -676,6 +675,146 @@ function fakeAudio(opts) {
   for (const m of ui.matchAll(/track\("samples_mix_opt", \{([^}]*)\}\)/g))
     for (const k of m[1].matchAll(/([a-z_]+):/g))
       assert(keptFields.has(k[1]), `F3 : samples_mix_opt.${k[1]} (page Mix) serait jeté`);
+}
+
+// ---------- F5 (28/11/2026) : transitions calées, Auto, fin douce, comparer sample ↔ morceau ----------
+{
+  // Réglage choisi : appliqué dans les DEUX sens (INFRA, 28/11 : « faut qu'il y ait une transition reverb
+  // ou quoi, si t'as choisi ») ; Auto par défaut ; anciens réglages Hasard / Basses relus.
+  const E = loadEngine();
+  const src = "assets/music/streams/v1/album/01-titre.m4a";
+  const smpA = { album: "A", track: "T", y: "aaaaaaaaaaa", s0: 10, s1: 40, at: 70, go: NaN, tb: 120, src, tx: ["t_700", 66, 68], x: [["aaaaaaaaaaa_1-2", 6, 38]] };
+  const smpB = { album: "B", track: "U", y: "bbbbbbbbbbb", s0: 20, s1: 50, at: 12, go: NaN, tb: 120, src, tx: ["u_120", 8, 68], x: [["bbbbbbbbbbb_1-2", 16, 38]] };
+  const voice = { x0: 6, len: 38, item: smpA, k: 0 };
+  assert.strictEqual(E.t.getOptions().fx, "auto", "F5 : Auto par défaut");
+  for (const fx of ["reverb", "echo", "filter", "fade"]) {
+    E.t.pref.mixo = { dur: "4", fx };
+    const pOut = E.t.planOf("out", smpA, smpB);
+    const pIn = E.t.planOf("in", smpA, smpA, { voice });
+    assert(pOut.sched && pIn.sched, `F5 : passages calés (${fx})`);
+    assert.strictEqual(pOut.fx, fx, `F5 : ton morceau → sample joue ${fx}`);
+    assert.strictEqual(pIn.fx, fx, `F5 : sample → ton morceau joue ${fx} (plus l'entrée nette de 0,35 s)`);
+  }
+  E.t.pref.mixo = { dur: "4", fx: "auto" };
+  const pa = E.t.planOf("in", smpA, smpA, { voice });
+  assert(pa.picked === "auto" && E.t.st && pa.fx !== "auto", "F5 : Auto choisit une vraie transition");
+  assert(E.t.planOf("in", smpA, smpA, { dur: 0.35 }).sched == null, "F5 : entrée de repli (YouTube, fin d'extrait) inchangée");
+  E.t.pref.mixo = { dur: "none", fx: "reverb" };
+  assert.strictEqual(E.t.planOf("in", smpA, smpA, { voice }).fx, "cut", "F5 : Aucune = coupe");
+  E.t.pref.mixo = { dur: "4", fx: "listen" };
+  assert.strictEqual(E.t.getOptions().fx, "auto", "F5 : ancien « Hasard » → Auto");
+  E.t.pref.mixo = { dur: "4", fx: "bass" };
+  assert.strictEqual(E.t.getOptions().fx, "filter", "F5 : ancien « Basses » → Filtre");
+  assert.strictEqual(E.t.setOptions({ fx: "auto" }).fx, "auto", "F5 : Auto se choisit");
+  assert.deepStrictEqual(E.t.getOptions().effects, ["auto", "fade", "reverb", "echo", "filter"]);
+  // grille du morceau : entrée calée sur le 1er temps le plus proche (samples-mix.json, tgd)
+  E.t.setMixData({ version: 1, items: { "A|T|aaaaaaaaaaa": { tgd: [120, 0.3, 0.95], sg: [120, 0.1, 0.9] } } });
+  assert(Math.abs(E.t.entryOf(smpA) - 70.3) < 1e-9, "F5 : entrée de ton morceau sur son 1er temps");
+  assert.strictEqual(E.t.entryOf(smpB), 12, "F5 : sans grille, entrée inchangée");
+}
+{
+  // F5 : fin douce (INFRA, 28/11 : « faut pas que ce soit aussi brut ») : aucune automation de fin ne
+  // saute de plus de 1 dB en moins de 20 ms (voix qui entre en fin de montée, voix qui sort sous −12 dB,
+  // retours d'écho et de nappe) ; filtres jamais déplacés d'un coup pendant qu'ils s'entendent.
+  const A = fakeAudio();
+  const E = loadEngine({ AudioContext: A.Ctx, Audio: A.Audio, timers: true });
+  const c = E.t.ensureCtx(true);
+  c.state = "running";
+  E.t.bus();
+  const P = A.made.params[0].constructor.prototype;
+  for (const k of ["setValueAtTime", "linearRampToValueAtTime", "exponentialRampToValueAtTime", "cancelScheduledValues", "cancelAndHoldAtTime"]) {
+    const f = P[k];
+    P[k] = function (...a) {
+      if (!("v0" in this)) this.v0 = this.value;
+      return f.apply(this, a);
+    };
+  }
+  // valeur d'un paramètre à l'instant t, d'après ses appels (sémantique Web Audio simplifiée)
+  const curve = (p) => {
+    let ev = [];
+    const at = (t) => {
+      const sorted = ev.slice().sort((a, b) => a.t - b.t);
+      let prev = null, next = null;
+      for (const e of sorted) {
+        if (e.t <= t) prev = e;
+        else { next = e; break; }
+      }
+      const pv = prev ? prev.v : p.v0 != null ? p.v0 : p.value;
+      const pt = prev ? prev.t : -Infinity;
+      if (next && next.type === "lin" && isFinite(pt)) return pv + ((next.v - pv) * (t - pt)) / (next.t - pt);
+      if (next && next.type === "exp" && isFinite(pt) && pv > 0) return pv * Math.pow(next.v / pv, (t - pt) / (next.t - pt));
+      return pv;
+    };
+    for (const [type, a, b] of p.calls) {
+      if (type === "set" || type === "lin" || type === "exp") ev.push({ type, v: a, t: b });
+      else if (type === "cancel") ev = ev.filter((e) => e.t < a);
+      else if (type === "hold") {
+        const v = at(a);
+        ev = ev.filter((e) => e.t <= a);
+        ev.push({ type: "set", v, t: a });
+      }
+    }
+    return at;
+  };
+  const db = (x) => 20 * Math.log10(x);
+  const smooth = (p, from, to, keep, what) => {
+    const f = curve(p);
+    for (let t = from; t < to; t += 0.002) {
+      const a = f(t), b = f(t + 0.02);
+      if (!keep(a) || !keep(b) || a < 0.001 || b < 0.001) continue;
+      assert(Math.abs(db(b) - db(a)) <= 1 + 1e-6, `${what} : saut de ${(db(b) - db(a)).toFixed(2)} dB en 20 ms à t = ${t.toFixed(3)}`);
+    }
+  };
+  const buf = c.createBuffer(2, 8000 * 60);
+  let checked = 0;
+  const core = E.win.InfraSamplesMixCore;
+  for (const fx of ["fade", "reverb", "blend", "filter", "echo", "wash", "brake", "roll"]) {
+    for (const bpm of [70, 128, 170]) {
+      E.t.eng.voices.length = 0;
+      const item = { y: "aaaaaaaaaaa", x: [["a", 0, 60]] };
+      const sg = { x: ["a", 0, 60], s0: 0, s1: 60 };
+      const ov = E.t.startVoice(buf, item, 0, 10, 5, sg);
+      E.t.setCurve(ov, 0, 1, 5, 0.05);
+      const S = core.schedule({ fx, bars: 2, outTempo: bpm, outEnd: 40, outMax: 44, outMin: 20, inTempo: bpm, inAt: 20, inMin: 16, rate: 1.03 });
+      const R = 5 + (S.R - 10); // la voix qui sort est à la position S.R à cet instant
+      const nv = E.t.startVoice(buf, item, 0, S.inFrom, R + S.inStart, sg);
+      const plan = { id: 1, kind: "smp", when: R + S.inStart, want: R + S.inStart, dur: S.span, fx: S.fx, picked: "auto", opt: {}, ev: {}, sched: S, fromTempo: bpm, toTempo: bpm };
+      const before = A.made.params.length;
+      E.t.transition({ all: true, except: nv, main: ov }, { v: nv }, plan, R + S.inStart);
+      const end = R + S.span + 8;
+      const what = `${fx} @ ${bpm}`;
+      smooth(nv.g.gain, R + S.inStart, end, (x) => x >= 0.9, `${what}, fin de la montée`);
+      if (fx !== "echo" && fx !== "roll") smooth(ov.g.gain, R - 2, end, (x) => x <= 0.25, `${what}, fin de la voix qui sort`);
+      // retours d'effet créés par ce passage (écho, nappe) : leur extinction
+      const sends = new Set((ov.sends || []).concat(nv.sends || []).map((s) => s.gain));
+      A.made.params.slice(before).forEach((p, i) => {
+        if (!p.isGain || sends.has(p) || !p.calls.length) return;
+        if (fx === "roll") return; // boucle : coupes voulues entre ses paliers (avant le 1er temps)
+        smooth(p, R + S.gap, end, () => true, `${what}, queue d'effet ${i}`);
+        checked++;
+      });
+      // filtres des deux voix : aucun saut pendant qu'elles s'entendent
+      for (const [v, name] of [[nv, "entrant"], [ov, "sortant"]]) {
+        const g = curve(v.g.gain);
+        for (const p of [v.hp.frequency, v.lp.frequency]) {
+          const f = curve(p);
+          for (let t = R + S.inStart; t < end; t += 0.001) {
+            if (g(t) < 0.001 || g(t + 0.001) < 0.001) continue;
+            const r = Math.abs(Math.log(f(t + 0.001) / f(t)));
+            assert(r < Math.log(1.5), `${what} : filtre ${name} qui saute à t = ${t.toFixed(3)}`);
+          }
+        }
+      }
+      // vitesse calée (F6) : seulement pour les fondus, retour progressif à 1
+      const pr = nv.s.playbackRate.calls;
+      if (["fade", "reverb", "blend", "filter"].includes(fx)) {
+        assert(pr.some((x) => x[0] === "lin" && x[1] === 1), `${what} : retour progressif de la vitesse à 1`);
+        const t = E.t.ctxAt(nv, S.inAt);
+        assert(Math.abs(t - R) < 1e-3, `${what} : le son qui entre est sur son 1er temps à l'instant calé (${(t - R).toFixed(4)})`);
+      } else assert(!pr.length, `${what} : vitesse inchangée`);
+    }
+  }
+  assert(checked >= 6, `F5 : queues d'effet vérifiées (${checked})`);
 }
 
 // ---------- bilan ----------

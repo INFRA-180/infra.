@@ -5336,8 +5336,9 @@ body::after {
 
 /* Vues : chaque onglet montre ses sections */
 .home-screen .bib-panel { order: 7; }
-body.home-screen:not([data-bib-view="titres"]):not([data-bib-view="samples"]):not(.bib-searching) .bib-panel { display: none; }
-body.home-screen[data-bib-view="samples"]:not(.bib-searching) .one-page-layout > .module:not(.bib-panel) { display: none; }
+body.home-screen:not([data-bib-view="titres"]):not([data-bib-view="samples"]):not([data-bib-view="credits"]):not(.bib-searching) .bib-panel { display: none; }
+body.home-screen[data-bib-view="samples"]:not(.bib-searching) .one-page-layout > .module:not(.bib-panel),
+body.home-screen[data-bib-view="credits"]:not(.bib-searching) .one-page-layout > .module:not(.bib-panel) { display: none; }
 body.home-screen[data-bib-view="accueil"] .albums-grid > li.bib-hide-home { display: none; }
 body.home-screen[data-bib-view="albums"] .one-page-layout > .module:not([data-module-id="albums"]) { display: none; }
 body.home-screen[data-bib-view="playlists"] .one-page-layout > .module:not([data-module-id="playlists"]) { display: none; }

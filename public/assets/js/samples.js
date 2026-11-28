@@ -2260,7 +2260,8 @@
         send("seekTo", [sg.s0 + loc.local, true]);
         yt.time = sg.s0 + loc.local;
         duo.armed = false;
-      } else play(cur, false, false, t); // retour dans le sample : ton morceau sort, le sample reprend
+      } else if (trackPhase()) jumpToSample(cur, t); // F5 : retour au sample en 0,3 s, comme l'aller
+      else play(cur, false, false, t); // retour dans le sample : ton morceau sort, le sample reprend
     } else {
       var off = clamp(t - S, 0, TRACK - 1);
       if (trackPhase()) seekTrack(cur, duo.from + off);
@@ -2791,6 +2792,40 @@
       engStart(i, -1, from, plan);
     }
     paintNow();
+  }
+  // F5 (28/11, télémétrie : comparaisons en rafale) : aller et retour sample ↔ morceau identiques (0,3 s,
+  // sans effet) et au même endroit musical : sample à s0 + Δ ↔ morceau à at + Δ × (bpm[0] / tb).
+  function musicalTrackPos(cur) {
+    var C = core();
+    if (!st.mix || duo.phase !== "sample" || !cur || !cur.segs || typeof C.sampleToTrack !== "function") return null;
+    var sg = cur.segs[duo.k || 0],
+      c = cur.chain ? cur.chain[sg ? sg.ci : 0] || cur : cur,
+      v = eng.cur && !eng.cur.track && eng.cur.item === cur ? eng.cur : null,
+      src = v ? ytNow(v) : yt.time,
+      t = C.sampleToTrack(c, src),
+      ts = trackSeg(cur),
+      lo = ts.stream ? 0 : ts.x[1],
+      hi = entryOf(cur) + TRACK - 1;
+    return isFinite(t) && t >= lo && t <= hi ? t : null;
+  }
+  function musicalSamplePos(cur, ci) {
+    var C = core();
+    if (!cur || !cur.segs || typeof C.trackToSample !== "function") return null;
+    var v = eng.cur && eng.cur.track ? eng.cur : null,
+      tp = v ? ytNow(v) : eng.hold && eng.hold.k < 0 ? eng.hold.t : NaN,
+      c = cur.chain ? cur.chain[ci] || cur : cur,
+      src = C.trackToSample(c, tp);
+    if (!isFinite(src)) return null;
+    for (var k = 0; k < cur.segs.length; k++) {
+      var sg = cur.segs[k];
+      if (sg.ci === ci && src >= sg.s0 && src < sg.s1 - 0.5) return sg.from + (src - sg.s0);
+    }
+    return null;
+  }
+  function jumpToSample(cur, t) {
+    var plan = planOf("seek", null, null, { dur: 0.3 });
+    plan.exact = true; // pas de marge avant : on reprend pile là
+    play(cur, false, false, Math.max(0.001, t), plan);
   }
   // Glisser dans ton morceau pendant qu'il joue.
   function seekTrack(i, t) {
@@ -5388,11 +5423,24 @@
       var to = jump.getAttribute("data-smp-jump");
       track("samples_jump", { to: to === "1" ? "track" : "sample" });
       setCause("jump");
-      if (to === "1") return seekTo(cj.S || Math.max(1, cj.s1 - cj.s0));
+      if (to === "1") {
+        // F5 (geste n° 1 d'INFRA) : ton morceau au même endroit musical que le sample entendu
+        var mt = musicalTrackPos(cj);
+        if (mt != null) {
+          dropNext();
+          jumpToTrack(cj, mt);
+          return paintBar();
+        }
+        return seekTo(cj.S || Math.max(1, cj.s1 - cj.s0));
+      }
       var ci = Number(to.slice(1)) || 0,
         first = (cj.segs || []).filter(function (sg) {
           return sg.ci === ci;
         })[0];
+      if (trackPhase()) {
+        var ms0 = musicalSamplePos(cj, ci);
+        return jumpToSample(cj, ms0 != null ? ms0 : first ? first.from : 0);
+      }
       return seekTo(first ? first.from : 0);
     }
     var sb = t.closest("[data-smp-sortv]");
@@ -5921,6 +5969,8 @@
       ytNow: ytNow,
       ctxAt: ctxAt,
       entryOf: entryOf,
+      musicalTrackPos: musicalTrackPos,
+      musicalSamplePos: musicalSamplePos,
       seekTo: seekTo,
       trackSeg: trackSeg,
       setMixData: setMixData,

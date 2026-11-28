@@ -711,6 +711,9 @@ function fakeAudio(opts) {
   E.t.setMixData({ version: 1, items: { "A|T|aaaaaaaaaaa": { tgd: [120, 0.3, 0.95], sg: [120, 0.1, 0.9] } } });
   assert(Math.abs(E.t.entryOf(smpA) - 70.3) < 1e-9, "F5 : entrée de ton morceau sur son 1er temps");
   assert.strictEqual(E.t.entryOf(smpB), 12, "F5 : sans grille, entrée inchangée");
+  // aller et retour sample ↔ morceau : 0,3 s tous les deux, au même endroit musical
+  assert(/function jumpToSample\(cur, t\) \{\s*var plan = planOf\("seek", null, null, \{ dur: 0\.3 \}\);/.test(samplesJs), "F5 : retour au sample en 0,3 s");
+  assert(/planOf\("seek", i, i, \{ dur: 0\.3 \}\)/.test(samplesJs), "F5 : aller au morceau en 0,3 s");
 }
 {
   // F5 : fin douce (INFRA, 28/11 : « faut pas que ce soit aussi brut ») : aucune automation de fin ne

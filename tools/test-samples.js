@@ -820,6 +820,13 @@ function fakeAudio(opts) {
   assert(checked >= 6, `F5 : queues d'effet vérifiées (${checked})`);
 }
 
+{
+  // V20 (validé 28/11) : clic droit / appui long sur le nom de ton morceau (barre du Mix) → crédits ;
+  // credits.js chargé à la demande, absent = message, rien ne casse.
+  assert(/\[data-smp-leg\] \[data-smp-jump\]/.test(samplesJs), "V20 : menu sur la légende de la barre");
+  assert(/api\.openTrack\(c\.slug, c\.tn\)/.test(samplesJs), "V20 : InfraCredits.openTrack(slug, n)");
+  assert(/assets\/js\/credits\.js/.test(samplesJs) && /typeof api\.openTrack === "function"/.test(samplesJs), "V20 : credits.js injecté, appel défensif");
+}
 // ---------- bilan ----------
 if (errors.length) {
   console.error(`Samples checks FAILED (${errors.length}) :\n- ${errors.slice(0, 30).join("\n- ")}`);

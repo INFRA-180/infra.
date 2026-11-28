@@ -146,12 +146,17 @@
     ])
       .then(function (res) {
         var covers = {},
-          srcs = {};
+          srcs = {},
+          slugs = {},
+          nums = {};
         ((res[1] && res[1].albums) || []).forEach(function (a) {
           covers[a.title] = a.cover;
           srcs[a.title] = {};
-          (a.tracks || []).forEach(function (t) {
+          slugs[a.title] = a.slug || "";
+          nums[a.title] = {};
+          (a.tracks || []).forEach(function (t, ti) {
             srcs[a.title][t.title] = t.src;
+            nums[a.title][t.title] = Number(t.index) || ti + 1; // crédits : numéro de piste (1, 2…)
           });
         });
         var albums = ((res[0] && res[0].albums) || []).map(function (a) {
@@ -170,6 +175,8 @@
                 album: a.title,
                 cover: covers[a.title] || "",
                 src: (srcs[a.title] || {})[t.title] || "",
+                slug: slugs[a.title] || "",
+                tn: (nums[a.title] || {})[t.title] || 0,
                 s0: Number(it.s0),
                 s1: Number(it.s1),
                 at: Number(it.at),
@@ -5617,6 +5624,8 @@
     dl: svg('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', LINE),
     link: svg('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>', LINE),
     yt: svg('<rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.2v5.6l4.8-2.8z"/>', LINE),
+    // crédits : une fiche avec trois lignes
+    credits: svg('<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>', LINE),
   };
   function sayMsg(m) {
     var t = document.getElementById("infraTrackToast");
@@ -5738,6 +5747,33 @@
         ],
       };
     }
+    // F5 (28/11, V20 validé par INFRA) : légende de la barre du Mix. Nom de ton morceau → ses crédits ;
+    // nom du sample → écouter l'original (Spotify, Apple Music, YouTube).
+    if ((el = t.closest("[data-smp-leg] [data-smp-jump]")) && st.list[st.pos]) {
+      var lc = st.list[st.pos],
+        lj = el.getAttribute("data-smp-jump");
+      if (lj === "1")
+        return {
+          head: [lc.track, lc.album],
+          kind: "player",
+          items: [
+            lc.slug && lc.tn ? ["Crédits", IC.credits, function () { openTrackCredits(lc); }] : null,
+            ["Aller à " + lc.track, IC.hook, function () { el.click(); }],
+            ["Copier le lien", IC.link, function () { copyLink(); }],
+          ],
+        };
+      var ls = lc.chain ? lc.chain[Number(lj.slice(1)) || 0] || lc : lc,
+        lq = encodeURIComponent((ls.t || "") + " " + (ls.a || ""));
+      return {
+        head: [ls.t, who(ls)],
+        kind: "player",
+        items: [
+          ["Écouter l’original dans Spotify", IC.tab, function () { openTab("https://open.spotify.com/search/" + lq); }],
+          ["Écouter l’original dans Apple Music", IC.tab, function () { openTab("https://music.apple.com/search?term=" + lq); }],
+          ["Ouvrir sur YouTube", IC.yt, function () { openTab(ytUrl(ls)); }],
+        ],
+      };
+    }
     if ((el = t.closest(".sx-art, .sx-next")) && st.list[st.pos]) {
       var c = st.list[st.pos],
         smp = curSample() || c,
@@ -5752,6 +5788,7 @@
           ["Ouvrir la pochette dans un nouvel onglet", IC.tab, function () { openTab(img); }],
           trackSide ? null : ["Ouvrir sur YouTube", IC.yt, function () { openTab(ytUrl(smp)); }],
           trackSide ? null : ["Aller à " + c.track, IC.hook, function () { goToTrack(smp); }],
+          trackSide && c.slug && c.tn ? ["Crédits", IC.credits, function () { openTrackCredits(c); }] : null,
           ["Copier le lien", IC.link, function () { copyLink(); }],
         ],
       };
@@ -5773,6 +5810,40 @@
       return { head: [yy, "Les samples de cette année"], kind: "year", items: [["Les années des samples", IC.years, function () { openYears(cur, yy, el); }]] };
     }
     return null;
+  }
+  // Crédits d'un morceau (credits.js, livré par la session credits-complets) : chargé à la demande comme
+  // dans track-actions.js ; absent ou en échec : un message, rien ne casse.
+  var creditsJs = null;
+  function creditsApi() {
+    if (window.InfraCredits) return Promise.resolve(window.InfraCredits);
+    if (creditsJs) return creditsJs;
+    creditsJs = new Promise(function (resolve, reject) {
+      var sc = document.createElement("script");
+      sc.src = assetUrl("assets/js/credits.js") + (window.INFRA_BUILD_TAG ? "?v=" + encodeURIComponent(window.INFRA_BUILD_TAG) : "");
+      sc.async = true;
+      sc.onload = function () {
+        if (window.InfraCredits) resolve(window.InfraCredits);
+        else reject(new Error("credits"));
+      };
+      sc.onerror = function () {
+        creditsJs = null;
+        reject(new Error("credits"));
+      };
+      document.head.appendChild(sc);
+    });
+    return creditsJs;
+  }
+  function openTrackCredits(c) {
+    creditsApi()
+      .then(function (api) {
+        return typeof api.openTrack === "function" ? api.openTrack(c.slug, c.tn) : false;
+      })
+      .then(function (ok) {
+        if (!ok) sayMsg("Crédits indisponibles pour le moment");
+      })
+      .catch(function () {
+        sayMsg(navigator.onLine === false ? "Crédits indisponibles hors ligne" : "Crédits indisponibles pour le moment");
+      });
   }
   function closeCtx() {
     if (!cmenu) return;

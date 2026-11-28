@@ -323,6 +323,7 @@
         plan = planOf("seg", item, item, { dur: SEGXF, k: k, voice: v, cause: "auto" });
       if (v)
         plan.when = plan.want = Math.max(eng.ctx.currentTime + 0.02, ctxAt(v, before.s1 - plan.dur / 2));
+      if (v) holdView(snapView(), plan.when + plan.dur / 2); // F2 : partie affichée quand on l'entend
       duo.k = k;
       duo.end = sg.s1;
       duo.armed = false;
@@ -1538,7 +1539,8 @@
     st.cued = false;
     var useE = useEng(item),
       hadVoice = !!(eng.on && eng.cur && !eng.paused),
-      prevItem = st.list[st.pos];
+      prevItem = st.list[st.pos],
+      snap = plan && MIXED[plan.kind] ? snapView() : null; // F2 : ce qu'on entend encore
     dropNext();
     stopDuo();
     if (fadeIn) {
@@ -1563,6 +1565,7 @@
       }
     }
     st.pos = st.list.indexOf(item);
+    if (snap) holdView(snap, plan.when + plan.dur / 2);
     var start = offset || 0,
       vid = item.y,
       endS = null;
@@ -1636,7 +1639,77 @@
     step(-1);
   }
 
+  // ---------- Écran calé sur l'oreille (F2, 28/11/2026) ----------
+  // Un passage automatique est armé look() s à l'avance (1,2 s ; 4,5 s page cachée) : le moteur passe
+  // tout de suite au son suivant, mais l'écran (page, titre, pochettes, barre, Media Session) garde ce
+  // qu'on entend jusqu'au milieu du passage (instant où le nouveau son domine). view : l'état montré
+  // pendant ce délai ; inView(fn) fait le rendu sur cet état, puis remet l'état du moteur.
+  var view = null;
+  function snapView() {
+    if (st.pos < 0 || !eng.cur || eng.paused || !st.list[st.pos]) return null;
+    return { pos: st.pos, item: st.list[st.pos], phase: duo.phase, k: duo.k, from: duo.from, v: eng.cur };
+  }
+  function holdView(snap, until) {
+    dropView(true);
+    if (!snap || !eng.ctx || !(until > eng.ctx.currentTime + 0.15) || !sheet || sheet.hidden) return;
+    snap.until = until;
+    view = snap;
+    clockAt(
+      until,
+      function () {
+        if (view === snap) dropView();
+      },
+      "view",
+    );
+  }
+  // quiet : sans repeindre (le rendu suit) ; sinon l'écran rejoint l'oreille tout de suite
+  function dropView(quiet) {
+    var had = !!view;
+    view = null;
+    clockClear("view");
+    if (had && !quiet && sheet && !sheet.hidden && st.list[st.pos]) {
+      paint(false);
+      msSync(true);
+    }
+  }
+  function viewOn() {
+    if (!view) return false;
+    var c = eng.ctx;
+    if (!c || c.currentTime >= view.until || !sheet || sheet.hidden || st.list[view.pos] !== view.item) {
+      view = null;
+      return false;
+    }
+    return true;
+  }
+  function inView(fn) {
+    if (!viewOn()) return fn();
+    var w = view,
+      sv = [st.pos, duo.phase, duo.k, duo.from, eng.cur, yt.time, st.ended];
+    st.pos = w.pos;
+    duo.phase = w.phase;
+    duo.k = w.k;
+    duo.from = w.from;
+    eng.cur = w.v;
+    st.ended = false;
+    if (w.v && !w.v.track) yt.time = ytNow(w.v);
+    try {
+      return fn();
+    } finally {
+      st.pos = sv[0];
+      duo.phase = sv[1];
+      duo.k = sv[2];
+      duo.from = sv[3];
+      eng.cur = sv[4];
+      yt.time = sv[5];
+      st.ended = sv[6];
+    }
+  }
   function paint(top) {
+    return inView(function () {
+      return paintRaw(top);
+    });
+  }
+  function paintRaw(top) {
     if (!sheet) return;
     var cur = st.list[st.pos];
     if (!cur) return;
@@ -1845,13 +1918,21 @@
     w.a.removeEventListener("playing", w.h);
   }
   function paintNow() {
+    return inView(paintNowRaw);
+  }
+  function paintNowRaw() {
     var cur = st.list[st.pos];
     if (!sheet || !cur) return;
     var inTrack = trackPhase(),
       smp = curSample() || cur;
     $("[data-smp-t]", sheet).textContent = inTrack ? cur.track : smp.t;
     var tag = $("[data-smp-tag]", sheet);
-    tag.innerHTML = inTrack
+    // F2 : fin de la liste dite à l'écran ; la toucher rejoue depuis le début
+    tag.innerHTML = st.ended
+      ? '<button type="button" class="sx-yr sx-end" data-smp-replay>' +
+        (st.mix && st.sec === "mix" ? "Fin du Mix" : "Fin de la liste") +
+        " · rejouer</button>"
+      : inTrack
       ? ""
       : "Sample" +
         (smp.an
@@ -1924,6 +2005,9 @@
   }
   // Position dans la barre : t (secondes depuis le début du sample) sur T (durée totale).
   function barState() {
+    return inView(barStateRaw);
+  }
+  function barStateRaw() {
     var cur = st.list[st.pos];
     if (!cur) return null;
     if (!st.mix && eng.on) {
@@ -1960,7 +2044,7 @@
     if (duo.phase === "end") t = S + TRACK;
     else if (trackPhase()) {
       // ton morceau (M3) : position de sa voix dans le moteur (ou de la pause)
-      var tv = eng.cur,
+      var tv = eng.cur || (duo.ending ? duo.endV : null),
         pos =
           tv && tv.track
             ? ytNow(tv)
@@ -1983,6 +2067,9 @@
     return yt.state === 1 || yt.state === 3;
   }
   function paintBar() {
+    return inView(paintBarRaw);
+  }
+  function paintBarRaw() {
     if (!sheet || sheet.hidden) return;
     var b = barState();
     if (!b) return;
@@ -2075,6 +2162,7 @@
       return xToT(barLens(), x, r.width);
     }
     bar.addEventListener("pointerdown", function (e) {
+      if (view) dropView();
       var t = at(e);
       if (t == null) return;
       st.drag = t;
@@ -2103,6 +2191,7 @@
       paintBar();
     });
     bar.addEventListener("keydown", function (e) {
+      if (view) dropView();
       var b = barState();
       if (!b || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
       e.preventDefault();
@@ -2154,6 +2243,19 @@
       duo.phase = "";
       var first = shownList()[0];
       if (first) play(first);
+    } else if (duo.ending) {
+      // bug 17 : pause pendant le fondu de fin : le Mix finit là (avant : le dernier son repartait du début)
+      evFlush();
+      muteFx();
+      engHush(0.08);
+      clockClear("duo");
+      duo.ending = false;
+      duo.endV = null;
+      duo.phase = "end";
+      st.ended = true;
+      eng.paused = true;
+      eng.hold = null;
+      paintNow();
     } else if (eng.on || trackPhase()) {
       if (isPlaying()) engPause();
       else engResume();
@@ -2384,6 +2486,9 @@
     return sg.stream ? 60 : Math.max(0, sg.x[1] + sg.x[2] - sg.s1);
   }
   function stopDuo() {
+    dropView(true);
+    duo.outV = null;
+    duo.endV = null;
     duo.timers.forEach(clearTimeout);
     duo.timers = [];
     clockClear("duo");
@@ -2583,6 +2688,8 @@
     eng.paused = false;
     eng.hold = null;
     eng.armed = false;
+    // F2 (bug 6) : jusqu'à l'instant T, la barre suit le sample qui joue encore (avant : figée)
+    duo.outV = eng.cur && eng.cur !== tv && !eng.cur.track ? eng.cur : null;
     eng.cur = tv;
     var c = sheet && $("[data-smp-cov]", sheet);
     if (c) c.style.transitionDuration = "0.5s";
@@ -2590,6 +2697,7 @@
       T,
       function () {
         if (duo.item !== i) return;
+        duo.outV = null;
         duo.phase = "track";
         duo.from = tv.sg.s0;
         duo.outArmed = false;
@@ -2727,10 +2835,12 @@
       plan = planOf("end", st.list[st.pos], null, { dur: 3, when: t, cause: "auto" });
     transition(v ? { v: v } : { all: true }, null, plan, t);
     duo.ending = true; // le bouton reste sur « pause » pendant le fondu de fin
+    duo.endV = v || null; // F2 (bug 7) : la barre suit le son qui s'éteint (avant : recul au début)
     clockAt(
       t + 3.05,
       function () {
         duo.ending = false;
+        duo.endV = null;
         duo.phase = "end";
         st.ended = true;
         eng.cur = null;
@@ -4138,6 +4248,8 @@
       dropTv();
     }
     muteFx(); // F1 (bug 8) : l'écho et la reverb se taisent avec la musique
+    evFlush(); // bug 18 : plus de calque « transition » affiché pendant la pause
+    dropView(); // F2 : l'écran montre ce qui est en pause
     engHush(0.08);
     eng.paused = true;
     yt.state = 2;
@@ -4244,7 +4356,10 @@
     if (!eng.on) return;
     var v = eng.cur;
     if (eng.paused || !v || v.item !== st.list[st.pos]) return;
-    if (v.track) return trackTick(v);
+    if (v.track) {
+      if (duo.phase === "sample" && duo.outV) yt.time = ytNow(duo.outV); // F2 : barre jamais figée
+      return trackTick(v);
+    }
     var tp = ytNow(v),
       sg = v.sg,
       last = v.k >= segsOf(v.item).length - 1;
@@ -4492,6 +4607,9 @@
   }
   // Ce qu'on entend maintenant (aucune donnée privée), pour l'interface ; null si le lecteur est fermé.
   function current() {
+    return inView(currentRaw);
+  }
+  function currentRaw() {
     var cur = st.list[st.pos];
     if (!sheet || sheet.hidden || !cur) return null;
     var inTrack = trackPhase(),
@@ -4637,6 +4755,7 @@
   }
   function onSheetClick(e) {
     ensureCtx(true);
+    dropView(true); // F2 : un geste agit sur ce que fait le moteur, l'écran le rejoint
     var t = e.target;
     if (t === sheet || (t.closest && t.closest("[data-smp-close]")))
       return close();
@@ -4648,7 +4767,7 @@
     }
     if (t.closest("[data-smp-prev]")) return prev();
     if (t.closest("[data-smp-next]")) return step(1);
-    if (t.closest("[data-smp-pp]")) return toggle();
+    if (t.closest("[data-smp-pp]") || t.closest("[data-smp-replay]")) return toggle();
     if (t.closest("[data-smp-goto]")) return goToTrack(st.list[st.pos]);
     var yr = t.closest("[data-smp-year]");
     if (yr && st.album) return openYears(st.album, yr.getAttribute("data-smp-year"), yr);
